@@ -64,6 +64,9 @@ def _markdown_to_html(text: str) -> str:
     Convert markdown formatting to HTML for Telegram.
     
     Converts:
+    - # Heading 1 -> <b>Heading 1</b> (bold with newlines)
+    - ## Heading 2 -> <b>Heading 2</b> (bold with newlines)
+    - ### Heading 3 -> <b>Heading 3</b> (bold with newlines)
     - **text** -> <b>text</b> (bold)
     - *text* -> <i>text</i> (italic)
     - ***text*** -> <b><i>text</i></b> (bold italic)
@@ -71,6 +74,12 @@ def _markdown_to_html(text: str) -> str:
     - [text](url) -> <a href="url">text</a> (links)
     """
     # Order matters: process longest patterns first to avoid conflicts
+    
+    # 0. Headings (must be done FIRST before bold processing)
+    # ### Heading -> <b>Heading</b> with newlines
+    text = re.sub(r'^### (.+?)$', r'\n<b>\1</b>', text, flags=re.MULTILINE)
+    text = re.sub(r'^## (.+?)$', r'\n<b>\1</b>', text, flags=re.MULTILINE)
+    text = re.sub(r'^# (.+?)$', r'\n<b>\1</b>', text, flags=re.MULTILINE)
     
     # 1. Bold italic: ***text*** -> <b><i>text</i></b>
     text = re.sub(r'\*\*\*(.+?)\*\*\*', r'<b><i>\1</i></b>', text)
