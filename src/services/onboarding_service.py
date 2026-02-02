@@ -11,8 +11,11 @@ Handles:
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from src.services.memory_manager import MemoryManager
-from src.models.database import User
-from datetime import datetime, timezone
+from src.models.database import User, Schedule
+from datetime import datetime, timezone, timedelta
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class OnboardingService:
@@ -161,6 +164,7 @@ Are you interested in exploring these lessons together? I'm here to guide and su
     def get_onboarding_complete_message(self, user_id: int) -> str:
         """
         Get the completion message after onboarding is done, in user's language.
+        Also automatically creates a daily schedule at 07:30 AM.
         
         Returns:
             Welcome message explaining what the user can do next
@@ -172,23 +176,50 @@ Are you interested in exploring these lessons together? I'm here to guide and su
         lang_memories = self.memory_manager.get_memory(user_id, "user_language")
         language = lang_memories[0]["value"] if lang_memories else "English"
         
+        # Automatically create daily schedule at 07:30 AM
+        from src.services.scheduler import SchedulerService
+        
+        try:
+            # Check if user already has an active schedule
+            existing_schedules = self.db.query(Schedule).filter_by(
+                user_id=user_id,
+                is_active=True
+            ).first()
+            
+            if not existing_schedules:
+                # Create daily schedule at 07:30 AM
+                SchedulerService.create_daily_schedule(
+                    user_id=user_id,
+                    lesson_id=None,  # Will send next lesson automatically
+                    time_str="07:30",
+                    schedule_type="daily",
+                    session=self.db
+                )
+                logger.info(f"✓ Auto-created daily schedule at 07:30 AM for user {user_id}")
+        except Exception as e:
+            logger.error(f"Failed to auto-create schedule for user {user_id}: {e}")
+        
         # Messages in different languages
         messages = {
             "Norwegian": f"""Velkommen til vårt åndelige fellesskap, {name}! 🙏
 
-Jeg er her for å støtte deg på reisen din med A Course in Miracles. Du kan:
+Jeg er her for å støtte deg på reisen din med A Course in Miracles.
 
+📅 **Daglige påminnelser satt opp** - Jeg vil sende deg leksjoner hver dag klokken 07:30. Du kan endre tiden når som helst.
+
+Du kan også:
 💬 **Chat med meg når som helst** - Still spørsmål, del innsikter eller diskuter leksjonene
-📅 **Sett opp daglige påminnelser** - Si bare "påminn meg daglig" eller "send meg leksjoner hver morgen" og jeg arrangerer det for deg
 📖 **Utforsk leksjoner** - Spør meg om noen av de 365 leksjonene når du er klar
 
 Hvordan vil du begynne?""",
             "English": f"""Welcome to our spiritual community, {name}! 🙏
 
-I'm here to support you on your journey with A Course in Miracles. You can:
+I'm here to support you on your journey with A Course in Miracles.
 
+📅 **Daily reminders set up** - I'll send you lessons every day at 07:30 AM. You can change the time anytime.
+
+You can also:
 💬 **Chat with me anytime** - Ask questions, share insights, or discuss the lessons
-📅 **Set up daily reminders** - Just say "remind me daily" or "send me lessons every morning" and I'll schedule them for you
 📖 **Explore lessons** - Ask me about any of the 365 lessons whenever you're ready
 
 How would you like to begin?""",
