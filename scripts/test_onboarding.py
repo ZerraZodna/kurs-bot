@@ -1,0 +1,269 @@
+"""
+Test Onboarding and Scheduling Flow
+
+Tests the complete user journey:
+1. User arrives (new user)
+2. Onboarding prompts appear
+3. User commits to 365 lessons
+4. User provides preferred time
+5. Schedule is created
+6. Daily reminders are set up
+"""
+
+import asyncio
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from src.models.database import SessionLocal, User, init_db
+from src.services.dialogue_engine import DialogueEngine
+from src.services.onboarding_service import OnboardingService
+from src.services.scheduler import SchedulerService
+from datetime import datetime, timezone
+
+
+def create_new_test_user(db) -> int:
+    """Create a fresh test user."""
+    # Delete existing test user and all their data if exists
+    existing_user = db.query(User).filter_by(external_id="test_onboarding_user").first()
+    if existing_user:
+        from src.models.database import Memory, Schedule
+        # Delete all memories
+        db.query(Memory).filter_by(user_id=existing_user.user_id).delete()
+        # Delete all schedules
+        db.query(Schedule).filter_by(user_id=existing_user.user_id).delete()
+        # Delete user
+        db.query(User).filter_by(user_id=existing_user.user_id).delete()
+        db.commit()
+    
+    user = User(
+        external_id="test_onboarding_user",
+        channel="test",
+        phone_number=None,
+        email="onboarding_test@example.com",
+        first_name=None,
+        last_name=None,
+        opted_in=True,
+        created_at=datetime.now(timezone.utc),
+        last_active_at=datetime.now(timezone.utc),
+    )
+    db.add(user)
+    db.commit()
+    
+    print(f"✓ Created new test user with ID: {user.user_id}")
+    return user.user_id
+
+
+async def test_onboarding_flow():
+    """Test complete onboarding flow."""
+    print("\n" + "=" * 80)
+    print("TEST: Complete Onboarding Flow")
+    print("=" * 80)
+    
+    db = SessionLocal()
+    try:
+        init_db()
+        user_id = create_new_test_user(db)
+        
+        dialogue = DialogueEngine(db)
+        onboarding = OnboardingService(db)
+        
+        # Step 1: First message - should get welcome prompt
+        print("\n[Step 1] User's first message")
+        print("-" * 80)
+        user_msg = "Hi there!"
+        print(f"User: {user_msg}")
+        
+        response = await dialogue.process_message(user_id, user_msg, db)
+        print(f"Bot: {response[:150]}...")
+        
+        # Check onboarding status
+        status = onboarding.get_onboarding_status(user_id)
+        print(f"\nOnboarding status: {status}")
+        
+        # Step 2: User provides name
+        print("\n[Step 2] User provides name")
+        print("-" * 80)
+        user_msg = "My name is Sarah"
+        print(f"User: {user_msg}")
+        
+        response = await dialogue.process_message(user_id, user_msg, db)
+        print(f"Bot: {response[:200]}...")
+        
+        status = onboarding.get_onboarding_status(user_id)
+        print(f"\nOnboarding status: {status}")
+        
+        # Step 3: User commits to lessons
+        print("\n[Step 3] User commits to 365 lessons")
+        print("-" * 80)
+        user_msg = "Yes, I'm ready to commit to this journey!"
+        print(f"User: {user_msg}")
+        
+        response = await dialogue.process_message(user_id, user_msg, db)
+        print(f"Bot: {response[:200]}...")
+        
+        status = onboarding.get_onboarding_status(user_id)
+        print(f"\nOnboarding status: {status}")
+        
+        # Step 4: User provides preferred time
+        print("\n[Step 4] User provides preferred lesson time")
+        print("-" * 80)
+        user_msg = "I prefer to receive lessons at 9:00 AM"
+        print(f"User: {user_msg}")
+        
+        response = await dialogue.process_message(user_id, user_msg, db)
+        print(f"Bot: {response[:300]}...")
+        
+        status = onboarding.get_onboarding_status(user_id)
+        print(f"\nOnboarding status: {status}")
+        
+        # Check if schedule was created
+        schedules = SchedulerService.get_user_schedules(user_id)
+        print(f"\n📅 Schedules created: {len(schedules)}")
+        for schedule in schedules:
+            print(f"  • Schedule ID: {schedule.schedule_id}")
+            print(f"    Type: {schedule.schedule_type}")
+            print(f"    Cron: {schedule.cron_expression}")
+            print(f"    Next send: {schedule.next_send_time}")
+            print(f"    Active: {schedule.is_active}")
+        
+        if status["onboarding_complete"] and len(schedules) > 0:
+            print("\n✅ SUCCESS: Onboarding complete and schedule created!")
+            return True
+        else:
+            print("\n❌ FAILED: Onboarding not complete or schedule not created")
+            return False
+        
+    finally:
+        db.close()
+
+
+async def test_schedule_request():
+    """Test that users can request reminders explicitly."""
+    print("\n" + "=" * 80)
+    print("TEST: Explicit Schedule Request")
+    print("=" * 80)
+    
+    db = SessionLocal()
+    try:
+        user_id = create_new_test_user(db)
+        dialogue = DialogueEngine(db)
+        
+        # User asks for reminders
+        print("\nUser asks for reminders...")
+        user_msg = "Can you remind me to do my daily lesson?"
+        print(f"User: {user_msg}")
+        
+        response = await dialogue.process_message(user_id, user_msg, db)
+        print(f"Bot: {response[:200]}...")
+        
+        # Check if bot is guiding them through setup
+        if "commit" in response.lower() or "ready" in response.lower():
+            print("\n✅ SUCCESS: Bot detected schedule request and guiding user")
+            return True
+        else:
+            print("\n⚠️  Bot response doesn't seem to be handling schedule request")
+            return False
+        
+    finally:
+        db.close()
+
+
+async def test_time_parsing():
+    """Test time string parsing."""
+    print("\n" + "=" * 80)
+    print("TEST: Time Parsing")
+    print("=" * 80)
+    
+    test_cases = [
+        ("9:00 AM", (9, 0)),
+        ("2:30 PM", (14, 30)),
+        ("morning", (9, 0)),
+        ("evening", (19, 0)),
+        ("21:00", (21, 0)),
+        ("kvelden", (19, 0)),  # Norwegian
+    ]
+    
+    all_passed = True
+    for time_str, expected in test_cases:
+        result = SchedulerService.parse_time_string(time_str)
+        status = "✓" if result == expected else "✗"
+        print(f"{status} '{time_str}' -> {result} (expected {expected})")
+        if result != expected:
+            all_passed = False
+    
+    if all_passed:
+        print("\n✅ SUCCESS: All time parsing tests passed!")
+    else:
+        print("\n❌ FAILED: Some time parsing tests failed")
+    
+    return all_passed
+
+
+async def run_all_tests():
+    """Run all onboarding and scheduling tests."""
+    print("\n" + "=" * 80)
+    print("ONBOARDING & SCHEDULING TEST SUITE")
+    print("=" * 80)
+    
+    # Initialize scheduler (required for schedule creation)
+    print("\nInitializing scheduler...")
+    SchedulerService.init_scheduler()
+    print("✓ Scheduler initialized")
+    
+    results = []
+    
+    # Test 1: Time parsing
+    try:
+        result = await test_time_parsing()
+        results.append(("Time parsing", result))
+    except Exception as e:
+        print(f"\n❌ Test failed with error: {e}")
+        results.append(("Time parsing", False))
+    
+    # Test 2: Complete onboarding flow
+    try:
+        result = await test_onboarding_flow()
+        results.append(("Onboarding flow", result))
+    except Exception as e:
+        print(f"\n❌ Test failed with error: {e}")
+        import traceback
+        traceback.print_exc()
+        results.append(("Onboarding flow", False))
+    
+    # Test 3: Explicit schedule request
+    try:
+        result = await test_schedule_request()
+        results.append(("Schedule request", result))
+    except Exception as e:
+        print(f"\n❌ Test failed with error: {e}")
+        results.append(("Schedule request", False))
+    
+    # Shutdown scheduler
+    print("\nShutting down scheduler...")
+    SchedulerService.shutdown()
+    print("✓ Scheduler shut down")
+    
+    # Summary
+    print("\n" + "=" * 80)
+    print("TEST SUMMARY")
+    print("=" * 80)
+    
+    passed = sum(1 for _, result in results if result)
+    total = len(results)
+    
+    for test_name, result in results:
+        status = "✅ PASS" if result else "❌ FAIL"
+        print(f"{status}: {test_name}")
+    
+    print(f"\nTotal: {passed}/{total} tests passed")
+    
+    if passed == total:
+        print("\n🎉 All tests passed! Onboarding and scheduling system working!")
+    else:
+        print(f"\n⚠️  {total - passed} test(s) failed.")
+
+
+if __name__ == "__main__":
+    asyncio.run(run_all_tests())

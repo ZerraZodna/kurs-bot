@@ -241,3 +241,145 @@ async def batch_store_memory(requests: List[MemoryRequest], db: Session = Depend
         })
     
     return {"results": results}
+
+
+# Lesson endpoints
+class LessonResponse(BaseModel):
+    lesson_id: int
+    title: str
+    content: str
+    difficulty_level: str
+    duration_minutes: int
+
+
+@router.get("/lesson/{lesson_id}", response_model=LessonResponse)
+def get_lesson(lesson_id: int, db: Session = Depends(get_db)):
+    """
+    Get a specific ACIM lesson by ID.
+    
+    Returns the full lesson text and metadata.
+    Lessons are imported from the ACIM PDF (run scripts/import_acim_lessons.py).
+    
+    Args:
+        lesson_id: Lesson number (1-365)
+    
+    Returns:
+        Lesson with title, content, and metadata
+    """
+    from src.models.database import Lesson
+    
+    lesson = db.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail=f"Lesson {lesson_id} not found")
+    
+    return LessonResponse(
+        lesson_id=lesson.lesson_id,
+        title=lesson.title,
+        content=lesson.content,
+        difficulty_level=lesson.difficulty_level or "beginner",
+        duration_minutes=lesson.duration_minutes or 15,
+    )
+
+
+@router.get("/lesson/today/{day}")
+def get_lesson_by_day(day: int, db: Session = Depends(get_db)):
+    """
+    Get today's ACIM lesson by day number (1-365).
+    
+    This is useful for daily lesson delivery systems.
+    
+    Args:
+        day: Day number (1-365 for a year of lessons)
+    
+    Returns:
+        Lesson for that day
+    """
+    from src.models.database import Lesson
+    
+    # Map day to lesson (day 1 = lesson 1, day 366 = lesson 1 again, etc.)
+    lesson_id = ((day - 1) % 365) + 1
+    
+    lesson = db.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail=f"No lesson found for day {day}")
+    
+    return {
+        "day": day,
+        "lesson_id": lesson_id,
+        "title": lesson.title,
+        "content": lesson.content,
+        "difficulty_level": lesson.difficulty_level,
+        "duration_minutes": lesson.duration_minutes,
+    }
+
+
+class LessonListResponse(BaseModel):
+    total: int
+    lessons: List[LessonResponse]
+
+
+@router.get("/lessons", response_model=LessonListResponse)
+def list_lessons(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
+    """
+    List all ACIM lessons with pagination.
+    
+    Args:
+        skip: Number of lessons to skip
+        limit: Maximum lessons to return (default 10, max 100)
+    
+    Returns:
+        Total count and paginated lessons
+    """
+    from src.models.database import Lesson
+    
+    limit = min(limit, 100)  # Cap at 100
+    
+    total = db.query(Lesson).count()
+    lessons = db.query(Lesson).order_by(Lesson.lesson_id).offset(skip).limit(limit).all()
+    
+    lesson_list = [
+        LessonResponse(
+            lesson_id=l.lesson_id,
+            title=l.title,
+            content=l.content[:500] + "..." if len(l.content) > 500 else l.content,  # Truncate for list view
+            difficulty_level=l.difficulty_level or "beginner",
+            duration_minutes=l.duration_minutes or 15,
+        )
+        for l in lessons
+    ]
+    
+    return LessonListResponse(total=total, lessons=lesson_list)
+
+
+@router.post("/lesson/{user_id}/mark-completed")
+def mark_lesson_completed(user_id: int, lesson_id: int, db: Session = Depends(get_db)):
+    """
+    Mark a lesson as completed for a user.
+    
+    This stores the completion in user memory for tracking progress.
+    
+    Args:
+        user_id: User ID
+        lesson_id: Lesson ID that was completed
+    
+    Returns:
+        Confirmation of completion
+    """
+    memory_manager = MemoryManager(db)
+    
+    # Store completion in user's memory
+    memory_manager.store_memory(
+        user_id=user_id,
+        key=MemoryKey.LESSON_COMPLETED,
+        value=str(lesson_id),
+        category=MemoryCategory.PROGRESS,
+        confidence=1.0,
+        source="api_lesson_completion",
+    )
+    
+    return {
+        "user_id": user_id,
+        "lesson_id": lesson_id,
+        "status": "completed",
+        "message": f"Lesson {lesson_id} marked as completed"
+    }

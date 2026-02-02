@@ -44,6 +44,31 @@ A chatbot/consultant with persistent memory that delivers daily lessons and inte
    .\run_tests.ps1
    ```
 
+## Development Commands
+
+Use `cmd.py` for common development tasks:
+
+```bash
+# Database management
+python cmd.py db status              # Show database status
+python cmd.py db reset               # Reset dev.db (keeps 365 lessons)
+python cmd.py db backup              # Create backup
+python cmd.py db fresh-start         # Complete fresh start (delete + re-import)
+python cmd.py db info                # Show detailed DB info
+
+# ACIM lessons
+python cmd.py import-lessons         # Import ACIM lessons from PDF
+
+# Debugging
+python cmd.py debug memory           # Debug memory extraction
+python cmd.py debug schedule         # Debug schedule creation
+
+# Production
+python cmd.py init-prod              # Initialize production database
+```
+
+See [SCRIPTS_ORGANIZATION.md](SCRIPTS_ORGANIZATION.md) for full script documentation.
+
 ## Configuration (.env)
 - `DATABASE_URL` - Database connection string (default: SQLite for dev)
 - `TELEGRAM_BOT_TOKEN` - Telegram bot token
