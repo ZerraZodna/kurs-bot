@@ -27,76 +27,101 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
     """Batch inbound messages for a user and send one AI response."""
     await asyncio.sleep(1.0)
 
-    message_ids = []
-    combined_text = ""
-
-    db = SessionLocal()
     try:
-        unprocessed = db.query(MessageLog).filter(
-            MessageLog.user_id == user_id,
-            MessageLog.direction == "inbound",
-            MessageLog.status == "delivered",
-        ).order_by(MessageLog.created_at).all()
+        for _ in range(3):
+            message_ids = []
+            combined_text = ""
 
-        if not unprocessed:
+            db = SessionLocal()
+            try:
+                unprocessed = db.query(MessageLog).filter(
+                    MessageLog.user_id == user_id,
+                    MessageLog.direction == "inbound",
+                    MessageLog.status == "delivered",
+                ).order_by(MessageLog.created_at).all()
+
+                if not unprocessed:
+                    db.close()
+                    break
+
+                if len(unprocessed) > 1:
+                    print(f"[batch] Combining {len(unprocessed)} messages from user {user_id}")
+
+                message_ids = [m.message_id for m in unprocessed]
+                combined_text = "\n".join([m.content for m in unprocessed if m.content])
+
+                # Claim messages
+                db.query(MessageLog).filter(
+                    MessageLog.message_id.in_(message_ids)
+                ).update({MessageLog.status: "processing"}, synchronize_session=False)
+                db.commit()
+                db.close()
+            except Exception as e:
+                print("[batch collection error]", e)
+                db.close()
+                break
+
+            # Generate AI response
+            db = SessionLocal()
+            dialogue = DialogueEngine(db)
+            ai_response = await dialogue.process_message(
+                user_id=user_id,
+                text=combined_text,
+                session=db,
+                include_history=True,
+                history_turns=4,
+            )
             db.close()
-            return
 
-        message_ids = [m.message_id for m in unprocessed]
-        combined_text = "\n".join([m.content for m in unprocessed if m.content])
+            # Send response back to user
+            await send_message(int(external_id), ai_response)
 
-        # Claim messages
-        db.query(MessageLog).filter(
-            MessageLog.message_id.in_(message_ids)
-        ).update({MessageLog.status: "processing"}, synchronize_session=False)
-        db.commit()
-        db.close()
-    except Exception as e:
-        print("[batch collection error]", e)
-        db.close()
-        return
+            # Log outbound and mark processed
+            try:
+                db = SessionLocal()
+                log = MessageLog(
+                    user_id=user_id,
+                    direction="outbound",
+                    channel="telegram",
+                    external_message_id=None,
+                    content=ai_response,
+                    status="sent",
+                    error_message=None
+                )
+                try:
+                    log.message_role = "assistant"
+                except Exception:
+                    pass
+                db.add(log)
+                db.commit()
 
-    # Generate AI response
-    db = SessionLocal()
-    dialogue = DialogueEngine(db)
-    ai_response = await dialogue.process_message(
-        user_id=user_id,
-        text=combined_text,
-        session=db,
-        include_history=True,
-        history_turns=4,
-    )
-    db.close()
+                db.query(MessageLog).filter(
+                    MessageLog.message_id.in_(message_ids)
+                ).update({MessageLog.status: "processed"}, synchronize_session=False)
+                db.commit()
+                db.close()
+            except Exception as e:
+                print("[messagelog outbound error]", e)
+                break
 
-    # Send response back to user
-    await send_message(int(external_id), ai_response)
-
-    # Log outbound and mark processed
-    try:
-        db = SessionLocal()
-        log = MessageLog(
-            user_id=user_id,
-            direction="outbound",
-            channel="telegram",
-            external_message_id=None,
-            content=ai_response,
-            status="sent",
-            error_message=None
-        )
+            await asyncio.sleep(0.5)
+    finally:
+        # Release batch lock quickly
         try:
-            log.message_role = "assistant"
-        except Exception:
-            pass
-        db.add(log)
-        db.commit()
-
-        db.query(MessageLog).filter(
-            MessageLog.message_id.in_(message_ids)
-        ).update({MessageLog.status: "processed"}, synchronize_session=False)
-        db.commit()
-        db.close()
-    except Exception as e:
-        print("[messagelog outbound error]", e)
+            db = SessionLocal()
+            memory_manager = MemoryManager(db)
+            memory_manager.store_memory(
+                user_id=user_id,
+                key="batch_lock",
+                value="released",
+                category="conversation",
+                ttl_hours=0.0001,
+                source="webhook",
+                allow_duplicates=False,
+            )
+            db.close()
+        except Exception as e:
+            print("[batch lock release error]", e)
 
 
 @app.post("/webhook/telegram/{secret_token}")
@@ -181,7 +206,7 @@ async def telegram_webhook(request: Request, secret_token: str):
                 key="batch_lock",
                 value="locked",
                 category="conversation",
-                ttl_hours=0.01,  # ~36 seconds
+                ttl_hours=0.05,  # ~3 minutes
                 source="webhook",
                 allow_duplicates=False,
             )

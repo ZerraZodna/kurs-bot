@@ -37,12 +37,25 @@ class OnboardingService:
             Dict with onboarding_complete, steps_completed, next_step
         """
         # Check for key onboarding memories
-        has_commitment = bool(self.memory_manager.get_memory(user_id, "acim_commitment"))
+        commitment_memories = self.memory_manager.get_memory(user_id, "acim_commitment")
+        has_commitment = bool(commitment_memories)
+        declined_commitment = any(
+            str(m.get("value", "")).lower() in ["declined", "no", "not interested"]
+            for m in commitment_memories
+        )
         has_name = bool(self.memory_manager.get_memory(user_id, "first_name"))
+        consent_memories = self.memory_manager.get_memory(user_id, "data_consent")
+        has_consent = bool(consent_memories)
+        declined_consent = any(
+            str(m.get("value", "")).lower() in ["declined", "no", "not consent"]
+            for m in consent_memories
+        )
         
         steps_completed = []
         if has_name:
             steps_completed.append("name")
+        if has_consent:
+            steps_completed.append("consent")
         if has_commitment:
             steps_completed.append("commitment")
         
@@ -50,12 +63,14 @@ class OnboardingService:
         next_step = None
         if not has_name:
             next_step = "name"
+        elif not has_consent:
+            next_step = "consent"
         elif not has_commitment:
             next_step = "commitment"
         
         # Onboarding is complete with just name and commitment
         # We don't need time preference for onboarding
-        onboarding_complete = has_name and has_commitment
+        onboarding_complete = has_name and has_consent and has_commitment
         
         return {
             "onboarding_complete": onboarding_complete,
@@ -63,6 +78,9 @@ class OnboardingService:
             "next_step": next_step,
             "has_name": has_name,
             "has_commitment": has_commitment,
+            "has_consent": has_consent,
+            "declined_commitment": declined_commitment,
+            "declined_consent": declined_consent,
         }
     
     def get_onboarding_prompt(self, user_id: int) -> Optional[str]:
@@ -89,11 +107,13 @@ class OnboardingService:
         prompts = {
             "Norwegian": {
                 "name": "Velkommen! Jeg er din åndelige veileder for A Course in Miracles. Hva heter du?",
+                "consent": "Før vi fortsetter: Er det greit at jeg lagrer samtalen og relevant informasjon for å gi deg oppfølging? (ja/nei)",
                 "commitment": f"""Herlig, {name}! 
 Er du interessert i å utforske disse leksjonene sammen med meg? Jeg er her for å veilede og støtte deg på denne åndelige reisen.""",
             },
             "English": {
                 "name": "Welcome! I'm your spiritual coach for A Course in Miracles. What's your name?",
+                "consent": "Before we continue: Do you consent to me storing the conversation and relevant info to support you? (yes/no)",
                 "commitment": f"""Beautiful, {name}! 
 Are you interested in exploring these lessons together? I'm here to guide and support you on this journey.""",
             },
@@ -103,8 +123,37 @@ Are you interested in exploring these lessons together? I'm here to guide and su
         lang_prompts = prompts.get(language, prompts["English"])
         
         if next_step == "name":
+            self.memory_manager.store_memory(
+                user_id=user_id,
+                key="onboarding_step_pending",
+                value="name",
+                category="conversation",
+                ttl_hours=2,
+                source="onboarding_service",
+                allow_duplicates=False,
+            )
             return lang_prompts["name"]
+        elif next_step == "consent":
+            self.memory_manager.store_memory(
+                user_id=user_id,
+                key="onboarding_step_pending",
+                value="consent",
+                category="conversation",
+                ttl_hours=2,
+                source="onboarding_service",
+                allow_duplicates=False,
+            )
+            return lang_prompts["consent"]
         elif next_step == "commitment":
+            self.memory_manager.store_memory(
+                user_id=user_id,
+                key="onboarding_step_pending",
+                value="commitment",
+                category="conversation",
+                ttl_hours=2,
+                source="onboarding_service",
+                allow_duplicates=False,
+            )
             return lang_prompts["commitment"]
         
         return None
@@ -169,6 +218,8 @@ How would you like to begin?""",
         
         # Show if not complete and user is relatively new (or never completed)
         if not status["onboarding_complete"]:
+            if status.get("declined_consent") or status.get("declined_commitment"):
+                return False
             return True
         
         return False
@@ -208,6 +259,37 @@ How would you like to begin?""",
         ]
         
         return any(keyword in message_lower for keyword in commitment_keywords)
+
+    def detect_decline_keywords(self, message: str) -> bool:
+        """Detect if user declines ACIM or consent."""
+        message_lower = message.lower()
+        decline_keywords = [
+            "no", "not interested", "no thanks", "no thank you", "stop",
+            "don't want", "do not want", "not into", "leave me",
+            # Norwegian
+            "nei", "ikke interessert", "nei takk", "stopp",
+            "vil ikke", "ønsker ikke",
+        ]
+        return any(keyword in message_lower for keyword in decline_keywords)
+
+    def detect_consent_keywords(self, message: str) -> Optional[bool]:
+        """Return True if consent given, False if declined, None if unclear."""
+        message_lower = message.lower()
+        yes_keywords = [
+            "yes", "yeah", "sure", "ok", "okay", "i agree", "consent",
+            # Norwegian
+            "ja", "jada", "greit", "ok", "samtykker",
+        ]
+        no_keywords = [
+            "no", "no thanks", "no thank you", "don't", "do not",
+            # Norwegian
+            "nei", "nei takk", "ikke",
+        ]
+        if any(k in message_lower for k in yes_keywords):
+            return True
+        if any(k in message_lower for k in no_keywords):
+            return False
+        return None
     
     def detect_schedule_request(self, message: str) -> bool:
         """

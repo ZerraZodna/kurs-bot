@@ -441,6 +441,66 @@ class DialogueEngine:
             Onboarding response or None if not in onboarding flow
         """
         status = self.onboarding.get_onboarding_status(user_id)
+
+        # Handle pending onboarding step explicitly
+        if self.memory_manager:
+            pending_step = self.memory_manager.get_memory(user_id, "onboarding_step_pending")
+            if pending_step:
+                step = str(pending_step[0].get("value", "")).lower()
+                if step == "consent":
+                    consent = self.onboarding.detect_consent_keywords(text)
+                    if consent is True:
+                        self.memory_manager.store_memory(
+                            user_id=user_id,
+                            key="data_consent",
+                            value="granted",
+                            confidence=1.0,
+                            source="dialogue_engine_consent",
+                            category="profile",
+                        )
+                    elif consent is False:
+                        # User declined consent during onboarding - delete the user
+                        self._delete_user(user_id)
+                        return "Understood. I won't store your information. If you change your mind, just message me again."
+                elif step == "commitment":
+                    if self.onboarding.detect_decline_keywords(text):
+                        self.memory_manager.store_memory(
+                            user_id=user_id,
+                            key="acim_commitment",
+                            value="declined",
+                            confidence=1.0,
+                            source="dialogue_engine_commitment",
+                            category="goals",
+                        )
+                        return "Understood. I won't ask about ACIM lessons. If you want to resume later, just message me."
+                    if self.onboarding.detect_commitment_keywords(text):
+                        self.memory_manager.store_memory(
+                            user_id=user_id,
+                            key="acim_commitment",
+                            value="committed to ACIM lessons",
+                            confidence=1.0,
+                            source="dialogue_engine_commitment",
+                            category="goals",
+                        )
+                        return self.onboarding.get_onboarding_complete_message(user_id)
+
+                # Clear pending step
+                self.memory_manager.store_memory(
+                    user_id=user_id,
+                    key="onboarding_step_pending",
+                    value="resolved",
+                    category="conversation",
+                    ttl_hours=0.1,
+                    source="dialogue_engine",
+                    allow_duplicates=False,
+                )
+
+        # Exit if user declined consent or commitment
+        if status.get("declined_consent"):
+            # User already declined and should have been deleted - don't process further
+            return None
+        if status.get("declined_commitment"):
+            return "Understood. I won't ask about ACIM lessons. If you want to resume later, just message me."
         
         # If onboarding just completed, show welcome message
         if status["onboarding_complete"]:
@@ -452,8 +512,54 @@ class DialogueEngine:
                     return self.onboarding.get_onboarding_complete_message(user_id)
             return None
         
-        # If they're answering commitment question, check for affirmative
-        if status["has_name"] and not status["has_commitment"]:
+        # If user explicitly declines ACIM, honor it immediately
+        if self.onboarding.detect_decline_keywords(text) and "acim" in text.lower():
+            self.memory_manager.store_memory(
+                user_id=user_id,
+                key="acim_commitment",
+                value="declined",
+                confidence=1.0,
+                source="dialogue_engine_commitment",
+                category="goals",
+            )
+            return "Understood. I won't ask about ACIM lessons. If you want to resume later, just message me."
+
+        # Handle consent step
+        if status.get("has_name") and not status.get("has_consent"):
+            consent = self.onboarding.detect_consent_keywords(text)
+            if consent is True:
+                self.memory_manager.store_memory(
+                    user_id=user_id,
+                    key="data_consent",
+                    value="granted",
+                    confidence=1.0,
+                    source="dialogue_engine_consent",
+                    category="profile",
+                )
+                return self.onboarding.get_onboarding_prompt(user_id)
+            if consent is False:
+                self.memory_manager.store_memory(
+                    user_id=user_id,
+                    key="data_consent",
+                    value="declined",
+                    confidence=1.0,
+                    source="dialogue_engine_consent",
+                    category="profile",
+                )
+                return "Understood. I won't store your information. If you change your mind, just message me again."
+
+        # If they're answering commitment question, check for affirmative/decline
+        if status["has_name"] and status.get("has_consent") and not status["has_commitment"]:
+            if self.onboarding.detect_decline_keywords(text):
+                self.memory_manager.store_memory(
+                    user_id=user_id,
+                    key="acim_commitment",
+                    value="declined",
+                    confidence=1.0,
+                    source="dialogue_engine_commitment",
+                    category="goals",
+                )
+                return "Understood. I won't ask about ACIM lessons. If you want to resume later, just message me."
             if self.onboarding.detect_commitment_keywords(text):
                 # Ensure commitment memory exists even if extractor missed it
                 commit_memories = self.memory_manager.get_memory(user_id, "acim_commitment")
@@ -604,6 +710,35 @@ Your first lesson will arrive tomorrow at {hour:02d}:{minute:02d} UTC. 🙏"""
                 ttl_hours=24,  # 24-hour window for active conversation
                 category="conversation",
             )
+
+    def _delete_user(self, user_id: int) -> None:
+        """
+        Delete a user and all associated data from the database.
+        Called when user declines consent during onboarding.
+        
+        Deletes:
+        - All memories associated with user
+        - All message logs
+        - All schedules
+        - The user record itself
+        """
+        if not self.db:
+            return
+        
+        try:
+            from src.models.database import Memory, Schedule, MessageLog, User
+            
+            # Delete in correct order due to foreign keys
+            self.db.query(Memory).filter_by(user_id=user_id).delete(synchronize_session=False)
+            self.db.query(Schedule).filter_by(user_id=user_id).delete(synchronize_session=False)
+            self.db.query(MessageLog).filter_by(user_id=user_id).delete(synchronize_session=False)
+            self.db.query(User).filter_by(user_id=user_id).delete(synchronize_session=False)
+            
+            self.db.commit()
+            logger.info(f"[User deleted] User {user_id} deleted due to declined consent")
+        except Exception as e:
+            logger.error(f"[User deletion error] Failed to delete user {user_id}: {e}")
+            self.db.rollback()
 
     def get_onboarding_prompt(self) -> str:
         """
