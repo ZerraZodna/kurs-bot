@@ -45,6 +45,7 @@ class Memory(Base):
     key = Column(String(128), nullable=False)
     value = Column(Text, nullable=False)  # JSON-friendly
     confidence = Column(Float, default=1.0, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
     ttl_expires_at = Column(DateTime(timezone=True))
