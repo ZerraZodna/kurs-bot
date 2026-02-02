@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+sqlalchemy
+pyodbc
+alembic
+python-telegram-bot
+slack-sdk
+sendgrid
+pytest
+pytest-cov
+httpx

@@ -1,45 +1,105 @@
+
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Float, Text, ForeignKey, func
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from sqlalchemy import DateTime
+import datetime
 import os
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Text, func
-from sqlalchemy.orm import declarative_base, sessionmaker
-from datetime import datetime, timezone
 
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-DB_DIR = os.path.join(BASE_DIR, "data")
-if not os.path.exists(DB_DIR):
-    os.makedirs(DB_DIR, exist_ok=True)
-
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{os.path.join(DB_DIR,'dev.db')}")
+# Use SQL Server by default, fallback to SQLite for dev/testing
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "sqlite:///./src/data/dev.db"
+)
 
 engine = create_engine(
     DATABASE_URL,
+    pool_size=10, max_overflow=20,
     connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
     future=True,
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 Base = declarative_base()
 
+class User(Base):
+    __tablename__ = 'users'
+    user_id = Column(Integer, primary_key=True)
+    external_id = Column(String(128), nullable=False)
+    channel = Column(String(32), nullable=False)
+    phone_number = Column(String(32))
+    email = Column(String(128))
+    first_name = Column(String(64))
+    last_name = Column(String(64))
+    opted_in = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    last_active_at = Column(DateTime(timezone=True))
+    memories = relationship('Memory', back_populates='user')
+    schedules = relationship('Schedule', back_populates='user')
+    message_logs = relationship('MessageLog', back_populates='user')
+    unsubscribes = relationship('Unsubscribe', back_populates='user')
 
 class Memory(Base):
-    __tablename__ = "memory"
-    memory_id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, index=True, nullable=False)
-    category = Column(String(50), nullable=True)
-    key = Column(String(100), nullable=False, index=True)
-    value = Column(Text, nullable=False)
-    value_hash = Column(String(128), nullable=True, index=True)
-    confidence = Column(Integer, default=1)
-    source = Column(String(100), nullable=True)
-    is_active = Column(Boolean, default=True, nullable=False)
-    conflict_group_id = Column(String(36), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
-    archived_at = Column(DateTime(timezone=True), nullable=True)
-    ttl_expires_at = Column(DateTime(timezone=True), nullable=True)
+    __tablename__ = 'memories'
+    memory_id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+    category = Column(String(64), nullable=False)
+    key = Column(String(128), nullable=False)
+    value = Column(Text, nullable=False)  # JSON-friendly
+    confidence = Column(Float, default=1.0, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+    ttl_expires_at = Column(DateTime(timezone=True))
+    user = relationship('User', back_populates='memories')
 
+class Lesson(Base):
+    __tablename__ = 'lessons'
+    lesson_id = Column(Integer, primary_key=True)
+    title = Column(String(128), nullable=False)
+    content = Column(Text, nullable=False)
+    difficulty_level = Column(String(32))
+    duration_minutes = Column(Integer)
+    created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    schedules = relationship('Schedule', back_populates='lesson')
+
+class Schedule(Base):
+    __tablename__ = 'schedules'
+    schedule_id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+    lesson_id = Column(Integer, ForeignKey('lessons.lesson_id'))
+    schedule_type = Column(String(32), nullable=False)  # one_time|daily|weekly|interval_reminder
+    cron_expression = Column(String(64), nullable=False)
+    next_send_time = Column(DateTime(timezone=True))
+    last_sent_at = Column(DateTime(timezone=True))
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    user = relationship('User', back_populates='schedules')
+    lesson = relationship('Lesson', back_populates='schedules')
+
+class MessageLog(Base):
+    __tablename__ = 'message_logs'
+    message_id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+    direction = Column(String(16), nullable=False)  # inbound|outbound
+    channel = Column(String(32), nullable=False)
+    external_message_id = Column(String(128))
+    content = Column(Text)
+    status = Column(String(16), nullable=False)  # queued|sent|delivered|failed
+    error_message = Column(Text)
+    created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    processed_at = Column(DateTime(timezone=True))
+    user = relationship('User', back_populates='message_logs')
+
+class Unsubscribe(Base):
+    __tablename__ = 'unsubscribes'
+    unsubscribe_id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+    channel = Column(String(32), nullable=False)
+    reason = Column(Text)
+    unsubscribed_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    compliance_required = Column(Boolean, default=False, nullable=False)
+    user = relationship('User', back_populates='unsubscribes')
 
 def init_db():
     Base.metadata.create_all(bind=engine)
-
 
 if __name__ == '__main__':
     init_db()
