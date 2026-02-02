@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
     SLACK_BOT_TOKEN: str = os.getenv("SLACK_BOT_TOKEN", "")
     SENDGRID_API_KEY: str = os.getenv("SENDGRID_API_KEY", "")
+    OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama2")
     # Add more config as needed
 
     class Config:

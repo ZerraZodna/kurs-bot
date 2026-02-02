@@ -2,10 +2,14 @@ from fastapi import FastAPI, Request, HTTPException
 from src.services.memory_manager import MemoryManager
 from src.models.database import SessionLocal, User, MessageLog
 from src.config import settings
-from src.integrations.telegram import TelegramHandler
+from src.integrations.telegram import TelegramHandler, send_message
+from src.services.dialogue_engine import DialogueEngine
 import threading
 import time
 from datetime import datetime, timedelta, timezone
+import asyncio
+import logging
+import httpx
 
 app = FastAPI()
 
@@ -77,6 +81,32 @@ async def telegram_webhook(request: Request, secret_token: str):
     except Exception as e:
         print("[messagelog error]", e)
 
+    # --- AI: Get response from DialogueEngine and send back to Telegram ---
+    db = SessionLocal()
+    dialogue = DialogueEngine()
+    ai_response = await dialogue.process_message(db_user.user_id, text, db)
+    db.close()
+    # Send response back to user
+    await send_message(int(uid), ai_response)
+
+    # Log outbound message
+    try:
+        db = SessionLocal()
+        log = MessageLog(
+            user_id=db_user.user_id,
+            direction="outbound",
+            channel="telegram",
+            external_message_id=None,
+            content=ai_response,
+            status="sent",
+            error_message=None
+        )
+        db.add(log)
+        db.commit()
+        db.close()
+    except Exception as e:
+        print("[messagelog outbound error]", e)
+
     return {"ok": True}
 
 
@@ -102,3 +132,17 @@ def start_purge_thread():
     t.start()
 
     return {"ok": True}
+
+@app.on_event("startup")
+def startup_info():
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+    ollama_url = "http://localhost:11434"
+    try:
+        # Try to GET /api/tags as a lightweight check
+        response = httpx.get(f"{ollama_url}/api/tags", timeout=2.0)
+        if response.status_code == 200:
+            logging.info(f"Ollama AI server is running at {ollama_url} (model: {settings.OLLAMA_MODEL})")
+        else:
+            logging.warning(f"Ollama AI server responded with status {response.status_code} at {ollama_url}")
+    except Exception as e:
+        logging.error(f"Ollama AI server is NOT reachable at {ollama_url}: {e}")
