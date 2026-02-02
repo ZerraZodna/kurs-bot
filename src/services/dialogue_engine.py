@@ -1,5 +1,7 @@
 import httpx
 import logging
+import json
+import re
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from langdetect import detect, LangDetectException
@@ -9,6 +11,8 @@ from src.services.memory_extractor import MemoryExtractor
 from src.services.onboarding_service import OnboardingService
 from src.services.scheduler import SchedulerService
 from src.config import settings
+from src.models.database import Lesson
+from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +50,7 @@ class DialogueEngine:
         session: Session,
         include_history: bool = True,
         history_turns: int = 4,
+        include_lesson: bool = True,
     ) -> str:
         """
         Process user message with full context awareness.
@@ -65,6 +70,26 @@ class DialogueEngine:
         """
         # FIRST: Extract memories from user message (this might store commitment, name, time, etc.)
         await self._extract_and_store_memories(user_id, text, session)
+
+        # Handle lesson confirmation replies (before onboarding/schedule logic)
+        lesson_response = await self._handle_lesson_confirmation(user_id, text, session)
+        if lesson_response:
+            return lesson_response
+
+        # Handle one-time reminder requests
+        reminder = self._parse_one_time_reminder(text)
+        if reminder:
+            schedule = SchedulerService.create_one_time_schedule(
+                user_id=user_id,
+                run_at=reminder["run_at"],
+                message=reminder["message"],
+                session=session,
+            )
+            confirmation = reminder["confirmation"]
+            language = self._get_user_language(user_id)
+            if language.lower() not in ["english", "en"]:
+                confirmation = await self._translate_text(confirmation, language)
+            return confirmation
 
         # If a schedule request is pending, continue schedule flow even without keywords
         if self.memory_manager:
@@ -106,6 +131,7 @@ class DialogueEngine:
                 user_id=user_id,
                 user_input=text,
                 system_prompt=settings.SYSTEM_PROMPT,
+                include_lesson=include_lesson,
                 include_conversation_history=include_history,
                 history_turns=history_turns,
             )
@@ -114,6 +140,196 @@ class DialogueEngine:
         response = await self.call_ollama(prompt)
         
         return response
+
+    def _parse_one_time_reminder(self, text: str) -> Optional[Dict[str, Any]]:
+        """Parse one-time reminders like 'remind me to X in 5 minutes'."""
+        msg = text.strip()
+        lower = msg.lower()
+
+        trigger_phrases = ["remind me", "påminn meg", "minn meg"]
+        if not any(tp in lower for tp in trigger_phrases):
+            return None
+
+        # Pattern: remind me to <message> in 5 minutes
+        pattern_1 = re.compile(
+            r"(?:remind me|påminn meg|minn meg)\s+(?:to\s+)?(?P<message>.+?)\s+(?:in|om)\s+(?P<amount>\d+)\s*(?P<unit>minutes?|hours?|minutter|timer)",
+            re.IGNORECASE,
+        )
+
+        # Pattern: remind me in 5 minutes to <message>
+        pattern_2 = re.compile(
+            r"(?:remind me|påminn meg|minn meg)\s+(?:in|om)\s+(?P<amount>\d+)\s*(?P<unit>minutes?|hours?|minutter|timer)\s*(?:to\s+)?(?P<message>.+)",
+            re.IGNORECASE,
+        )
+
+        match = pattern_1.search(msg) or pattern_2.search(msg)
+        if match:
+            message = match.group("message").strip().strip('"').strip("'")
+            amount = int(match.group("amount"))
+            unit = match.group("unit").lower()
+
+            if amount <= 0 or not message:
+                return None
+
+            minutes = amount
+            if unit in ["hour", "hours", "timer"]:
+                minutes = amount * 60
+
+            run_at = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+            confirmation = f"Got it! I'll remind you in {amount} {unit}."
+
+            return {"message": message, "run_at": run_at, "confirmation": confirmation}
+
+        # Pattern: remind me at HH:MM to <message> (today/tomorrow)
+        pattern_at = re.compile(
+            r"(?:remind me|påminn meg|minn meg)\s+(?:at|kl)\s+(?P<hour>\d{1,2})(?::(?P<minute>\d{2}))?\s*(?:to\s+)?(?P<message>.+)",
+            re.IGNORECASE,
+        )
+
+        match = pattern_at.search(msg)
+        if match:
+            hour = int(match.group("hour"))
+            minute = int(match.group("minute") or 0)
+            message = match.group("message").strip().strip('"').strip("'")
+
+            if not message:
+                return None
+
+            now = datetime.now(timezone.utc)
+            run_at = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            if run_at <= now:
+                run_at += timedelta(days=1)
+            confirmation = f"Got it! I'll remind you at {hour:02d}:{minute:02d} UTC."
+
+            return {"message": message, "run_at": run_at, "confirmation": confirmation}
+
+        return None
+
+    async def _handle_lesson_confirmation(self, user_id: int, text: str, session: Session) -> Optional[str]:
+        """Handle replies to daily lesson completion prompts."""
+        if not self.memory_manager:
+            return None
+
+        pending = self._get_pending_confirmation(user_id)
+        if not pending:
+            return None
+
+        message_lower = text.lower().strip()
+
+        # Detect yes/no responses
+        is_yes = self.onboarding.detect_commitment_keywords(message_lower) if self.onboarding else False
+        no_keywords = [
+            "no", "not yet", "nope", "nei", "ikke ennå", "ikke enda",
+            "ikke", "ikke ferdig", "senere",
+        ]
+        is_no = any(k in message_lower for k in no_keywords)
+
+        if not is_yes and not is_no:
+            return None
+
+        lesson_id = pending.get("lesson_id")
+        next_id = pending.get("next_lesson_id")
+
+        if is_no:
+            self._resolve_pending_confirmation(user_id)
+            message = "No problem. Take your time and reply 'yes' when you're ready to continue."
+            language = self._get_user_language(user_id)
+            if language.lower() not in ["english", "en"]:
+                message = await self._translate_text(message, language)
+            return message
+
+        # Yes: mark completed and send next lesson
+        if lesson_id:
+            self.memory_manager.store_memory(
+                user_id=user_id,
+                key="lesson_completed",
+                value=str(lesson_id),
+                category="progress",
+                confidence=1.0,
+                source="dialogue_engine_lesson_confirmation",
+            )
+
+        lesson = session.query(Lesson).filter(Lesson.lesson_id == next_id).first() if next_id else None
+        if not lesson:
+            self._resolve_pending_confirmation(user_id)
+            return "Thanks! I couldn't find the next lesson right now."
+
+        language = self._get_user_language(user_id)
+        message = await self._format_lesson_message(lesson, language)
+
+        # Update last sent lesson id
+        self.memory_manager.store_memory(
+            user_id=user_id,
+            key="last_sent_lesson_id",
+            value=str(lesson.lesson_id),
+            category="progress",
+            confidence=1.0,
+            source="dialogue_engine_lesson_confirmation",
+        )
+
+        self._resolve_pending_confirmation(user_id)
+        return message
+
+    def _get_pending_confirmation(self, user_id: int) -> Optional[dict]:
+        memories = self.memory_manager.get_memory(user_id, "lesson_confirmation_pending")
+        if not memories:
+            return None
+        def _normalize_dt(value: Optional[datetime]) -> datetime:
+            if isinstance(value, datetime):
+                return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+            return datetime.min.replace(tzinfo=timezone.utc)
+
+        latest = max(memories, key=lambda m: _normalize_dt(m.get("created_at")))
+        raw = latest.get("value", "")
+        try:
+            data = json.loads(raw)
+            if isinstance(data, dict) and data.get("lesson_id"):
+                return data
+        except Exception:
+            return None
+        return None
+
+    def _resolve_pending_confirmation(self, user_id: int) -> None:
+        # Archive pending by replacing with a short-lived resolved marker
+        self.memory_manager.store_memory(
+            user_id=user_id,
+            key="lesson_confirmation_pending",
+            value=json.dumps({"resolved": True, "timestamp": datetime.now(timezone.utc).isoformat()}),
+            category="conversation",
+            ttl_hours=12,
+            source="dialogue_engine",
+        )
+
+    def _get_user_language(self, user_id: int) -> str:
+        memories = self.memory_manager.get_memory(user_id, "user_language")
+        return memories[0].get("value", "English") if memories else "English"
+
+    async def _format_lesson_message(self, lesson: Lesson, language: str) -> str:
+        text = f"Lesson {lesson.lesson_id}: {lesson.title}\n\n{lesson.content}"
+        if language.lower() in ["english", "en"]:
+            return text
+        return await self._translate_text(text, language)
+
+    async def _translate_text(self, text: str, language: str) -> str:
+        try:
+            prompt = (
+                f"Translate the following text to {language}. "
+                "Preserve paragraph breaks and meaning. Return only the translation.\n\n"
+                f"{text}"
+            )
+            payload = {
+                "model": settings.OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": False,
+            }
+            async with httpx.AsyncClient() as client:
+                response = await client.post(settings.OLLAMA_URL, json=payload, timeout=60.0)
+                response.raise_for_status()
+                data = response.json()
+                return data.get("response", text) or text
+        except Exception as e:
+            logger.warning(f"Translation failed, sending original text: {e}")
+            return text
 
     async def _extract_and_store_memories(self, user_id: int, user_message: str, session: Session) -> None:
         """
@@ -239,13 +455,20 @@ class DialogueEngine:
         # If they're answering commitment question, check for affirmative
         if status["has_name"] and not status["has_commitment"]:
             if self.onboarding.detect_commitment_keywords(text):
-                # User committed! (memory already stored by extractor)
-                # Check that it was actually stored
+                # Ensure commitment memory exists even if extractor missed it
                 commit_memories = self.memory_manager.get_memory(user_id, "acim_commitment")
-                if commit_memories:
-                    logger.info(f"User {user_id} expressed interest in ACIM lessons")
-                    # Return completion message
-                    return self.onboarding.get_onboarding_complete_message(user_id)
+                if not commit_memories:
+                    self.memory_manager.store_memory(
+                        user_id=user_id,
+                        key="acim_commitment",
+                        value="committed to ACIM lessons",
+                        confidence=1.0,
+                        source="dialogue_engine_commitment",
+                        category="goals",
+                    )
+                logger.info(f"User {user_id} expressed interest in ACIM lessons")
+                # Return completion message
+                return self.onboarding.get_onboarding_complete_message(user_id)
         
         # Return next onboarding prompt
         return self.onboarding.get_onboarding_prompt(user_id)
@@ -269,6 +492,16 @@ class DialogueEngine:
         if schedules:
             schedule = schedules[0]
             hour, minute = schedule.next_send_time.hour, schedule.next_send_time.minute
+            if self.memory_manager:
+                self.memory_manager.store_memory(
+                    user_id=user_id,
+                    key="schedule_request_pending",
+                    value="false",
+                    confidence=1.0,
+                    source="dialogue_engine",
+                    ttl_hours=1,
+                    category="conversation",
+                )
             return f"""You're already all set up! ✨
 
 You have a daily reminder for {hour:02d}:{minute:02d} UTC.

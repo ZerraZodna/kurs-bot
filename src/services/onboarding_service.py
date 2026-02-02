@@ -191,6 +191,20 @@ How would you like to begin?""",
             "interested", "absolutely", "definitely", "ok", "okay",
             # Norwegian
             "ja", "jada", "klar", "begynn", "start", "vil gjerne",
+            # Swedish
+            "ja", "gärna", "redo", "börja",
+            # Danish
+            "ja", "gerne", "klar", "begynd",
+            # German
+            "ja", "klar", "bereit", "los geht's",
+            # Spanish
+            "sí", "si", "claro", "listo", "empecemos", "quiero",
+            # French
+            "oui", "d'accord", "prêt", "prete", "commençons", "commencer",
+            # Portuguese
+            "sim", "claro", "pronto", "vamos começar", "quero",
+            # Italian
+            "sì", "si", "certo", "pronto", "iniziamo", "voglio",
         ]
         
         return any(keyword in message_lower for keyword in commitment_keywords)

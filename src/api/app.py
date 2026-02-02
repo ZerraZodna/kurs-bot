@@ -149,11 +149,46 @@ def purge_old_messages():
             print(f"[purge error] {e}")
         time.sleep(24 * 60 * 60)  # Run once per day
 
+
+def purge_inactive_memories(days_keep: int = 60):
+    """Purge archived/inactive memories older than days_keep (UTC)."""
+    try:
+        db = SessionLocal()
+        memory_manager = MemoryManager(db)
+        deleted = memory_manager.purge_expired(days_keep=days_keep)
+        if deleted:
+            print(f"[purge] Deleted {deleted} archived memories older than {days_keep} days.")
+        db.close()
+    except Exception as e:
+        print(f"[purge error] {e}")
+
+
+def nightly_memory_purge(days_keep: int = 60, hour_utc: int = 2):
+    """Run memory purge at startup and then nightly at a fixed UTC hour."""
+    # Run immediately at startup
+    purge_inactive_memories(days_keep=days_keep)
+
+    while True:
+        try:
+            now = datetime.now(timezone.utc)
+            next_run = now.replace(hour=hour_utc, minute=0, second=0, microsecond=0)
+            if next_run <= now:
+                next_run += timedelta(days=1)
+            sleep_seconds = (next_run - now).total_seconds()
+            time.sleep(sleep_seconds)
+            purge_inactive_memories(days_keep=days_keep)
+        except Exception as e:
+            print(f"[purge error] {e}")
+            time.sleep(60)
+
 # Start the purge thread when the app starts
 @app.on_event("startup")
 def start_purge_thread():
     t = threading.Thread(target=purge_old_messages, daemon=True)
     t.start()
+
+    t2 = threading.Thread(target=nightly_memory_purge, daemon=True)
+    t2.start()
 
     return {"ok": True}
 

@@ -6,7 +6,7 @@ Supports dynamic context assembly for Ollama LLM with token optimization.
 from typing import Dict, List, Optional, Any
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
-from src.models.database import Memory, MessageLog, User
+from src.models.database import Memory, MessageLog, User, Lesson
 from src.services.memory_manager import MemoryManager
 import json
 
@@ -51,6 +51,7 @@ class PromptBuilder:
         user_id: int,
         user_input: str,
         system_prompt: str,
+        include_lesson: bool = True,
         include_conversation_history: bool = True,
         history_turns: int = 4,
         max_context_tokens: int = 2000,
@@ -62,6 +63,7 @@ class PromptBuilder:
             user_id: User ID from database
             user_input: Current user message
             system_prompt: Base system/persona prompt
+            include_lesson: Include today's ACIM lesson in context
             include_conversation_history: Include recent conversation context
             history_turns: Number of recent message pairs to include
             max_context_tokens: Soft limit on context section size (approximate)
@@ -78,36 +80,95 @@ class PromptBuilder:
         # Build context blocks
         context_parts = [system_prompt]
         
-        # 1. User Profile Context
+        # 1. Today's Lesson (optional)
+        if include_lesson:
+            lesson_context = self._get_today_lesson(user_id)
+            if lesson_context:
+                context_parts.append(f"\n### Today's ACIM Lesson\n{lesson_context}")
+
+        # 2. User Profile Context
         profile_context = self._build_profile_context(user)
         if profile_context:
             context_parts.append(f"\n### User Profile\n{profile_context}")
         
-        # 2. Goals & Learning Progress
+        # 3. Goals & Learning Progress
         goals_context = self._build_goals_context(user_id)
         if goals_context:
             context_parts.append(f"\n### Current Goals\n{goals_context}")
         
-        # 3. User Preferences
+        # 4. User Preferences
         prefs_context = self._build_preferences_context(user_id)
         if prefs_context:
             context_parts.append(f"\n### Preferences\n{prefs_context}")
         
-        # 4. Recent Progress/Insights
+        # 5. Recent Progress/Insights
         progress_context = self._build_progress_context(user_id)
         if progress_context:
             context_parts.append(f"\n### Recent Progress\n{progress_context}")
         
-        # 5. Conversation History
+        # 6. Conversation History
         if include_conversation_history:
             history_context = self._build_conversation_history(user_id, history_turns)
             if history_context:
                 context_parts.append(f"\n### Recent Conversation\n{history_context}")
         
-        # 6. Current Message
+        # 7. Current Message
         context_parts.append(f"\n### Current Message\nUser: {user_input}\n\nAssistant:")
         
         return "".join(context_parts)
+
+    def _get_today_lesson(self, user_id: int, max_chars: int = 800) -> str:
+        """Return today's lesson text based on user progress.
+
+        Defaults to Lesson 1 unless the user is explicitly on another lesson.
+        """
+        lesson_id = self._get_current_lesson_id(user_id)
+        if not lesson_id:
+            return ""
+
+        lesson = self.db.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
+        if not lesson:
+            return ""
+
+        content = lesson.content or ""
+        if max_chars and len(content) > max_chars:
+            content = content[:max_chars].rsplit(" ", 1)[0] + "..."
+
+        return f"**Lesson {lesson.lesson_id}**: \"{lesson.title}\"\n\n{content}"
+
+    def _get_current_lesson_id(self, user_id: int) -> int:
+        """Determine current lesson ID.
+
+        If the user has completed lessons, use the most recent completion.
+        Otherwise, default to Lesson 1.
+        """
+        lessons_completed = self.memory_manager.get_memory(user_id, "lesson_completed")
+        if lessons_completed:
+            def _normalize_dt(value: Any) -> datetime:
+                if isinstance(value, datetime):
+                    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+                return datetime.min.replace(tzinfo=timezone.utc)
+
+            most_recent = max(
+                lessons_completed,
+                key=lambda x: _normalize_dt(x.get("created_at")),
+            )
+            raw_value = str(most_recent.get("value", "")).strip()
+            parsed = self._parse_lesson_id(raw_value)
+            if parsed:
+                return parsed
+
+        return 1
+
+    def _parse_lesson_id(self, value: str) -> Optional[int]:
+        """Parse lesson id from memory value (e.g., '1' or 'Lesson 1')."""
+        if not value:
+            return None
+        try:
+            return int(value)
+        except ValueError:
+            digits = "".join(ch for ch in value if ch.isdigit())
+            return int(digits) if digits else None
     
     def _build_profile_context(self, user: Any) -> str:
         """Extract user profile information."""
