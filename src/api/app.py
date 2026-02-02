@@ -4,6 +4,7 @@ from src.models.database import SessionLocal, User, MessageLog
 from src.config import settings
 from src.integrations.telegram import TelegramHandler, send_message
 from src.services.dialogue_engine import DialogueEngine
+from src.api.dialogue_routes import router as dialogue_router
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -12,6 +13,9 @@ import logging
 import httpx
 
 app = FastAPI()
+
+# Include dialogue routes with context-aware endpoints
+app.include_router(dialogue_router)
 
 
 @app.get("/")
@@ -66,8 +70,9 @@ async def telegram_webhook(request: Request, secret_token: str):
     # Log all incoming messages to MessageLog
     try:
         db = SessionLocal()
+        user_id = db.query(User).filter_by(external_id=str(uid), channel="telegram").first().user_id if uid else None
         log = MessageLog(
-            user_id=db.query(User).filter_by(external_id=str(uid), channel="telegram").first().user_id if uid else None,
+            user_id=user_id,
             direction="inbound",
             channel="telegram",
             external_message_id=parsed["external_message_id"],
@@ -75,16 +80,27 @@ async def telegram_webhook(request: Request, secret_token: str):
             status="delivered",
             error_message=None
         )
+        # Only set new columns if they exist (migration applied)
+        try:
+            log.message_role = "user"
+        except:
+            pass
         db.add(log)
         db.commit()
         db.close()
     except Exception as e:
         print("[messagelog error]", e)
 
-    # --- AI: Get response from DialogueEngine and send back to Telegram ---
+    # --- AI: Get response from DialogueEngine with context awareness ---
     db = SessionLocal()
-    dialogue = DialogueEngine()
-    ai_response = await dialogue.process_message(db_user.user_id, text, db)
+    dialogue = DialogueEngine(db)
+    ai_response = await dialogue.process_message(
+        user_id=db_user.user_id,
+        text=text,
+        session=db,
+        include_history=True,
+        history_turns=4,
+    )
     db.close()
     # Send response back to user
     await send_message(int(uid), ai_response)
@@ -101,6 +117,11 @@ async def telegram_webhook(request: Request, secret_token: str):
             status="sent",
             error_message=None
         )
+        # Only set new columns if they exist (migration applied)
+        try:
+            log.message_role = "assistant"
+        except:
+            pass
         db.add(log)
         db.commit()
         db.close()

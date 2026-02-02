@@ -42,13 +42,17 @@ class MemoryManager:
         return results
 
     def store_memory(self, user_id: int, key: str, value: str, confidence: float = 1.0,
-                     source: str = "dialogue_engine", ttl_hours: Optional[int] = None, category: str = "fact") -> int:
+                     source: str = "dialogue_engine", ttl_hours: Optional[int] = None, category: str = "fact",
+                     allow_duplicates: bool = False) -> int:
         """Store a memory with simple conflict resolution.
 
-        Rules:
+        Rules (when allow_duplicates=False):
         - If an active memory exists with identical value_hash -> merge (update confidence/updated_at).
         - If active memory exists with different value_hash -> archive existing, insert new as active and set conflict_group_id.
         - If none exists -> insert new.
+        
+        When allow_duplicates=True:
+        - Always insert new memory without archiving existing ones
         """
         now = datetime.now(timezone.utc)
         value_hash = self._hash_value(value)
@@ -77,6 +81,23 @@ class MemoryManager:
                 self.db.add(e)
                 self.db.commit()
                 return e.memory_id
+
+        # If allow_duplicates, just insert new memory
+        if allow_duplicates:
+            new = Memory(
+                user_id=user_id,
+                category=category,
+                key=key,
+                value=value,
+                value_hash=value_hash,
+                confidence=float(confidence),
+                source=source,
+                is_active=True,
+                ttl_expires_at=ttl,
+            )
+            self.db.add(new)
+            self.db.commit()
+            return new.memory_id
 
         if existing:
             # conflict: archive existing and insert new with conflict_group

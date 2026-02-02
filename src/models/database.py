@@ -89,6 +89,8 @@ class MessageLog(Base):
     content = Column(Text)
     status = Column(String(16), nullable=False)  # queued|sent|delivered|failed
     error_message = Column(Text)
+    conversation_thread_id = Column(String(64))  # For grouping related messages
+    message_role = Column(String(16), default="user")  # user|assistant for LLM context
     created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
     processed_at = Column(DateTime(timezone=True))
     user = relationship('User', back_populates='message_logs')
