@@ -65,9 +65,27 @@ class DialogueEngine:
         """
         # FIRST: Extract memories from user message (this might store commitment, name, time, etc.)
         await self._extract_and_store_memories(user_id, text, session)
+
+        # If a schedule request is pending, continue schedule flow even without keywords
+        if self.memory_manager:
+            pending = self.memory_manager.get_memory(user_id, "schedule_request_pending")
+            if pending and pending[0].get("value") == "true":
+                schedule_response = await self._handle_schedule_request(user_id, text, session)
+                if schedule_response:
+                    return schedule_response
         
         # Check if user is requesting schedule/reminder setup (EXPLICIT REQUEST ONLY)
         if self.onboarding and self.onboarding.detect_schedule_request(text):
+            if self.memory_manager:
+                self.memory_manager.store_memory(
+                    user_id=user_id,
+                    key="schedule_request_pending",
+                    value="true",
+                    confidence=1.0,
+                    source="dialogue_engine",
+                    ttl_hours=1,
+                    category="conversation",
+                )
             schedule_response = await self._handle_schedule_request(user_id, text, session)
             if schedule_response:
                 return schedule_response
@@ -265,6 +283,16 @@ Would you like to:
 
         if not time_memories:
             # Ask for their preferred time
+            if self.memory_manager:
+                self.memory_manager.store_memory(
+                    user_id=user_id,
+                    key="schedule_request_pending",
+                    value="true",
+                    confidence=1.0,
+                    source="dialogue_engine",
+                    ttl_hours=1,
+                    category="conversation",
+                )
             return """Great! I'll set up daily reminders for your ACIM lessons.
 
 When would you like to receive them? (e.g., "9:00 AM", "morning", "evening", "8:30 PM")"""
@@ -284,6 +312,17 @@ When would you like to receive them? (e.g., "9:00 AM", "morning", "evening", "8:
 
             name_memories = self.memory_manager.get_memory(user_id, "first_name")
             name = name_memories[0]["value"] if name_memories else "friend"
+
+            if self.memory_manager:
+                self.memory_manager.store_memory(
+                    user_id=user_id,
+                    key="schedule_request_pending",
+                    value="false",
+                    confidence=1.0,
+                    source="dialogue_engine",
+                    ttl_hours=1,
+                    category="conversation",
+                )
 
             return f"""Perfect, {name}! ✨
 
