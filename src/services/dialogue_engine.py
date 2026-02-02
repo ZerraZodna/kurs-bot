@@ -115,6 +115,13 @@ class DialogueEngine:
             if schedule_response:
                 return schedule_response
         
+        # Check if user is asking about a specific lesson (LESSON REQUEST - BEFORE ONBOARDING)
+        lesson_request = self._detect_lesson_request(text)
+        if lesson_request:
+            lesson_response = await self._handle_lesson_request(lesson_request["lesson_id"], text, session)
+            if lesson_response:
+                return lesson_response
+        
         # Check if user needs onboarding (new users)
         if self.onboarding and self.onboarding.should_show_onboarding(user_id):
             onboarding_response = await self._handle_onboarding(user_id, text, session)
@@ -739,6 +746,85 @@ Your first lesson will arrive tomorrow at {hour:02d}:{minute:02d} UTC. 🙏"""
         except Exception as e:
             logger.error(f"[User deletion error] Failed to delete user {user_id}: {e}")
             self.db.rollback()
+
+    def _detect_lesson_request(self, text: str) -> Optional[Dict[str, Any]]:
+        """
+        Detect if user is requesting information about a specific lesson.
+        
+        Examples:
+        - "Tell me about lesson 10"
+        - "What is lesson 5?"
+        - "Explain lesson 42"
+        - "Lesson 1 content"
+        
+        Returns:
+            Dict with lesson_id if detected, None otherwise
+        """
+        text_lower = text.lower()
+        
+        # Pattern: mention of "lesson" + number
+        import re
+        lesson_patterns = [
+            r'lesson\s+(\d+)',
+            r'day\s+(\d+)',
+            r'lesson\s+#(\d+)',
+            r'#(\d+)',
+        ]
+        
+        for pattern in lesson_patterns:
+            match = re.search(pattern, text_lower)
+            if match:
+                lesson_num = int(match.group(1))
+                # Validate lesson is within valid range (1-365 for ACIM)
+                if 1 <= lesson_num <= 365:
+                    return {"lesson_id": lesson_num}
+        
+        return None
+
+    async def _handle_lesson_request(self, lesson_id: int, user_input: str, session: Session) -> str:
+        """
+        Handle requests for specific lesson content using RAG.
+        
+        Retrieves the lesson from database and injects it into the context
+        so the LLM responds with accurate information.
+        """
+        if not self.db:
+            return "I couldn't retrieve that lesson right now."
+        
+        try:
+            # Fetch the lesson from database
+            lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
+            
+            if not lesson:
+                return f"I couldn't find lesson {lesson_id} in my database. ACIM has 365 lessons - please ask for a lesson between 1 and 365."
+            
+            # Build RAG-enhanced prompt with lesson content
+            system_prompt = f"""{settings.SYSTEM_PROMPT}
+
+### Requested Lesson Content [RAG CONTEXT - USE THIS]
+**Lesson {lesson.lesson_id}**: "{lesson.title}"
+
+{lesson.content}
+
+---
+The user is asking about this lesson. Use the above content to provide accurate, detailed information."""
+            
+            # Build the prompt with lesson context
+            prompt = f"""{system_prompt}
+
+### User Question
+{user_input}
+
+### Response
+Provide a thoughtful, detailed response about this ACIM lesson. Reference specific points from the lesson content above. Be warm and encouraging."""
+            
+            # Call Ollama with lesson-injected context
+            response = await self.call_ollama(prompt)
+            return response
+            
+        except Exception as e:
+            logger.error(f"[Lesson request error] Failed to handle lesson {lesson_id}: {e}")
+            return f"I encountered an error retrieving lesson {lesson_id}. Please try again."
 
     def get_onboarding_prompt(self) -> str:
         """
