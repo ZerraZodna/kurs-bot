@@ -23,6 +23,82 @@ async def root():
     return {"status": "ok", "service": "kurs-bot prototype"}
 
 
+async def process_telegram_batch(user_id: int, external_id: str) -> None:
+    """Batch inbound messages for a user and send one AI response."""
+    await asyncio.sleep(1.0)
+
+    message_ids = []
+    combined_text = ""
+
+    db = SessionLocal()
+    try:
+        unprocessed = db.query(MessageLog).filter(
+            MessageLog.user_id == user_id,
+            MessageLog.direction == "inbound",
+            MessageLog.status == "delivered",
+        ).order_by(MessageLog.created_at).all()
+
+        if not unprocessed:
+            db.close()
+            return
+
+        message_ids = [m.message_id for m in unprocessed]
+        combined_text = "\n".join([m.content for m in unprocessed if m.content])
+
+        # Claim messages
+        db.query(MessageLog).filter(
+            MessageLog.message_id.in_(message_ids)
+        ).update({MessageLog.status: "processing"}, synchronize_session=False)
+        db.commit()
+        db.close()
+    except Exception as e:
+        print("[batch collection error]", e)
+        db.close()
+        return
+
+    # Generate AI response
+    db = SessionLocal()
+    dialogue = DialogueEngine(db)
+    ai_response = await dialogue.process_message(
+        user_id=user_id,
+        text=combined_text,
+        session=db,
+        include_history=True,
+        history_turns=4,
+    )
+    db.close()
+
+    # Send response back to user
+    await send_message(int(external_id), ai_response)
+
+    # Log outbound and mark processed
+    try:
+        db = SessionLocal()
+        log = MessageLog(
+            user_id=user_id,
+            direction="outbound",
+            channel="telegram",
+            external_message_id=None,
+            content=ai_response,
+            status="sent",
+            error_message=None
+        )
+        try:
+            log.message_role = "assistant"
+        except Exception:
+            pass
+        db.add(log)
+        db.commit()
+
+        db.query(MessageLog).filter(
+            MessageLog.message_id.in_(message_ids)
+        ).update({MessageLog.status: "processed"}, synchronize_session=False)
+        db.commit()
+        db.close()
+    except Exception as e:
+        print("[messagelog outbound error]", e)
+
+
 @app.post("/webhook/telegram/{secret_token}")
 async def telegram_webhook(request: Request, secret_token: str):
     # Validate secret token from config
@@ -94,42 +170,25 @@ async def telegram_webhook(request: Request, secret_token: str):
     except Exception as e:
         print("[messagelog error]", e)
 
-    # --- AI: Get response from DialogueEngine with context awareness ---
-    db = SessionLocal()
-    dialogue = DialogueEngine(db)
-    ai_response = await dialogue.process_message(
-        user_id=user_id,
-        text=text,
-        session=db,
-        include_history=True,
-        history_turns=4,
-    )
-    db.close()
-    # Send response back to user
-    await send_message(int(uid), ai_response)
-
-    # Log outbound message
+    # Schedule background batch processing to allow more messages to arrive
     try:
         db = SessionLocal()
-        log = MessageLog(
-            user_id=db_user.user_id,
-            direction="outbound",
-            channel="telegram",
-            external_message_id=None,
-            content=ai_response,
-            status="sent",
-            error_message=None
-        )
-        # Only set new columns if they exist (migration applied)
-        try:
-            log.message_role = "assistant"
-        except:
-            pass
-        db.add(log)
-        db.commit()
+        memory_manager = MemoryManager(db)
+        lock = memory_manager.get_memory(user_id, "batch_lock")
+        if not lock:
+            memory_manager.store_memory(
+                user_id=user_id,
+                key="batch_lock",
+                value="locked",
+                category="conversation",
+                ttl_hours=0.01,  # ~36 seconds
+                source="webhook",
+                allow_duplicates=False,
+            )
+            asyncio.create_task(process_telegram_batch(user_id, uid))
         db.close()
     except Exception as e:
-        print("[messagelog outbound error]", e)
+        print("[batch lock error]", e)
 
     return {"ok": True}
 
