@@ -31,8 +31,8 @@ class DialogueEngine:
         """
         Send user message to Ollama and return the AI's response.
         """
-        # Optionally, you can add user memory/context here
-        prompt = text  # You may want to build a richer prompt with memory
+        # Prepend system prompt for persona
+        prompt = f"{settings.SYSTEM_PROMPT}\nUser: {text}"
         return await self.call_ollama(prompt)
 
     def get_conversation_state(self, user_id: int, session: Session) -> Dict[str, Any]:
