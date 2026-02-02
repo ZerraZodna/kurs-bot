@@ -42,7 +42,7 @@ class MemoryManager:
         return results
 
     def store_memory(self, user_id: int, key: str, value: str, confidence: float = 1.0,
-                     source: str = "dialogue_engine", ttl_hours: Optional[int] = None) -> int:
+                     source: str = "dialogue_engine", ttl_hours: Optional[int] = None, category: str = "fact") -> int:
         """Store a memory with simple conflict resolution.
 
         Rules:
@@ -59,17 +59,18 @@ class MemoryManager:
         # ensure tables exist
         init_db()
 
-        # fetch active entries for same user/key
+        # fetch active entries for same user/key/category
         existing = self.db.query(Memory).filter(
             Memory.user_id == user_id,
             Memory.key == key,
+            Memory.category == category,
             Memory.is_active == True,
         ).all()
 
         # identical value exists -> merge
         for e in existing:
             if e.value_hash == value_hash:
-                e.confidence = max(e.confidence, int(confidence))
+                e.confidence = max(e.confidence, float(confidence))
                 e.updated_at = now
                 if ttl:
                     e.ttl_expires_at = ttl
@@ -87,10 +88,11 @@ class MemoryManager:
                 self.db.add(e)
             new = Memory(
                 user_id=user_id,
+                category=category,
                 key=key,
                 value=value,
                 value_hash=value_hash,
-                confidence=int(confidence),
+                confidence=float(confidence),
                 source=source,
                 is_active=True,
                 conflict_group_id=group_id,
@@ -103,10 +105,11 @@ class MemoryManager:
         # no existing -> insert
         new = Memory(
             user_id=user_id,
+            category=category,
             key=key,
             value=value,
             value_hash=value_hash,
-            confidence=int(confidence),
+            confidence=float(confidence),
             source=source,
             is_active=True,
             ttl_expires_at=ttl,
