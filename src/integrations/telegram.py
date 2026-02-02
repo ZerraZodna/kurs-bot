@@ -37,20 +37,18 @@ async def send_message(chat_id: int, text: str) -> Optional[dict]:
     url = f"{API_BASE}/sendMessage"
     try:
         async with httpx.AsyncClient() as client:
-            # Convert markdown formatting to Telegram MarkdownV2
-            # This handles *text* -> **text** (bold) and **text** stays **text** (bold)
-            # And _text_ -> *text* (italic) 
-            formatted_text = _convert_to_telegram_markdown(text)
+            # Convert markdown to HTML for Telegram (more forgiving than MarkdownV2)
+            html_text = _markdown_to_html(text)
             
             # Telegram hard limit is 4096 chars; stay below to be safe
             max_len = 3500
-            chunks = [formatted_text[i:i + max_len] for i in range(0, len(formatted_text), max_len)] or [""]
+            chunks = [html_text[i:i + max_len] for i in range(0, len(html_text), max_len)] or [""]
             last_response = None
             for chunk in chunks:
                 payload = {
                     "chat_id": chat_id,
                     "text": chunk,
-                    "parse_mode": "MarkdownV2"  # Enable Telegram markdown parsing
+                    "parse_mode": "HTML"  # Use HTML instead of MarkdownV2
                 }
                 r = await client.post(url, json=payload, timeout=10.0)
                 r.raise_for_status()
@@ -61,40 +59,32 @@ async def send_message(chat_id: int, text: str) -> Optional[dict]:
         return None
 
 
-def _convert_to_telegram_markdown(text: str) -> str:
+def _markdown_to_html(text: str) -> str:
     """
-    Convert markdown formatting to Telegram MarkdownV2 format.
+    Convert markdown formatting to HTML for Telegram.
     
-    Telegram MarkdownV2 uses:
-    - **text** for bold (same as markdown)
-    - *text* for italic (markdown uses _ or *)
-    
-    Special chars that need escaping in MarkdownV2:
-    _ * [ ] ( ) ~ ` > # + - = | { } . !
+    Converts:
+    - **text** -> <b>text</b> (bold)
+    - *text* -> <i>text</i> (italic)
+    - ***text*** -> <b><i>text</i></b> (bold italic)
+    - `text` -> <code>text</code> (code)
+    - [text](url) -> <a href="url">text</a> (links)
     """
-    # First, escape special characters except for markdown symbols
-    # We'll handle markdown symbols separately
-    special_chars = r'_\[\]()~`>#+-=|{}.!'
+    # Order matters: process longest patterns first to avoid conflicts
     
-    # Convert standard markdown to Telegram MarkdownV2
-    # Pattern: **text** stays as **text** (bold)
-    # Pattern: *text* -> *text* (italic)
-    # Pattern: ***text*** -> ***text*** (bold italic)
+    # 1. Bold italic: ***text*** -> <b><i>text</i></b>
+    text = re.sub(r'\*\*\*(.+?)\*\*\*', r'<b><i>\1</i></b>', text)
     
-    # Escape literal special chars (but preserve markdown formatting)
-    # This is tricky - we need to escape non-markdown special chars
-    result = text
+    # 2. Bold: **text** -> <b>text</b>
+    text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
     
-    # Preserve existing **bold** and ***bold italic***
-    # Convert single *italic* to _italic_ for clarity (Telegram supports both)
+    # 3. Italic: *text* -> <i>text</i>
+    text = re.sub(r'\*(.+?)\*', r'<i>\1</i>', text)
     
-    # Handle the case where Ollama might output ***bold italic***
-    # Telegram MarkdownV2 supports this natively
+    # 4. Code: `text` -> <code>text</code>
+    text = re.sub(r'`(.+?)`', r'<code>\1</code>', text)
     
-    # Escape special characters that aren't part of markdown formatting
-    # But be careful not to double-escape or break valid markdown
+    # 5. Links: [text](url) -> <a href="url">text</a>
+    text = re.sub(r'\[(.+?)\]\((.+?)\)', r'<a href="\2">\1</a>', text)
     
-    # For simplicity and safety: just ensure we're using MarkdownV2 compatible syntax
-    # The output from Ollama should already be mostly compatible
-    
-    return result
+    return text
