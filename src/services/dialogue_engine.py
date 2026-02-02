@@ -3,10 +3,7 @@ from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from src.services.memory_manager import MemoryManager
 from src.services.prompt_builder import PromptBuilder
-from src.models.database import MessageLog
 from src.config import settings
-from datetime import datetime, timezone
-import uuid
 
 OLLAMA_URL = "http://localhost:11434/api/generate"  # Default Ollama endpoint
 
@@ -70,48 +67,7 @@ class DialogueEngine:
         # Call Ollama
         response = await self.call_ollama(prompt)
         
-        # Log conversation if session available
-        if session:
-            self._log_conversation(user_id, text, response, session)
-        
         return response
-    
-    def _log_conversation(self, user_id: int, user_text: str, assistant_text: str, session: Session) -> None:
-        """Log user and assistant messages to message history."""
-        thread_id = str(uuid.uuid4())
-        now = datetime.now(timezone.utc)
-        
-        try:
-            # Log user message
-            user_msg = MessageLog(
-                user_id=user_id,
-                direction="inbound",
-                channel="dialogue_engine",
-                content=user_text,
-                status="delivered",
-                message_role="user",
-                conversation_thread_id=thread_id,
-                created_at=now,
-            )
-            session.add(user_msg)
-            session.flush()
-            
-            # Log assistant response
-            assistant_msg = MessageLog(
-                user_id=user_id,
-                direction="outbound",
-                channel="dialogue_engine",
-                content=assistant_text,
-                status="delivered",
-                message_role="assistant",
-                conversation_thread_id=thread_id,
-                created_at=now,
-            )
-            session.add(assistant_msg)
-            session.commit()
-        except Exception as e:
-            print(f"[Error logging conversation] {e}")
-            session.rollback()
 
     def get_conversation_state(self, user_id: int, session: Session) -> Dict[str, Any]:
         """
