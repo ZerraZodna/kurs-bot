@@ -103,6 +103,14 @@ class Unsubscribe(Base):
     compliance_required = Column(Boolean, default=False, nullable=False)
     user = relationship('User', back_populates='unsubscribes')
 
+class BatchLock(Base):
+    __tablename__ = 'batch_locks'
+    lock_id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+    channel = Column(String(32), nullable=False)  # telegram, email, etc
+    locked_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)  # When lock expires
+    
 def init_db():
     Base.metadata.create_all(bind=engine)
 

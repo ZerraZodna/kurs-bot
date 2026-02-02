@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request, HTTPException
 from src.services.memory_manager import MemoryManager
-from src.models.database import SessionLocal, User, MessageLog
+from src.models.database import SessionLocal, User, MessageLog, BatchLock
 from src.config import settings
 from src.integrations.telegram import TelegramHandler, send_message
 from src.services.dialogue_engine import DialogueEngine
@@ -106,19 +106,11 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
 
             await asyncio.sleep(0.5)
     finally:
-        # Release batch lock quickly
+        # Release batch lock by deleting from table
         try:
             db = SessionLocal()
-            memory_manager = MemoryManager(db)
-            memory_manager.store_memory(
-                user_id=user_id,
-                key="batch_lock",
-                value="released",
-                category="conversation",
-                ttl_hours=0.0001,
-                source="webhook",
-                allow_duplicates=False,
-            )
+            db.query(BatchLock).filter_by(user_id=user_id).delete(synchronize_session=False)
+            db.commit()
             db.close()
         except Exception as e:
             print("[batch lock release error]", e)
@@ -198,19 +190,23 @@ async def telegram_webhook(request: Request, secret_token: str):
     # Schedule background batch processing to allow more messages to arrive
     try:
         db = SessionLocal()
-        memory_manager = MemoryManager(db)
-        lock = memory_manager.get_memory(user_id, "batch_lock")
-        if not lock:
-            memory_manager.store_memory(
+        # Check if lock already exists and is still valid
+        existing_lock = db.query(BatchLock).filter(
+            BatchLock.user_id == user_id,
+            BatchLock.expires_at > datetime.now(timezone.utc)
+        ).first()
+        
+        if not existing_lock:
+            # Create new lock (3 minute TTL)
+            lock = BatchLock(
                 user_id=user_id,
-                key="batch_lock",
-                value="locked",
-                category="conversation",
-                ttl_hours=0.05,  # ~3 minutes
-                source="webhook",
-                allow_duplicates=False,
+                channel="telegram",
+                expires_at=datetime.now(timezone.utc) + timedelta(minutes=3)
             )
+            db.add(lock)
+            db.commit()
             asyncio.create_task(process_telegram_batch(user_id, uid))
+        
         db.close()
     except Exception as e:
         print("[batch lock error]", e)
@@ -247,10 +243,26 @@ def purge_inactive_memories(days_keep: int = 60):
         print(f"[purge error] {e}")
 
 
+def purge_expired_batch_locks():
+    """Remove expired batch locks from the database."""
+    try:
+        db = SessionLocal()
+        deleted = db.query(BatchLock).filter(
+            BatchLock.expires_at < datetime.now(timezone.utc)
+        ).delete(synchronize_session=False)
+        if deleted:
+            print(f"[purge] Deleted {deleted} expired batch locks.")
+        db.commit()
+        db.close()
+    except Exception as e:
+        print(f"[batch lock purge error] {e}")
+
+
 def nightly_memory_purge(days_keep: int = 60, hour_utc: int = 2):
     """Run memory purge at startup and then nightly at a fixed UTC hour."""
     # Run immediately at startup
     purge_inactive_memories(days_keep=days_keep)
+    purge_expired_batch_locks()
 
     while True:
         try:
@@ -261,6 +273,7 @@ def nightly_memory_purge(days_keep: int = 60, hour_utc: int = 2):
             sleep_seconds = (next_run - now).total_seconds()
             time.sleep(sleep_seconds)
             purge_inactive_memories(days_keep=days_keep)
+            purge_expired_batch_locks()
         except Exception as e:
             print(f"[purge error] {e}")
             time.sleep(60)
