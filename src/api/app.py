@@ -41,6 +41,7 @@ async def telegram_webhook(request: Request, secret_token: str):
     text = parsed["text"]
     first_name = payload.get("message", {}).get("from", {}).get("first_name")
     last_name = payload.get("message", {}).get("from", {}).get("last_name")
+
     db = SessionLocal()
     db_user = db.query(User).filter_by(external_id=str(uid), channel="telegram").first()
     if not db_user:
@@ -65,6 +66,8 @@ async def telegram_webhook(request: Request, secret_token: str):
         if updated:
             db.commit()
             print(f"[user updated] {uid} {first_name} {last_name}")
+    # Extract user_id before closing session
+    user_id = db_user.user_id if db_user else db.query(User).filter_by(external_id=str(uid), channel="telegram").first().user_id
     db.close()
 
     # Log all incoming messages to MessageLog
@@ -95,7 +98,7 @@ async def telegram_webhook(request: Request, secret_token: str):
     db = SessionLocal()
     dialogue = DialogueEngine(db)
     ai_response = await dialogue.process_message(
-        user_id=db_user.user_id,
+        user_id=user_id,
         text=text,
         session=db,
         include_history=True,

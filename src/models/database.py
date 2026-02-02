@@ -3,13 +3,11 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from sqlalchemy import DateTime
 import datetime
-import os
 
-# Use SQL Server by default, fallback to SQLite for dev/testing
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "sqlite:///./src/data/dev.db"
-)
+# Use Settings from config.py for database URL
+from src.config import settings
+
+DATABASE_URL = settings.DATABASE_URL
 
 engine = create_engine(
     DATABASE_URL,
