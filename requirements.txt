@@ -9,3 +9,5 @@ sendgrid
 pytest
 pytest-cov
 httpx
+apscheduler
+langdetect

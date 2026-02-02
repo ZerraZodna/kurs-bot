@@ -24,9 +24,26 @@ Rules:
 4. Skip casual chit-chat, questions, and vague statements
 5. Work in any language - Norwegian, English, etc.
 6. Prefer user corrections (e.g., "actually my goal is X") over inferred information
+7. COMMITMENT DETECTION: Look for statements where users commit to doing lessons regularly (e.g., "Ja, jeg ønsker", "Yes, I want", "ready to commit", "I'll do it daily", "jeg har lyst")
+
+Common memory keys to use:
+- "first_name": User's first/given name
+- "name": Full name
+- "learning_goal": What they want to learn/achieve
+- "preferred_lesson_time": When they want lessons/reminders (e.g., "morning", "9:00 AM", "evening", "daily")
+- "acim_commitment": If they commit to ACIM lessons (store "committed to 365 ACIM lessons" or similar commitment phrase)
+- "study_preference": How they prefer to study
+- "email": Email address
+- "phone": Phone number
+
+COMMITMENT EXAMPLES (extract as "acim_commitment"):
+- English: "Yes, I'm ready to commit to this journey!" -> store "committed to ACIM lessons"
+- Norwegian: "Ja, jeg ønsker gjøre leksene hver dag" -> store "committed to daily ACIM lessons"
+- Norwegian: "jeg har lyst å bli kjent med deg" -> NO commitment (just wanting to get to know the coach)
+- English: "I want to start learning" -> store "committed to learning ACIM"
 
 Output ONLY valid JSON (no markdown, no code blocks). Example:
-{"memories": [{"store": true, "key": "learning_goal", "value": "Learn Python programming", "confidence": 0.95, "ttl_hours": null}]}
+{"memories": [{"store": true, "key": "first_name", "value": "Sarah", "confidence": 0.98, "ttl_hours": null}]}
 
 Empty if nothing to store:
 {"memories": []}
