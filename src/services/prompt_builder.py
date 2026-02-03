@@ -139,9 +139,29 @@ class PromptBuilder:
     def _get_current_lesson_id(self, user_id: int) -> int:
         """Determine current lesson ID.
 
-        If the user has completed lessons, use the most recent completion.
-        Otherwise, default to Lesson 1.
+        Priority:
+        1. Check if user has explicitly stated their current lesson
+        2. If they have completed lessons, use most recent + 1
+        3. Otherwise, default to Lesson 1
         """
+        # First check for explicit current_lesson memory
+        current_lesson_memories = self.memory_manager.get_memory(user_id, "current_lesson")
+        if current_lesson_memories:
+            def _normalize_dt(value: Any) -> datetime:
+                if isinstance(value, datetime):
+                    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+                return datetime.min.replace(tzinfo=timezone.utc)
+
+            most_recent = max(
+                current_lesson_memories,
+                key=lambda x: _normalize_dt(x.get("created_at")),
+            )
+            raw_value = str(most_recent.get("value", "")).strip()
+            parsed = self._parse_lesson_id(raw_value)
+            if parsed:
+                return parsed
+        
+        # Check completed lessons and return next one
         lessons_completed = self.memory_manager.get_memory(user_id, "lesson_completed")
         if lessons_completed:
             def _normalize_dt(value: Any) -> datetime:
@@ -155,8 +175,10 @@ class PromptBuilder:
             )
             raw_value = str(most_recent.get("value", "")).strip()
             parsed = self._parse_lesson_id(raw_value)
-            if parsed:
-                return parsed
+            if parsed and parsed < 365:
+                return parsed + 1  # Next lesson after completion
+            elif parsed == 365:
+                return 365  # Stay on last lesson
 
         return 1
 
