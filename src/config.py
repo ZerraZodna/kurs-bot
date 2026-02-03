@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     OLLAMA_URL: str = "http://localhost:11434/api/generate"
     OLLAMA_MODEL: str = "qwen3:latest"
     MEMORY_EXTRACTOR_MODEL: str = "qwen3:latest"
+    OLLAMA_CHAT_RAG_MODEL: str = "llama3.2:3b"
+    MEMORY_EXTRACTOR_RAG_MODEL: str = "llama3.2:3b"
     
     # Embedding settings for semantic search
     OLLAMA_EMBED_URL: str = "http://localhost:11434/api/embed"
@@ -18,6 +20,7 @@ class Settings(BaseSettings):
     SEMANTIC_SEARCH_MAX_RESULTS: int = 5
     
     SYSTEM_PROMPT: str = "You are a spiritual coach specializing in A Course in Miracles. Respond with wisdom, compassion, and practical spiritual guidance."
+    SYSTEM_PROMPT_RAG: str = "You are a helpful personal assistant. Use the provided memories and context to give clear, concise answers. Be conversational and practical. Avoid lengthy spiritual lectures unless asked."
     # Add more config as needed
 
     class Config:

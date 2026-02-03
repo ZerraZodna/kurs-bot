@@ -19,26 +19,36 @@ class MemoryManager:
     def _hash_value(self, value: str) -> str:
         return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
-    async def _generate_and_store_embedding(self, memory: Memory):
+    async def _generate_and_store_embedding(self, memory_id: int, value: str):
         """
         Generate embedding for a memory and store it
         
         Args:
-            memory: Memory object to generate embedding for
+            memory_id: ID of the memory to generate embedding for
+            value: Memory value to generate embedding from
         """
         try:
-            embedding = await self.embedding_service.generate_embedding(memory.value)
+            embedding = await self.embedding_service.generate_embedding(value)
             if embedding:
-                memory.embedding = self.embedding_service.embedding_to_bytes(embedding)
-                memory.embedding_version = 1
-                memory.embedding_generated_at = datetime.now(timezone.utc)
-                self.db.add(memory)
-                self.db.commit()
-                logger.debug(f"Generated embedding for memory {memory.memory_id}")
+                # Create a new session for this async task
+                db = SessionLocal()
+                try:
+                    memory = db.query(Memory).filter(Memory.memory_id == memory_id).first()
+                    if memory:
+                        memory.embedding = self.embedding_service.embedding_to_bytes(embedding)
+                        memory.embedding_version = 1
+                        memory.embedding_generated_at = datetime.now(timezone.utc)
+                        db.add(memory)
+                        db.commit()
+                        logger.debug(f"Generated embedding for memory {memory_id}")
+                    else:
+                        logger.warning(f"Memory {memory_id} not found for embedding generation")
+                finally:
+                    db.close()
             else:
-                logger.warning(f"Failed to generate embedding for memory {memory.memory_id}")
+                logger.warning(f"Failed to generate embedding for memory {memory_id}")
         except Exception as e:
-            logger.error(f"Error generating embedding for memory {memory.memory_id}: {e}")
+            logger.error(f"Error generating embedding for memory {memory_id}: {e}")
 
     def get_memory(self, user_id: int, key: str) -> List[Dict]:
         now = datetime.now(timezone.utc)
@@ -125,7 +135,7 @@ class MemoryManager:
                 # Generate embedding asynchronously if needed
                 if generate_embedding:
                     try:
-                        asyncio.create_task(self._generate_and_store_embedding(e))
+                        asyncio.create_task(self._generate_and_store_embedding(e.memory_id, e.value))
                     except Exception as ex:
                         logger.warning(f"Could not schedule embedding generation: {ex}")
                 
@@ -150,7 +160,7 @@ class MemoryManager:
             # Generate embedding asynchronously if needed
             if generate_embedding:
                 try:
-                    asyncio.create_task(self._generate_and_store_embedding(new))
+                    asyncio.create_task(self._generate_and_store_embedding(new.memory_id, new.value))
                 except Exception as ex:
                     logger.warning(f"Could not schedule embedding generation: {ex}")
             
@@ -182,7 +192,7 @@ class MemoryManager:
             # Generate embedding asynchronously if needed
             if generate_embedding:
                 try:
-                    asyncio.create_task(self._generate_and_store_embedding(new))
+                    asyncio.create_task(self._generate_and_store_embedding(new.memory_id, new.value))
                 except Exception as ex:
                     logger.warning(f"Could not schedule embedding generation: {ex}")
             
@@ -206,11 +216,28 @@ class MemoryManager:
         # Generate embedding asynchronously if needed
         if generate_embedding:
             try:
-                asyncio.create_task(self._generate_and_store_embedding(new))
+                asyncio.create_task(self._generate_and_store_embedding(new.memory_id, new.value))
             except Exception as ex:
                 logger.warning(f"Could not schedule embedding generation: {ex}")
         
         return new.memory_id
+
+    def archive_memories(self, user_id: int, memory_ids: List[int]) -> int:
+        """Archive (soft-delete) memories by IDs for a user. Returns count archived."""
+        if not memory_ids:
+            return 0
+        now = datetime.now(timezone.utc)
+        q = self.db.query(Memory).filter(
+            Memory.user_id == user_id,
+            Memory.memory_id.in_(memory_ids),
+            Memory.is_active == True,
+        )
+        updated = q.update(
+            {Memory.is_active: False, Memory.archived_at: now},
+            synchronize_session=False,
+        )
+        self.db.commit()
+        return updated
 
     def purge_expired(self, days_keep: int = 365) -> int:
         """Delete archived rows older than days_keep. Returns number deleted."""

@@ -10,6 +10,7 @@ from langdetect import detect, LangDetectException
 from sqlalchemy.orm import Session
 from src.services.memory_manager import MemoryManager
 from src.services.memory_extractor import MemoryExtractor
+from src.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +162,7 @@ async def extract_and_store_memories(
     memory_extractor: MemoryExtractor,
     user_id: int,
     user_message: str,
+    rag_mode: bool = False,
 ) -> None:
     """
     Extract and store memories from user message.
@@ -184,8 +186,9 @@ async def extract_and_store_memories(
             else None
         )
 
+        model_override = settings.MEMORY_EXTRACTOR_RAG_MODEL if rag_mode else None
         extracted_memories = await memory_extractor.extract_memories(
-            user_message, user_context
+            user_message, user_context, model_override=model_override
         )
 
         for memory in extracted_memories:
@@ -197,6 +200,7 @@ async def extract_and_store_memories(
                     confidence=memory.get("confidence", 1.0),
                     ttl_hours=memory.get("ttl_hours"),
                     source="dialogue_engine_extractor",
+                    generate_embedding=False,  # Disable embedding to avoid lock contention
                 )
                 logger.info(
                     f"Stored memory for user {user_id}: {memory.get('key')}="

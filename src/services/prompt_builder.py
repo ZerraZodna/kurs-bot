@@ -55,6 +55,7 @@ class PromptBuilder:
         include_conversation_history: bool = True,
         history_turns: int = 4,
         max_context_tokens: int = 2000,
+        relevant_memories: Optional[List[Dict[str, Any]]] = None,
     ) -> str:
         """
         Build a context-rich prompt for the LLM.
@@ -107,6 +108,11 @@ class PromptBuilder:
         progress_context = self._build_progress_context(user_id)
         if progress_context:
             context_parts.append(f"\n### Recent Progress\n{progress_context}")
+
+        # 5b. Semantic Relevant Memories (optional)
+        semantic_context = self._build_semantic_memory_context(relevant_memories or [])
+        if semantic_context:
+            context_parts.append(f"\n### Relevant Memories\n{semantic_context}")
         
         # 6. Conversation History
         if include_conversation_history:
@@ -118,6 +124,92 @@ class PromptBuilder:
         context_parts.append(f"\n### Current Message\nUser: {user_input}\n\nAssistant:")
         
         return "".join(context_parts)
+
+    def build_rag_prompt(
+        self,
+        user_id: int,
+        user_input: str,
+        system_prompt: str,
+        relevant_memories: Optional[List[Dict[str, Any]]] = None,
+        include_conversation_history: bool = True,
+        history_turns: int = 2,
+        max_memories: int = 5,
+    ) -> str:
+        """
+        Build a RAG-focused prompt with minimal context.
+        
+        Skips ACIM lesson and category-based memories.
+        Uses only semantically relevant memories from the search.
+        
+        Args:
+            user_id: User ID from database
+            user_input: Current user message
+            system_prompt: Base system/persona prompt
+            relevant_memories: Semantically matched memories from search
+            include_conversation_history: Include recent conversation context
+            history_turns: Number of recent message pairs to include
+            max_memories: Maximum relevant memories to include
+        
+        Returns:
+            Formatted RAG prompt ready for Ollama
+        """
+        # Fetch user details for minimal profile info only
+        user = self.db.query(User).filter_by(user_id=user_id).first()
+        if not user:
+            return f"{system_prompt}\n\nUser: {user_input}\n\nAssistant:"
+        
+        context_parts = [system_prompt]
+        
+        # 1. Minimal user profile (just name if available)
+        if user.first_name:
+            name = user.first_name
+            if user.last_name:
+                name += f" {user.last_name}"
+            context_parts.append(f"\n### User\n{name}")
+        
+        # 2. Semantically relevant memories only
+        semantic_context = self._build_semantic_memory_context(relevant_memories or [], max_items=max_memories)
+        if semantic_context:
+            context_parts.append(f"\n### Relevant Context\n{semantic_context}")
+        
+        # 3. Light conversation history
+        if include_conversation_history:
+            history_context = self._build_conversation_history(user_id, history_turns)
+            if history_context:
+                context_parts.append(f"\n### Recent Conversation\n{history_context}")
+        
+        # 4. Current message
+        context_parts.append(f"\n### Current Message\nUser: {user_input}\n\nAssistant:")
+        
+        return "".join(context_parts)
+
+    def _build_semantic_memory_context(
+        self,
+        memories: List[Dict[str, Any]],
+        max_items: int = 5,
+        max_value_chars: int = 200,
+    ) -> str:
+        """Build a compact block of semantically relevant memories."""
+        if not memories:
+            return ""
+
+        lines: List[str] = []
+        for memory in memories[:max_items]:
+            value = str(memory.get("value", "")).strip()
+            if not value:
+                continue
+            if len(value) > max_value_chars:
+                value = value[:max_value_chars].rsplit(" ", 1)[0] + "..."
+
+            key = str(memory.get("key", "memory")).strip()
+            category = str(memory.get("category", "")).strip()
+            label = key if key else "memory"
+            if category:
+                label = f"{label} ({category})"
+
+            lines.append(f"- {label}: {value}")
+
+        return "\n".join(lines)
 
     def _get_today_lesson(self, user_id: int, max_chars: int = 800) -> Tuple[str, Optional[str]]:
         """Return today's lesson text based on user progress.
@@ -340,12 +432,24 @@ class PromptBuilder:
             return int(digits) if digits else None
     
     def _build_profile_context(self, user: Any) -> str:
-        """Extract user profile information."""
+        """Extract user profile information from both database and stored memories."""
         parts = []
-        if user.first_name:
-            parts.append(f"Name: {user.first_name}")
+        
+        # Check for stored full_name memory first, fall back to database name
+        stored_name = self.memory_manager.get_memory(user.user_id, "full_name")
+        if stored_name:
+            parts.append(f"Name: {stored_name[0]['value']}")
+        elif user.first_name:
+            name = user.first_name
             if user.last_name:
-                parts.append(f" {user.last_name}")
+                name += f" {user.last_name}"
+            parts.append(f"Name: {name}")
+        
+        # Add personal background if stored
+        personal_bg = self.memory_manager.get_memory(user.user_id, "personal_background")
+        if personal_bg:
+            parts.append(f"Background: {personal_bg[0]['value']}")
+        
         if user.email:
             parts.append(f"Email: {user.email}")
         if user.phone_number:

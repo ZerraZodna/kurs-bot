@@ -1,5 +1,5 @@
 
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Float, Text, ForeignKey, func, LargeBinary
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Float, Text, ForeignKey, func, LargeBinary, event
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from sqlalchemy import DateTime
 import datetime
@@ -12,9 +12,25 @@ DATABASE_URL = settings.DATABASE_URL
 engine = create_engine(
     DATABASE_URL,
     pool_size=10, max_overflow=20,
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+    connect_args={"check_same_thread": False, "timeout": 30} if DATABASE_URL.startswith("sqlite") else {},
     future=True,
 )
+
+# Improve SQLite concurrency behavior
+if DATABASE_URL.startswith("sqlite"):
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA busy_timeout=30000")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            try:
+                cursor.execute("PRAGMA journal_mode=WAL")
+            except Exception:
+                # If database is locked during startup, skip WAL and continue
+                pass
+        finally:
+            cursor.close()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 Base = declarative_base()
 

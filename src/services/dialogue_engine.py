@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from langdetect import detect, LangDetectException
 from src.services.memory_manager import MemoryManager
 from src.services.prompt_builder import PromptBuilder
+from src.services.semantic_search import get_semantic_search_service
 from src.services.memory_extractor import MemoryExtractor
 from src.services.onboarding_service import OnboardingService
 from src.services.scheduler import SchedulerService
@@ -69,6 +70,77 @@ class DialogueEngine:
         Returns:
             AI response from Ollama
         """
+        # Handle RAG mode toggle: rag_mode on/off
+        text_lower = text.strip().lower()
+        if text_lower == "rag_mode":
+            rag_mode_memory = self.memory_manager.get_memory(user_id, "rag_mode_enabled")
+            is_on = bool(rag_mode_memory and rag_mode_memory[0].get("value") == "true")
+            return f"RAG mode is {'on' if is_on else 'off'}."
+        if text_lower.startswith("rag_mode "):
+            mode_cmd = text_lower.replace("rag_mode", "").strip()
+            if mode_cmd == "on":
+                self.memory_manager.store_memory(
+                    user_id=user_id,
+                    key="rag_mode_enabled",
+                    value="true",
+                    confidence=1.0,
+                    source="user_command",
+                    category="conversation",
+                )
+                return "RAG mode enabled. I will use semantic search for all future messages."
+            elif mode_cmd == "off":
+                self.memory_manager.store_memory(
+                    user_id=user_id,
+                    key="rag_mode_enabled",
+                    value="false",
+                    confidence=1.0,
+                    source="user_command",
+                    category="conversation",
+                )
+                return "RAG mode disabled. Back to standard workflow."
+        
+        # Detect RAG prefix: "rag my question" or "rag: my question"
+        use_rag_for_this_message = False
+        if text_lower.startswith("rag:") or text_lower.startswith("rag "):
+            use_rag_for_this_message = True
+            # Strip the RAG prefix from the actual message
+            text = text[4:].lstrip(": ").strip()
+            text_lower = text.strip().lower()
+        
+        # Check if RAG mode is persistently enabled
+        if not use_rag_for_this_message and self.memory_manager:
+            rag_mode_memory = self.memory_manager.get_memory(user_id, "rag_mode_enabled")
+            if rag_mode_memory and rag_mode_memory[0].get("value") == "true":
+                use_rag_for_this_message = True
+
+        # Handle forget commands (semantic memory deletion)
+        forget_prefixes = ("forget ", "erase ", "delete ", "remove ")
+        if text_lower in {"forget", "erase", "delete", "remove"}:
+            return "Tell me what to forget (e.g., 'forget my grandfather')."
+        if text_lower.startswith(forget_prefixes):
+            query_text = text.split(" ", 1)[1].strip()
+            if not query_text:
+                return "Tell me what to forget (e.g., 'forget my grandfather')."
+            memory_ids = []
+            try:
+                search_service = get_semantic_search_service()
+                search_session = Session(bind=session.get_bind())
+                try:
+                    results = await search_service.search_memories(
+                        user_id=user_id,
+                        query_text=query_text,
+                        session=search_session,
+                    )
+                    memory_ids = [memory.memory_id for memory, _ in results]
+                finally:
+                    search_session.close()
+            except Exception as ex:
+                logger.warning(f"Semantic search failed for forget: {ex}")
+            archived = self.memory_manager.archive_memories(user_id, memory_ids)
+            if archived == 0:
+                return "I couldn't find any matching memories to forget."
+            return f"Forgot {archived} memory item(s) related to: {query_text}."
+
         # Debug magic command: simulate next day for lesson progression
         if text.strip().lower() == "next_day":
             if self.memory_manager:
@@ -109,7 +181,7 @@ class DialogueEngine:
 
         # FIRST: Extract memories from user message (this might store commitment, name, time, etc.)
         await extract_and_store_memories(
-            self.memory_manager, self.memory_extractor, user_id, text
+            self.memory_manager, self.memory_extractor, user_id, text, rag_mode=use_rag_for_this_message
         )
         await detect_and_store_language(self.memory_manager, user_id, text)
 
@@ -182,7 +254,7 @@ class DialogueEngine:
                 return onboarding_response
 
         # Auto-send next lesson on a new day when user makes contact
-        if include_lesson and self.prompt_builder:
+        if include_lesson and self.prompt_builder and not use_rag_for_this_message:
             auto_message = await self._maybe_send_next_lesson(user_id, text, session)
             if auto_message:
                 return auto_message
@@ -193,17 +265,59 @@ class DialogueEngine:
             prompt = f"{settings.SYSTEM_PROMPT}\nUser: {text}\n\nAssistant:"
         else:
             # Build context-aware prompt
-            prompt = self.prompt_builder.build_prompt(
-                user_id=user_id,
-                user_input=text,
-                system_prompt=settings.SYSTEM_PROMPT,
-                include_lesson=include_lesson,
-                include_conversation_history=include_history,
-                history_turns=history_turns,
-            )
+            relevant_memories = []
+            try:
+                search_service = get_semantic_search_service()
+                # Use a fresh session for semantic search to avoid lock conflicts
+                search_session = Session(bind=session.get_bind())
+                try:
+                    results = await search_service.search_memories(
+                        user_id=user_id,
+                        query_text=text,
+                        session=search_session,
+                    )
+                    relevant_memories = [
+                        {
+                            "memory_id": memory.memory_id,
+                            "key": memory.key,
+                            "value": memory.value,
+                            "category": memory.category,
+                            "confidence": memory.confidence,
+                            "similarity": score,
+                        }
+                        for memory, score in results
+                    ]
+                finally:
+                    search_session.close()
+            except Exception as ex:
+                logger.warning(f"Semantic search failed: {ex}")
+
+            # Use RAG prompt if RAG mode is active for this message
+            if use_rag_for_this_message:
+                system_prompt = settings.SYSTEM_PROMPT_RAG
+                prompt = self.prompt_builder.build_rag_prompt(
+                    user_id=user_id,
+                    user_input=text,
+                    system_prompt=system_prompt,
+                    relevant_memories=relevant_memories,
+                    include_conversation_history=include_history,
+                    history_turns=history_turns,
+                )
+            else:
+                system_prompt = settings.SYSTEM_PROMPT
+                prompt = self.prompt_builder.build_prompt(
+                    user_id=user_id,
+                    user_input=text,
+                    system_prompt=system_prompt,
+                    include_lesson=include_lesson,
+                    include_conversation_history=include_history,
+                    history_turns=history_turns,
+                    relevant_memories=relevant_memories,
+                )
         
         # Call Ollama
-        response = await self.call_ollama(prompt)
+        rag_model = settings.OLLAMA_CHAT_RAG_MODEL or settings.OLLAMA_MODEL
+        response = await self.call_ollama(prompt, model=rag_model if use_rag_for_this_message else None)
         
         return response
 

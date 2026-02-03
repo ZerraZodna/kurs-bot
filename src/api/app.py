@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 import asyncio
 import logging
 import httpx
+from sqlalchemy.exc import OperationalError
 
 app = FastAPI()
 
@@ -163,51 +164,60 @@ async def telegram_webhook(request: Request, secret_token: str):
     user_id = db_user.user_id if db_user else db.query(User).filter_by(external_id=str(uid), channel="telegram").first().user_id
     db.close()
 
-    # Log all incoming messages to MessageLog
-    try:
+    # Log all incoming messages to MessageLog with retry
+    def _log_message():
         db = SessionLocal()
-        user_id = db.query(User).filter_by(external_id=str(uid), channel="telegram").first().user_id if uid else None
-        log = MessageLog(
-            user_id=user_id,
-            direction="inbound",
-            channel="telegram",
-            external_message_id=parsed["external_message_id"],
-            content=text,
-            status="delivered",
-            error_message=None
-        )
-        # Only set new columns if they exist (migration applied)
         try:
-            log.message_role = "user"
-        except:
-            pass
-        db.add(log)
-        db.commit()
-        db.close()
+            user_id = db.query(User).filter_by(external_id=str(uid), channel="telegram").first().user_id if uid else None
+            log = MessageLog(
+                user_id=user_id,
+                direction="inbound",
+                channel="telegram",
+                external_message_id=parsed["external_message_id"],
+                content=text,
+                status="delivered",
+                error_message=None
+            )
+            # Only set new columns if they exist (migration applied)
+            try:
+                log.message_role = "user"
+            except:
+                pass
+            db.add(log)
+            db.commit()
+        finally:
+            db.close()
+    
+    try:
+        _retry_db_op("messagelog", _log_message, attempts=3, delay_seconds=0.1)
     except Exception as e:
         print("[messagelog error]", e)
 
     # Schedule background batch processing to allow more messages to arrive
-    try:
+    def _create_batch_lock():
         db = SessionLocal()
-        # Check if lock already exists and is still valid
-        existing_lock = db.query(BatchLock).filter(
-            BatchLock.user_id == user_id,
-            BatchLock.expires_at > datetime.now(timezone.utc)
-        ).first()
-        
-        if not existing_lock:
-            # Create new lock (3 minute TTL)
-            lock = BatchLock(
-                user_id=user_id,
-                channel="telegram",
-                expires_at=datetime.now(timezone.utc) + timedelta(minutes=3)
-            )
-            db.add(lock)
-            db.commit()
-            asyncio.create_task(process_telegram_batch(user_id, uid))
-        
-        db.close()
+        try:
+            # Check if lock already exists and is still valid
+            existing_lock = db.query(BatchLock).filter(
+                BatchLock.user_id == user_id,
+                BatchLock.expires_at > datetime.now(timezone.utc)
+            ).first()
+            
+            if not existing_lock:
+                # Create new lock (3 minute TTL)
+                lock = BatchLock(
+                    user_id=user_id,
+                    channel="telegram",
+                    expires_at=datetime.now(timezone.utc) + timedelta(minutes=3)
+                )
+                db.add(lock)
+                db.commit()
+                asyncio.create_task(process_telegram_batch(user_id, uid))
+        finally:
+            db.close()
+    
+    try:
+        _retry_db_op("batch lock", _create_batch_lock, attempts=3, delay_seconds=0.1)
     except Exception as e:
         print("[batch lock error]", e)
 
@@ -215,30 +225,70 @@ async def telegram_webhook(request: Request, secret_token: str):
 
 
 # --- Add a background thread to purge old messages from MessageLog daily ---
-def purge_old_messages():
+def _retry_db_op(op_name: str, func, attempts: int = 3, delay_seconds: float = 1.0):
+    for attempt in range(1, attempts + 1):
+        try:
+            return func()
+        except OperationalError as e:
+            if attempt == attempts:
+                print(f"[{op_name} error] {e}")
+                return None
+            time.sleep(delay_seconds * attempt)
+
+
+def purge_old_messages(hour_utc: int = 2):
+    """Purge old messages at maintenance time (02:00 UTC). Skip first run on startup."""
+    first_run = True
     while True:
         try:
-            db = SessionLocal()
-            cutoff = datetime.now(timezone.utc) - timedelta(days=30)
-            deleted = db.query(MessageLog).filter(MessageLog.created_at < cutoff).delete()
-            if deleted:
-                print(f"[purge] Deleted {deleted} old messages from MessageLog.")
-            db.commit()
-            db.close()
+            now = datetime.now(timezone.utc)
+            next_run = now.replace(hour=hour_utc, minute=0, second=0, microsecond=0)
+            if next_run <= now:
+                next_run += timedelta(days=1)
+            
+            # Skip purge on first startup to avoid conflicts
+            if not first_run:
+                sleep_seconds = (next_run - now).total_seconds()
+                time.sleep(sleep_seconds)
+                
+                def _do_purge():
+                    db = SessionLocal()
+                    try:
+                        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+                        deleted = db.query(MessageLog).filter(MessageLog.created_at < cutoff).delete()
+                        if deleted:
+                            print(f"[purge] Deleted {deleted} old messages from MessageLog.")
+                        db.commit()
+                    finally:
+                        db.close()
+
+                _retry_db_op("purge", _do_purge)
+            else:
+                # First run: calculate sleep to next 02:00 UTC without running
+                sleep_seconds = (next_run - now).total_seconds()
+                print(f"[purge] Next message purge scheduled at {next_run.isoformat()}")
+                time.sleep(sleep_seconds)
+            
+            first_run = False
         except Exception as e:
             print(f"[purge error] {e}")
-        time.sleep(24 * 60 * 60)  # Run once per day
+            time.sleep(60)
 
 
 def purge_inactive_memories(days_keep: int = 60):
     """Purge archived/inactive memories older than days_keep (UTC)."""
     try:
-        db = SessionLocal()
-        memory_manager = MemoryManager(db)
-        deleted = memory_manager.purge_expired(days_keep=days_keep)
-        if deleted:
-            print(f"[purge] Deleted {deleted} archived memories older than {days_keep} days.")
-        db.close()
+        def _do_purge():
+            db = SessionLocal()
+            try:
+                memory_manager = MemoryManager(db)
+                deleted = memory_manager.purge_expired(days_keep=days_keep)
+                if deleted:
+                    print(f"[purge] Deleted {deleted} archived memories older than {days_keep} days.")
+            finally:
+                db.close()
+
+        _retry_db_op("purge", _do_purge)
     except Exception as e:
         print(f"[purge error] {e}")
 
@@ -246,34 +296,46 @@ def purge_inactive_memories(days_keep: int = 60):
 def purge_expired_batch_locks():
     """Remove expired batch locks from the database."""
     try:
-        db = SessionLocal()
-        deleted = db.query(BatchLock).filter(
-            BatchLock.expires_at < datetime.now(timezone.utc)
-        ).delete(synchronize_session=False)
-        if deleted:
-            print(f"[purge] Deleted {deleted} expired batch locks.")
-        db.commit()
-        db.close()
+        def _do_purge():
+            db = SessionLocal()
+            try:
+                deleted = db.query(BatchLock).filter(
+                    BatchLock.expires_at < datetime.now(timezone.utc)
+                ).delete(synchronize_session=False)
+                if deleted:
+                    print(f"[purge] Deleted {deleted} expired batch locks.")
+                db.commit()
+            finally:
+                db.close()
+
+        _retry_db_op("batch lock purge", _do_purge)
     except Exception as e:
         print(f"[batch lock purge error] {e}")
 
 
 def nightly_memory_purge(days_keep: int = 60, hour_utc: int = 2):
-    """Run memory purge at startup and then nightly at a fixed UTC hour."""
-    # Run immediately at startup
-    purge_inactive_memories(days_keep=days_keep)
-    purge_expired_batch_locks()
-
+    """Run memory purge only at fixed UTC maintenance hour (02:00 AM). Skip first run on startup."""
+    first_run = True
     while True:
         try:
             now = datetime.now(timezone.utc)
             next_run = now.replace(hour=hour_utc, minute=0, second=0, microsecond=0)
             if next_run <= now:
                 next_run += timedelta(days=1)
-            sleep_seconds = (next_run - now).total_seconds()
-            time.sleep(sleep_seconds)
-            purge_inactive_memories(days_keep=days_keep)
-            purge_expired_batch_locks()
+            
+            # Skip purge on first startup to avoid conflicts with normal operations
+            if not first_run:
+                sleep_seconds = (next_run - now).total_seconds()
+                time.sleep(sleep_seconds)
+                purge_inactive_memories(days_keep=days_keep)
+                purge_expired_batch_locks()
+            else:
+                # First run: just schedule for next maintenance window
+                sleep_seconds = (next_run - now).total_seconds()
+                print(f"[purge] Scheduled nightly maintenance at {next_run.isoformat()}")
+                time.sleep(sleep_seconds)
+            
+            first_run = False
         except Exception as e:
             print(f"[purge error] {e}")
             time.sleep(60)

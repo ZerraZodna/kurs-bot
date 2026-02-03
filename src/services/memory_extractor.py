@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 OLLAMA_URL = settings.OLLAMA_URL or "http://localhost:11434/api/generate"
 MEMORY_EXTRACTOR_MODEL = settings.MEMORY_EXTRACTOR_MODEL or "qwen2.5-coder:7b"
+MEMORY_EXTRACTOR_RAG_MODEL = settings.MEMORY_EXTRACTOR_RAG_MODEL or MEMORY_EXTRACTOR_MODEL
 
 # System prompt for memory extraction - language agnostic
 MEMORY_EXTRACTION_PROMPT = """You are a personal memory classifier. Your job is to extract meaningful facts and preferences from user messages.
@@ -68,6 +69,7 @@ class MemoryExtractor:
     async def extract_memories(
         user_message: str,
         user_context: Optional[Dict[str, Any]] = None,
+        model_override: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Extract memories from a user message using Ollama.
@@ -96,7 +98,7 @@ User message: "{user_message}"{context_str}"""
             
             # Call Ollama
             payload = {
-                "model": MEMORY_EXTRACTOR_MODEL,
+                "model": model_override or MEMORY_EXTRACTOR_MODEL,
                 "prompt": prompt,
                 "stream": False,
             }
