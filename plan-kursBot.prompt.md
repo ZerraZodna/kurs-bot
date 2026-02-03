@@ -4,6 +4,10 @@ Self-contained prompts for each milestone. Copy/paste each into a new AI convers
 
 ---
 
+Vital missing points currently (Added by JS/AI)
+8b. Compliance/production hardening items are missing: rate limiting, logging middleware, audit logging, GDPR delete/export endpoints, security headers, performance tests, and docs (e.g., src/middleware/logging.py, src/middleware/audit.py, tests/test_performance.py, docs/DEPLOYMENT.md, .github/SECURITY.md).
+
+
 ## **MILESTONE 1: Foundation & Data Layer**
 
 You are implementing Milestone 1 of the Kurs Bot project: a learning-bot system with persistent memory for customers using SQL Server.
