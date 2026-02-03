@@ -46,7 +46,22 @@ class OnboardingService:
             str(m.get("value", "")).lower() in ["declined", "no", "not interested"]
             for m in commitment_memories
         )
-        has_name = bool(self.memory_manager.get_memory(user_id, "first_name"))
+        # Check for name in either 'first_name' or 'name' key
+        first_name_memories = self.memory_manager.get_memory(user_id, "first_name")
+        name_memories = self.memory_manager.get_memory(user_id, "name")
+        has_name = bool(first_name_memories or name_memories)
+        
+        # If we have 'name' but not 'first_name', copy it over
+        if name_memories and not first_name_memories:
+            self.memory_manager.store_memory(
+                user_id=user_id,
+                key="first_name",
+                value=name_memories[0].get("value"),
+                confidence=name_memories[0].get("confidence", 1.0),
+                source="onboarding_service_name_migration",
+                category="profile",
+            )
+        
         consent_memories = self.memory_manager.get_memory(user_id, "data_consent")
         has_consent = bool(consent_memories)
         declined_consent = any(
@@ -103,7 +118,10 @@ class OnboardingService:
         language = lang_memories[0]["value"] if lang_memories else "English"
         
         next_step = status["next_step"]
+        # Get name from either 'first_name' or 'name' key
         name_memories = self.memory_manager.get_memory(user_id, "first_name")
+        if not name_memories:
+            name_memories = self.memory_manager.get_memory(user_id, "name")
         name = name_memories[0]["value"] if name_memories else "friend"
         
         # Prompts in different languages
@@ -169,7 +187,10 @@ Are you interested in exploring these lessons together? I'm here to guide and su
         Returns:
             Welcome message explaining what the user can do next
         """
+        # Get name from either 'first_name' or 'name' key
         name_memories = self.memory_manager.get_memory(user_id, "first_name")
+        if not name_memories:
+            name_memories = self.memory_manager.get_memory(user_id, "name")
         name = name_memories[0]["value"] if name_memories else "friend"
         
         # Detect user's language

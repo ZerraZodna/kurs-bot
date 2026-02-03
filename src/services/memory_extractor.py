@@ -28,8 +28,8 @@ Rules:
 8. LESSON PROGRESS: Extract when user mentions what lesson they're on or have completed
 
 Common memory keys to use:
-- "first_name": User's first/given name
-- "name": Full name
+- "first_name": User's first/given name (ALWAYS use this key for any name, even short ones like "Jo", "Li", "Live", "Max")
+- "name": Only use for full name if both first and last name are provided together
 - "learning_goal": What they want to learn/achieve
 - "preferred_lesson_time": When they want lessons/reminders (e.g., "morning", "9:00 AM", "evening", "daily")
 - "acim_commitment": If they commit to ACIM lessons (store "committed to 365 ACIM lessons" or similar commitment phrase)

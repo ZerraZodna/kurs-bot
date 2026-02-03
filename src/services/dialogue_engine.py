@@ -68,6 +68,20 @@ class DialogueEngine:
         Returns:
             AI response from Ollama
         """
+        # Debug magic command: simulate next day for lesson progression
+        if text.strip().lower() == "next_day":
+            if self.memory_manager:
+                self.memory_manager.store_memory(
+                    user_id=user_id,
+                    key="debug_day_offset",
+                    value="1",
+                    confidence=1.0,
+                    source="debug_command",
+                    ttl_hours=1,
+                    category="conversation",
+                )
+            return "OK — simulating next day for 1 hour. Send any message to get the next lesson."
+
         # FIRST: Extract memories from user message (this might store commitment, name, time, etc.)
         await self._extract_and_store_memories(user_id, text, session)
 
@@ -127,6 +141,12 @@ class DialogueEngine:
             onboarding_response = await self._handle_onboarding(user_id, text, session)
             if onboarding_response:
                 return onboarding_response
+
+        # Auto-send next lesson on a new day when user makes contact
+        if include_lesson and self.prompt_builder:
+            auto_message = await self._maybe_send_next_lesson(user_id, text, session)
+            if auto_message:
+                return auto_message
         
         # Regular conversation
         if not self.prompt_builder:
@@ -147,6 +167,64 @@ class DialogueEngine:
         response = await self.call_ollama(prompt)
         
         return response
+
+    async def _maybe_send_next_lesson(self, user_id: int, text: str, session: Session) -> Optional[str]:
+        context = self.prompt_builder.get_today_lesson_context(user_id)
+        lesson_text = context.get("lesson_text", "")
+        state = context.get("state", {})
+        if not lesson_text or not state.get("advanced_by_day"):
+            return None
+
+        if not self._is_simple_greeting(text):
+            return None
+
+        lesson_id = state.get("lesson_id")
+        previous_lesson_id = state.get("previous_lesson_id")
+        if not lesson_id:
+            return None
+
+        lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
+        if not lesson:
+            return None
+
+        language = self._get_user_language(user_id)
+        message = await self._format_lesson_message(lesson, language)
+
+        repeat_note = None
+        if previous_lesson_id:
+            repeat_note = (
+                f"If you'd like to repeat Lesson {previous_lesson_id} instead, just let me know."
+            )
+            if language.lower() not in ["english", "en"]:
+                repeat_note = await self._translate_text(repeat_note, language)
+
+        if repeat_note:
+            message = f"{message}\n\n{repeat_note}"
+
+        # Track last sent lesson for future day-advance logic
+        self.memory_manager.store_memory(
+            user_id=user_id,
+            key="last_sent_lesson_id",
+            value=str(lesson.lesson_id),
+            category="progress",
+            confidence=1.0,
+            source="dialogue_engine_auto_lesson",
+        )
+
+        return message
+
+    def _is_simple_greeting(self, text: str) -> bool:
+        cleaned = re.sub(r"[^a-zA-Z\s]", "", text or "").strip().lower()
+        if not cleaned:
+            return True
+        if len(cleaned.split()) <= 3:
+            greetings = {
+                "hi", "hello", "hey", "good morning", "good evening",
+                "good afternoon", "morning", "evening", "afternoon",
+                "hei", "hallo", "god morgen", "god kveld", "god ettermiddag",
+            }
+            return cleaned in greetings
+        return False
 
     def _parse_one_time_reminder(self, text: str) -> Optional[Dict[str, Any]]:
         """Parse one-time reminders like 'remind me to X in 5 minutes'."""
@@ -352,38 +430,64 @@ class DialogueEngine:
             session: SQLAlchemy session
         """
         try:
-            # Detect language from user message (store on first message)
+            # Detect language from user message (store/update when confident)
             if self.memory_manager:
                 existing_lang = self.memory_manager.get_memory(user_id, "user_language")
-                if not existing_lang:
-                    try:
-                        detected_lang = detect(user_message)
-                        
-                        # Check for Norwegian-specific keywords if confidence is low
-                        norwegian_keywords = ["hei", "jeg", "heter", "jeg heter", "hvordan", "hvordan går", "takk", "vær så snill", "lyst"]
-                        msg_lower = user_message.lower()
-                        
-                        # If Norwegian keywords found and message is short, prioritize Norwegian
-                        if detected_lang in ['de', 'sv', 'da'] and len(user_message.split()) <= 5:
-                            if any(kw in msg_lower for kw in norwegian_keywords):
-                                detected_lang = 'no'
-                        
-                        # Map language codes to full names
-                        lang_names = {
-                            'no': 'Norwegian',
-                            'en': 'English',
-                            'sv': 'Swedish',
-                            'da': 'Danish',
-                            'de': 'German',
-                            'fr': 'French',
-                            'es': 'Spanish',
-                            'it': 'Italian',
-                            'pt': 'Portuguese',
-                            'ru': 'Russian',
-                            'ja': 'Japanese',
-                            'zh-cn': 'Chinese',
-                        }
-                        lang_name = lang_names.get(detected_lang, detected_lang.upper())
+                existing_value = existing_lang[0].get("value") if existing_lang else None
+                try:
+                    detected_lang = detect(user_message)
+
+                    norwegian_keywords = [
+                        "hei", "jeg", "heter", "jeg heter", "hvordan", "hvordan går", "takk",
+                        "vær så snill", "lyst", "god morgen", "god kveld", "god ettermiddag",
+                        "ikke", "ja", "nei",
+                    ]
+                    english_keywords = [
+                        "hello", "hi", "i", "you", "the", "and", "please", "thank", "good morning",
+                        "good evening", "good afternoon", "how are", "what is",
+                    ]
+
+                    msg_lower = user_message.lower()
+                    word_count = len(user_message.split())
+                    has_no_keywords = any(kw in msg_lower for kw in norwegian_keywords)
+                    has_en_keywords = any(kw in msg_lower for kw in english_keywords)
+
+                    # Guard against NL misclassification when Norwegian keywords are present
+                    if detected_lang in ["nl", "de", "sv", "da"] and has_no_keywords:
+                        detected_lang = "no"
+
+                    # Map language codes to full names
+                    lang_names = {
+                        "no": "Norwegian",
+                        "nb": "Norwegian",
+                        "nn": "Norwegian",
+                        "en": "English",
+                        "sv": "Swedish",
+                        "da": "Danish",
+                        "de": "German",
+                        "fr": "French",
+                        "es": "Spanish",
+                        "it": "Italian",
+                        "pt": "Portuguese",
+                        "ru": "Russian",
+                        "ja": "Japanese",
+                        "zh-cn": "Chinese",
+                    }
+                    lang_name = lang_names.get(detected_lang, detected_lang.upper())
+
+                    should_update = False
+                    if not existing_value:
+                        should_update = True
+                    elif lang_name != existing_value:
+                        # Only update when message is long enough or contains strong keywords
+                        if word_count >= 4 and (has_no_keywords or has_en_keywords):
+                            should_update = True
+                        elif has_no_keywords and lang_name == "Norwegian":
+                            should_update = True
+                        elif has_en_keywords and lang_name == "English":
+                            should_update = True
+
+                    if should_update:
                         self.memory_manager.store_memory(
                             user_id=user_id,
                             key="user_language",
@@ -393,8 +497,8 @@ class DialogueEngine:
                             category="preference",
                         )
                         logger.info(f"Detected language for user {user_id}: {lang_name} (code: {detected_lang})")
-                    except LangDetectException as e:
-                        logger.warning(f"Could not detect language: {e}")
+                except LangDetectException as e:
+                    logger.warning(f"Could not detect language: {e}")
             
             # Get user's existing memories for context
             user_context = None

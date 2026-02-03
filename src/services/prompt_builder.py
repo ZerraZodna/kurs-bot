@@ -3,7 +3,7 @@ Prompt Builder: Constructs context-aware prompts from user memory, preferences, 
 Supports dynamic context assembly for Ollama LLM with token optimization.
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
 from src.models.database import Memory, MessageLog, User, Lesson
@@ -82,9 +82,11 @@ class PromptBuilder:
         
         # 1. Today's Lesson (optional)
         if include_lesson:
-            lesson_context = self._get_today_lesson(user_id)
+            lesson_context, progress_note = self._get_today_lesson(user_id)
             if lesson_context:
                 context_parts.append(f"\n### Today's ACIM Lesson\n{lesson_context}")
+            if progress_note:
+                context_parts.append(f"\n### Lesson Progress Note\n{progress_note}")
 
         # 2. User Profile Context
         profile_context = self._build_profile_context(user)
@@ -117,70 +119,215 @@ class PromptBuilder:
         
         return "".join(context_parts)
 
-    def _get_today_lesson(self, user_id: int, max_chars: int = 800) -> str:
+    def _get_today_lesson(self, user_id: int, max_chars: int = 800) -> Tuple[str, Optional[str]]:
         """Return today's lesson text based on user progress.
 
         Defaults to Lesson 1 unless the user is explicitly on another lesson.
         """
-        lesson_id = self._get_current_lesson_id(user_id)
+        state = self._get_current_lesson_state(user_id)
+        lesson_id = state.get("lesson_id")
         if not lesson_id:
-            return ""
+            return "", None
 
         lesson = self.db.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
         if not lesson:
-            return ""
+            return "", None
 
         content = lesson.content or ""
         if max_chars and len(content) > max_chars:
             content = content[:max_chars].rsplit(" ", 1)[0] + "..."
 
-        return f"**Lesson {lesson.lesson_id}**: \"{lesson.title}\"\n\n{content}"
+        lesson_text = f"**Lesson {lesson.lesson_id}**: \"{lesson.title}\"\n\n{content}"
+        return lesson_text, state.get("progress_note")
+
+    def get_today_lesson_context(self, user_id: int, max_chars: int = 800) -> Dict[str, Any]:
+        """Return lesson text and state for deterministic responses."""
+        state = self._get_current_lesson_state(user_id)
+        lesson_id = state.get("lesson_id")
+        if not lesson_id:
+            return {"lesson_text": "", "state": state}
+
+        lesson = self.db.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
+        if not lesson:
+            return {"lesson_text": "", "state": state}
+
+        content = lesson.content or ""
+        if max_chars and len(content) > max_chars:
+            content = content[:max_chars].rsplit(" ", 1)[0] + "..."
+
+        lesson_text = f"**Lesson {lesson.lesson_id}**: \"{lesson.title}\"\n\n{content}"
+        return {"lesson_text": lesson_text, "state": state}
 
     def _get_current_lesson_id(self, user_id: int) -> int:
         """Determine current lesson ID.
 
-        Priority:
-        1. Check if user has explicitly stated their current lesson
-        2. If they have completed lessons, use most recent + 1
-        3. Otherwise, default to Lesson 1
+        Priority (by most recent signal):
+        - Explicit current lesson
+        - Lesson completion
+        - Last lesson sent (auto-advance on a new day)
+        - Default to Lesson 1
         """
-        # First check for explicit current_lesson memory
+        state = self._get_current_lesson_state(user_id)
+        return state.get("lesson_id", 1)
+
+    def _get_current_lesson_state(self, user_id: int) -> Dict[str, Any]:
+        """Return current lesson state and progress note for prompt guidance."""
+        now = datetime.now(timezone.utc)
+        day_offset = self._get_debug_day_offset(user_id)
+        today = (now + timedelta(days=day_offset)).date()
+
+        def _normalize_dt(value: Any) -> datetime:
+            if isinstance(value, datetime):
+                return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+            return datetime.min.replace(tzinfo=timezone.utc)
+
+        signals: List[Dict[str, Any]] = []
+
         current_lesson_memories = self.memory_manager.get_memory(user_id, "current_lesson")
         if current_lesson_memories:
-            def _normalize_dt(value: Any) -> datetime:
-                if isinstance(value, datetime):
-                    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
-                return datetime.min.replace(tzinfo=timezone.utc)
+            most_recent = max(current_lesson_memories, key=lambda x: _normalize_dt(x.get("created_at")))
+            signals.append({
+                "type": "current_lesson",
+                "value": str(most_recent.get("value", "")).strip(),
+                "created_at": _normalize_dt(most_recent.get("created_at")),
+            })
 
-            most_recent = max(
-                current_lesson_memories,
-                key=lambda x: _normalize_dt(x.get("created_at")),
-            )
-            raw_value = str(most_recent.get("value", "")).strip()
-            parsed = self._parse_lesson_id(raw_value)
-            if parsed:
-                return parsed
-        
-        # Check completed lessons and return next one
         lessons_completed = self.memory_manager.get_memory(user_id, "lesson_completed")
         if lessons_completed:
-            def _normalize_dt(value: Any) -> datetime:
-                if isinstance(value, datetime):
-                    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
-                return datetime.min.replace(tzinfo=timezone.utc)
+            most_recent = max(lessons_completed, key=lambda x: _normalize_dt(x.get("created_at")))
+            signals.append({
+                "type": "lesson_completed",
+                "value": str(most_recent.get("value", "")).strip(),
+                "created_at": _normalize_dt(most_recent.get("created_at")),
+            })
 
-            most_recent = max(
-                lessons_completed,
-                key=lambda x: _normalize_dt(x.get("created_at")),
-            )
-            raw_value = str(most_recent.get("value", "")).strip()
-            parsed = self._parse_lesson_id(raw_value)
-            if parsed and parsed < 365:
-                return parsed + 1  # Next lesson after completion
-            elif parsed == 365:
-                return 365  # Stay on last lesson
+        last_sent_memories = self.memory_manager.get_memory(user_id, "last_sent_lesson_id")
+        if last_sent_memories:
+            most_recent = max(last_sent_memories, key=lambda x: _normalize_dt(x.get("created_at")))
+            signals.append({
+                "type": "last_sent_lesson_id",
+                "value": str(most_recent.get("value", "")).strip(),
+                "created_at": _normalize_dt(most_recent.get("created_at")),
+            })
+        else:
+            log_value = self._get_last_lesson_from_logs(user_id)
+            if log_value:
+                signals.append({
+                    "type": "last_sent_lesson_id",
+                    "value": str(log_value.get("lesson_id", "")).strip(),
+                    "created_at": _normalize_dt(log_value.get("created_at")),
+                })
 
-        return 1
+        if not signals:
+            return {
+                "lesson_id": 1,
+                "progress_note": None,
+                "advanced_by_day": False,
+                "previous_lesson_id": None,
+            }
+
+        latest = max(signals, key=lambda s: s.get("created_at", datetime.min.replace(tzinfo=timezone.utc)))
+        signal_type = latest.get("type")
+        parsed = self._parse_lesson_id(str(latest.get("value", "")).strip())
+        if not parsed:
+            return {
+                "lesson_id": 1,
+                "progress_note": None,
+                "advanced_by_day": False,
+                "previous_lesson_id": None,
+            }
+
+        if signal_type == "current_lesson":
+            return {
+                "lesson_id": parsed,
+                "progress_note": None,
+                "advanced_by_day": False,
+                "previous_lesson_id": None,
+            }
+
+        if signal_type == "lesson_completed":
+            if parsed < 365:
+                return {
+                    "lesson_id": parsed + 1,
+                    "progress_note": None,
+                    "advanced_by_day": False,
+                    "previous_lesson_id": parsed,
+                }
+            return {
+                "lesson_id": 365,
+                "progress_note": None,
+                "advanced_by_day": False,
+                "previous_lesson_id": parsed,
+            }
+
+        if signal_type == "last_sent_lesson_id":
+            last_date = latest.get("created_at", now).date()
+            if last_date < today:
+                next_id = parsed + 1 if parsed < 365 else 365
+                note = (
+                    f"The user received Lesson {parsed} on a previous day. "
+                    f"Assume today's lesson is Lesson {next_id}. "
+                    "You may offer to repeat yesterday's lesson if they want, but proceed with the new lesson by default."
+                )
+                return {
+                    "lesson_id": next_id,
+                    "progress_note": note,
+                    "advanced_by_day": True,
+                    "previous_lesson_id": parsed,
+                }
+            return {
+                "lesson_id": parsed,
+                "progress_note": None,
+                "advanced_by_day": False,
+                "previous_lesson_id": None,
+            }
+
+        return {
+            "lesson_id": 1,
+            "progress_note": None,
+            "advanced_by_day": False,
+            "previous_lesson_id": None,
+        }
+
+    def _get_debug_day_offset(self, user_id: int) -> int:
+        """Return temporary day offset for testing (e.g., via 'next_day' command)."""
+        debug_offsets = self.memory_manager.get_memory(user_id, "debug_day_offset")
+        if not debug_offsets:
+            return 0
+
+        def _normalize_dt(value: Any) -> datetime:
+            if isinstance(value, datetime):
+                return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+            return datetime.min.replace(tzinfo=timezone.utc)
+
+        latest = max(debug_offsets, key=lambda x: _normalize_dt(x.get("created_at")))
+        raw_value = str(latest.get("value", "")).strip()
+        try:
+            return int(raw_value)
+        except ValueError:
+            return 0
+
+    def _get_last_lesson_from_logs(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Fallback: infer last sent lesson from message logs."""
+        messages = (
+            self.db.query(MessageLog)
+            .filter(MessageLog.user_id == user_id, MessageLog.direction == "outbound")
+            .order_by(MessageLog.created_at.desc())
+            .limit(20)
+            .all()
+        )
+        if not messages:
+            return None
+
+        import re
+
+        for msg in messages:
+            content = msg.content or ""
+            match = re.search(r"\bLesson\s+(\d+)\b", content)
+            if match:
+                return {"lesson_id": int(match.group(1)), "created_at": msg.created_at}
+
+        return None
 
     def _parse_lesson_id(self, value: str) -> Optional[int]:
         """Parse lesson id from memory value (e.g., '1' or 'Lesson 1')."""
