@@ -130,6 +130,8 @@ cython_debug/
 
 # Database
 *.db
+*.db-wal
+*.db-shm
 *.sqlite3
 
 # VS Code
