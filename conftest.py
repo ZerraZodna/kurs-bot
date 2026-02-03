@@ -1,13 +1,17 @@
 """
 Pytest configuration for kurs-bot tests.
-Sets up test environment and cleans up after test session.
-Database URL is set by run_tests.ps1 before pytest is invoked.
+Central location for all test database setup and configuration.
 """
 import os
 from pathlib import Path
 import pytest
 
+# Test database configuration (single source of truth)
 TEST_DB_PATH = Path('src/data/test.db')
+TEST_DB_URL = f'sqlite:///{TEST_DB_PATH}'
+
+# Set test database environment variable for all tests
+os.environ['DATABASE_URL'] = TEST_DB_URL
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_environment():
@@ -21,7 +25,7 @@ def setup_test_environment():
         TEST_DB_PATH.unlink()
         print("\n🧪 Cleaned up old test database")
     
-    print(f"🧪 Test database path: {TEST_DB_PATH}")
+    print(f"🧪 Using test database: {TEST_DB_URL}")
     
     yield
     
