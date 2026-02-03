@@ -1,17 +1,44 @@
 import hashlib
 import uuid
+import asyncio
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict
 from sqlalchemy.orm import Session
 from src.models.database import SessionLocal, Memory, init_db
+from src.services.embedding_service import get_embedding_service
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryManager:
     def __init__(self, db: Optional[Session] = None):
         self.db = db or SessionLocal()
+        self.embedding_service = get_embedding_service()
 
     def _hash_value(self, value: str) -> str:
         return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+    async def _generate_and_store_embedding(self, memory: Memory):
+        """
+        Generate embedding for a memory and store it
+        
+        Args:
+            memory: Memory object to generate embedding for
+        """
+        try:
+            embedding = await self.embedding_service.generate_embedding(memory.value)
+            if embedding:
+                memory.embedding = self.embedding_service.embedding_to_bytes(embedding)
+                memory.embedding_version = 1
+                memory.embedding_generated_at = datetime.now(timezone.utc)
+                self.db.add(memory)
+                self.db.commit()
+                logger.debug(f"Generated embedding for memory {memory.memory_id}")
+            else:
+                logger.warning(f"Failed to generate embedding for memory {memory.memory_id}")
+        except Exception as e:
+            logger.error(f"Error generating embedding for memory {memory.memory_id}: {e}")
 
     def get_memory(self, user_id: int, key: str) -> List[Dict]:
         now = datetime.now(timezone.utc)
@@ -43,7 +70,7 @@ class MemoryManager:
 
     def store_memory(self, user_id: int, key: str, value: str, confidence: float = 1.0,
                      source: str = "dialogue_engine", ttl_hours: Optional[int] = None, category: str = "fact",
-                     allow_duplicates: bool = False) -> int:
+                     allow_duplicates: bool = False, generate_embedding: bool = True) -> int:
         """Store a memory with simple conflict resolution.
 
         Rules (when allow_duplicates=False):
@@ -53,6 +80,20 @@ class MemoryManager:
         
         When allow_duplicates=True:
         - Always insert new memory without archiving existing ones
+        
+        Args:
+            user_id: User ID
+            key: Memory key
+            value: Memory value
+            confidence: Confidence score (0.0-1.0)
+            source: Source of memory
+            ttl_hours: Hours until memory expires (None = never)
+            category: Memory category
+            allow_duplicates: Allow duplicate values
+            generate_embedding: Generate embedding for semantic search (runs async)
+        
+        Returns:
+            Memory ID of stored memory
         """
         now = datetime.now(timezone.utc)
         value_hash = self._hash_value(value)
@@ -80,6 +121,14 @@ class MemoryManager:
                     e.ttl_expires_at = ttl
                 self.db.add(e)
                 self.db.commit()
+                
+                # Generate embedding asynchronously if needed
+                if generate_embedding:
+                    try:
+                        asyncio.create_task(self._generate_and_store_embedding(e))
+                    except Exception as ex:
+                        logger.warning(f"Could not schedule embedding generation: {ex}")
+                
                 return e.memory_id
 
         # If allow_duplicates, just insert new memory
@@ -97,6 +146,14 @@ class MemoryManager:
             )
             self.db.add(new)
             self.db.commit()
+            
+            # Generate embedding asynchronously if needed
+            if generate_embedding:
+                try:
+                    asyncio.create_task(self._generate_and_store_embedding(new))
+                except Exception as ex:
+                    logger.warning(f"Could not schedule embedding generation: {ex}")
+            
             return new.memory_id
 
         if existing:
@@ -121,6 +178,14 @@ class MemoryManager:
             )
             self.db.add(new)
             self.db.commit()
+            
+            # Generate embedding asynchronously if needed
+            if generate_embedding:
+                try:
+                    asyncio.create_task(self._generate_and_store_embedding(new))
+                except Exception as ex:
+                    logger.warning(f"Could not schedule embedding generation: {ex}")
+            
             return new.memory_id
 
         # no existing -> insert
@@ -137,6 +202,14 @@ class MemoryManager:
         )
         self.db.add(new)
         self.db.commit()
+        
+        # Generate embedding asynchronously if needed
+        if generate_embedding:
+            try:
+                asyncio.create_task(self._generate_and_store_embedding(new))
+            except Exception as ex:
+                logger.warning(f"Could not schedule embedding generation: {ex}")
+        
         return new.memory_id
 
     def purge_expired(self, days_keep: int = 365) -> int:

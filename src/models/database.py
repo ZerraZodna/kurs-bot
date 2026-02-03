@@ -1,5 +1,5 @@
 
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Float, Text, ForeignKey, func
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Float, Text, ForeignKey, func, LargeBinary
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from sqlalchemy import DateTime
 import datetime
@@ -51,6 +51,10 @@ class Memory(Base):
     updated_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
     ttl_expires_at = Column(DateTime(timezone=True))
     archived_at = Column(DateTime(timezone=True))
+    # Embedding fields for semantic search
+    embedding = Column(LargeBinary, nullable=True)  # Stores 384-dim vector as bytes
+    embedding_version = Column(Integer, default=1)  # Track embedding model version
+    embedding_generated_at = Column(DateTime(timezone=True), nullable=True)  # When embedding was generated
     user = relationship('User', back_populates='memories')
 
 class Lesson(Base):

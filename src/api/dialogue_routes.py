@@ -383,3 +383,84 @@ def mark_lesson_completed(user_id: int, lesson_id: int, db: Session = Depends(ge
         "status": "completed",
         "message": f"Lesson {lesson_id} marked as completed"
     }
+
+# Semantic search endpoints
+
+class SemanticSearchRequest(BaseModel):
+    user_id: int
+    query: str
+    categories: Optional[List[str]] = None
+    limit: Optional[int] = None
+    threshold: Optional[float] = None
+
+
+class MemoryWithScore(BaseModel):
+    memory_id: int
+    key: str
+    value: str
+    category: str
+    confidence: float
+    similarity_score: float
+
+
+class SemanticSearchResponse(BaseModel):
+    user_id: int
+    query: str
+    results: List[MemoryWithScore]
+    count: int
+
+
+@router.post("/search", response_model=SemanticSearchResponse)
+async def semantic_search(request: SemanticSearchRequest, db: Session = Depends(get_db)):
+    """
+    Semantically search user's memories for contextually relevant information.
+    
+    Uses vector embeddings to find memories similar to the query text,
+    rather than exact keyword matching.
+    
+    Args:
+        user_id: User ID
+        query: Search query text
+        categories: Optional list of memory categories to filter by
+        limit: Maximum results to return
+        threshold: Minimum similarity score (0.0-1.0)
+    
+    Returns:
+        List of memories ranked by semantic similarity
+    """
+    from src.services.semantic_search import get_semantic_search_service
+    
+    # Verify user exists
+    user = db.query(User).filter_by(user_id=request.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Perform semantic search
+    search_service = get_semantic_search_service()
+    results = await search_service.search_memories(
+        user_id=request.user_id,
+        query_text=request.query,
+        session=db,
+        categories=request.categories,
+        limit=request.limit,
+        threshold=request.threshold
+    )
+    
+    # Format results
+    memory_results = []
+    for memory, score in results:
+        memory_results.append(MemoryWithScore(
+            memory_id=memory.memory_id,
+            key=memory.key,
+            value=memory.value,
+            category=memory.category,
+            confidence=memory.confidence,
+            similarity_score=round(score, 4)
+        ))
+    
+    return SemanticSearchResponse(
+        user_id=request.user_id,
+        query=request.query,
+        results=memory_results,
+        count=len(memory_results)
+    )

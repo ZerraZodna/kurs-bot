@@ -24,13 +24,11 @@ A production-ready **User Memory & Context Prompt Building System** has been ful
 | [tests/test_prompt_builder.py](tests/test_prompt_builder.py) | 450 | 20+ comprehensive tests |
 | [tests/test_integration_memory.py](tests/test_integration_memory.py) | 500 | End-to-end integration tests |
 
-### Documentation (5 New)
+### Documentation (3 New)
 | File | Purpose | Audience |
 |------|---------|----------|
 | [MEMORY_CONTEXT_SYSTEM.md](MEMORY_CONTEXT_SYSTEM.md) | Complete technical guide (400+ lines) | Developers |
-| [QUICKSTART_MEMORY.md](QUICKSTART_MEMORY.md) | 5-minute setup guide | Quick learners |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System design & diagrams (300+ lines) | Architects |
-| [DEPLOYMENT.md](DEPLOYMENT.md) | Production deployment guide | DevOps |
 | [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) | What was built & next steps | Project managers |
 
 ### Modified Files (2)
@@ -135,27 +133,19 @@ User Response
 
 ## 🚀 Getting Started
 
-### 1. Quick Start (5 minutes)
-Read [QUICKSTART_MEMORY.md](QUICKSTART_MEMORY.md)
-
-### 2. Full Documentation
+### 1. Full Documentation
 - System overview: [MEMORY_CONTEXT_SYSTEM.md](MEMORY_CONTEXT_SYSTEM.md)
 - Architecture details: [ARCHITECTURE.md](ARCHITECTURE.md)
-- Deployment guide: [DEPLOYMENT.md](DEPLOYMENT.md)
 
-### 3. Code Examples
+### 2. Code Examples
 - API usage: [src/api/dialogue_routes.py](src/api/dialogue_routes.py)
 - Test examples: [tests/test_prompt_builder.py](tests/test_prompt_builder.py)
 - Service usage: [src/services/dialogue_engine.py](src/services/dialogue_engine.py)
 
-### 4. Run Tests
+### 3. Run Tests
 ```bash
-# Setup
-python -m src.models.database
-alembic upgrade head
-
-# Test
-pytest tests/test_prompt_builder.py -v
+# Run test suite
+.\run_tests.ps1
 
 # Start server
 uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
@@ -178,20 +168,11 @@ uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
 ✅ Error logging for debugging  
 ✅ Thread-safe session management  
 
-## 📚 Code Statistics
-
-| Component | Lines | Files |
-|-----------|-------|-------|
-| Services | 914 | 3 new |
-| API Routes | 260 | 1 new |
-| Tests | 950 | 2 new |
-| Docs | 1500+ | 5 new |
-| **Total** | **3624+** | **11 new** |
 
 ## 🎓 Learning Path
 
 1. **Understanding** (15 min)
-   - Read QUICKSTART_MEMORY.md
+   - Read MEMORY_CONTEXT_SYSTEM.md
    - Skim ARCHITECTURE.md diagrams
 
 2. **Installation** (10 min)
@@ -270,7 +251,6 @@ message_role           # 'user' or 'assistant'
 
 ## 🚢 Deployment Checklist
 
-- [ ] Read DEPLOYMENT.md
 - [ ] Configure .env for production
 - [ ] Run alembic upgrade
 - [ ] Test all endpoints
@@ -287,7 +267,7 @@ message_role           # 'user' or 'assistant'
 - [ ] Set up memory collection
 
 ### Short Term (Medium)
-- [ ] Add vector embeddings for semantic search
+- [x] Add vector embeddings for semantic search (use existing `nomic-embed-text` model via Ollama API) **✅ COMPLETED**
 - [ ] Implement caching layer
 - [ ] Build analytics dashboard
 
@@ -308,14 +288,12 @@ For issues or questions:
 ## 📄 File Quick Reference
 
 ### Most Important Files
-1. **[QUICKSTART_MEMORY.md](QUICKSTART_MEMORY.md)** - Start here! (5 min read)
-2. **[MEMORY_CONTEXT_SYSTEM.md](MEMORY_CONTEXT_SYSTEM.md)** - Complete guide (30 min read)
+1. **[MEMORY_CONTEXT_SYSTEM.md](MEMORY_CONTEXT_SYSTEM.md)** - Complete technical guide (30 min read)
+2. **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design & diagrams
 3. **[src/services/prompt_builder.py](src/services/prompt_builder.py)** - Main engine
 4. **[src/api/dialogue_routes.py](src/api/dialogue_routes.py)** - API definition
 
 ### Reference Files
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System design
-- [DEPLOYMENT.md](DEPLOYMENT.md) - Production setup
 - [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) - Project overview
 
 ### Code Files
