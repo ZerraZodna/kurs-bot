@@ -1,36 +1,33 @@
 """
 Pytest configuration for kurs-bot tests.
-Ensures tests always use a separate test database.
+Sets up test environment and cleans up after test session.
+Database URL is set by run_tests.ps1 before pytest is invoked.
 """
 import os
-import shutil
 from pathlib import Path
 import pytest
 
-# Force tests to use a separate test database
-TEST_DB_URL = 'sqlite:///./src/data/test.db'
-os.environ['DATABASE_URL'] = TEST_DB_URL
+TEST_DB_PATH = Path('src/data/test.db')
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_environment():
     """
-    Ensure test database is used for all tests.
-    Cleans up test database after test session completes.
+    Setup test environment and cleanup after tests.
+    - Removes old test database before tests start
+    - Removes test database after tests complete
     """
-    test_db_path = Path('src/data/test.db')
-    
     # Remove old test database if it exists
-    if test_db_path.exists():
-        test_db_path.unlink()
+    if TEST_DB_PATH.exists():
+        TEST_DB_PATH.unlink()
         print("\n🧪 Cleaned up old test database")
     
-    print(f"🧪 Using test database: {TEST_DB_URL}")
+    print(f"🧪 Test database path: {TEST_DB_PATH}")
     
     yield
     
     # Cleanup after all tests
-    if test_db_path.exists():
-        test_db_path.unlink()
+    if TEST_DB_PATH.exists():
+        TEST_DB_PATH.unlink()
         print("\n✅ Test session complete - cleaned up test database")
     else:
         print("\n✅ Test session complete")
