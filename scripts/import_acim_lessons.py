@@ -25,29 +25,152 @@ from src.models.database import SessionLocal, Lesson, init_db
 def extract_lessons_from_pdf(pdf_path: str) -> list:
     """
     Extract lessons from PDF file.
-    Attempts to use pypdf first, falls back to pdfplumber if available.
+    Uses pypdf for reliable text extraction with formatting preservation.
+    Preserves: bold, italics, and paragraph breaks.
     """
     try:
         from pypdf import PdfReader
+        print("Using pypdf for formatted text extraction...")
         reader = PdfReader(pdf_path)
-        text = ""
+        
+        # Extract text with formatting
+        text_parts = []
+        
         for page in reader.pages:
-            text += page.extract_text() + "\n"
+            page_parts = []
+            prev_y = None
+            
+            def visitor_text(text, cm, tm, font_dict, font_size):
+                """Visitor to capture text with formatting."""
+                nonlocal prev_y
+                font_name = str(font_dict.get('/BaseFont', '')) if font_dict else ''
+                font_name_lower = font_name.lower()
+                
+                # Check formatting (case-insensitive)
+                is_bold = 'bold' in font_name_lower
+                is_italic = 'italic' in font_name_lower or 'oblique' in font_name_lower
+                
+                # Get vertical position for paragraph detection
+                y_pos = tm[5] if tm else 0
+                
+                # Add paragraph break if Y position changed significantly
+                if prev_y is not None and abs(y_pos - prev_y) > 5:
+                    page_parts.append({'text': '\n\n', 'bold': False, 'italic': False})
+                
+                prev_y = y_pos
+                
+                page_parts.append({
+                    'text': text,
+                    'bold': is_bold,
+                    'italic': is_italic
+                })
+            
+            page.extract_text(visitor_text=visitor_text)
+            text_parts.extend(page_parts)
+        
+        # Convert formatted parts to markdown-like text
+        text = format_text_parts_to_markdown(text_parts)
         return parse_lessons_from_text(text)
     except ImportError:
-        try:
-            import pdfplumber
-            lessons = []
-            with pdfplumber.open(pdf_path) as pdf:
-                for page in pdf.pages:
-                    text = page.extract_text()
-                    if text:
-                        lessons.extend(parse_lessons_from_text(text))
-            return lessons
-        except ImportError:
-            print("ERROR: Neither 'pypdf' nor 'pdfplumber' is installed.")
-            print("Install with: pip install pypdf")
-            sys.exit(1)
+        print("ERROR: 'pypdf' is not installed.")
+        print("Install with: pip install pypdf")
+        sys.exit(1)
+
+
+def format_text_parts_to_markdown(parts: list) -> str:
+    """
+    Convert text parts with formatting info to markdown-like text.
+    Preserves bold (**text**), italics (*text*), and paragraph breaks.
+    """
+    runs = []
+    buffer = []
+    current_fmt = None
+
+    def flush_buffer():
+        nonlocal buffer, current_fmt
+        if buffer:
+            runs.append((current_fmt, ''.join(buffer)))
+            buffer = []
+
+    for part in parts:
+        text = part['text']
+        if not text:
+            continue
+
+        # Preserve explicit paragraph breaks
+        if text == '\n\n':
+            flush_buffer()
+            runs.append((None, '\n\n'))
+            current_fmt = None
+            continue
+
+        fmt = (part['bold'], part['italic'])
+        if current_fmt is None:
+            current_fmt = fmt
+
+        if fmt != current_fmt:
+            # Avoid formatting changes in the middle of a word
+            if buffer and buffer[-1] and buffer[-1][-1].isalnum() and text[0].isalnum():
+                fmt = current_fmt
+            else:
+                flush_buffer()
+                current_fmt = fmt
+
+        buffer.append(text)
+
+    flush_buffer()
+
+    result = []
+    for fmt, text in runs:
+        if text == '\n\n':
+            result.append(text)
+            continue
+
+        bold, italic = fmt if fmt else (False, False)
+        if bold and italic:
+            result.append(f"***{text}***")
+        elif bold:
+            result.append(f"**{text}**")
+        elif italic:
+            result.append(f"*{text}*")
+        else:
+            result.append(text)
+
+    # Join and clean up excessive whitespace (but preserve paragraph breaks)
+    formatted = ''.join(result)
+
+    # Normalize multiple newlines to double newlines (paragraph breaks)
+    formatted = re.sub(r'\n{3,}', '\n\n', formatted)
+
+    # Remove spaces before/after newlines but preserve the newlines
+    formatted = re.sub(r' *\n *', '\n', formatted)
+
+    return formatted
+
+
+def clean_content_preserve_formatting(content: str) -> str:
+    """
+    Clean content while preserving formatting (bold, italics, paragraphs).
+    - Preserves markdown formatting: **bold**, *italic*
+    - Preserves paragraph breaks (double newlines)
+    - Removes excessive whitespace on single lines
+    """
+    # Split into lines
+    lines = content.split('\n')
+    cleaned_lines = []
+    
+    for line in lines:
+        # Clean excessive spaces within a line but preserve formatting markers
+        line = re.sub(r' {2,}', ' ', line).strip()
+        cleaned_lines.append(line)
+    
+    # Rejoin with newlines
+    result = '\n'.join(cleaned_lines)
+    
+    # Normalize paragraph breaks (multiple newlines -> double newline)
+    result = re.sub(r'\n{3,}', '\n\n', result)
+    
+    return result.strip()
 
 
 def clean_page_artifacts(content: str) -> str:
@@ -189,7 +312,8 @@ def parse_lessons_from_text(text: str) -> list:
         # Clean up title and content
         title = re.sub(r'\s+', ' ', title)
         title = title.replace('\\', '').replace('"', '').strip()
-        content = re.sub(r'\s+', ' ', content).strip()
+        # Preserve paragraph breaks and formatting in content
+        content = clean_content_preserve_formatting(content)
         
         if not title or len(title) < 2:
             title = f"Lesson {start_num} to {end_num}"
@@ -267,7 +391,8 @@ def parse_lessons_from_text(text: str) -> list:
         # Clean up title and content
         title = re.sub(r'\s+', ' ', title)
         title = title.replace('\\', '').replace('"', '').strip()
-        content = re.sub(r'\s+', ' ', content).strip()
+        # Preserve paragraph breaks and formatting in content
+        content = clean_content_preserve_formatting(content)
         
         if not title or len(title) < 2:
             title = f"Lesson {lesson_num}"
@@ -340,12 +465,12 @@ def import_lessons_to_db(lessons: list, clear_existing: bool = False) -> int:
                 print(f"  Imported {count} lessons...")
         
         session.commit()
-        print(f"\n✅ Successfully imported {count} lessons")
+        print(f"\n[OK] Successfully imported {count} lessons")
         return count
     
     except Exception as e:
         session.rollback()
-        print(f"❌ Error importing lessons: {e}")
+        print(f"[ERROR] Error importing lessons: {e}")
         raise
     finally:
         session.close()
@@ -356,14 +481,14 @@ def verify_lessons(expected_count: int = 365) -> None:
     session = SessionLocal()
     try:
         count = session.query(Lesson).count()
-        print(f"\n📊 Database now contains {count} lessons")
+        print(f"\n[DB] Database now contains {count} lessons")
         
         if count == expected_count:
-            print(f"✅ All {expected_count} ACIM lessons successfully imported!")
+            print(f"[OK] All {expected_count} ACIM lessons successfully imported!")
         elif count > 0:
-            print(f"⚠️  Expected {expected_count} lessons, found {count}")
+            print(f"[WARN] Expected {expected_count} lessons, found {count}")
         else:
-            print(f"❌ No lessons found in database")
+            print(f"[ERROR] No lessons found in database")
         
         # Show a sample
         sample = session.query(Lesson).order_by(Lesson.lesson_id).limit(3).all()
@@ -406,19 +531,19 @@ def main():
     
     # Check if PDF exists
     if not os.path.exists(args.pdf):
-        print(f"❌ PDF file not found: {args.pdf}")
+        print(f"[ERROR] PDF file not found: {args.pdf}")
         sys.exit(1)
     
-    print(f"📖 Reading ACIM lessons from: {args.pdf}")
+    print(f"[PDF] Reading ACIM lessons from: {args.pdf}")
     print(f"File size: {os.path.getsize(args.pdf) / 1024 / 1024:.2f} MB")
     
     # Extract lessons
-    print("\n🔍 Extracting lessons from PDF...")
+    print("\n[INFO] Extracting lessons from PDF...")
     lessons = extract_lessons_from_pdf(args.pdf)
     print(f"Found {len(lessons)} lessons in PDF")
     
     if not lessons:
-        print("❌ No lessons could be extracted from the PDF")
+        print("[ERROR] No lessons could be extracted from the PDF")
         print("\nTroubleshooting:")
         print("1. Ensure the PDF is in the correct format")
         print("2. Try installing: pip install pypdf pdfplumber")
@@ -430,7 +555,7 @@ def main():
         print(f"  - Lesson {lesson['lesson_id']}: {lesson['title']}")
     
     # Import to database
-    print("\n💾 Importing lessons to database...")
+    print("\n[DB] Importing lessons to database...")
     count = import_lessons_to_db(lessons, clear_existing=args.clear)
     
     # Verify
