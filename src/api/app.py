@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request, HTTPException
 from src.services.memory_manager import MemoryManager
+from src.services.maintenance import run_daily_maintenance
 from src.models.database import SessionLocal, User, MessageLog, BatchLock
 from src.config import settings
 from src.integrations.telegram import TelegramHandler, send_message
@@ -275,24 +276,6 @@ def purge_old_messages(hour_utc: int = 2):
             time.sleep(60)
 
 
-def purge_inactive_memories(days_keep: int = 60):
-    """Purge archived/inactive memories older than days_keep (UTC)."""
-    try:
-        def _do_purge():
-            db = SessionLocal()
-            try:
-                memory_manager = MemoryManager(db)
-                deleted = memory_manager.purge_expired(days_keep=days_keep)
-                if deleted:
-                    print(f"[purge] Deleted {deleted} archived memories older than {days_keep} days.")
-            finally:
-                db.close()
-
-        _retry_db_op("purge", _do_purge)
-    except Exception as e:
-        print(f"[purge error] {e}")
-
-
 def purge_expired_batch_locks():
     """Remove expired batch locks from the database."""
     try:
@@ -314,7 +297,7 @@ def purge_expired_batch_locks():
 
 
 def nightly_memory_purge(days_keep: int = 60, hour_utc: int = 2):
-    """Run memory purge only at fixed UTC maintenance hour (02:00 AM). Skip first run on startup."""
+    """Run maintenance at fixed UTC hour (02:00 AM). Skip first run on startup."""
     first_run = True
     while True:
         try:
@@ -327,7 +310,7 @@ def nightly_memory_purge(days_keep: int = 60, hour_utc: int = 2):
             if not first_run:
                 sleep_seconds = (next_run - now).total_seconds()
                 time.sleep(sleep_seconds)
-                purge_inactive_memories(days_keep=days_keep)
+                run_daily_maintenance(days_keep=days_keep)
                 purge_expired_batch_locks()
             else:
                 # First run: just schedule for next maintenance window
