@@ -435,25 +435,59 @@ class DialogueEngine:
                 existing_lang = self.memory_manager.get_memory(user_id, "user_language")
                 existing_value = existing_lang[0].get("value") if existing_lang else None
                 try:
-                    detected_lang = detect(user_message)
-
                     norwegian_keywords = [
-                        "hei", "jeg", "heter", "jeg heter", "hvordan", "hvordan går", "takk",
-                        "vær så snill", "lyst", "god morgen", "god kveld", "god ettermiddag",
-                        "ikke", "ja", "nei",
+                        "jeg heter", "hvordan går", "vær så snill", "god morgen", "god kveld", "god ettermiddag",
                     ]
+                    norwegian_single_words = {
+                        "hei", "jeg", "heter", "hvordan", "takk", "lyst", "ikke", "ja", "nei",
+                    }
                     english_keywords = [
-                        "hello", "hi", "i", "you", "the", "and", "please", "thank", "good morning",
-                        "good evening", "good afternoon", "how are", "what is",
+                        "good morning", "good evening", "good afternoon", "how are", "what is",
                     ]
+                    english_single_words = {
+                        "hello", "hi", "i", "you", "the", "and", "please", "thank",
+                    }
 
                     msg_lower = user_message.lower()
+                    tokens = re.findall(r"[a-zA-Z]+", msg_lower)
+                    token_set = set(tokens)
                     word_count = len(user_message.split())
-                    has_no_keywords = any(kw in msg_lower for kw in norwegian_keywords)
-                    has_en_keywords = any(kw in msg_lower for kw in english_keywords)
+                    has_no_keywords = (
+                        any(kw in msg_lower for kw in norwegian_keywords)
+                        or any(kw in token_set for kw in norwegian_single_words)
+                    )
+                    has_en_keywords = (
+                        any(kw in msg_lower for kw in english_keywords)
+                        or any(kw in token_set for kw in english_single_words)
+                    )
+                    stripped_message = user_message.strip()
+                    is_probable_name = (
+                        word_count <= 2
+                        and stripped_message[:1].isupper()
+                        and stripped_message.replace(" ", "").isalpha()
+                        and not (has_no_keywords or has_en_keywords)
+                    )
+
+                    detected_lang = None
+                    # For very short inputs, prefer strong keyword hints
+                    if word_count <= 3 and has_no_keywords:
+                        detected_lang = "no"
+                    elif word_count <= 3 and has_en_keywords:
+                        detected_lang = "en"
+                    # Avoid detection on very short messages unless strong keywords are present
+                    elif word_count < 4 and not (has_no_keywords or has_en_keywords):
+                        detected_lang = None
+                    else:
+                        try:
+                            detected_lang = detect(user_message)
+                        except LangDetectException:
+                            if has_no_keywords:
+                                detected_lang = "no"
+                            elif has_en_keywords:
+                                detected_lang = "en"
 
                     # Guard against NL misclassification when Norwegian keywords are present
-                    if detected_lang in ["nl", "de", "sv", "da"] and has_no_keywords:
+                    if detected_lang in ["nl", "de", "sv", "da", "sl"] and has_no_keywords:
                         detected_lang = "no"
 
                     # Map language codes to full names
@@ -473,12 +507,17 @@ class DialogueEngine:
                         "ja": "Japanese",
                         "zh-cn": "Chinese",
                     }
-                    lang_name = lang_names.get(detected_lang, detected_lang.upper())
+                    if not detected_lang:
+                        lang_name = None
+                    else:
+                        lang_name = lang_names.get(detected_lang, detected_lang.upper())
 
                     should_update = False
-                    if not existing_value:
+                    if is_probable_name:
+                        should_update = False
+                    elif not existing_value and lang_name:
                         should_update = True
-                    elif lang_name != existing_value:
+                    elif lang_name and lang_name != existing_value:
                         # Only update when message is long enough or contains strong keywords
                         if word_count >= 4 and (has_no_keywords or has_en_keywords):
                             should_update = True
@@ -593,7 +632,97 @@ class DialogueEngine:
                             source="dialogue_engine_commitment",
                             category="goals",
                         )
-                        return self.onboarding.get_onboarding_complete_message(user_id)
+                        return self.onboarding.get_onboarding_prompt(user_id)
+                elif step == "lesson_status":
+                    response = self.onboarding.handle_lesson_status_response(user_id, text)
+
+                    if response.get("action") == "send_lesson_1":
+                        self.memory_manager.store_memory(
+                            user_id=user_id,
+                            key="current_lesson",
+                            value="1",
+                            category="progress",
+                            confidence=1.0,
+                            source="onboarding_lesson_status",
+                        )
+
+                        lesson = session.query(Lesson).filter(Lesson.lesson_id == 1).first()
+                        if lesson:
+                            language = self._get_user_language(user_id)
+                            welcome_msg = self.onboarding.get_lesson_1_welcome_message(user_id)
+                            lesson_msg = await self._format_lesson_message(lesson, language)
+                            self.memory_manager.store_memory(
+                                user_id=user_id,
+                                key="onboarding_step_pending",
+                                value="resolved",
+                                category="conversation",
+                                ttl_hours=0.1,
+                                source="dialogue_engine",
+                                allow_duplicates=False,
+                            )
+                            return f"{welcome_msg}\n\n{lesson_msg}"
+
+                        return "I couldn't load Lesson 1 right now. Please try again."
+
+                    if response.get("action") == "send_specific_lesson":
+                        lesson_id = response["lesson_id"]
+                        self.memory_manager.store_memory(
+                            user_id=user_id,
+                            key="current_lesson",
+                            value=str(lesson_id),
+                            category="progress",
+                            confidence=1.0,
+                            source="onboarding_lesson_status",
+                        )
+
+                        lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
+                        if lesson:
+                            language = self._get_user_language(user_id)
+                            continuation_msg = self.onboarding.get_continuation_welcome_message(user_id, lesson_id)
+                            lesson_msg = await self._format_lesson_message(lesson, language)
+                            self.memory_manager.store_memory(
+                                user_id=user_id,
+                                key="onboarding_step_pending",
+                                value="resolved",
+                                category="conversation",
+                                ttl_hours=0.1,
+                                source="dialogue_engine",
+                                allow_duplicates=False,
+                            )
+                            return f"{continuation_msg}\n\n{lesson_msg}"
+
+                        return "I couldn't load that lesson right now. Please try again."
+
+                    if response.get("action") == "ask_lesson_number":
+                        language = self._get_user_language(user_id)
+                        message = "Great! Which lesson are you currently working on?"
+                        if language == "Norwegian":
+                            message = "Flott! Hvilken leksjon jobber du med nå?"
+                        self.memory_manager.store_memory(
+                            user_id=user_id,
+                            key="onboarding_step_pending",
+                            value="lesson_status",
+                            category="conversation",
+                            ttl_hours=2,
+                            source="dialogue_engine",
+                            allow_duplicates=False,
+                        )
+                        return message
+
+                    language = self._get_user_language(user_id)
+                    message = "Are you completely new to ACIM, or have you already started? (Answer 'new' or 'continuing')"
+                    if language == "Norwegian":
+                        message = "Er du helt ny til ACIM, eller har du allerede begynt? (Svar 'ny' eller 'fortsetter')"
+                    self.memory_manager.store_memory(
+                        user_id=user_id,
+                        key="onboarding_step_pending",
+                        value="lesson_status",
+                        category="conversation",
+                        ttl_hours=2,
+                        source="dialogue_engine",
+                        allow_duplicates=False,
+                    )
+                    return message
 
                 # Clear pending step
                 self.memory_manager.store_memory(
@@ -615,12 +744,6 @@ class DialogueEngine:
         
         # If onboarding just completed, show welcome message
         if status["onboarding_complete"]:
-            # Check if this is the first message after completion
-            if status["has_name"] and status["has_commitment"]:
-                commit_memories = self.memory_manager.get_memory(user_id, "acim_commitment")
-                # If commitment was just stored (check if it's recent), show completion message
-                if commit_memories:
-                    return self.onboarding.get_onboarding_complete_message(user_id)
             return None
         
         # If user explicitly declines ACIM, honor it immediately
@@ -684,8 +807,8 @@ class DialogueEngine:
                         category="goals",
                     )
                 logger.info(f"User {user_id} expressed interest in ACIM lessons")
-                # Return completion message
-                return self.onboarding.get_onboarding_complete_message(user_id)
+                # Move to lesson status step
+                return self.onboarding.get_onboarding_prompt(user_id)
         
         # Return next onboarding prompt
         return self.onboarding.get_onboarding_prompt(user_id)
