@@ -1,6 +1,8 @@
 # Windows PowerShell startup script for Kurs Bot
 # This script activates the Python virtual environment, starts the FastAPI app, and launches ngrok.
 
+# Need account at: https://dashboard.ngrok.com/get-started/setup/windows
+
 # Activate virtual environment
 . .venv\Scripts\Activate.ps1
 

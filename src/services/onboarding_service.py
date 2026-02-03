@@ -69,6 +69,10 @@ class OnboardingService:
             for m in consent_memories
         )
         
+        # Check for lesson status
+        lesson_status_memories = self.memory_manager.get_memory(user_id, "current_lesson")
+        has_lesson_status = bool(lesson_status_memories)
+        
         steps_completed = []
         if has_name:
             steps_completed.append("name")
@@ -76,6 +80,8 @@ class OnboardingService:
             steps_completed.append("consent")
         if has_commitment:
             steps_completed.append("commitment")
+        if has_lesson_status:
+            steps_completed.append("lesson_status")
         
         # Determine next step
         next_step = None
@@ -85,18 +91,21 @@ class OnboardingService:
             next_step = "consent"
         elif not has_commitment:
             next_step = "commitment"
+        elif not has_lesson_status:
+            next_step = "lesson_status"
         
-        # Onboarding is complete with just name and commitment
-        # We don't need time preference for onboarding
-        onboarding_complete = has_name and has_consent and has_commitment
-        
+        # Check if user has completed all onboarding steps
+        onboarding_complete = has_name and has_consent and has_commitment and has_lesson_status
+
+        # Return status dict
         return {
+            "has_name": has_name,
+            "has_consent": has_consent,
+            "has_commitment": has_commitment,
+            "has_lesson_status": has_lesson_status,
             "onboarding_complete": onboarding_complete,
             "steps_completed": steps_completed,
             "next_step": next_step,
-            "has_name": has_name,
-            "has_commitment": has_commitment,
-            "has_consent": has_consent,
             "declined_commitment": declined_commitment,
             "declined_consent": declined_consent,
         }
@@ -131,12 +140,14 @@ class OnboardingService:
                 "consent": "Før vi fortsetter: Er det greit at jeg lagrer samtalen og relevant informasjon for å gi deg oppfølging? (ja/nei)",
                 "commitment": f"""Herlig, {name}! 
 Er du interessert i å utforske disse leksjonene sammen med meg? Jeg er her for å veilede og støtte deg på denne åndelige reisen.""",
+                "lesson_status": f"Flott, {name}! Er du ny til ACIM, eller har du allerede begynt med leksjonene?"
             },
             "English": {
                 "name": "Welcome! I'm your spiritual coach for A Course in Miracles. What's your name?",
                 "consent": "Before we continue: Do you consent to me storing the conversation and relevant info to support you? (yes/no)",
                 "commitment": f"""Beautiful, {name}! 
 Are you interested in exploring these lessons together? I'm here to guide and support you on this journey.""",
+                "lesson_status": f"Wonderful, {name}! Are you new to ACIM, or have you already begun working with the lessons?"
             },
         }
         
@@ -176,6 +187,17 @@ Are you interested in exploring these lessons together? I'm here to guide and su
                 allow_duplicates=False,
             )
             return lang_prompts["commitment"]
+        elif next_step == "lesson_status":
+            self.memory_manager.store_memory(
+                user_id=user_id,
+                key="onboarding_step_pending",
+                value="lesson_status",
+                category="conversation",
+                ttl_hours=2,
+                source="onboarding_service",
+                allow_duplicates=False,
+            )
+            return lang_prompts["lesson_status"]
         
         return None
     
@@ -363,3 +385,98 @@ How would you like to begin?""",
         ]
         
         return any(keyword in message_lower for keyword in schedule_keywords)
+
+    def handle_lesson_status_response(self, user_id: int, text: str) -> Dict[str, Any]:
+        """
+        Handle user's response about whether they're new or continuing.
+        
+        Returns:
+            Dict with action: "send_lesson_1" or "ask_lesson_number" and appropriate message
+        """
+        text_lower = text.lower().strip()
+        
+        # Detect "new" responses
+        new_keywords = [
+            "new", "ny", "beginner", "nybegynner", "start", "beginning", 
+            "never", "aldri", "first time", "første gang"
+        ]
+        is_new = any(kw in text_lower for kw in new_keywords)
+        
+        # Detect "continuing" responses
+        continuing_keywords = [
+            "continuing", "fortsetter", "already", "allerede", "started", "begynt",
+            "on lesson", "på leksjon", "lesson", "leksjon"
+        ]
+        is_continuing = any(kw in text_lower for kw in continuing_keywords)
+        
+        # Check if they mentioned a lesson number directly
+        import re
+        lesson_match = re.search(r'(?:lesson|leksjon)\s*(\d+)', text_lower)
+        if lesson_match:
+            lesson_num = int(lesson_match.group(1))
+            if 1 <= lesson_num <= 365:
+                return {"action": "send_specific_lesson", "lesson_id": lesson_num}
+        
+        if is_new:
+            return {"action": "send_lesson_1"}
+        elif is_continuing:
+            return {"action": "ask_lesson_number"}
+        
+        # Unclear response - ask again more clearly
+        return {"action": "clarify"}
+
+    def get_lesson_1_welcome_message(self, user_id: int) -> str:
+        """Welcome message for brand new users starting with Lesson 1."""
+        name_memories = self.memory_manager.get_memory(user_id, "first_name")
+        if not name_memories:
+            name_memories = self.memory_manager.get_memory(user_id, "name")
+        name = name_memories[0]["value"] if name_memories else "friend"
+
+        lang_memories = self.memory_manager.get_memory(user_id, "user_language")
+        language = lang_memories[0]["value"] if lang_memories else "English"
+
+        messages = {
+            "Norwegian": f"""Perfekt, {name}! La oss begynne sammen med Leksjon 1. Dette er hvor transformasjonen starter.
+
+📅 **Daglig støtte**: Hver morgen kl. 07:30 sender jeg deg neste leksjon.
+💬 **Alltid tilgjengelig**: Du kan ta kontakt når som helst for å diskutere innsikter, stille spørsmål, eller reflektere sammen.
+
+Ta deg tid med dagens leksjon. Når du er klar til å snakke om den, er jeg her. 🌿""",
+
+            "English": f"""Perfect, {name}! Let's begin together with Lesson 1. This is where transformation starts.
+
+📅 **Daily support**: Each morning at 7:30 AM, I'll send you the next lesson.
+💬 **Always available**: You can reach out anytime to discuss insights, ask questions, or reflect together.
+
+Take your time with today's lesson. When you're ready to talk about it, I'm here. 🌿"""
+        }
+
+        return messages.get(language, messages["English"])
+
+    def get_continuation_welcome_message(self, user_id: int, lesson_id: int) -> str:
+        """Welcome message for users continuing from a specific lesson."""
+        name_memories = self.memory_manager.get_memory(user_id, "first_name")
+        if not name_memories:
+            name_memories = self.memory_manager.get_memory(user_id, "name")
+        name = name_memories[0]["value"] if name_memories else "friend"
+
+        lang_memories = self.memory_manager.get_memory(user_id, "user_language")
+        language = lang_memories[0]["value"] if lang_memories else "English"
+
+        messages = {
+            "Norwegian": f"""Flott, {name}! Du er på Leksjon {lesson_id}. La oss fortsette reisen sammen.
+
+📅 **Daglig støtte**: Hver morgen kl. 07:30 sender jeg deg neste leksjon.
+💬 **Alltid tilgjengelig**: Du kan ta kontakt når som helst for å diskutere, stille spørsmål, eller reflektere.
+
+Her er dagens leksjon:""",
+
+            "English": f"""Wonderful, {name}! You're on Lesson {lesson_id}. Let's continue this journey together.
+
+📅 **Daily support**: Each morning at 7:30 AM, I'll send you the next lesson.
+💬 **Always available**: You can reach out anytime to discuss, ask questions, or reflect.
+
+Here's today's lesson:"""
+        }
+
+        return messages.get(language, messages["English"])
