@@ -11,7 +11,8 @@ from src.services.memory_extractor import MemoryExtractor
 from src.services.onboarding_service import OnboardingService
 from src.services.scheduler import SchedulerService
 from src.config import settings
-from src.models.database import Lesson
+from src.models.database import Lesson, Schedule
+from apscheduler.triggers.date import DateTrigger
 from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
@@ -80,7 +81,31 @@ class DialogueEngine:
                     ttl_hours=1,
                     category="conversation",
                 )
-            return "OK — simulating next day for 1 hour. Send any message to get the next lesson."
+            schedules = []
+            if session:
+                schedules = (
+                    session.query(Schedule)
+                    .filter(
+                        Schedule.user_id == user_id,
+                        Schedule.is_active == True,
+                        Schedule.schedule_type == "daily",
+                    )
+                    .all()
+                )
+            if schedules:
+                scheduler = SchedulerService.get_scheduler()
+                now = datetime.now(timezone.utc)
+                for schedule in schedules:
+                    job_id = f"debug_next_day_{schedule.schedule_id}_{int(now.timestamp())}"
+                    scheduler.add_job(
+                        func=SchedulerService.execute_scheduled_task,
+                        trigger=DateTrigger(run_date=now, timezone="UTC"),
+                        args=[schedule.schedule_id],
+                        id=job_id,
+                        replace_existing=True,
+                    )
+                return "OK — simulating next day for 1 hour and triggering the scheduled morning message now."
+            return "OK — simulating next day for 1 hour. No active daily schedule found."
 
         # FIRST: Extract memories from user message (this might store commitment, name, time, etc.)
         await self._extract_and_store_memories(user_id, text, session)
@@ -646,11 +671,55 @@ class DialogueEngine:
                             source="onboarding_lesson_status",
                         )
 
+                        completion_msg = None
+                        completion_sent = self.memory_manager.get_memory(user_id, "onboarding_complete_message_sent")
+                        if not completion_sent:
+                            status = self.onboarding.get_onboarding_status(user_id)
+                            if status.get("has_name") and status.get("has_consent") and status.get("has_commitment"):
+                                completion_msg = self.onboarding.get_onboarding_complete_message(user_id)
+                                self.memory_manager.store_memory(
+                                    user_id=user_id,
+                                    key="onboarding_complete_message_sent",
+                                    value="true",
+                                    category="conversation",
+                                    ttl_hours=365 * 24,
+                                    source="dialogue_engine",
+                                    allow_duplicates=False,
+                                )
+                                self.memory_manager.store_memory(
+                                    user_id=user_id,
+                                    key="pending_lesson_delivery",
+                                    value="1",
+                                    category="conversation",
+                                    ttl_hours=1,
+                                    source="dialogue_engine",
+                                    allow_duplicates=False,
+                                )
+                                self.memory_manager.store_memory(
+                                    user_id=user_id,
+                                    key="onboarding_step_pending",
+                                    value="resolved",
+                                    category="conversation",
+                                    ttl_hours=0.1,
+                                    source="dialogue_engine",
+                                    allow_duplicates=False,
+                                )
+                                return completion_msg
+
                         lesson = session.query(Lesson).filter(Lesson.lesson_id == 1).first()
                         if lesson:
                             language = self._get_user_language(user_id)
                             welcome_msg = self.onboarding.get_lesson_1_welcome_message(user_id)
                             lesson_msg = await self._format_lesson_message(lesson, language)
+                            self.memory_manager.store_memory(
+                                user_id=user_id,
+                                key="pending_lesson_delivery",
+                                value="",
+                                category="conversation",
+                                ttl_hours=0.1,
+                                source="dialogue_engine",
+                                allow_duplicates=False,
+                            )
                             self.memory_manager.store_memory(
                                 user_id=user_id,
                                 key="onboarding_step_pending",
@@ -675,11 +744,55 @@ class DialogueEngine:
                             source="onboarding_lesson_status",
                         )
 
+                        completion_msg = None
+                        completion_sent = self.memory_manager.get_memory(user_id, "onboarding_complete_message_sent")
+                        if not completion_sent:
+                            status = self.onboarding.get_onboarding_status(user_id)
+                            if status.get("has_name") and status.get("has_consent") and status.get("has_commitment"):
+                                completion_msg = self.onboarding.get_onboarding_complete_message(user_id)
+                                self.memory_manager.store_memory(
+                                    user_id=user_id,
+                                    key="onboarding_complete_message_sent",
+                                    value="true",
+                                    category="conversation",
+                                    ttl_hours=365 * 24,
+                                    source="dialogue_engine",
+                                    allow_duplicates=False,
+                                )
+                                self.memory_manager.store_memory(
+                                    user_id=user_id,
+                                    key="pending_lesson_delivery",
+                                    value=str(lesson_id),
+                                    category="conversation",
+                                    ttl_hours=1,
+                                    source="dialogue_engine",
+                                    allow_duplicates=False,
+                                )
+                                self.memory_manager.store_memory(
+                                    user_id=user_id,
+                                    key="onboarding_step_pending",
+                                    value="resolved",
+                                    category="conversation",
+                                    ttl_hours=0.1,
+                                    source="dialogue_engine",
+                                    allow_duplicates=False,
+                                )
+                                return completion_msg
+
                         lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
                         if lesson:
                             language = self._get_user_language(user_id)
                             continuation_msg = self.onboarding.get_continuation_welcome_message(user_id, lesson_id)
                             lesson_msg = await self._format_lesson_message(lesson, language)
+                            self.memory_manager.store_memory(
+                                user_id=user_id,
+                                key="pending_lesson_delivery",
+                                value="",
+                                category="conversation",
+                                ttl_hours=0.1,
+                                source="dialogue_engine",
+                                allow_duplicates=False,
+                            )
                             self.memory_manager.store_memory(
                                 user_id=user_id,
                                 key="onboarding_step_pending",
