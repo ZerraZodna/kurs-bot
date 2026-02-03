@@ -265,6 +265,24 @@ class DialogueEngine:
             return cleaned in greetings
         return False
 
+    def _get_user_language(self, user_id: int) -> str:
+        """
+        Get user's preferred language from memories table.
+        
+        Looks for memory with key='user_language' and category='preference'.
+        Returns the language value (e.g., 'Norwegian', 'English') or 'English' as default.
+        
+        Args:
+            user_id: The user's ID
+            
+        Returns:
+            Language string (e.g., 'Norwegian', 'English')
+        """
+        memories = self.memory_manager.get_memory(user_id, "user_language")
+        if memories and len(memories) > 0:
+            # get_memory returns a list, get the first/most recent one
+            return memories[0].value
+        return "English"  # Default to English if not found
 
 
     async def _handle_onboarding(self, user_id: int, text: str, session: Session) -> Optional[str]:

@@ -108,10 +108,10 @@ async def test_onboarding_flow():
         status = onboarding.get_onboarding_status(user_id)
         print(f"\nOnboarding status: {status}")
         
-        # Step 4: User provides preferred time
-        print("\n[Step 4] User provides preferred lesson time")
+        # Step 4: User provides lesson status (new vs continuing)
+        print("\n[Step 4] User indicates they're new to ACIM")
         print("-" * 80)
-        user_msg = "I prefer to receive lessons at 9:00 AM"
+        user_msg = "I'm new to ACIM"
         print(f"User: {user_msg}")
         
         response = await dialogue.process_message(user_id, user_msg, db)
@@ -120,7 +120,7 @@ async def test_onboarding_flow():
         status = onboarding.get_onboarding_status(user_id)
         print(f"\nOnboarding status: {status}")
         
-        # Check if schedule was created
+        # Check if schedule was auto-created (should be created at completion)
         schedules = SchedulerService.get_user_schedules(user_id)
         print(f"\n📅 Schedules created: {len(schedules)}")
         for schedule in schedules:
@@ -131,10 +131,12 @@ async def test_onboarding_flow():
             print(f"    Active: {schedule.is_active}")
         
         if status["onboarding_complete"] and len(schedules) > 0:
-            print("\n✅ SUCCESS: Onboarding complete and schedule created!")
+            print("\n✅ SUCCESS: Onboarding complete and auto-schedule created!")
             return True
         else:
-            print("\n❌ FAILED: Onboarding not complete or schedule not created")
+            print("\n❌ FAILED: Onboarding not complete or schedule not auto-created")
+            print(f"    Onboarding complete: {status['onboarding_complete']}")
+            print(f"    Schedules: {len(schedules)}")
             return False
         
     finally:
