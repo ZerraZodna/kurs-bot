@@ -3,7 +3,7 @@
 
 . .venv\Scripts\Activate.ps1
 
-Write-Host "🧪 Running tests..." -ForegroundColor Cyan
+Write-Host "Running tests..." -ForegroundColor Cyan
 pytest --maxfail=3 --disable-warnings --tb=short -v
 
 # Show result

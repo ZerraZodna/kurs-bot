@@ -12,6 +12,7 @@ Tests the complete user journey:
 
 import asyncio
 import sys
+import pytest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -55,6 +56,7 @@ def create_new_test_user(db) -> int:
     return user.user_id
 
 
+@pytest.mark.asyncio
 async def test_onboarding_flow():
     """Test complete onboarding flow."""
     print("\n" + "=" * 80)
@@ -139,6 +141,7 @@ async def test_onboarding_flow():
         db.close()
 
 
+@pytest.mark.asyncio
 async def test_schedule_request():
     """Test that users can request reminders explicitly."""
     print("\n" + "=" * 80)
@@ -170,6 +173,7 @@ async def test_schedule_request():
         db.close()
 
 
+@pytest.mark.asyncio
 async def test_time_parsing():
     """Test time string parsing."""
     print("\n" + "=" * 80)

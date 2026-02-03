@@ -11,6 +11,7 @@ Test case:
 
 import asyncio
 import sys
+import pytest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -49,6 +50,7 @@ def create_norwegian_test_user(db) -> int:
     return user.user_id
 
 
+@pytest.mark.asyncio
 async def test_norwegian_response():
     """Test that Norwegian input gets Norwegian response."""
     print("\n" + "=" * 80)
