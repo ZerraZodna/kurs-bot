@@ -265,48 +265,7 @@ class DialogueEngine:
             return cleaned in greetings
         return False
 
-    def _parse_one_time_reminder(self, text: str) -> Optional[Dict[str, Any]]:
-        """DEPRECATED: Use detect_one_time_reminder from dialogue.reminder_handler instead."""
-        return detect_one_time_reminder(text)
 
-    async def _handle_lesson_confirmation(self, user_id: int, text: str, session: Session) -> Optional[str]:
-        """DEPRECATED: Use handle_lesson_confirmation from dialogue.reminder_handler instead."""
-        return await handle_lesson_confirmation(
-            user_id,
-            text,
-            session,
-            self.memory_manager,
-            self.onboarding,
-            translate_text,
-            lambda uid: get_user_language(self.memory_manager, uid),
-            lambda les, lang: format_lesson_message(les, lang, self.call_ollama),
-        )
-
-    def _get_pending_confirmation(self, user_id: int) -> Optional[dict]:
-        """DEPRECATED: Use get_pending_confirmation from dialogue.reminder_handler instead."""
-        return get_pending_confirmation(self.memory_manager, user_id)
-
-    def _resolve_pending_confirmation(self, user_id: int) -> None:
-        """DEPRECATED: Use resolve_pending_confirmation from dialogue.reminder_handler instead."""
-        resolve_pending_confirmation(self.memory_manager, user_id)
-
-    def _get_user_language(self, user_id: int) -> str:
-        """DEPRECATED: Use get_user_language from dialogue.memory_helpers instead."""
-        return get_user_language(self.memory_manager, user_id)
-
-    async def _format_lesson_message(self, lesson: Lesson, language: str) -> str:
-        """DEPRECATED: Use format_lesson_message from dialogue.lesson_handler instead."""
-        return await format_lesson_message(lesson, language, self.call_ollama)
-
-    async def _translate_text(self, text: str, language: str) -> str:
-        """DEPRECATED: Use translate_text from dialogue.lesson_handler instead."""
-        return await translate_text(text, language, self.call_ollama)
-
-    async def _extract_and_store_memories(self, user_id: int, user_message: str, session: Session) -> None:
-        """DEPRECATED: Use extract_and_store_memories from dialogue package instead."""
-        await extract_and_store_memories(
-            self.memory_manager, self.memory_extractor, user_id, user_message
-        )
 
     async def _handle_onboarding(self, user_id: int, text: str, session: Session) -> Optional[str]:
         """
@@ -760,18 +719,6 @@ Your first lesson will arrive tomorrow at {hour:02d}:{minute:02d} UTC. 🙏"""
                 ttl_hours=24,  # 24-hour window for active conversation
                 category="conversation",
             )
-
-    def _delete_user(self, user_id: int) -> None:
-        """DEPRECATED: Use delete_user_and_data from dialogue.memory_helpers instead."""
-        delete_user_and_data(self.db, user_id)
-
-    def _detect_lesson_request(self, text: str) -> Optional[Dict[str, Any]]:
-        """DEPRECATED: Use detect_lesson_request from dialogue.lesson_handler instead."""
-        return detect_lesson_request(text)
-
-    async def _handle_lesson_request(self, lesson_id: int, user_input: str, session: Session) -> str:
-        """DEPRECATED: Use handle_lesson_request from dialogue.lesson_handler instead."""
-        return await handle_lesson_request(lesson_id, user_input, session)
 
     def get_onboarding_prompt(self) -> str:
         """
