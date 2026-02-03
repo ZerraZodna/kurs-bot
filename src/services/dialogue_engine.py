@@ -10,14 +10,27 @@ from src.services.prompt_builder import PromptBuilder
 from src.services.memory_extractor import MemoryExtractor
 from src.services.onboarding_service import OnboardingService
 from src.services.scheduler import SchedulerService
+from src.services.dialogue import (
+    call_ollama,
+    detect_lesson_request,
+    handle_lesson_request,
+    format_lesson_message,
+    translate_text,
+    detect_one_time_reminder,
+    get_pending_confirmation,
+    resolve_pending_confirmation,
+    handle_lesson_confirmation,
+    get_user_language,
+    detect_and_store_language,
+    extract_and_store_memories,
+    delete_user_and_data,
+)
 from src.config import settings
 from src.models.database import Lesson, Schedule
 from apscheduler.triggers.date import DateTrigger
 from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
-
-OLLAMA_URL = "http://localhost:11434/api/generate"  # Default Ollama endpoint
 
 class DialogueEngine:
     def __init__(self, db: Optional[Session] = None, memory_manager: Optional[MemoryManager] = None):
@@ -28,21 +41,8 @@ class DialogueEngine:
         self.onboarding = OnboardingService(db) if db else None
 
     async def call_ollama(self, prompt: str, model: Optional[str] = None) -> str:
-        model = model or settings.OLLAMA_MODEL
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "stream": False
-        }
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(OLLAMA_URL, json=payload, timeout=30.0)
-                response.raise_for_status()
-                data = response.json()
-                return data.get("response", "[No response from Ollama]")
-        except Exception as e:
-            logger.error(f"[Ollama error] {e}")
-            return "[Sorry, I couldn't process your request right now.]"
+        """Delegate to dialogue.ollama_client."""
+        return await call_ollama(prompt, model)
 
     async def process_message(
         self,
@@ -108,15 +108,27 @@ class DialogueEngine:
             return "OK — simulating next day for 1 hour. No active daily schedule found."
 
         # FIRST: Extract memories from user message (this might store commitment, name, time, etc.)
-        await self._extract_and_store_memories(user_id, text, session)
+        await extract_and_store_memories(
+            self.memory_manager, self.memory_extractor, user_id, text
+        )
+        await detect_and_store_language(self.memory_manager, user_id, text)
 
         # Handle lesson confirmation replies (before onboarding/schedule logic)
-        lesson_response = await self._handle_lesson_confirmation(user_id, text, session)
+        lesson_response = await handle_lesson_confirmation(
+            user_id,
+            text,
+            session,
+            self.memory_manager,
+            self.onboarding,
+            translate_text,
+            lambda uid: get_user_language(self.memory_manager, uid),
+            lambda les, lang: format_lesson_message(les, lang, self.call_ollama),
+        )
         if lesson_response:
             return lesson_response
 
         # Handle one-time reminder requests
-        reminder = self._parse_one_time_reminder(text)
+        reminder = detect_one_time_reminder(text)
         if reminder:
             schedule = SchedulerService.create_one_time_schedule(
                 user_id=user_id,
@@ -125,9 +137,9 @@ class DialogueEngine:
                 session=session,
             )
             confirmation = reminder["confirmation"]
-            language = self._get_user_language(user_id)
+            language = get_user_language(self.memory_manager, user_id)
             if language.lower() not in ["english", "en"]:
-                confirmation = await self._translate_text(confirmation, language)
+                confirmation = await translate_text(confirmation, language, self.call_ollama)
             return confirmation
 
         # If a schedule request is pending, continue schedule flow even without keywords
@@ -155,9 +167,11 @@ class DialogueEngine:
                 return schedule_response
         
         # Check if user is asking about a specific lesson (LESSON REQUEST - BEFORE ONBOARDING)
-        lesson_request = self._detect_lesson_request(text)
+        lesson_request = detect_lesson_request(text)
         if lesson_request:
-            lesson_response = await self._handle_lesson_request(lesson_request["lesson_id"], text, session)
+            lesson_response = await handle_lesson_request(
+                lesson_request["lesson_id"], text, session
+            )
             if lesson_response:
                 return lesson_response
         
@@ -212,8 +226,8 @@ class DialogueEngine:
         if not lesson:
             return None
 
-        language = self._get_user_language(user_id)
-        message = await self._format_lesson_message(lesson, language)
+        language = get_user_language(self.memory_manager, user_id)
+        message = await format_lesson_message(lesson, language, self.call_ollama)
 
         repeat_note = None
         if previous_lesson_id:
@@ -221,7 +235,7 @@ class DialogueEngine:
                 f"If you'd like to repeat Lesson {previous_lesson_id} instead, just let me know."
             )
             if language.lower() not in ["english", "en"]:
-                repeat_note = await self._translate_text(repeat_note, language)
+                repeat_note = await translate_text(repeat_note, language, self.call_ollama)
 
         if repeat_note:
             message = f"{message}\n\n{repeat_note}"
@@ -252,358 +266,47 @@ class DialogueEngine:
         return False
 
     def _parse_one_time_reminder(self, text: str) -> Optional[Dict[str, Any]]:
-        """Parse one-time reminders like 'remind me to X in 5 minutes'."""
-        msg = text.strip()
-        lower = msg.lower()
-
-        trigger_phrases = ["remind me", "påminn meg", "minn meg"]
-        if not any(tp in lower for tp in trigger_phrases):
-            return None
-
-        # Pattern: remind me to <message> in 5 minutes
-        pattern_1 = re.compile(
-            r"(?:remind me|påminn meg|minn meg)\s+(?:to\s+)?(?P<message>.+?)\s+(?:in|om)\s+(?P<amount>\d+)\s*(?P<unit>minutes?|hours?|minutter|timer)",
-            re.IGNORECASE,
-        )
-
-        # Pattern: remind me in 5 minutes to <message>
-        pattern_2 = re.compile(
-            r"(?:remind me|påminn meg|minn meg)\s+(?:in|om)\s+(?P<amount>\d+)\s*(?P<unit>minutes?|hours?|minutter|timer)\s*(?:to\s+)?(?P<message>.+)",
-            re.IGNORECASE,
-        )
-
-        match = pattern_1.search(msg) or pattern_2.search(msg)
-        if match:
-            message = match.group("message").strip().strip('"').strip("'")
-            amount = int(match.group("amount"))
-            unit = match.group("unit").lower()
-
-            if amount <= 0 or not message:
-                return None
-
-            minutes = amount
-            if unit in ["hour", "hours", "timer"]:
-                minutes = amount * 60
-
-            run_at = datetime.now(timezone.utc) + timedelta(minutes=minutes)
-            confirmation = f"Got it! I'll remind you in {amount} {unit}."
-
-            return {"message": message, "run_at": run_at, "confirmation": confirmation}
-
-        # Pattern: remind me at HH:MM to <message> (today/tomorrow)
-        pattern_at = re.compile(
-            r"(?:remind me|påminn meg|minn meg)\s+(?:at|kl)\s+(?P<hour>\d{1,2})(?::(?P<minute>\d{2}))?\s*(?:to\s+)?(?P<message>.+)",
-            re.IGNORECASE,
-        )
-
-        match = pattern_at.search(msg)
-        if match:
-            hour = int(match.group("hour"))
-            minute = int(match.group("minute") or 0)
-            message = match.group("message").strip().strip('"').strip("'")
-
-            if not message:
-                return None
-
-            now = datetime.now(timezone.utc)
-            run_at = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-            if run_at <= now:
-                run_at += timedelta(days=1)
-            confirmation = f"Got it! I'll remind you at {hour:02d}:{minute:02d} UTC."
-
-            return {"message": message, "run_at": run_at, "confirmation": confirmation}
-
-        return None
+        """DEPRECATED: Use detect_one_time_reminder from dialogue.reminder_handler instead."""
+        return detect_one_time_reminder(text)
 
     async def _handle_lesson_confirmation(self, user_id: int, text: str, session: Session) -> Optional[str]:
-        """Handle replies to daily lesson completion prompts."""
-        if not self.memory_manager:
-            return None
-
-        pending = self._get_pending_confirmation(user_id)
-        if not pending:
-            return None
-
-        message_lower = text.lower().strip()
-
-        # Detect yes/no responses
-        is_yes = self.onboarding.detect_commitment_keywords(message_lower) if self.onboarding else False
-        no_keywords = [
-            "no", "not yet", "nope", "nei", "ikke ennå", "ikke enda",
-            "ikke", "ikke ferdig", "senere",
-        ]
-        is_no = any(k in message_lower for k in no_keywords)
-
-        if not is_yes and not is_no:
-            return None
-
-        lesson_id = pending.get("lesson_id")
-        next_id = pending.get("next_lesson_id")
-
-        if is_no:
-            self._resolve_pending_confirmation(user_id)
-            message = "No problem. Take your time and reply 'yes' when you're ready to continue."
-            language = self._get_user_language(user_id)
-            if language.lower() not in ["english", "en"]:
-                message = await self._translate_text(message, language)
-            return message
-
-        # Yes: mark completed and send next lesson
-        if lesson_id:
-            self.memory_manager.store_memory(
-                user_id=user_id,
-                key="lesson_completed",
-                value=str(lesson_id),
-                category="progress",
-                confidence=1.0,
-                source="dialogue_engine_lesson_confirmation",
-            )
-
-        lesson = session.query(Lesson).filter(Lesson.lesson_id == next_id).first() if next_id else None
-        if not lesson:
-            self._resolve_pending_confirmation(user_id)
-            return "Thanks! I couldn't find the next lesson right now."
-
-        language = self._get_user_language(user_id)
-        message = await self._format_lesson_message(lesson, language)
-
-        # Update last sent lesson id
-        self.memory_manager.store_memory(
-            user_id=user_id,
-            key="last_sent_lesson_id",
-            value=str(lesson.lesson_id),
-            category="progress",
-            confidence=1.0,
-            source="dialogue_engine_lesson_confirmation",
+        """DEPRECATED: Use handle_lesson_confirmation from dialogue.reminder_handler instead."""
+        return await handle_lesson_confirmation(
+            user_id,
+            text,
+            session,
+            self.memory_manager,
+            self.onboarding,
+            translate_text,
+            lambda uid: get_user_language(self.memory_manager, uid),
+            lambda les, lang: format_lesson_message(les, lang, self.call_ollama),
         )
-
-        self._resolve_pending_confirmation(user_id)
-        return message
 
     def _get_pending_confirmation(self, user_id: int) -> Optional[dict]:
-        memories = self.memory_manager.get_memory(user_id, "lesson_confirmation_pending")
-        if not memories:
-            return None
-        def _normalize_dt(value: Optional[datetime]) -> datetime:
-            if isinstance(value, datetime):
-                return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
-            return datetime.min.replace(tzinfo=timezone.utc)
-
-        latest = max(memories, key=lambda m: _normalize_dt(m.get("created_at")))
-        raw = latest.get("value", "")
-        try:
-            data = json.loads(raw)
-            if isinstance(data, dict) and data.get("lesson_id"):
-                return data
-        except Exception:
-            return None
-        return None
+        """DEPRECATED: Use get_pending_confirmation from dialogue.reminder_handler instead."""
+        return get_pending_confirmation(self.memory_manager, user_id)
 
     def _resolve_pending_confirmation(self, user_id: int) -> None:
-        # Archive pending by replacing with a short-lived resolved marker
-        self.memory_manager.store_memory(
-            user_id=user_id,
-            key="lesson_confirmation_pending",
-            value=json.dumps({"resolved": True, "timestamp": datetime.now(timezone.utc).isoformat()}),
-            category="conversation",
-            ttl_hours=12,
-            source="dialogue_engine",
-        )
+        """DEPRECATED: Use resolve_pending_confirmation from dialogue.reminder_handler instead."""
+        resolve_pending_confirmation(self.memory_manager, user_id)
 
     def _get_user_language(self, user_id: int) -> str:
-        memories = self.memory_manager.get_memory(user_id, "user_language")
-        return memories[0].get("value", "English") if memories else "English"
+        """DEPRECATED: Use get_user_language from dialogue.memory_helpers instead."""
+        return get_user_language(self.memory_manager, user_id)
 
     async def _format_lesson_message(self, lesson: Lesson, language: str) -> str:
-        text = f"Lesson {lesson.lesson_id}: {lesson.title}\n\n{lesson.content}"
-        if language.lower() in ["english", "en"]:
-            return text
-        return await self._translate_text(text, language)
+        """DEPRECATED: Use format_lesson_message from dialogue.lesson_handler instead."""
+        return await format_lesson_message(lesson, language, self.call_ollama)
 
     async def _translate_text(self, text: str, language: str) -> str:
-        try:
-            prompt = (
-                f"Translate the following text to {language}. "
-                "Preserve paragraph breaks and meaning. Return only the translation.\n\n"
-                f"{text}"
-            )
-            payload = {
-                "model": settings.OLLAMA_MODEL,
-                "prompt": prompt,
-                "stream": False,
-            }
-            async with httpx.AsyncClient() as client:
-                response = await client.post(settings.OLLAMA_URL, json=payload, timeout=60.0)
-                response.raise_for_status()
-                data = response.json()
-                return data.get("response", text) or text
-        except Exception as e:
-            logger.warning(f"Translation failed, sending original text: {e}")
-            return text
+        """DEPRECATED: Use translate_text from dialogue.lesson_handler instead."""
+        return await translate_text(text, language, self.call_ollama)
 
     async def _extract_and_store_memories(self, user_id: int, user_message: str, session: Session) -> None:
-        """
-        Extract meaningful information from user message and store as memories.
-        
-        Uses MemoryExtractor to intelligently identify facts, preferences, goals, etc.
-        Automatically handles name, commitment, preferred times, etc.
-        Also detects user's language from first message.
-        
-        Args:
-            user_id: User ID from database
-            user_message: The user's message
-            session: SQLAlchemy session
-        """
-        try:
-            # Detect language from user message (store/update when confident)
-            if self.memory_manager:
-                existing_lang = self.memory_manager.get_memory(user_id, "user_language")
-                existing_value = existing_lang[0].get("value") if existing_lang else None
-                try:
-                    norwegian_keywords = [
-                        "jeg heter", "hvordan går", "vær så snill", "god morgen", "god kveld", "god ettermiddag",
-                    ]
-                    norwegian_single_words = {
-                        "hei", "jeg", "heter", "hvordan", "takk", "lyst", "ikke", "ja", "nei",
-                    }
-                    english_keywords = [
-                        "good morning", "good evening", "good afternoon", "how are", "what is",
-                    ]
-                    english_single_words = {
-                        "hello", "hi", "i", "you", "the", "and", "please", "thank",
-                    }
-
-                    msg_lower = user_message.lower()
-                    tokens = re.findall(r"[a-zA-Z]+", msg_lower)
-                    token_set = set(tokens)
-                    word_count = len(user_message.split())
-                    has_no_keywords = (
-                        any(kw in msg_lower for kw in norwegian_keywords)
-                        or any(kw in token_set for kw in norwegian_single_words)
-                    )
-                    has_en_keywords = (
-                        any(kw in msg_lower for kw in english_keywords)
-                        or any(kw in token_set for kw in english_single_words)
-                    )
-                    stripped_message = user_message.strip()
-                    is_probable_name = (
-                        word_count <= 2
-                        and stripped_message[:1].isupper()
-                        and stripped_message.replace(" ", "").isalpha()
-                        and not (has_no_keywords or has_en_keywords)
-                    )
-
-                    detected_lang = None
-                    # For very short inputs, prefer strong keyword hints
-                    if word_count <= 3 and has_no_keywords:
-                        detected_lang = "no"
-                    elif word_count <= 3 and has_en_keywords:
-                        detected_lang = "en"
-                    # Avoid detection on very short messages unless strong keywords are present
-                    elif word_count < 4 and not (has_no_keywords or has_en_keywords):
-                        detected_lang = None
-                    else:
-                        try:
-                            detected_lang = detect(user_message)
-                        except LangDetectException:
-                            if has_no_keywords:
-                                detected_lang = "no"
-                            elif has_en_keywords:
-                                detected_lang = "en"
-
-                    # Guard against NL misclassification when Norwegian keywords are present
-                    if detected_lang in ["nl", "de", "sv", "da", "sl"] and has_no_keywords:
-                        detected_lang = "no"
-
-                    # Map language codes to full names
-                    lang_names = {
-                        "no": "Norwegian",
-                        "nb": "Norwegian",
-                        "nn": "Norwegian",
-                        "en": "English",
-                        "sv": "Swedish",
-                        "da": "Danish",
-                        "de": "German",
-                        "fr": "French",
-                        "es": "Spanish",
-                        "it": "Italian",
-                        "pt": "Portuguese",
-                        "ru": "Russian",
-                        "ja": "Japanese",
-                        "zh-cn": "Chinese",
-                    }
-                    if not detected_lang:
-                        lang_name = None
-                    else:
-                        lang_name = lang_names.get(detected_lang, detected_lang.upper())
-
-                    should_update = False
-                    if is_probable_name:
-                        should_update = False
-                    elif not existing_value and lang_name:
-                        should_update = True
-                    elif lang_name and lang_name != existing_value:
-                        # Only update when message is long enough or contains strong keywords
-                        if word_count >= 4 and (has_no_keywords or has_en_keywords):
-                            should_update = True
-                        elif has_no_keywords and lang_name == "Norwegian":
-                            should_update = True
-                        elif has_en_keywords and lang_name == "English":
-                            should_update = True
-
-                    if should_update:
-                        self.memory_manager.store_memory(
-                            user_id=user_id,
-                            key="user_language",
-                            value=lang_name,
-                            confidence=0.9,
-                            source="dialogue_engine_language_detection",
-                            category="preference",
-                        )
-                        logger.info(f"Detected language for user {user_id}: {lang_name} (code: {detected_lang})")
-                except LangDetectException as e:
-                    logger.warning(f"Could not detect language: {e}")
-            
-            # Get user's existing memories for context
-            user_context = None
-            if self.memory_manager:
-                existing_memories = {}
-                for key in ["first_name", "acim_commitment", "learning_goal"]:
-                    memories = self.memory_manager.get_memory(user_id, key)
-                    if memories:
-                        existing_memories[key] = memories[0].get("value")
-                
-                user_context = {
-                    "user_id": user_id,
-                    "existing_memories": existing_memories,
-                } if existing_memories else None
-            
-            # Extract memories using Ollama
-            extracted_memories = await self.memory_extractor.extract_memories(
-                user_message, 
-                user_context
-            )
-            
-            # Store extracted memories
-            for memory in extracted_memories:
-                try:
-                    self.memory_manager.store_memory(
-                        user_id=user_id,
-                        key=memory.get("key"),
-                        value=memory.get("value"),
-                        confidence=memory.get("confidence", 1.0),
-                        ttl_hours=memory.get("ttl_hours"),
-                        source="dialogue_engine_extractor",
-                    )
-                    logger.info(
-                        f"Stored memory for user {user_id}: {memory.get('key')}="
-                        f"{memory.get('value')[:50]}"
-                    )
-                except Exception as e:
-                    logger.error(f"Error storing memory: {e}")
-        
-        except Exception as e:
-            logger.error(f"Error in memory extraction: {e}")
+        """DEPRECATED: Use extract_and_store_memories from dialogue package instead."""
+        await extract_and_store_memories(
+            self.memory_manager, self.memory_extractor, user_id, user_message
+        )
 
     async def _handle_onboarding(self, user_id: int, text: str, session: Session) -> Optional[str]:
         """
@@ -1059,112 +762,16 @@ Your first lesson will arrive tomorrow at {hour:02d}:{minute:02d} UTC. 🙏"""
             )
 
     def _delete_user(self, user_id: int) -> None:
-        """
-        Delete a user and all associated data from the database.
-        Called when user declines consent during onboarding.
-        
-        Deletes:
-        - All memories associated with user
-        - All message logs
-        - All schedules
-        - The user record itself
-        """
-        if not self.db:
-            return
-        
-        try:
-            from src.models.database import Memory, Schedule, MessageLog, User
-            
-            # Delete in correct order due to foreign keys
-            self.db.query(Memory).filter_by(user_id=user_id).delete(synchronize_session=False)
-            self.db.query(Schedule).filter_by(user_id=user_id).delete(synchronize_session=False)
-            self.db.query(MessageLog).filter_by(user_id=user_id).delete(synchronize_session=False)
-            self.db.query(User).filter_by(user_id=user_id).delete(synchronize_session=False)
-            
-            self.db.commit()
-            logger.info(f"[User deleted] User {user_id} deleted due to declined consent")
-        except Exception as e:
-            logger.error(f"[User deletion error] Failed to delete user {user_id}: {e}")
-            self.db.rollback()
+        """DEPRECATED: Use delete_user_and_data from dialogue.memory_helpers instead."""
+        delete_user_and_data(self.db, user_id)
 
     def _detect_lesson_request(self, text: str) -> Optional[Dict[str, Any]]:
-        """
-        Detect if user is requesting information about a specific lesson.
-        
-        Examples:
-        - "Tell me about lesson 10"
-        - "What is lesson 5?"
-        - "Explain lesson 42"
-        - "Lesson 1 content"
-        
-        Returns:
-            Dict with lesson_id if detected, None otherwise
-        """
-        text_lower = text.lower()
-        
-        # Pattern: mention of "lesson" + number
-        import re
-        lesson_patterns = [
-            r'lesson\s+(\d+)',
-            r'day\s+(\d+)',
-            r'lesson\s+#(\d+)',
-            r'#(\d+)',
-        ]
-        
-        for pattern in lesson_patterns:
-            match = re.search(pattern, text_lower)
-            if match:
-                lesson_num = int(match.group(1))
-                # Validate lesson is within valid range (1-365 for ACIM)
-                if 1 <= lesson_num <= 365:
-                    return {"lesson_id": lesson_num}
-        
-        return None
+        """DEPRECATED: Use detect_lesson_request from dialogue.lesson_handler instead."""
+        return detect_lesson_request(text)
 
     async def _handle_lesson_request(self, lesson_id: int, user_input: str, session: Session) -> str:
-        """
-        Handle requests for specific lesson content using RAG.
-        
-        Retrieves the lesson from database and injects it into the context
-        so the LLM responds with accurate information.
-        """
-        if not self.db:
-            return "I couldn't retrieve that lesson right now."
-        
-        try:
-            # Fetch the lesson from database
-            lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
-            
-            if not lesson:
-                return f"I couldn't find lesson {lesson_id} in my database. ACIM has 365 lessons - please ask for a lesson between 1 and 365."
-            
-            # Build RAG-enhanced prompt with lesson content
-            system_prompt = f"""{settings.SYSTEM_PROMPT}
-
-### Requested Lesson Content [RAG CONTEXT - USE THIS]
-**Lesson {lesson.lesson_id}**: "{lesson.title}"
-
-{lesson.content}
-
----
-The user is asking about this lesson. Use the above content to provide accurate, detailed information."""
-            
-            # Build the prompt with lesson context
-            prompt = f"""{system_prompt}
-
-### User Question
-{user_input}
-
-### Response
-Provide a thoughtful, detailed response about this ACIM lesson. Reference specific points from the lesson content above. Be warm and encouraging."""
-            
-            # Call Ollama with lesson-injected context
-            response = await self.call_ollama(prompt)
-            return response
-            
-        except Exception as e:
-            logger.error(f"[Lesson request error] Failed to handle lesson {lesson_id}: {e}")
-            return f"I encountered an error retrieving lesson {lesson_id}. Please try again."
+        """DEPRECATED: Use handle_lesson_request from dialogue.lesson_handler instead."""
+        return await handle_lesson_request(lesson_id, user_input, session)
 
     def get_onboarding_prompt(self) -> str:
         """
