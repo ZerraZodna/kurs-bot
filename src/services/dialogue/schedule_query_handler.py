@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import timezone
 from typing import Iterable
 
 from src.models.database import Schedule
+from src.services.timezone_utils import format_dt_in_timezone
 
 
 def detect_schedule_status_request(text: str) -> bool:
@@ -46,7 +46,7 @@ def detect_schedule_status_request(text: str) -> bool:
     return any(q in message for q in question_terms) and any(s in message for s in schedule_terms)
 
 
-def build_schedule_status_response(schedules: Iterable[Schedule]) -> str:
+def build_schedule_status_response(schedules: Iterable[Schedule], tz_name: str = "UTC") -> str:
     schedules = list(schedules)
     if not schedules:
         return "You don't have any active reminders."
@@ -55,15 +55,15 @@ def build_schedule_status_response(schedules: Iterable[Schedule]) -> str:
     for schedule in schedules:
         if schedule.schedule_type.startswith("one_time"):
             if schedule.next_send_time:
-                ts = schedule.next_send_time.astimezone(timezone.utc)
-                lines.append(f"- One-time reminder at {ts:%Y-%m-%d %H:%M} UTC")
+                ts, _ = format_dt_in_timezone(schedule.next_send_time, tz_name)
+                lines.append(f"- One-time reminder at {ts:%Y-%m-%d %H:%M}")
             else:
                 lines.append("- One-time reminder (time not set)")
             continue
 
         if schedule.next_send_time:
-            ts = schedule.next_send_time.astimezone(timezone.utc)
-            lines.append(f"- Daily reminder at {ts:%H:%M} UTC")
+            ts, _ = format_dt_in_timezone(schedule.next_send_time, tz_name)
+            lines.append(f"- Daily reminder at {ts:%H:%M}")
         else:
             lines.append("- Daily reminder (time not set)")
 

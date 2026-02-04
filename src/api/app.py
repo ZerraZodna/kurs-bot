@@ -6,6 +6,7 @@ from src.config import settings
 from src.integrations.telegram import TelegramHandler, send_message
 from src.services.dialogue_engine import DialogueEngine
 from src.api.dialogue_routes import router as dialogue_router
+from src.api.gdpr_routes import router as gdpr_router
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -18,6 +19,7 @@ app = FastAPI()
 
 # Include dialogue routes with context-aware endpoints
 app.include_router(dialogue_router)
+app.include_router(gdpr_router)
 
 
 @app.get("/")
@@ -163,7 +165,13 @@ async def telegram_webhook(request: Request, secret_token: str):
             print(f"[user updated] {uid} {first_name} {last_name}")
     # Extract user_id before closing session
     user_id = db_user.user_id if db_user else db.query(User).filter_by(external_id=str(uid), channel="telegram").first().user_id
+    processing_restricted = bool(getattr(db_user, "processing_restricted", False)) if db_user else False
+    is_deleted = bool(getattr(db_user, "is_deleted", False)) if db_user else False
+    is_opted_in = bool(getattr(db_user, "opted_in", True)) if db_user else True
     db.close()
+
+    if processing_restricted or is_deleted or not is_opted_in:
+        return {"ok": True, "restricted": True}
 
     # Log all incoming messages to MessageLog with retry
     def _log_message():

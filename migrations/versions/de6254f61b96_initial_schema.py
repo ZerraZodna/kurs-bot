@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 # revision identifiers, used by Alembic.
@@ -94,11 +95,19 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ),
     sa.PrimaryKeyConstraint('unsubscribe_id')
     )
-    op.drop_index(op.f('ix_memory_key'), table_name='memory')
-    op.drop_index(op.f('ix_memory_memory_id'), table_name='memory')
-    op.drop_index(op.f('ix_memory_user_id'), table_name='memory')
-    op.drop_index(op.f('ix_memory_value_hash'), table_name='memory')
-    op.drop_table('memory')
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    if 'memory' in inspector.get_table_names():
+        existing_indexes = {idx.get('name') for idx in inspector.get_indexes('memory')}
+        for index_name in [
+            op.f('ix_memory_key'),
+            op.f('ix_memory_memory_id'),
+            op.f('ix_memory_user_id'),
+            op.f('ix_memory_value_hash'),
+        ]:
+            if index_name in existing_indexes:
+                op.drop_index(index_name, table_name='memory')
+        op.drop_table('memory')
     # ### end Alembic commands ###
 
 

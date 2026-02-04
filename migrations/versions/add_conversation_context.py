@@ -5,7 +5,7 @@ import sqlalchemy as sa
 
 # Revision identifiers
 revision = 'add_conversation_context'
-down_revision = '579b16a573a2_add_is_active_to_memory'
+down_revision = '579b16a573a2'
 branch_labels = None
 depends_on = None
 

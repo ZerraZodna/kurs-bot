@@ -39,12 +39,19 @@ class User(Base):
     first_name = Column(String(64))
     last_name = Column(String(64))
     opted_in = Column(Boolean, default=True, nullable=False)
+    processing_restricted = Column(Boolean, default=False, nullable=False)
+    restriction_reason = Column(Text)
+    is_deleted = Column(Boolean, default=False, nullable=False)
+    deleted_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
     last_active_at = Column(DateTime(timezone=True))
     memories = relationship('Memory', back_populates='user')
     schedules = relationship('Schedule', back_populates='user')
     message_logs = relationship('MessageLog', back_populates='user')
     unsubscribes = relationship('Unsubscribe', back_populates='user')
+    consent_logs = relationship('ConsentLog', back_populates='user')
+    gdpr_requests = relationship('GdprRequest', back_populates='user')
+    gdpr_audit_logs = relationship('GdprAuditLog', back_populates='user')
 
 class Memory(Base):
     __tablename__ = 'memories'
@@ -117,6 +124,43 @@ class Unsubscribe(Base):
     unsubscribed_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
     compliance_required = Column(Boolean, default=False, nullable=False)
     user = relationship('User', back_populates='unsubscribes')
+
+
+class ConsentLog(Base):
+    __tablename__ = 'consent_logs'
+    consent_id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+    scope = Column(String(64), nullable=False)
+    granted = Column(Boolean, nullable=False)
+    consent_version = Column(String(32))
+    source = Column(String(64))
+    created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    user = relationship('User', back_populates='consent_logs')
+
+
+class GdprRequest(Base):
+    __tablename__ = 'gdpr_requests'
+    request_id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'))
+    request_type = Column(String(32), nullable=False)
+    status = Column(String(32), default="completed", nullable=False)
+    reason = Column(Text)
+    details = Column(Text)
+    actor = Column(String(64), default="user", nullable=False)
+    requested_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    processed_at = Column(DateTime(timezone=True))
+    user = relationship('User', back_populates='gdpr_requests')
+
+
+class GdprAuditLog(Base):
+    __tablename__ = 'gdpr_audit_logs'
+    audit_id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'))
+    action = Column(String(64), nullable=False)
+    details = Column(Text)
+    actor = Column(String(64), default="system", nullable=False)
+    created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    user = relationship('User', back_populates='gdpr_audit_logs')
 
 class BatchLock(Base):
     __tablename__ = 'batch_locks'

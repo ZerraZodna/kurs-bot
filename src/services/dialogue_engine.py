@@ -30,7 +30,9 @@ from src.services.dialogue import (
     delete_user_and_data,
 )
 from src.config import settings
-from src.models.database import Lesson, Schedule
+from src.models.database import Lesson, Schedule, User
+from src.services.gdpr_service import record_consent
+from src.services.timezone_utils import ensure_user_timezone, format_dt_in_timezone, get_user_timezone_name
 from apscheduler.triggers.date import DateTrigger
 from datetime import datetime, timezone, timedelta
 
@@ -73,6 +75,14 @@ class DialogueEngine:
         Returns:
             AI response from Ollama
         """
+        user = session.query(User).filter_by(user_id=user_id).first()
+        if not user:
+            return "User not found."
+        if user.is_deleted:
+            return "Your data has been deleted. If you want to start again, please re-register."
+        if user.processing_restricted or not user.opted_in:
+            return "Your data processing is restricted. If you want to resume, please update your consent settings."
+
         # Handle RAG mode toggle: rag_mode on/off
         text_lower = text.strip().lower()
         if text_lower == "rag_mode":
@@ -219,7 +229,13 @@ class DialogueEngine:
 
         if detect_schedule_status_request(text):
             schedules = SchedulerService.get_user_schedules(user_id)
-            response = build_schedule_status_response(schedules)
+            tz_name = ensure_user_timezone(
+                self.memory_manager,
+                user_id,
+                get_user_language(self.memory_manager, user_id),
+                source="dialogue_engine_schedule_status",
+            )
+            response = build_schedule_status_response(schedules, tz_name)
             language = get_user_language(self.memory_manager, user_id)
             if language.lower() not in ["english", "en"]:
                 response = await translate_text(response, language, self.call_ollama)
@@ -459,7 +475,21 @@ class DialogueEngine:
                             source="dialogue_engine_consent",
                             category="profile",
                         )
+                        record_consent(
+                            session,
+                            user_id=user_id,
+                            scope="data_storage",
+                            granted=True,
+                            source="dialogue_engine_consent",
+                        )
                     elif consent is False:
+                        record_consent(
+                            session,
+                            user_id=user_id,
+                            scope="data_storage",
+                            granted=False,
+                            source="dialogue_engine_consent",
+                        )
                         # User declined consent during onboarding - delete the user
                         self._delete_user(user_id)
                         return "Understood. I won't store your information. If you change your mind, just message me again."
@@ -709,6 +739,13 @@ class DialogueEngine:
                     source="dialogue_engine_consent",
                     category="profile",
                 )
+                record_consent(
+                    session,
+                    user_id=user_id,
+                    scope="data_storage",
+                    granted=True,
+                    source="dialogue_engine_consent",
+                )
                 return self.onboarding.get_onboarding_prompt(user_id)
             if consent is False:
                 self.memory_manager.store_memory(
@@ -718,6 +755,13 @@ class DialogueEngine:
                     confidence=1.0,
                     source="dialogue_engine_consent",
                     category="profile",
+                )
+                record_consent(
+                    session,
+                    user_id=user_id,
+                    scope="data_storage",
+                    granted=False,
+                    source="dialogue_engine_consent",
                 )
                 return "Understood. I won't store your information. If you change your mind, just message me again."
 
@@ -770,7 +814,17 @@ class DialogueEngine:
         schedules = SchedulerService.get_user_schedules(user_id)
         if schedules:
             schedule = schedules[0]
-            hour, minute = schedule.next_send_time.hour, schedule.next_send_time.minute
+            tz_name = ensure_user_timezone(
+                self.memory_manager,
+                user_id,
+                get_user_language(self.memory_manager, user_id),
+                source="dialogue_engine_schedule_status",
+            )
+            if schedule.next_send_time:
+                local_dt, _ = format_dt_in_timezone(schedule.next_send_time, tz_name)
+                time_display = f"{local_dt:%H:%M}"
+            else:
+                time_display = "(time not set)"
             if self.memory_manager:
                 self.memory_manager.store_memory(
                     user_id=user_id,
@@ -783,7 +837,7 @@ class DialogueEngine:
                 )
             return f"""You're already all set up! ✨
 
-You have a daily reminder for {hour:02d}:{minute:02d} UTC.
+You have a daily reminder for {time_display}.
 
 Would you like to:
 • Change the time?
@@ -820,7 +874,18 @@ When would you like to receive them? (e.g., "9:00 AM", "morning", "evening", "8:
                 session=session,
             )
 
-            hour, minute = SchedulerService.parse_time_string(time_str)
+            tz_name = ensure_user_timezone(
+                self.memory_manager,
+                user_id,
+                get_user_language(self.memory_manager, user_id),
+                source="dialogue_engine_schedule_create",
+            )
+            if schedule.next_send_time:
+                local_dt, _ = format_dt_in_timezone(schedule.next_send_time, tz_name)
+                time_display = f"{local_dt:%H:%M}"
+            else:
+                hour, minute = SchedulerService.parse_time_string(time_str)
+                time_display = f"{hour:02d}:{minute:02d}"
 
             name_memories = self.memory_manager.get_memory(user_id, "first_name")
             name = name_memories[0]["value"] if name_memories else "friend"
@@ -838,11 +903,11 @@ When would you like to receive them? (e.g., "9:00 AM", "morning", "evening", "8:
 
             return f"""Perfect, {name}! ✨
 
-I've scheduled your daily ACIM lesson for {hour:02d}:{minute:02d} UTC each day.
+I've scheduled your daily ACIM lesson for {time_display} each day.
 
 Each day at this time, I'll send you one lesson. Remember: consistency is key. Even if you can only spend 5 minutes with the lesson, that daily practice will transform your perception.
 
-Your first lesson will arrive tomorrow at {hour:02d}:{minute:02d} UTC. 🙏"""
+Your first lesson will arrive tomorrow at {time_display}. 🙏"""
 
         except Exception as e:
             logger.error(f"Error creating schedule: {e}")

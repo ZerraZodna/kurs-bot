@@ -29,6 +29,7 @@ from src.services.onboarding.prompts import (
 )
 from src.services.onboarding.status import get_onboarding_status_dict
 from src.services.onboarding.schedule_setup import create_auto_schedule
+from src.services.timezone_utils import ensure_user_timezone
 from src.services.onboarding.user_management import delete_user_and_data, is_user_new
 
 logger = logging.getLogger(__name__)
@@ -166,6 +167,8 @@ class OnboardingService:
 
         lang_memories = self.memory_manager.get_memory(user_id, "user_language")
         language = lang_memories[0]["value"] if lang_memories else "English"
+
+        ensure_user_timezone(self.memory_manager, user_id, language)
 
         # Auto-create schedule
         create_auto_schedule(self.db, user_id)
