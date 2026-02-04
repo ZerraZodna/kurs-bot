@@ -1,7 +1,6 @@
 import httpx
 import logging
 import json
-import re
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from langdetect import detect, LangDetectException
@@ -10,6 +9,7 @@ from src.services.prompt_builder import PromptBuilder
 from src.services.semantic_search import get_semantic_search_service
 from src.services.memory_extractor import MemoryExtractor
 from src.services.onboarding_service import OnboardingService
+from src.services.onboarding.flow import OnboardingFlow
 from src.services.scheduler import SchedulerService
 from src.services.dialogue import (
     call_ollama,
@@ -17,24 +17,21 @@ from src.services.dialogue import (
     handle_lesson_request,
     format_lesson_message,
     translate_text,
-    detect_one_time_reminder,
-    detect_pause_request,
-    detect_schedule_status_request,
-    build_schedule_status_response,
-    get_pending_confirmation,
-    resolve_pending_confirmation,
     handle_lesson_confirmation,
     get_user_language,
     detect_and_store_language,
     extract_and_store_memories,
-    delete_user_and_data,
+    handle_rag_mode_toggle,
+    parse_rag_prefix,
+    is_rag_mode_enabled,
+    handle_forget_commands,
+    handle_debug_next_day,
+    handle_schedule_messages,
+    maybe_send_next_lesson,
 )
 from src.config import settings
-from src.models.database import Lesson, Schedule, User
-from src.services.gdpr_service import record_consent
-from src.services.timezone_utils import ensure_user_timezone, format_dt_in_timezone, get_user_timezone_name
-from apscheduler.triggers.date import DateTrigger
-from datetime import datetime, timezone, timedelta
+from src.models.database import User
+from src.services.timezone_utils import ensure_user_timezone, format_dt_in_timezone
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +42,11 @@ class DialogueEngine:
         self.prompt_builder = PromptBuilder(db, self.memory_manager) if db else None
         self.memory_extractor = MemoryExtractor()
         self.onboarding = OnboardingService(db) if db else None
+        self.onboarding_flow = (
+            OnboardingFlow(self.memory_manager, self.onboarding, self.call_ollama)
+            if self.onboarding
+            else None
+        )
 
     async def call_ollama(self, prompt: str, model: Optional[str] = None) -> str:
         """Delegate to dialogue.ollama_client."""
@@ -84,113 +86,36 @@ class DialogueEngine:
             return "Your data processing is restricted. If you want to resume, please update your consent settings."
 
         # Handle RAG mode toggle: rag_mode on/off
-        text_lower = text.strip().lower()
-        if text_lower == "rag_mode":
-            rag_mode_memory = self.memory_manager.get_memory(user_id, "rag_mode_enabled")
-            is_on = bool(rag_mode_memory and rag_mode_memory[0].get("value") == "true")
-            return f"RAG mode is {'on' if is_on else 'off'}."
-        if text_lower.startswith("rag_mode "):
-            mode_cmd = text_lower.replace("rag_mode", "").strip()
-            if mode_cmd == "on":
-                self.memory_manager.store_memory(
-                    user_id=user_id,
-                    key="rag_mode_enabled",
-                    value="true",
-                    confidence=1.0,
-                    source="user_command",
-                    category="conversation",
-                )
-                return "RAG mode enabled. I will use semantic search for all future messages."
-            elif mode_cmd == "off":
-                self.memory_manager.store_memory(
-                    user_id=user_id,
-                    key="rag_mode_enabled",
-                    value="false",
-                    confidence=1.0,
-                    source="user_command",
-                    category="conversation",
-                )
-                return "RAG mode disabled. Back to standard workflow."
-        
+        rag_toggle_response = handle_rag_mode_toggle(text, self.memory_manager, user_id)
+        if rag_toggle_response:
+            return rag_toggle_response
+
         # Detect RAG prefix: "rag my question" or "rag: my question"
-        use_rag_for_this_message = False
-        if text_lower.startswith("rag:") or text_lower.startswith("rag "):
-            use_rag_for_this_message = True
-            # Strip the RAG prefix from the actual message
-            text = text[4:].lstrip(": ").strip()
-            text_lower = text.strip().lower()
-        
+        text, use_rag_for_this_message = parse_rag_prefix(text)
+
         # Check if RAG mode is persistently enabled
         if not use_rag_for_this_message and self.memory_manager:
-            rag_mode_memory = self.memory_manager.get_memory(user_id, "rag_mode_enabled")
-            if rag_mode_memory and rag_mode_memory[0].get("value") == "true":
-                use_rag_for_this_message = True
+            use_rag_for_this_message = is_rag_mode_enabled(self.memory_manager, user_id)
 
         # Handle forget commands (semantic memory deletion)
-        forget_prefixes = ("forget ", "erase ", "delete ", "remove ")
-        if text_lower in {"forget", "erase", "delete", "remove"}:
-            return "Tell me what to forget (e.g., 'forget my grandfather')."
-        if text_lower.startswith(forget_prefixes):
-            query_text = text.split(" ", 1)[1].strip()
-            if not query_text:
-                return "Tell me what to forget (e.g., 'forget my grandfather')."
-            memory_ids = []
-            try:
-                search_service = get_semantic_search_service()
-                search_session = Session(bind=session.get_bind())
-                try:
-                    results = await search_service.search_memories(
-                        user_id=user_id,
-                        query_text=query_text,
-                        session=search_session,
-                    )
-                    memory_ids = [memory.memory_id for memory, _ in results]
-                finally:
-                    search_session.close()
-            except Exception as ex:
-                logger.warning(f"Semantic search failed for forget: {ex}")
-            archived = self.memory_manager.archive_memories(user_id, memory_ids)
-            if archived == 0:
-                return "I couldn't find any matching memories to forget."
-            return f"Forgot {archived} memory item(s) related to: {query_text}."
+        forget_response = await handle_forget_commands(
+            text,
+            self.memory_manager,
+            session,
+            user_id,
+        )
+        if forget_response:
+            return forget_response
 
         # Debug magic command: simulate next day for lesson progression
-        if text.strip().lower() == "next_day":
-            if self.memory_manager:
-                self.memory_manager.store_memory(
-                    user_id=user_id,
-                    key="debug_day_offset",
-                    value="1",
-                    confidence=1.0,
-                    source="debug_command",
-                    ttl_hours=1,
-                    category="conversation",
-                )
-            schedules = []
-            if session:
-                schedules = (
-                    session.query(Schedule)
-                    .filter(
-                        Schedule.user_id == user_id,
-                        Schedule.is_active == True,
-                        Schedule.schedule_type == "daily",
-                    )
-                    .all()
-                )
-            if schedules:
-                scheduler = SchedulerService.get_scheduler()
-                now = datetime.now(timezone.utc)
-                for schedule in schedules:
-                    job_id = f"debug_next_day_{schedule.schedule_id}_{int(now.timestamp())}"
-                    scheduler.add_job(
-                        func=SchedulerService.execute_scheduled_task,
-                        trigger=DateTrigger(run_date=now, timezone="UTC"),
-                        args=[schedule.schedule_id],
-                        id=job_id,
-                        replace_existing=True,
-                    )
-                return "OK — simulating next day for 1 hour and triggering the scheduled morning message now."
-            return "OK — simulating next day for 1 hour. No active daily schedule found."
+        debug_response = handle_debug_next_day(
+            text,
+            self.memory_manager,
+            session,
+            user_id,
+        )
+        if debug_response:
+            return debug_response
 
         # FIRST: Extract memories from user message (this might store commitment, name, time, etc.)
         await extract_and_store_memories(
@@ -212,79 +137,17 @@ class DialogueEngine:
         if lesson_response:
             return lesson_response
 
-        # Handle one-time reminder requests
-        reminder = detect_one_time_reminder(text)
-        if reminder:
-            schedule = SchedulerService.create_one_time_schedule(
-                user_id=user_id,
-                run_at=reminder["run_at"],
-                message=reminder["message"],
-                session=session,
-            )
-            confirmation = reminder["confirmation"]
-            language = get_user_language(self.memory_manager, user_id)
-            if language.lower() not in ["english", "en"]:
-                confirmation = await translate_text(confirmation, language, self.call_ollama)
-            return confirmation
-
-        if detect_schedule_status_request(text):
-            schedules = SchedulerService.get_user_schedules(user_id)
-            tz_name = ensure_user_timezone(
-                self.memory_manager,
-                user_id,
-                get_user_language(self.memory_manager, user_id),
-                source="dialogue_engine_schedule_status",
-            )
-            response = build_schedule_status_response(schedules, tz_name)
-            language = get_user_language(self.memory_manager, user_id)
-            if language.lower() not in ["english", "en"]:
-                response = await translate_text(response, language, self.call_ollama)
-            return response
-
-        if detect_pause_request(text):
-            deactivated = SchedulerService.deactivate_user_schedules(user_id, session=session)
-            if self.memory_manager:
-                self.memory_manager.store_memory(
-                    user_id=user_id,
-                    key="schedule_request_pending",
-                    value="false",
-                    confidence=1.0,
-                    source="dialogue_engine",
-                    ttl_hours=1,
-                    category="conversation",
-                )
-            if deactivated > 0:
-                response = "Okay — I paused your daily lessons. Tell me when you want to resume."
-            else:
-                response = "You don’t have any active lesson schedules to pause."
-            language = get_user_language(self.memory_manager, user_id)
-            if language.lower() not in ["english", "en"]:
-                response = await translate_text(response, language, self.call_ollama)
-            return response
-
-        # If a schedule request is pending, continue schedule flow even without keywords
-        if self.memory_manager:
-            pending = self.memory_manager.get_memory(user_id, "schedule_request_pending")
-            if pending and pending[0].get("value") == "true":
-                schedule_response = await self._handle_schedule_request(user_id, text, session)
-                if schedule_response:
-                    return schedule_response
-        
-        # Check if user is requesting schedule/reminder setup (EXPLICIT REQUEST ONLY)
-        if self.onboarding and self.onboarding.detect_schedule_request(text):
-            if self.memory_manager:
-                self.memory_manager.store_memory(
-                    user_id=user_id,
-                    key="schedule_request_pending",
-                    value="true",
-                    confidence=1.0,
-                    source="dialogue_engine",
-                    ttl_hours=1,
-                    category="conversation",
-                )
-            schedule_response = await self._handle_schedule_request(user_id, text, session)
-            if schedule_response:
-                return schedule_response
+        schedule_response = await handle_schedule_messages(
+            user_id=user_id,
+            text=text,
+            session=session,
+            memory_manager=self.memory_manager,
+            onboarding_service=self.onboarding,
+            schedule_request_handler=self._handle_schedule_request,
+            call_ollama=self.call_ollama,
+        )
+        if schedule_response:
+            return schedule_response
         
         # Check if user is asking about a specific lesson (LESSON REQUEST - BEFORE ONBOARDING)
         lesson_request = detect_lesson_request(text)
@@ -296,14 +159,21 @@ class DialogueEngine:
                 return lesson_response
         
         # Check if user needs onboarding (new users)
-        if self.onboarding and self.onboarding.should_show_onboarding(user_id):
-            onboarding_response = await self._handle_onboarding(user_id, text, session)
+        if self.onboarding_flow and self.onboarding.should_show_onboarding(user_id):
+            onboarding_response = await self.onboarding_flow.handle_onboarding(user_id, text, session)
             if onboarding_response:
                 return onboarding_response
 
         # Auto-send next lesson on a new day when user makes contact
         if include_lesson and self.prompt_builder and not use_rag_for_this_message:
-            auto_message = await self._maybe_send_next_lesson(user_id, text, session)
+            auto_message = await maybe_send_next_lesson(
+                user_id=user_id,
+                text=text,
+                session=session,
+                prompt_builder=self.prompt_builder,
+                memory_manager=self.memory_manager,
+                call_ollama=self.call_ollama,
+            )
             if auto_message:
                 return auto_message
         
@@ -369,432 +239,7 @@ class DialogueEngine:
         
         return response
 
-    async def _maybe_send_next_lesson(self, user_id: int, text: str, session: Session) -> Optional[str]:
-        context = self.prompt_builder.get_today_lesson_context(user_id)
-        lesson_text = context.get("lesson_text", "")
-        state = context.get("state", {})
-        if not lesson_text or not state.get("advanced_by_day"):
-            return None
 
-        if not self._is_simple_greeting(text):
-            return None
-
-        lesson_id = state.get("lesson_id")
-        previous_lesson_id = state.get("previous_lesson_id")
-        if not lesson_id:
-            return None
-
-        lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
-        if not lesson:
-            return None
-
-        language = get_user_language(self.memory_manager, user_id)
-        message = await format_lesson_message(lesson, language, self.call_ollama)
-
-        repeat_note = None
-        if previous_lesson_id:
-            repeat_note = (
-                f"If you'd like to repeat Lesson {previous_lesson_id} instead, just let me know."
-            )
-            if language.lower() not in ["english", "en"]:
-                repeat_note = await translate_text(repeat_note, language, self.call_ollama)
-
-        if repeat_note:
-            message = f"{message}\n\n{repeat_note}"
-
-        # Track last sent lesson for future day-advance logic
-        self.memory_manager.store_memory(
-            user_id=user_id,
-            key="last_sent_lesson_id",
-            value=str(lesson.lesson_id),
-            category="progress",
-            confidence=1.0,
-            source="dialogue_engine_auto_lesson",
-        )
-
-        return message
-
-    def _is_simple_greeting(self, text: str) -> bool:
-        cleaned = re.sub(r"[^a-zA-Z\s]", "", text or "").strip().lower()
-        if not cleaned:
-            return True
-        if len(cleaned.split()) <= 3:
-            greetings = {
-                "hi", "hello", "hey", "good morning", "good evening",
-                "good afternoon", "morning", "evening", "afternoon",
-                "hei", "hallo", "god morgen", "god kveld", "god ettermiddag",
-            }
-            return cleaned in greetings
-        return False
-
-    def _get_user_language(self, user_id: int) -> str:
-        """
-        Get user's preferred language from memories table.
-        
-        Looks for memory with key='user_language' and category='preference'.
-        Returns the language value (e.g., 'Norwegian', 'English') or 'English' as default.
-        
-        Args:
-            user_id: The user's ID
-            
-        Returns:
-            Language string (e.g., 'Norwegian', 'English')
-        """
-        memories = self.memory_manager.get_memory(user_id, "user_language")
-        if memories and len(memories) > 0:
-            # get_memory returns a list of dicts, get the first/most recent one
-            return memories[0].get("value", "English")
-        return "English"  # Default to English if not found
-
-
-    async def _handle_onboarding(self, user_id: int, text: str, session: Session) -> Optional[str]:
-        """
-        Handle onboarding flow.
-        
-        Onboarding just collects basic info (name, commitment).
-        It does NOT create schedules - that only happens on explicit user request.
-        
-        Returns:
-            Onboarding response or None if not in onboarding flow
-        """
-        status = self.onboarding.get_onboarding_status(user_id)
-
-        # Handle pending onboarding step explicitly
-        if self.memory_manager:
-            pending_step = self.memory_manager.get_memory(user_id, "onboarding_step_pending")
-            if pending_step:
-                step = str(pending_step[0].get("value", "")).lower()
-                if step == "consent":
-                    consent = self.onboarding.detect_consent_keywords(text)
-                    if consent is True:
-                        self.memory_manager.store_memory(
-                            user_id=user_id,
-                            key="data_consent",
-                            value="granted",
-                            confidence=1.0,
-                            source="dialogue_engine_consent",
-                            category="profile",
-                        )
-                        record_consent(
-                            session,
-                            user_id=user_id,
-                            scope="data_storage",
-                            granted=True,
-                            source="dialogue_engine_consent",
-                        )
-                    elif consent is False:
-                        record_consent(
-                            session,
-                            user_id=user_id,
-                            scope="data_storage",
-                            granted=False,
-                            source="dialogue_engine_consent",
-                        )
-                        # User declined consent during onboarding - delete the user
-                        self._delete_user(user_id)
-                        return "Understood. I won't store your information. If you change your mind, just message me again."
-                elif step == "commitment":
-                    if self.onboarding.detect_decline_keywords(text):
-                        self.memory_manager.store_memory(
-                            user_id=user_id,
-                            key="acim_commitment",
-                            value="declined",
-                            confidence=1.0,
-                            source="dialogue_engine_commitment",
-                            category="goals",
-                        )
-                        return "Understood. I won't ask about ACIM lessons. If you want to resume later, just message me."
-                    if self.onboarding.detect_commitment_keywords(text):
-                        self.memory_manager.store_memory(
-                            user_id=user_id,
-                            key="acim_commitment",
-                            value="committed to ACIM lessons",
-                            confidence=1.0,
-                            source="dialogue_engine_commitment",
-                            category="goals",
-                        )
-                        return self.onboarding.get_onboarding_prompt(user_id)
-                elif step == "lesson_status":
-                    response = self.onboarding.handle_lesson_status_response(user_id, text)
-
-                    if response.get("action") == "send_lesson_1":
-                        self.memory_manager.store_memory(
-                            user_id=user_id,
-                            key="current_lesson",
-                            value="1",
-                            category="progress",
-                            confidence=1.0,
-                            source="onboarding_lesson_status",
-                        )
-
-                        completion_msg = None
-                        completion_sent = self.memory_manager.get_memory(user_id, "onboarding_complete_message_sent")
-                        if not completion_sent:
-                            status = self.onboarding.get_onboarding_status(user_id)
-                            if status.get("has_name") and status.get("has_consent") and status.get("has_commitment"):
-                                completion_msg = self.onboarding.get_onboarding_complete_message(user_id)
-                                self.memory_manager.store_memory(
-                                    user_id=user_id,
-                                    key="onboarding_complete_message_sent",
-                                    value="true",
-                                    category="conversation",
-                                    ttl_hours=365 * 24,
-                                    source="dialogue_engine",
-                                    allow_duplicates=False,
-                                )
-                                self.memory_manager.store_memory(
-                                    user_id=user_id,
-                                    key="pending_lesson_delivery",
-                                    value="1",
-                                    category="conversation",
-                                    ttl_hours=1,
-                                    source="dialogue_engine",
-                                    allow_duplicates=False,
-                                )
-                                self.memory_manager.store_memory(
-                                    user_id=user_id,
-                                    key="onboarding_step_pending",
-                                    value="resolved",
-                                    category="conversation",
-                                    ttl_hours=0.1,
-                                    source="dialogue_engine",
-                                    allow_duplicates=False,
-                                )
-                                return completion_msg
-
-                        lesson = session.query(Lesson).filter(Lesson.lesson_id == 1).first()
-                        if lesson:
-                            language = self._get_user_language(user_id)
-                            welcome_msg = self.onboarding.get_lesson_1_welcome_message(user_id)
-                            lesson_msg = await self._format_lesson_message(lesson, language)
-                            self.memory_manager.store_memory(
-                                user_id=user_id,
-                                key="pending_lesson_delivery",
-                                value="",
-                                category="conversation",
-                                ttl_hours=0.1,
-                                source="dialogue_engine",
-                                allow_duplicates=False,
-                            )
-                            self.memory_manager.store_memory(
-                                user_id=user_id,
-                                key="onboarding_step_pending",
-                                value="resolved",
-                                category="conversation",
-                                ttl_hours=0.1,
-                                source="dialogue_engine",
-                                allow_duplicates=False,
-                            )
-                            return f"{welcome_msg}\n\n{lesson_msg}"
-
-                        return "I couldn't load Lesson 1 right now. Please try again."
-
-                    if response.get("action") == "send_specific_lesson":
-                        lesson_id = response["lesson_id"]
-                        self.memory_manager.store_memory(
-                            user_id=user_id,
-                            key="current_lesson",
-                            value=str(lesson_id),
-                            category="progress",
-                            confidence=1.0,
-                            source="onboarding_lesson_status",
-                        )
-
-                        completion_msg = None
-                        completion_sent = self.memory_manager.get_memory(user_id, "onboarding_complete_message_sent")
-                        if not completion_sent:
-                            status = self.onboarding.get_onboarding_status(user_id)
-                            if status.get("has_name") and status.get("has_consent") and status.get("has_commitment"):
-                                completion_msg = self.onboarding.get_onboarding_complete_message(user_id)
-                                self.memory_manager.store_memory(
-                                    user_id=user_id,
-                                    key="onboarding_complete_message_sent",
-                                    value="true",
-                                    category="conversation",
-                                    ttl_hours=365 * 24,
-                                    source="dialogue_engine",
-                                    allow_duplicates=False,
-                                )
-                                self.memory_manager.store_memory(
-                                    user_id=user_id,
-                                    key="pending_lesson_delivery",
-                                    value=str(lesson_id),
-                                    category="conversation",
-                                    ttl_hours=1,
-                                    source="dialogue_engine",
-                                    allow_duplicates=False,
-                                )
-                                self.memory_manager.store_memory(
-                                    user_id=user_id,
-                                    key="onboarding_step_pending",
-                                    value="resolved",
-                                    category="conversation",
-                                    ttl_hours=0.1,
-                                    source="dialogue_engine",
-                                    allow_duplicates=False,
-                                )
-                                return completion_msg
-
-                        lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
-                        if lesson:
-                            language = self._get_user_language(user_id)
-                            continuation_msg = self.onboarding.get_continuation_welcome_message(user_id, lesson_id)
-                            lesson_msg = await self._format_lesson_message(lesson, language)
-                            self.memory_manager.store_memory(
-                                user_id=user_id,
-                                key="pending_lesson_delivery",
-                                value="",
-                                category="conversation",
-                                ttl_hours=0.1,
-                                source="dialogue_engine",
-                                allow_duplicates=False,
-                            )
-                            self.memory_manager.store_memory(
-                                user_id=user_id,
-                                key="onboarding_step_pending",
-                                value="resolved",
-                                category="conversation",
-                                ttl_hours=0.1,
-                                source="dialogue_engine",
-                                allow_duplicates=False,
-                            )
-                            return f"{continuation_msg}\n\n{lesson_msg}"
-
-                        return "I couldn't load that lesson right now. Please try again."
-
-                    if response.get("action") == "ask_lesson_number":
-                        language = self._get_user_language(user_id)
-                        message = "Great! Which lesson are you currently working on?"
-                        if language == "Norwegian":
-                            message = "Flott! Hvilken leksjon jobber du med nå?"
-                        self.memory_manager.store_memory(
-                            user_id=user_id,
-                            key="onboarding_step_pending",
-                            value="lesson_status",
-                            category="conversation",
-                            ttl_hours=2,
-                            source="dialogue_engine",
-                            allow_duplicates=False,
-                        )
-                        return message
-
-                    language = self._get_user_language(user_id)
-                    message = "Are you completely new to ACIM, or have you already started? (Answer 'new' or 'continuing')"
-                    if language == "Norwegian":
-                        message = "Er du helt ny til ACIM, eller har du allerede begynt? (Svar 'ny' eller 'fortsetter')"
-                    self.memory_manager.store_memory(
-                        user_id=user_id,
-                        key="onboarding_step_pending",
-                        value="lesson_status",
-                        category="conversation",
-                        ttl_hours=2,
-                        source="dialogue_engine",
-                        allow_duplicates=False,
-                    )
-                    return message
-
-                # Clear pending step
-                self.memory_manager.store_memory(
-                    user_id=user_id,
-                    key="onboarding_step_pending",
-                    value="resolved",
-                    category="conversation",
-                    ttl_hours=0.1,
-                    source="dialogue_engine",
-                    allow_duplicates=False,
-                )
-
-        # Exit if user declined consent or commitment
-        if status.get("declined_consent"):
-            # User already declined and should have been deleted - don't process further
-            return None
-        if status.get("declined_commitment"):
-            return "Understood. I won't ask about ACIM lessons. If you want to resume later, just message me."
-        
-        # If onboarding just completed, show welcome message
-        if status["onboarding_complete"]:
-            return None
-        
-        # If user explicitly declines ACIM, honor it immediately
-        if self.onboarding.detect_decline_keywords(text) and "acim" in text.lower():
-            self.memory_manager.store_memory(
-                user_id=user_id,
-                key="acim_commitment",
-                value="declined",
-                confidence=1.0,
-                source="dialogue_engine_commitment",
-                category="goals",
-            )
-            return "Understood. I won't ask about ACIM lessons. If you want to resume later, just message me."
-
-        # Handle consent step
-        if status.get("has_name") and not status.get("has_consent"):
-            consent = self.onboarding.detect_consent_keywords(text)
-            if consent is True:
-                self.memory_manager.store_memory(
-                    user_id=user_id,
-                    key="data_consent",
-                    value="granted",
-                    confidence=1.0,
-                    source="dialogue_engine_consent",
-                    category="profile",
-                )
-                record_consent(
-                    session,
-                    user_id=user_id,
-                    scope="data_storage",
-                    granted=True,
-                    source="dialogue_engine_consent",
-                )
-                return self.onboarding.get_onboarding_prompt(user_id)
-            if consent is False:
-                self.memory_manager.store_memory(
-                    user_id=user_id,
-                    key="data_consent",
-                    value="declined",
-                    confidence=1.0,
-                    source="dialogue_engine_consent",
-                    category="profile",
-                )
-                record_consent(
-                    session,
-                    user_id=user_id,
-                    scope="data_storage",
-                    granted=False,
-                    source="dialogue_engine_consent",
-                )
-                return "Understood. I won't store your information. If you change your mind, just message me again."
-
-        # If they're answering commitment question, check for affirmative/decline
-        if status["has_name"] and status.get("has_consent") and not status["has_commitment"]:
-            if self.onboarding.detect_decline_keywords(text):
-                self.memory_manager.store_memory(
-                    user_id=user_id,
-                    key="acim_commitment",
-                    value="declined",
-                    confidence=1.0,
-                    source="dialogue_engine_commitment",
-                    category="goals",
-                )
-                return "Understood. I won't ask about ACIM lessons. If you want to resume later, just message me."
-            if self.onboarding.detect_commitment_keywords(text):
-                # Ensure commitment memory exists even if extractor missed it
-                commit_memories = self.memory_manager.get_memory(user_id, "acim_commitment")
-                if not commit_memories:
-                    self.memory_manager.store_memory(
-                        user_id=user_id,
-                        key="acim_commitment",
-                        value="committed to ACIM lessons",
-                        confidence=1.0,
-                        source="dialogue_engine_commitment",
-                        category="goals",
-                    )
-                logger.info(f"User {user_id} expressed interest in ACIM lessons")
-                # Move to lesson status step
-                return self.onboarding.get_onboarding_prompt(user_id)
-        
-        # Return next onboarding prompt
-        return self.onboarding.get_onboarding_prompt(user_id)
 
     async def _handle_schedule_request(self, user_id: int, text: str, session: Session) -> Optional[str]:
         """
