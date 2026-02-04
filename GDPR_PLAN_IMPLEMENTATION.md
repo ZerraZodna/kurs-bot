@@ -5,9 +5,9 @@
 
 ## 1) Governance & Accountability
 - [ ] Appoint a Data Protection Officer (DPO) or document why not required (Art. 37–39).
-- [ ] Maintain Records of Processing Activities (RoPA) (Art. 30).
+- [x] Maintain Records of Processing Activities (RoPA) (Art. 30).
 - [ ] Establish a data protection policy and staff training.
-- [ ] Perform and document a Data Protection Impact Assessment (DPIA) (Art. 35).
+- [x] Perform and document a Data Protection Impact Assessment (DPIA) (Art. 35).
 - [ ] Define roles: controller/processor and data processing agreements (DPAs) with vendors (Art. 28).
 
 ## 2) Lawful Basis & Consent
@@ -37,7 +37,7 @@ Implement and document processes + APIs for:
 - [x] Right to data portability (Art. 20)
 - [x] Right to object (Art. 21)
 - [ ] Rights related to automated decision-making and profiling (Art. 22)
-- [ ] Identity verification and response SLA (1 month) (Art. 12)
+- [x] Identity verification and response SLA (1 month) (Art. 12)
 - [x] DSR logging/audit trail
 
 ## 5) Data Minimization & Purpose Limitation
@@ -46,8 +46,8 @@ Implement and document processes + APIs for:
 - [ ] Disable optional data collection by default.
 
 ## 6) Retention & Deletion
-- [ ] Define retention schedule per data category (Art. 5(1)(e)).
-- [ ] Implement automated deletion/anonymization jobs.
+- [x] Define retention schedule per data category (Art. 5(1)(e)).
+- [x] Implement automated deletion/anonymization jobs.
 - [ ] Ensure backups follow retention & deletion policy.
 
 ## 7) Security of Processing
@@ -63,31 +63,31 @@ Implement and document processes + APIs for:
 - [ ] Document transfer impact assessments.
 
 ## 9) Incident & Breach Response
-- [ ] Incident response plan.
+- [x] Incident response plan.
 - [ ] Breach notification within 72 hours (Art. 33).
 - [ ] Communicate high-risk breaches to data subjects (Art. 34).
 
 ## 10) Vendor & Subprocessor Management
-- [ ] Maintain vendor list and subprocessors.
+- [x] Maintain vendor list and subprocessors.
 - [ ] Ensure DPAs and security due diligence.
 - [ ] Subprocessor change notifications.
 
 ## 11) Product Features to Implement (Code/DB)
-- [ ] Data inventory: map all personal data fields and processing.
+- [x] Data inventory: map all personal data fields and processing.
 - [x] Consent storage table with timestamps, scope, and version.
 - [x] DSR endpoints: export, delete, restrict, rectify.
 - [ ] Admin tools for DSR handling and audit logs.
 - [x] Retention job (scheduled) for anonymization/deletion.
 - [x] Data portability export (JSON/CSV) with schema/version.
-- [x] Privacy notice and terms endpoints.
+- [ ] Privacy notice and terms endpoints.
 
 ## 12) Documentation & Evidence
-- [ ] DPIA report.
-- [ ] RoPA.
+- [x] DPIA report.
+- [x] RoPA.
 - [ ] Security policies and controls.
 - [ ] Vendor DPAs.
-- [ ] DSR request logs.
-- [ ] Retention schedule.
+- [x] DSR request logs.
+- [x] Retention schedule.
 
 ---
 

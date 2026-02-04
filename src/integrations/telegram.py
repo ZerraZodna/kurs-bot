@@ -37,22 +37,33 @@ async def send_message(chat_id: int, text: str) -> Optional[dict]:
     url = f"{API_BASE}/sendMessage"
     try:
         async with httpx.AsyncClient() as client:
-            # Convert markdown to HTML for Telegram (more forgiving than MarkdownV2)
-            html_text = _markdown_to_html(text)
-            
             # Telegram hard limit is 4096 chars; stay below to be safe
             max_len = 3500
-            chunks = [html_text[i:i + max_len] for i in range(0, len(html_text), max_len)] or [""]
+            chunks = _split_text(text, max_len) or [""]
             last_response = None
             for chunk in chunks:
+                html_chunk = _markdown_to_html(chunk)
                 payload = {
                     "chat_id": chat_id,
-                    "text": chunk,
+                    "text": html_chunk,
                     "parse_mode": "HTML"  # Use HTML instead of MarkdownV2
                 }
-                r = await client.post(url, json=payload, timeout=10.0)
-                r.raise_for_status()
-                last_response = r.json()
+                try:
+                    r = await client.post(url, json=payload, timeout=10.0)
+                    r.raise_for_status()
+                    last_response = r.json()
+                except httpx.HTTPStatusError as e:
+                    # Fallback: send plain text without parse_mode to avoid HTML errors
+                    if e.response is not None and e.response.status_code == 400:
+                        fallback_payload = {
+                            "chat_id": chat_id,
+                            "text": chunk
+                        }
+                        r = await client.post(url, json=fallback_payload, timeout=10.0)
+                        r.raise_for_status()
+                        last_response = r.json()
+                    else:
+                        raise
             return last_response
     except Exception as e:
         print("[telegram send error]", e)
@@ -73,6 +84,9 @@ def _markdown_to_html(text: str) -> str:
     - `text` -> <code>text</code> (code)
     - [text](url) -> <a href="url">text</a> (links)
     """
+    # Escape HTML-sensitive characters first to avoid invalid HTML
+    text = _escape_html(text)
+
     # Order matters: process longest patterns first to avoid conflicts
     
     # 0. Headings (must be done FIRST before bold processing)
@@ -97,3 +111,27 @@ def _markdown_to_html(text: str) -> str:
     text = re.sub(r'\[(.+?)\]\((.+?)\)', r'<a href="\2">\1</a>', text)
     
     return text
+
+
+def _escape_html(text: str) -> str:
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+
+def _split_text(text: str, max_len: int) -> list[str]:
+    if len(text) <= max_len:
+        return [text]
+    chunks: list[str] = []
+    remaining = text
+    while len(remaining) > max_len:
+        split_at = remaining.rfind("\n", 0, max_len)
+        if split_at == -1:
+            split_at = max_len
+        chunks.append(remaining[:split_at])
+        remaining = remaining[split_at:].lstrip("\n")
+    if remaining:
+        chunks.append(remaining)
+    return chunks

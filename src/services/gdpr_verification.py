@@ -16,6 +16,12 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _ensure_utc_aware(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def _hash_code(code: str) -> str:
     return hashlib.sha256(code.encode("utf-8")).hexdigest()
 
@@ -61,7 +67,7 @@ def verify_code(
     if not verification:
         raise ValueError("No pending verification")
 
-    if verification.expires_at < _utc_now():
+    if _ensure_utc_aware(verification.expires_at) < _utc_now():
         raise ValueError("Verification expired")
 
     if verification.attempts >= settings.GDPR_VERIFICATION_MAX_ATTEMPTS:

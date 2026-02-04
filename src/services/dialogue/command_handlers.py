@@ -103,6 +103,40 @@ async def handle_forget_commands(
     return None
 
 
+def _execute_verified_request(session: Session, user_id: int, verification) -> str:
+    request_type = verification.request_type
+    payload = {}
+    try:
+        if verification.request_payload:
+            payload = json.loads(verification.request_payload)
+    except Exception:
+        payload = {}
+
+    if request_type == "export":
+        data = export_user_data(session, user_id)
+        return "Export (JSON): " + json.dumps(data, ensure_ascii=False)
+    if request_type == "erase":
+        erase_user_data(session, user_id, payload.get("reason"), actor="user")
+        return "Your data has been erased."
+    if request_type == "restrict":
+        restrict_processing(session, user_id, payload.get("reason"), actor="user")
+        return "Your data processing has been restricted."
+    if request_type == "object":
+        object_to_processing(session, user_id, payload.get("reason"), actor="user")
+        return "Your objection has been recorded and processing restricted."
+    if request_type == "withdraw":
+        withdraw_consent(
+            session,
+            user_id=user_id,
+            scope=payload.get("scope", "data_storage"),
+            actor="user",
+            reason=payload.get("reason"),
+        )
+        return "Your consent has been withdrawn."
+
+    return "Verification completed, but request type is unsupported."
+
+
 async def handle_gdpr_commands(
     text: str,
     session: Session,
@@ -126,45 +160,15 @@ async def handle_gdpr_commands(
     if not (text_lower.startswith("gdpr") or text_lower.startswith("/gdpr")):
         return None
 
-
-    def _execute_verified_request(session: Session, user_id: int, verification) -> str:
-        request_type = verification.request_type
-        payload = {}
-        try:
-            if verification.request_payload:
-                payload = json.loads(verification.request_payload)
-        except Exception:
-            payload = {}
-
-        if request_type == "export":
-            data = export_user_data(session, user_id)
-            return "Export (JSON): " + json.dumps(data, ensure_ascii=False)
-        if request_type == "erase":
-            erase_user_data(session, user_id, payload.get("reason"), actor="user")
-            return "Your data has been erased."
-        if request_type == "restrict":
-            restrict_processing(session, user_id, payload.get("reason"), actor="user")
-            return "Your data processing has been restricted."
-        if request_type == "object":
-            object_to_processing(session, user_id, payload.get("reason"), actor="user")
-            return "Your objection has been recorded and processing restricted."
-        if request_type == "withdraw":
-            withdraw_consent(
-                session,
-                user_id=user_id,
-                scope=payload.get("scope", "data_storage"),
-                actor="user",
-                reason=payload.get("reason"),
-            )
-            return "Your consent has been withdrawn."
-
-        return "Verification completed, but request type is unsupported."
-
     parts = text_lower.replace("/gdpr", "gdpr", 1).split()
     if len(parts) == 1:
         return (
-            "GDPR options: gdpr export | gdpr erase | gdpr restrict <reason> | "
-            "gdpr object <reason> | gdpr withdraw <scope>."
+            "GDPR options:\n"
+            "- gdpr export: receive a JSON copy of your data\n"
+            "- gdpr erase: delete your data (you can onboard again later)\n"
+            "- gdpr restrict <reason>: limit processing (onboarding is blocked)\n"
+            "- gdpr object <reason>: object to processing and restrict it (onboarding is blocked)\n"
+            "- gdpr withdraw <scope>: withdraw consent (onboarding is blocked; default scope: data_storage)"
         )
 
     action = parts[1]

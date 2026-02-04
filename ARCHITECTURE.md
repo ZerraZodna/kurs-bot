@@ -4,11 +4,11 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                   External Integrations                      │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐         │
-│  │  Telegram    │ │    Slack     │ │     Email    │         │
-│  └──────┬───────┘ └──────┬───────┘ └──────┬───────┘         │
-└─────────┼──────────────────┼──────────────────┼───────────────┘
+│                   External Integrations                     │
+│  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐     │
+│  │  Telegram    │   │    Slack     │   │     Email    │     │
+│  └──────┬───────┘   └──────┬───────┘   └──────┬───────┘     │
+└─────────┼──────────────────┼──────────────────┼─────────────┘
           │                  │                  │
           └──────────────────┼──────────────────┘
                              │
@@ -42,8 +42,8 @@
          │                 │                  │
          └─────────┬───────┘                  │
                    │                          │
-        ┌──────────▼────────────┐            │
-        │ PromptOptimizer       │◄───────────┘
+        ┌──────────▼────────────┐             │
+        │ PromptOptimizer       │◄────────────┘
         │ (token mgmt)          │
         └──────────┬────────────┘
                    │
@@ -217,8 +217,8 @@ This section documents where personal data is stored, logged, and transmitted.
 
 ```
 ┌──────────────────────────────────────────────────┐
-│                 Store New Memory                  │
-│              (key, value, category)               │
+│                 Store New Memory                 │
+│              (key, value, category)              │
 └────────────────────┬─────────────────────────────┘
                      │
                      ▼
@@ -242,7 +242,7 @@ This section documents where personal data is stored, logged, and transmitted.
             │                      │ - Update timestamp│
             │                      └──────┬────────────┘
             │                             │
-            │                      ┌──────▼────────────┐
+            │                      ┌──────▼───────────┐
             │                      │ Commit           │
             │                      │ Return memory_id │
             │                      └──────────────────┘
@@ -256,7 +256,7 @@ This section documents where personal data is stored, logged, and transmitted.
                                        │ - Create new active │
                                        └──────┬──────────────┘
                                               │
-                                       ┌──────▼──────────────┐
+                                       ┌──────▼─────────────┐
                                        │ Commit             │
                                        │ Return memory_id   │
                                        └────────────────────┘
@@ -406,17 +406,17 @@ System Prompt (Role Definition)
 ┌──────────────┐
 │    Users     │
 ├──────────────┤
-│ user_id (PK)│◄──┐
-│ external_id │   │
-│ channel     │   │
-│ first_name  │   │
-│ last_name   │   │
-│ email       │   │
-│ created_at  │   │
+│ user_id (PK) │◄──┐
+│ external_id  │   │
+│ channel      │   │
+│ first_name   │   │
+│ last_name    │   │
+│ email        │   │
+│ created_at   │   │
 └──────┬───────┘   │
        │           │ 1:N
        │           │
-       └─────►  ┌──────────────────┐
+       └─────► ┌──────────────────┐
                │    Memories      │
                ├──────────────────┤
                │ memory_id (PK)   │
@@ -436,7 +436,7 @@ System Prompt (Role Definition)
        │
        │ 1:N
        │
-       └─────►  ┌──────────────────┐
+       └─────► ┌──────────────────┐
                │  MessageLogs     │
                ├──────────────────┤
                │ message_id (PK)  │
@@ -481,10 +481,10 @@ Request Processing
     │
     ▼
 ┌─────────────────────────┐
-│ Extract user_id from   │
-│ - JWT token            │
-│ - Session              │
-│ - Request parameter    │
+│ Extract user_id from    │
+│ - JWT token             │
+│ - Session               │
+│ - Request parameter     │
 └────────┬────────────────┘
          │
          ▼
@@ -525,8 +525,8 @@ Request
    ▼
 Try Block
    │
-   ├─ Validation Error ───────────────┐
-   │                                  │
+   ├─ Validation Error ──────────────┐
+   │                                 │
    ├─ Database Error ────────────────┤
    │                                 │
    ├─ Ollama Timeout ────────────────├──► Log Error
