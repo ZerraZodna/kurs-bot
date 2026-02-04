@@ -124,3 +124,37 @@ def test_execute_scheduled_task_prompts_confirmation(db_session, scheduler_sessi
 
     pending = db_session.query(Memory).filter_by(key="lesson_confirmation_pending").first()
     assert pending is not None
+
+
+def test_deactivate_user_schedules(db_session, scheduler_session_factory, monkeypatch):
+    removed = []
+
+    class FakeScheduler:
+        def remove_job(self, job_id: str):
+            removed.append(job_id)
+
+    monkeypatch.setattr(
+        scheduler_module.SchedulerService,
+        "get_scheduler",
+        staticmethod(lambda: FakeScheduler()),
+    )
+
+    user = db_session.query(User).first()
+    schedule = Schedule(
+        user_id=user.user_id,
+        lesson_id=None,
+        schedule_type="daily",
+        cron_expression="0 9 * * *",
+        next_send_time=datetime.now(timezone.utc),
+        is_active=True,
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add(schedule)
+    db_session.commit()
+
+    deactivated = scheduler_module.SchedulerService.deactivate_user_schedules(user.user_id)
+
+    db_session.refresh(schedule)
+    assert deactivated == 1
+    assert schedule.is_active is False
+    assert removed == [f"schedule_{schedule.schedule_id}"]

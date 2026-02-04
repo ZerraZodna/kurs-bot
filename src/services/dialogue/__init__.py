@@ -19,6 +19,8 @@ from .memory_helpers import (
     extract_and_store_memories,
     delete_user_and_data,
 )
+from .pause_handler import detect_pause_request
+from .schedule_query_handler import detect_schedule_status_request, build_schedule_status_response
 
 __all__ = [
     "call_ollama",
@@ -34,4 +36,7 @@ __all__ = [
     "detect_and_store_language",
     "extract_and_store_memories",
     "delete_user_and_data",
+    "detect_pause_request",
+    "detect_schedule_status_request",
+    "build_schedule_status_response",
 ]

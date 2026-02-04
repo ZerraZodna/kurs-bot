@@ -87,22 +87,6 @@ class EmbeddingService:
             logger.error(f"Error generating embedding: {e}")
             return None
     
-    async def batch_embed(self, texts: List[str]) -> List[Optional[List[float]]]:
-        """
-        Generate embeddings for multiple texts
-        
-        Args:
-            texts: List of texts to embed
-            
-        Returns:
-            List of embeddings (or None for failures)
-        """
-        embeddings = []
-        for text in texts:
-            embedding = await self.generate_embedding(text)
-            embeddings.append(embedding)
-        return embeddings
-    
     @staticmethod
     def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
         """

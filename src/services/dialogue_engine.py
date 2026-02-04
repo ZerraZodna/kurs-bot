@@ -18,6 +18,9 @@ from src.services.dialogue import (
     format_lesson_message,
     translate_text,
     detect_one_time_reminder,
+    detect_pause_request,
+    detect_schedule_status_request,
+    build_schedule_status_response,
     get_pending_confirmation,
     resolve_pending_confirmation,
     handle_lesson_confirmation,
@@ -214,6 +217,35 @@ class DialogueEngine:
                 confirmation = await translate_text(confirmation, language, self.call_ollama)
             return confirmation
 
+        if detect_schedule_status_request(text):
+            schedules = SchedulerService.get_user_schedules(user_id)
+            response = build_schedule_status_response(schedules)
+            language = get_user_language(self.memory_manager, user_id)
+            if language.lower() not in ["english", "en"]:
+                response = await translate_text(response, language, self.call_ollama)
+            return response
+
+        if detect_pause_request(text):
+            deactivated = SchedulerService.deactivate_user_schedules(user_id, session=session)
+            if self.memory_manager:
+                self.memory_manager.store_memory(
+                    user_id=user_id,
+                    key="schedule_request_pending",
+                    value="false",
+                    confidence=1.0,
+                    source="dialogue_engine",
+                    ttl_hours=1,
+                    category="conversation",
+                )
+            if deactivated > 0:
+                response = "Okay — I paused your daily lessons. Tell me when you want to resume."
+            else:
+                response = "You don’t have any active lesson schedules to pause."
+            language = get_user_language(self.memory_manager, user_id)
+            if language.lower() not in ["english", "en"]:
+                response = await translate_text(response, language, self.call_ollama)
+            return response
+
         # If a schedule request is pending, continue schedule flow even without keywords
         if self.memory_manager:
             pending = self.memory_manager.get_memory(user_id, "schedule_request_pending")
@@ -394,8 +426,8 @@ class DialogueEngine:
         """
         memories = self.memory_manager.get_memory(user_id, "user_language")
         if memories and len(memories) > 0:
-            # get_memory returns a list, get the first/most recent one
-            return memories[0].value
+            # get_memory returns a list of dicts, get the first/most recent one
+            return memories[0].get("value", "English")
         return "English"  # Default to English if not found
 
 
@@ -816,41 +848,6 @@ Your first lesson will arrive tomorrow at {hour:02d}:{minute:02d} UTC. 🙏"""
             logger.error(f"Error creating schedule: {e}")
             return "I had trouble setting up your schedule. Could you tell me your preferred time? (e.g., '9:00 AM' or 'morning')"
 
-    def get_conversation_state(self, user_id: int, session: Session) -> Dict[str, Any]:
-        """
-        Return current user memory and profile for conversation context.
-        """
-        if not self.memory_manager or not self.prompt_builder:
-            return {}
-        
-        return {
-            "user_id": user_id,
-            "profile": {
-                "goals": self.memory_manager.get_memory(user_id, "learning_goal"),
-                "preferences": self.memory_manager.get_memory(user_id, "preferred_tone"),
-            },
-            "recent_history": self.prompt_builder._build_conversation_history(user_id, num_turns=3),
-        }
-
-    def set_conversation_state(self, user_id: int, state: Dict[str, Any], session: Session):
-        """
-        Update conversation context for multi-turn dialogue.
-        Stores key insights and state in memory system.
-        """
-        if not self.memory_manager:
-            return
-        
-        # Store state snapshots in memory if needed
-        # Example: persist current lesson or topic
-        if "current_topic" in state:
-            self.memory_manager.store_memory(
-                user_id=user_id,
-                key="conversation_state",
-                value=state["current_topic"],
-                source="dialogue_engine",
-                ttl_hours=24,  # 24-hour window for active conversation
-                category="conversation",
-            )
 
     def get_onboarding_prompt(self) -> str:
         """

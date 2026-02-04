@@ -170,22 +170,3 @@ User message: "{user_message}"{context_str}"""
         logger.warning(f"Could not parse memory extraction response: {response_text[:100]}")
         return []
 
-    @staticmethod
-    async def extract_memories_batch(
-        messages: List[str],
-        user_context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, List[Dict[str, Any]]]:
-        """
-        Extract memories from multiple messages.
-        
-        Args:
-            messages: List of user messages
-            user_context: Optional context about the user
-        
-        Returns:
-            Dict mapping message -> list of memories
-        """
-        results = {}
-        for msg in messages:
-            results[msg] = await MemoryExtractor.extract_memories(msg, user_context)
-        return results

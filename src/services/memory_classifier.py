@@ -13,16 +13,6 @@ class MemoryDecision:
     ttl_hours: Optional[int]
     source: str
 
-    def to_dict(self) -> Dict[str, object]:
-        return {
-            "store": self.store,
-            "key": self.key,
-            "value": self.value,
-            "confidence": self.confidence,
-            "ttl_hours": self.ttl_hours,
-            "source": self.source,
-        }
-
 
 SENSITIVE_HINTS = (
     "health",

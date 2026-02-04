@@ -250,18 +250,6 @@ class PromptBuilder:
         lesson_text = f"**Lesson {lesson.lesson_id}**: \"{lesson.title}\"\n\n{content}"
         return {"lesson_text": lesson_text, "state": state}
 
-    def _get_current_lesson_id(self, user_id: int) -> int:
-        """Determine current lesson ID.
-
-        Priority (by most recent signal):
-        - Explicit current lesson
-        - Lesson completion
-        - Last lesson sent (auto-advance on a new day)
-        - Default to Lesson 1
-        """
-        state = self._get_current_lesson_state(user_id)
-        return state.get("lesson_id", 1)
-
     def _get_current_lesson_state(self, user_id: int) -> Dict[str, Any]:
         """Return current lesson state and progress note for prompt guidance."""
         now = datetime.now(timezone.utc)
