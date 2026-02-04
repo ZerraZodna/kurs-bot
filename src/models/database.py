@@ -16,7 +16,7 @@ engine = create_engine(
     future=True,
 )
 
-# Improve SQLite concurrency behavior
+# SQLite connection pragmas
 if DATABASE_URL.startswith("sqlite"):
     @event.listens_for(engine, "connect")
     def _set_sqlite_pragma(dbapi_connection, connection_record):
@@ -24,11 +24,6 @@ if DATABASE_URL.startswith("sqlite"):
         try:
             cursor.execute("PRAGMA busy_timeout=30000")
             cursor.execute("PRAGMA synchronous=NORMAL")
-            try:
-                cursor.execute("PRAGMA journal_mode=WAL")
-            except Exception:
-                # If database is locked during startup, skip WAL and continue
-                pass
         finally:
             cursor.close()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)

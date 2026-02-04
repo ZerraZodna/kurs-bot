@@ -1,1 +1,11 @@
-# ...main entry point for the app...
+"""Main entry point to run the API with Uvicorn."""
+
+import uvicorn
+
+
+def main() -> None:
+	uvicorn.run("src.api.app:app", host="0.0.0.0", port=8000, reload=True)
+
+
+if __name__ == "__main__":
+	main()
