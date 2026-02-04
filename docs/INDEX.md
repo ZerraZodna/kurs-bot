@@ -9,39 +9,39 @@ A production-ready **User Memory & Context Prompt Building System** has been ful
 ### Core Services (3 New)
 | File | Lines | Purpose |
 |------|-------|---------|
-| [src/services/prompt_builder.py](src/services/prompt_builder.py) | 324 | ⭐ Main prompt assembly engine |
-| [src/services/context_utils.py](src/services/context_utils.py) | 210 | Memory categories, keys, and helpers |
-| [src/services/prompt_optimizer.py](src/services/prompt_optimizer.py) | 380 | Advanced token/context optimization |
+| [src/services/prompt_builder.py](../src/services/prompt_builder.py) | 324 | ⭐ Main prompt assembly engine |
+| [src/services/context_utils.py](../src/services/context_utils.py) | 210 | Memory categories, keys, and helpers |
+| [src/services/prompt_optimizer.py](../src/services/prompt_optimizer.py) | 380 | Advanced token/context optimization |
 
 ### API Layer (1 New)
 | File | Lines | Purpose |
 |------|-------|---------|
-| [src/api/dialogue_routes.py](src/api/dialogue_routes.py) | 260 | 9 REST endpoints for dialogue & memory |
+| [src/api/dialogue_routes.py](../src/api/dialogue_routes.py) | 260 | 9 REST endpoints for dialogue & memory |
 
 ### Tests (2 New)
 | File | Lines | Purpose |
 |------|-------|---------|
-| [tests/test_prompt_builder.py](tests/test_prompt_builder.py) | 450 | 20+ comprehensive tests |
-| [tests/test_integration_memory.py](tests/test_integration_memory.py) | 500 | End-to-end integration tests |
+| [tests/test_prompt_builder.py](../tests/test_prompt_builder.py) | 450 | 20+ comprehensive tests |
+| [tests/test_integration_memory.py](../tests/test_integration_memory.py) | 500 | End-to-end integration tests |
 
 ### Documentation (3 New)
 | File | Purpose | Audience |
 |------|---------|----------|
 | [MEMORY_CONTEXT_SYSTEM.md](MEMORY_CONTEXT_SYSTEM.md) | Complete technical guide (400+ lines) | Developers |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | System design & diagrams (300+ lines) | Architects |
+| [ARCHITECTURE.md](../ARCHITECTURE.md) | System design & diagrams (300+ lines) | Architects |
 | [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) | What was built & next steps | Project managers |
 
 ### Modified Files (2)
 | File | Changes |
 |------|---------|
-| [src/services/dialogue_engine.py](src/services/dialogue_engine.py) | Integrated PromptBuilder, added context logging |
-| [src/models/database.py](src/models/database.py) | Added conversation_thread_id and message_role to MessageLog |
-| [src/api/app.py](src/api/app.py) | Integrated dialogue_router, updated webhook |
+| [src/services/dialogue_engine.py](../src/services/dialogue_engine.py) | Integrated PromptBuilder, added context logging |
+| [src/models/database.py](../src/models/database.py) | Added conversation_thread_id and message_role to MessageLog |
+| [src/api/app.py](../src/api/app.py) | Integrated dialogue_router, updated webhook |
 
 ### Migrations (1 New)
 | File | Purpose |
 |------|---------|
-| [migrations/versions/add_conversation_context.py](migrations/versions/add_conversation_context.py) | Schema migration for MessageLog |
+| [migrations/versions/add_conversation_context.py](../migrations/versions/add_conversation_context.py) | Schema migration for MessageLog |
 
 ## 🎯 Key Features Implemented
 
@@ -97,8 +97,8 @@ POST   /api/v1/dialogue/onboard             - Onboarding prompt
 
 ## 🧪 Testing Coverage
 
-- ✅ 20+ test cases in [test_prompt_builder.py](tests/test_prompt_builder.py)
-- ✅ 10+ integration tests in [test_integration_memory.py](tests/test_integration_memory.py)
+- ✅ 20+ test cases in [test_prompt_builder.py](../tests/test_prompt_builder.py)
+- ✅ 10+ integration tests in [test_integration_memory.py](../tests/test_integration_memory.py)
 - ✅ Context inclusion tests
 - ✅ Memory conflict resolution
 - ✅ TTL expiration handling
@@ -135,12 +135,12 @@ User Response
 
 ### 1. Full Documentation
 - System overview: [MEMORY_CONTEXT_SYSTEM.md](MEMORY_CONTEXT_SYSTEM.md)
-- Architecture details: [ARCHITECTURE.md](ARCHITECTURE.md)
+- Architecture details: [ARCHITECTURE.md](../ARCHITECTURE.md)
 
 ### 2. Code Examples
-- API usage: [src/api/dialogue_routes.py](src/api/dialogue_routes.py)
-- Test examples: [tests/test_prompt_builder.py](tests/test_prompt_builder.py)
-- Service usage: [src/services/dialogue_engine.py](src/services/dialogue_engine.py)
+- API usage: [src/api/dialogue_routes.py](../src/api/dialogue_routes.py)
+- Test examples: [tests/test_prompt_builder.py](../tests/test_prompt_builder.py)
+- Service usage: [src/services/dialogue_engine.py](../src/services/dialogue_engine.py)
 
 ### 3. Run Tests
 ```bash
@@ -258,68 +258,3 @@ message_role           # 'user' or 'assistant'
 - [ ] Configure backups
 - [ ] Set rate limiting
 - [ ] Deploy!
-
-## 🎯 Next Steps (Optional Enhancements)
-
-### Immediate (Easy)
-- [ ] Customize memory categories for your domain
-- [ ] Build onboarding flow
-- [ ] Set up memory collection
-
-### Short Term (Medium)
-- [x] Add vector embeddings for semantic search (use existing `nomic-embed-text` model via Ollama API) **✅ COMPLETED**
-- [ ] Implement caching layer
-- [ ] Build analytics dashboard
-
-### Long Term (Advanced)
-- [ ] Automatic insight generation
-- [ ] A/B testing for prompt variations
-- [ ] Multi-region deployment
-- [ ] Real-time memory updates
-
-## 📞 Support
-
-For issues or questions:
-1. Check [Troubleshooting](MEMORY_CONTEXT_SYSTEM.md#troubleshooting)
-2. Review [ARCHITECTURE.md](ARCHITECTURE.md) diagrams
-3. Study test examples in [tests/](tests/)
-4. Check [DEPLOYMENT.md](DEPLOYMENT.md) for production issues
-
-## 📄 File Quick Reference
-
-### Most Important Files
-1. **[MEMORY_CONTEXT_SYSTEM.md](MEMORY_CONTEXT_SYSTEM.md)** - Complete technical guide (30 min read)
-2. **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design & diagrams
-3. **[src/services/prompt_builder.py](src/services/prompt_builder.py)** - Main engine
-4. **[src/api/dialogue_routes.py](src/api/dialogue_routes.py)** - API definition
-
-### Reference Files
-- [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) - Project overview
-
-### Code Files
-- [src/services/](src/services/) - Business logic
-- [src/api/dialogue_routes.py](src/api/dialogue_routes.py) - REST endpoints
-- [tests/](tests/) - Test examples
-
-## 🎉 Summary
-
-You now have a **complete, tested, and documented** user memory and context system that:
-
-✅ Stores user memories in 6 organized categories  
-✅ Builds personalized prompts from context  
-✅ Maintains multi-turn conversation history  
-✅ Supports thousands of concurrent users  
-✅ Optimizes token usage for efficiency  
-✅ Provides comprehensive REST APIs  
-✅ Includes 1000+ lines of documentation  
-✅ Has 20+ test cases  
-✅ Follows FastAPI & SQLAlchemy best practices  
-✅ Is production-ready and deployable  
-
-**Total Implementation Time Investment: Complete**
-**Ready to Deploy: Yes** ✅
-**Ready to Customize: Yes** ✅
-**Ready to Scale: Yes** ✅
-
-Start with [QUICKSTART_MEMORY.md](QUICKSTART_MEMORY.md) and enjoy!
-

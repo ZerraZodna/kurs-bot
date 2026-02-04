@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import json
 from typing import Optional, Tuple
 
 from sqlalchemy.orm import Session
@@ -10,6 +11,14 @@ from datetime import datetime, timezone
 from src.services.semantic_search import get_semantic_search_service
 from src.services.scheduler import SchedulerService
 from src.models.database import Schedule
+from src.services.gdpr_service import (
+    export_user_data,
+    restrict_processing,
+    erase_user_data,
+    object_to_processing,
+    withdraw_consent,
+)
+from src.services.gdpr_verification import create_verification, verify_code
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +101,95 @@ async def handle_forget_commands(
             return "I couldn't find any matching memories to forget."
         return f"Forgot {archived} memory item(s) related to: {query_text}."
     return None
+
+
+async def handle_gdpr_commands(
+    text: str,
+    session: Session,
+    user_id: int,
+    channel: str,
+) -> Optional[str]:
+    text_lower = text.strip().lower()
+
+    if text_lower.startswith("verify "):
+        code = text_lower.split(" ", 1)[1].strip()
+        if not code.isdigit():
+            return "Verification code must be numeric."
+        try:
+            verification = verify_code(session, user_id, code)
+        except ValueError as exc:
+            return f"Verification failed: {exc}."
+
+        response = _execute_verified_request(session, user_id, verification)
+        return response
+
+    if not (text_lower.startswith("gdpr") or text_lower.startswith("/gdpr")):
+        return None
+
+
+    def _execute_verified_request(session: Session, user_id: int, verification) -> str:
+        request_type = verification.request_type
+        payload = {}
+        try:
+            if verification.request_payload:
+                payload = json.loads(verification.request_payload)
+        except Exception:
+            payload = {}
+
+        if request_type == "export":
+            data = export_user_data(session, user_id)
+            return "Export (JSON): " + json.dumps(data, ensure_ascii=False)
+        if request_type == "erase":
+            erase_user_data(session, user_id, payload.get("reason"), actor="user")
+            return "Your data has been erased."
+        if request_type == "restrict":
+            restrict_processing(session, user_id, payload.get("reason"), actor="user")
+            return "Your data processing has been restricted."
+        if request_type == "object":
+            object_to_processing(session, user_id, payload.get("reason"), actor="user")
+            return "Your objection has been recorded and processing restricted."
+        if request_type == "withdraw":
+            withdraw_consent(
+                session,
+                user_id=user_id,
+                scope=payload.get("scope", "data_storage"),
+                actor="user",
+                reason=payload.get("reason"),
+            )
+            return "Your consent has been withdrawn."
+
+        return "Verification completed, but request type is unsupported."
+
+    parts = text_lower.replace("/gdpr", "gdpr", 1).split()
+    if len(parts) == 1:
+        return (
+            "GDPR options: gdpr export | gdpr erase | gdpr restrict <reason> | "
+            "gdpr object <reason> | gdpr withdraw <scope>."
+        )
+
+    action = parts[1]
+    reason = " ".join(parts[2:]).strip() if len(parts) > 2 else None
+
+    if action not in {"export", "erase", "restrict", "object", "withdraw"}:
+        return "Unsupported GDPR action. Try: export, erase, restrict, object, withdraw."
+
+    payload = {}
+    if action in {"restrict", "object", "erase"} and reason:
+        payload["reason"] = reason
+    if action == "withdraw":
+        payload["scope"] = reason or "data_storage"
+
+    code = create_verification(
+        session=session,
+        user_id=user_id,
+        channel=channel,
+        request_type=action,
+        payload=payload,
+    )
+    return (
+        f"Verification code: {code}. Reply with 'verify {code}' within "
+        "10 minutes to proceed."
+    )
 
 
 def handle_debug_next_day(

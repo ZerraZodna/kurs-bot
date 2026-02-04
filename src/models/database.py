@@ -52,6 +52,7 @@ class User(Base):
     consent_logs = relationship('ConsentLog', back_populates='user')
     gdpr_requests = relationship('GdprRequest', back_populates='user')
     gdpr_audit_logs = relationship('GdprAuditLog', back_populates='user')
+    gdpr_verifications = relationship('GdprVerification', back_populates='user')
 
 class Memory(Base):
     __tablename__ = 'memories'
@@ -161,6 +162,21 @@ class GdprAuditLog(Base):
     actor = Column(String(64), default="system", nullable=False)
     created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
     user = relationship('User', back_populates='gdpr_audit_logs')
+
+
+class GdprVerification(Base):
+    __tablename__ = 'gdpr_verifications'
+    verification_id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+    channel = Column(String(32), nullable=False)
+    request_type = Column(String(32), nullable=False)
+    request_payload = Column(Text)
+    code_hash = Column(String(64), nullable=False)
+    attempts = Column(Integer, default=0, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    verified_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    user = relationship('User', back_populates='gdpr_verifications')
 
 class BatchLock(Base):
     __tablename__ = 'batch_locks'

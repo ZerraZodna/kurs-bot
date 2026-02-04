@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     EMBEDDING_DIMENSION: int = 768
     SEMANTIC_SEARCH_THRESHOLD: float = 0.4
     SEMANTIC_SEARCH_MAX_RESULTS: int = 5
+    GDPR_ADMIN_TOKEN: str = ""
+    API_AUTH_TOKEN: str = ""
+    MESSAGE_LOG_RETENTION_DAYS: int = 30
+    MEMORY_ARCHIVE_RETENTION_DAYS: int = 365
+    GDPR_VERIFICATION_TTL_MINUTES: int = 10
+    GDPR_VERIFICATION_MAX_ATTEMPTS: int = 3
+    GDPR_VERIFICATION_CODE_LENGTH: int = 6
     
     SYSTEM_PROMPT: str = "You are a spiritual coach specializing in A Course in Miracles. Respond with wisdom, compassion, and practical spiritual guidance."
     SYSTEM_PROMPT_RAG: str = "You are a helpful personal assistant. Use the provided memories and context to give clear, concise answers. Be conversational and practical. Avoid lengthy spiritual lectures unless asked."

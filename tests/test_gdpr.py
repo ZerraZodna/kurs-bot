@@ -12,12 +12,15 @@ from src.models.database import (
     Schedule,
     Unsubscribe,
 )
+from src.services.maintenance import purge_expired_ttl_memories
 from src.services.gdpr_service import (
     export_user_data,
     restrict_processing,
+    object_to_processing,
     rectify_user,
     erase_user_data,
     record_consent,
+    withdraw_consent,
 )
 
 
@@ -152,3 +155,45 @@ def test_gdpr_export_restrict_rectify_erase(db_session):
     assert db_session.query(Memory).filter_by(user_id=user.user_id).count() == 0
     assert db_session.query(MessageLog).filter_by(user_id=user.user_id).count() == 0
     assert db_session.query(Schedule).filter_by(user_id=user.user_id).count() == 0
+
+
+def test_gdpr_retention_purges_ttl_memories(db_session):
+    user = _create_user(db_session)
+    expired = Memory(
+        user_id=user.user_id,
+        category="profile",
+        key="temp",
+        value="old",
+        confidence=0.5,
+        is_active=True,
+        source="test",
+        created_at=datetime.datetime.utcnow(),
+        updated_at=datetime.datetime.utcnow(),
+        ttl_expires_at=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1),
+    )
+    db_session.add(expired)
+    db_session.commit()
+
+    deleted = purge_expired_ttl_memories(session=db_session)
+    assert deleted == 1
+    assert db_session.query(Memory).filter_by(user_id=user.user_id).count() == 0
+
+
+def test_gdpr_object_and_withdraw_consent(db_session):
+    user = _create_user(db_session)
+
+    object_to_processing(db_session, user.user_id, reason="marketing", actor="tester")
+    refreshed = db_session.query(User).filter_by(user_id=user.user_id).first()
+    assert refreshed.processing_restricted is True
+    assert refreshed.opted_in is False
+
+    withdraw_consent(
+        db_session,
+        user_id=user.user_id,
+        scope="data_storage",
+        actor="tester",
+        reason="user request",
+    )
+    refreshed = db_session.query(User).filter_by(user_id=user.user_id).first()
+    assert refreshed.processing_restricted is True
+    assert refreshed.opted_in is False

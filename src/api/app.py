@@ -1,6 +1,10 @@
 from fastapi import FastAPI, Request, HTTPException
 from src.services.memory_manager import MemoryManager
-from src.services.maintenance import run_daily_maintenance
+from src.services.maintenance import run_daily_maintenance, purge_message_logs, run_gdpr_retention
+from src.middleware.consent import ConsentMiddleware
+from src.middleware.api_key_auth import ApiKeyAuthMiddleware
+from src.middleware.logging_redaction import apply_logging_redaction
+from src.services.security_checks import verify_secrets_config
 from src.models.database import SessionLocal, User, MessageLog, BatchLock
 from src.config import settings
 from src.integrations.telegram import TelegramHandler, send_message
@@ -16,6 +20,9 @@ import httpx
 from sqlalchemy.exc import OperationalError
 
 app = FastAPI()
+
+app.add_middleware(ConsentMiddleware)
+app.add_middleware(ApiKeyAuthMiddleware)
 
 # Include dialogue routes with context-aware endpoints
 app.include_router(dialogue_router)
@@ -130,8 +137,11 @@ async def telegram_webhook(request: Request, secret_token: str):
     parsed = TelegramHandler.parse_webhook(payload)
     if not parsed:
         return {"ok": False, "reason": "Not a valid Telegram message"}
-    # Log to console
-    print("[telegram webhook]", parsed)
+    logging.info(
+        "[telegram webhook] user_id=%s message_id=%s channel=telegram",
+        parsed.get("user_id"),
+        parsed.get("external_message_id"),
+    )
 
     # --- Add or update user in DB ---
     uid = parsed["user_id"]
@@ -263,11 +273,9 @@ def purge_old_messages(hour_utc: int = 2):
                 def _do_purge():
                     db = SessionLocal()
                     try:
-                        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
-                        deleted = db.query(MessageLog).filter(MessageLog.created_at < cutoff).delete()
+                        deleted = purge_message_logs(session=db, days_keep=settings.MESSAGE_LOG_RETENTION_DAYS)
                         if deleted:
                             print(f"[purge] Deleted {deleted} old messages from MessageLog.")
-                        db.commit()
                     finally:
                         db.close()
 
@@ -304,7 +312,7 @@ def purge_expired_batch_locks():
         print(f"[batch lock purge error] {e}")
 
 
-def nightly_memory_purge(days_keep: int = 60, hour_utc: int = 2):
+def nightly_memory_purge(days_keep: int = settings.MEMORY_ARCHIVE_RETENTION_DAYS, hour_utc: int = 2):
     """Run maintenance at fixed UTC hour (02:00 AM). Skip first run on startup."""
     first_run = True
     while True:
@@ -319,6 +327,7 @@ def nightly_memory_purge(days_keep: int = 60, hour_utc: int = 2):
                 sleep_seconds = (next_run - now).total_seconds()
                 time.sleep(sleep_seconds)
                 run_daily_maintenance(days_keep=days_keep)
+                run_gdpr_retention()
                 purge_expired_batch_locks()
             else:
                 # First run: just schedule for next maintenance window
@@ -345,6 +354,8 @@ def start_purge_thread():
 @app.on_event("startup")
 def startup_info():
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+    apply_logging_redaction()
+    verify_secrets_config()
     ollama_url = "http://localhost:11434"
     try:
         # Try to GET /api/tags as a lightweight check

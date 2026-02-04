@@ -249,6 +249,85 @@ def restrict_processing(
     )
 
 
+def object_to_processing(
+    session: Session,
+    user_id: int,
+    reason: Optional[str],
+    actor: str,
+) -> None:
+    """Handle GDPR right to object by restricting processing."""
+    user = session.query(User).filter_by(user_id=user_id).first()
+    if not user:
+        raise ValueError("User not found")
+    user = cast(Any, user)
+
+    user.processing_restricted = True
+    user.opted_in = False
+    user.restriction_reason = reason or "object"
+    session.add(user)
+    session.commit()
+
+    record_gdpr_request(
+        session=session,
+        user_id=user_id,
+        request_type="object",
+        status="completed",
+        actor=actor,
+        reason=reason,
+    )
+    record_gdpr_audit(
+        session=session,
+        user_id=user_id,
+        action="object",
+        actor=actor,
+        details={"reason": reason},
+    )
+
+
+def withdraw_consent(
+    session: Session,
+    user_id: int,
+    scope: str,
+    actor: str,
+    reason: Optional[str] = None,
+) -> None:
+    """Withdraw consent for a scope and restrict processing."""
+    user = session.query(User).filter_by(user_id=user_id).first()
+    if not user:
+        raise ValueError("User not found")
+    user = cast(Any, user)
+
+    user.opted_in = False
+    user.processing_restricted = True
+    user.restriction_reason = reason or "consent_withdrawn"
+    session.add(user)
+    session.commit()
+
+    record_consent(
+        session=session,
+        user_id=user_id,
+        scope=scope,
+        granted=False,
+        source="gdpr_withdrawal",
+    )
+    record_gdpr_request(
+        session=session,
+        user_id=user_id,
+        request_type="withdraw_consent",
+        status="completed",
+        actor=actor,
+        reason=reason,
+        details={"scope": scope},
+    )
+    record_gdpr_audit(
+        session=session,
+        user_id=user_id,
+        action="withdraw_consent",
+        actor=actor,
+        details={"scope": scope, "reason": reason},
+    )
+
+
 def rectify_user(
     session: Session,
     user_id: int,

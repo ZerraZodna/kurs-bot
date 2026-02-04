@@ -67,7 +67,7 @@ python cmd.py debug schedule         # Debug schedule creation
 python cmd.py init-prod              # Initialize production database
 ```
 
-See [SCRIPTS_ORGANIZATION.md](SCRIPTS_ORGANIZATION.md) for full script documentation.
+See [docs/SCRIPTS_ORGANIZATION.md](docs/SCRIPTS_ORGANIZATION.md) for full script documentation.
 
 ## Configuration (.env)
 - `DATABASE_URL` - Database connection string (default: SQLite for dev)

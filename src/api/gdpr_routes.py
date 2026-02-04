@@ -3,19 +3,42 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from src.models.database import SessionLocal, User
+from src.config import settings
 from src.services.gdpr_service import (
     export_user_data,
     restrict_processing,
+    object_to_processing,
     rectify_user,
     erase_user_data,
+    withdraw_consent,
 )
 
 router = APIRouter(prefix="/gdpr", tags=["gdpr"])
+
+
+def require_gdpr_admin(
+    x_gdpr_token: Optional[str] = Header(default=None, alias="X-GDPR-Token"),
+    authorization: Optional[str] = Header(default=None, alias="Authorization"),
+) -> None:
+    expected = settings.GDPR_ADMIN_TOKEN
+    if not expected:
+        raise HTTPException(status_code=503, detail="GDPR admin token not configured")
+
+    token: Optional[str] = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+    elif x_gdpr_token:
+        token = x_gdpr_token.strip()
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing GDPR admin token")
+    if token != expected:
+        raise HTTPException(status_code=403, detail="Invalid GDPR admin token")
 
 
 class GdprExportRequest(BaseModel):
@@ -46,6 +69,19 @@ class GdprEraseRequest(BaseModel):
     actor: str = "user"
 
 
+class GdprObjectRequest(BaseModel):
+    user_id: int
+    reason: Optional[str] = None
+    actor: str = "user"
+
+
+class GdprWithdrawConsentRequest(BaseModel):
+    user_id: int
+    scope: str = "data_storage"
+    reason: Optional[str] = None
+    actor: str = "user"
+
+
 def get_db():
     db = SessionLocal()
     try:
@@ -59,7 +95,11 @@ def get_db():
 
 
 @router.post("/export")
-async def gdpr_export(request: GdprExportRequest, db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def gdpr_export(
+    request: GdprExportRequest,
+    db: Session = Depends(get_db),
+    _admin: None = Depends(require_gdpr_admin),
+) -> Dict[str, Any]:
     user = db.query(User).filter_by(user_id=request.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -73,7 +113,11 @@ async def gdpr_export(request: GdprExportRequest, db: Session = Depends(get_db))
 
 
 @router.get("/export/{user_id}")
-async def gdpr_export_get(user_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def gdpr_export_get(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _admin: None = Depends(require_gdpr_admin),
+) -> Dict[str, Any]:
     user = db.query(User).filter_by(user_id=user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -87,7 +131,11 @@ async def gdpr_export_get(user_id: int, db: Session = Depends(get_db)) -> Dict[s
 
 
 @router.post("/restrict")
-async def gdpr_restrict(request: GdprRestrictRequest, db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def gdpr_restrict(
+    request: GdprRestrictRequest,
+    db: Session = Depends(get_db),
+    _admin: None = Depends(require_gdpr_admin),
+) -> Dict[str, Any]:
     try:
         restrict_processing(db, request.user_id, request.reason, request.actor)
     except ValueError as exc:
@@ -96,8 +144,26 @@ async def gdpr_restrict(request: GdprRestrictRequest, db: Session = Depends(get_
     return {"status": "restricted", "user_id": request.user_id}
 
 
+@router.post("/object")
+async def gdpr_object(
+    request: GdprObjectRequest,
+    db: Session = Depends(get_db),
+    _admin: None = Depends(require_gdpr_admin),
+) -> Dict[str, Any]:
+    try:
+        object_to_processing(db, request.user_id, request.reason, request.actor)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    return {"status": "objected", "user_id": request.user_id}
+
+
 @router.post("/rectify")
-async def gdpr_rectify(request: GdprRectifyRequest, db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def gdpr_rectify(
+    request: GdprRectifyRequest,
+    db: Session = Depends(get_db),
+    _admin: None = Depends(require_gdpr_admin),
+) -> Dict[str, Any]:
     try:
         memory_updates = (
             [item.model_dump() for item in request.memory_updates]
@@ -112,13 +178,31 @@ async def gdpr_rectify(request: GdprRectifyRequest, db: Session = Depends(get_db
 
 
 @router.post("/erase")
-async def gdpr_erase(request: GdprEraseRequest, db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def gdpr_erase(
+    request: GdprEraseRequest,
+    db: Session = Depends(get_db),
+    _admin: None = Depends(require_gdpr_admin),
+) -> Dict[str, Any]:
     try:
         erase_user_data(db, request.user_id, request.reason, request.actor)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
     return {"status": "erased", "user_id": request.user_id}
+
+
+@router.post("/withdraw-consent")
+async def gdpr_withdraw_consent(
+    request: GdprWithdrawConsentRequest,
+    db: Session = Depends(get_db),
+    _admin: None = Depends(require_gdpr_admin),
+) -> Dict[str, Any]:
+    try:
+        withdraw_consent(db, request.user_id, request.scope, request.actor, request.reason)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    return {"status": "withdrawn", "user_id": request.user_id}
 
 
 @router.get("/privacy-notice")

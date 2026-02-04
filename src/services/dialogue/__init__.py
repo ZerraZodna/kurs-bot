@@ -28,6 +28,7 @@ from .command_handlers import (
     parse_rag_prefix,
     is_rag_mode_enabled,
     handle_forget_commands,
+    handle_gdpr_commands,
     handle_debug_next_day,
 )
 
@@ -52,6 +53,7 @@ __all__ = [
     "parse_rag_prefix",
     "is_rag_mode_enabled",
     "handle_forget_commands",
+    "handle_gdpr_commands",
     "handle_debug_next_day",
     "handle_schedule_messages",
     "maybe_send_next_lesson",

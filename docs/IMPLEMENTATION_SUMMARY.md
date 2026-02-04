@@ -7,20 +7,20 @@ A comprehensive multi-user memory and context-aware prompt building system has b
 ## 📁 Files Created/Modified
 
 ### Core Services (New)
-1. **[src/services/prompt_builder.py](src/services/prompt_builder.py)** ⭐
+1. **[src/services/prompt_builder.py](../src/services/prompt_builder.py)** ⭐
    - Main `PromptBuilder` class for dynamic context assembly
    - Builds context-aware prompts from user memories, preferences, and conversation history
    - 6 context building methods (profile, goals, preferences, progress, history)
    - Onboarding prompt generation
 
-2. **[src/services/context_utils.py](src/services/context_utils.py)**
+2. **[src/services/context_utils.py](../src/services/context_utils.py)**
    - `MemoryCategory` enum (profile, goals, preferences, progress, insights, conversation)
    - `MemoryKey` class with standard memory keys
    - `ContextOptimizer` for token estimation and formatting
    - `ConversationContextBuilder` for multi-turn dialogue
    - `PromptTemplate` for common scenarios
 
-3. **[src/services/prompt_optimizer.py](src/services/prompt_optimizer.py)**
+3. **[src/services/prompt_optimizer.py](../src/services/prompt_optimizer.py)**
    - `PromptOptimizer` for advanced context optimization
    - Token counting and budget allocation
    - Memory prioritization by relevance
@@ -29,7 +29,7 @@ A comprehensive multi-user memory and context-aware prompt building system has b
    - `MemoryFilter` for relevance-based filtering
 
 ### API Routes (New)
-4. **[src/api/dialogue_routes.py](src/api/dialogue_routes.py)** ⭐
+4. **[src/api/dialogue_routes.py](../src/api/dialogue_routes.py)** ⭐
    - REST endpoints for dialogue and memory management
    - `POST /api/v1/dialogue/message` - Send message with full context
    - `POST /api/v1/dialogue/memory` - Store user memories
@@ -40,7 +40,7 @@ A comprehensive multi-user memory and context-aware prompt building system has b
    - `DELETE /api/v1/dialogue/memory/{user_id}/{key}` - Archive memories
 
 ### Tests (New)
-5. **[tests/test_prompt_builder.py](tests/test_prompt_builder.py)**
+5. **[tests/test_prompt_builder.py](../tests/test_prompt_builder.py)**
    - 20+ test cases covering:
    - Basic prompt building
    - Context inclusion (profile, goals, history)
@@ -50,16 +50,16 @@ A comprehensive multi-user memory and context-aware prompt building system has b
    - Multi-turn dialogue
 
 ### Database
-6. **[src/models/database.py](src/models/database.py)** (Enhanced)
+6. **[src/models/database.py](../src/models/database.py)** (Enhanced)
    - `MessageLog` model updated with:
      - `conversation_thread_id` - Group related messages
      - `message_role` - Distinguish user/assistant messages
 
-7. **[migrations/versions/add_conversation_context.py](migrations/versions/add_conversation_context.py)** (New)
+7. **[migrations/versions/add_conversation_context.py](../migrations/versions/add_conversation_context.py)** (New)
    - Alembic migration for new MessageLog columns
 
 ### Service Integration
-8. **[src/services/dialogue_engine.py](src/services/dialogue_engine.py)** (Enhanced)
+8. **[src/services/dialogue_engine.py](../src/services/dialogue_engine.py)** (Enhanced)
    - Integrated `PromptBuilder` for context-aware prompts
    - Enhanced `process_message()` with full context awareness
    - `_log_conversation()` for tracking message pairs
@@ -67,7 +67,7 @@ A comprehensive multi-user memory and context-aware prompt building system has b
    - `set_conversation_state()` for state persistence
    - `get_onboarding_prompt()` for new users
 
-9. **[src/api/app.py](src/api/app.py)** (Enhanced)
+9. **[src/api/app.py](../src/api/app.py)** (Enhanced)
    - Integrated dialogue router
    - Updated Telegram webhook to use context-aware engine
 
@@ -229,9 +229,9 @@ Coverage includes:
 
 1. **Start Here**: Read [QUICKSTART_MEMORY.md](QUICKSTART_MEMORY.md)
 2. **Deep Dive**: Review [MEMORY_CONTEXT_SYSTEM.md](MEMORY_CONTEXT_SYSTEM.md)
-3. **Examples**: Check [tests/test_prompt_builder.py](tests/test_prompt_builder.py)
-4. **Integration**: Study [src/api/dialogue_routes.py](src/api/dialogue_routes.py)
-5. **Advanced**: Explore [src/services/prompt_optimizer.py](src/services/prompt_optimizer.py)
+3. **Examples**: Check [tests/test_prompt_builder.py](../tests/test_prompt_builder.py)
+4. **Integration**: Study [src/api/dialogue_routes.py](../src/api/dialogue_routes.py)
+5. **Advanced**: Explore [src/services/prompt_optimizer.py](../src/services/prompt_optimizer.py)
 
 ## 🔧 Configuration
 
@@ -309,21 +309,21 @@ See [MEMORY_CONTEXT_SYSTEM.md](MEMORY_CONTEXT_SYSTEM.md#troubleshooting) for:
 ## 📚 Files Reference
 
 **Service Layer:**
-- [prompt_builder.py](src/services/prompt_builder.py) - Main context builder
-- [context_utils.py](src/services/context_utils.py) - Utilities and constants  
-- [prompt_optimizer.py](src/services/prompt_optimizer.py) - Advanced optimization
-- [dialogue_engine.py](src/services/dialogue_engine.py) - Orchestration (enhanced)
-- [memory_manager.py](src/services/memory_manager.py) - Memory operations (existing)
+- [prompt_builder.py](../src/services/prompt_builder.py) - Main context builder
+- [context_utils.py](../src/services/context_utils.py) - Utilities and constants  
+- [prompt_optimizer.py](../src/services/prompt_optimizer.py) - Advanced optimization
+- [dialogue_engine.py](../src/services/dialogue_engine.py) - Orchestration (enhanced)
+- [memory_manager.py](../src/services/memory_manager.py) - Memory operations (existing)
 
 **API Layer:**
-- [dialogue_routes.py](src/api/dialogue_routes.py) - REST endpoints
-- [app.py](src/api/app.py) - FastAPI app (enhanced)
+- [dialogue_routes.py](../src/api/dialogue_routes.py) - REST endpoints
+- [app.py](../src/api/app.py) - FastAPI app (enhanced)
 
 **Data Layer:**
-- [database.py](src/models/database.py) - SQLAlchemy models (enhanced)
+- [database.py](../src/models/database.py) - SQLAlchemy models (enhanced)
 
 **Testing:**
-- [test_prompt_builder.py](tests/test_prompt_builder.py) - Comprehensive tests
+- [test_prompt_builder.py](../tests/test_prompt_builder.py) - Comprehensive tests
 
 **Documentation:**
 - [MEMORY_CONTEXT_SYSTEM.md](MEMORY_CONTEXT_SYSTEM.md) - Complete guide

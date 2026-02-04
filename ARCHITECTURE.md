@@ -153,6 +153,66 @@ User Input (Message)
         User Receives Response
 ```
 
+## GDPR Data Inventory & Personal Data Flow
+
+This section documents where personal data is stored, logged, and transmitted.
+
+### Personal Data Inventory (by storage)
+
+**Core database models**
+- Users (src/models/database.py)
+        - Identifiers: user_id (internal), external_id (channel user id)
+        - Contact: email, phone_number
+        - Profile: first_name, last_name
+        - Consent/status: opted_in, processing_restricted, restriction_reason, is_deleted, deleted_at
+        - Metadata: channel, created_at, last_active_at
+- Memory (src/models/database.py)
+        - User-derived content: key, value (may contain personal data)
+        - Metadata: category, confidence, source, timestamps, TTL, embedding
+- MessageLog (src/models/database.py)
+        - Communication content: content (user and assistant text)
+        - Metadata: direction, channel, status, timestamps, thread id, message_role
+- Schedule (src/models/database.py)
+        - Delivery preferences: schedule_type, cron_expression, next_send_time, last_sent_at
+- Unsubscribe (src/models/database.py)
+        - Preference: channel, reason, compliance_required, unsubscribed_at
+- ConsentLog (src/models/database.py)
+        - Consent scope, granted flag, consent_version, source, created_at
+- GdprRequest / GdprAuditLog (src/models/database.py)
+        - DSR request metadata, actor, reasons, details, timestamps
+
+**Operational logs**
+- MessageLog rows act as conversation logs and retain content + metadata for a retention period.
+
+### Personal Data Flows (high level)
+
+1) **Inbound message**
+         - Source: Telegram/Slack/Email/Twilio integrations
+         - Data: external user id, message content, metadata
+         - Stored in: Users (external_id/channel), MessageLog (content/status)
+
+2) **Processing & memory extraction**
+         - DialogueEngine + MemoryExtractor derive structured memories from content
+         - Stored in: Memory (key/value/category/metadata)
+
+3) **Scheduling**
+         - User preferences and timing for reminders
+         - Stored in: Schedule (cron, next_send_time)
+
+4) **Consent & GDPR requests**
+         - Consent events recorded in ConsentLog
+         - DSR requests recorded in GdprRequest and GdprAuditLog
+
+5) **Outbound response**
+         - Data: assistant response content, delivery metadata
+         - Stored in: MessageLog (content/status)
+
+### Integrations That Receive/Send Personal Data
+- Telegram: inbound messages and outbound replies include user id and message content
+- Slack: same data types for workspace users
+- Email: address + message content
+- Twilio: phone number + message content
+
 ## Memory System State Machine
 
 ```

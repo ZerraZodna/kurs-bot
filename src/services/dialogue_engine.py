@@ -25,6 +25,7 @@ from src.services.dialogue import (
     parse_rag_prefix,
     is_rag_mode_enabled,
     handle_forget_commands,
+    handle_gdpr_commands,
     handle_debug_next_day,
     handle_schedule_messages,
     maybe_send_next_lesson,
@@ -80,6 +81,16 @@ class DialogueEngine:
         user = session.query(User).filter_by(user_id=user_id).first()
         if not user:
             return "User not found."
+
+        gdpr_response = await handle_gdpr_commands(
+            text=text,
+            session=session,
+            user_id=user_id,
+            channel=user.channel,
+        )
+        if gdpr_response:
+            return gdpr_response
+
         if user.is_deleted:
             return "Your data has been deleted. If you want to start again, please re-register."
         if user.processing_restricted or not user.opted_in:
