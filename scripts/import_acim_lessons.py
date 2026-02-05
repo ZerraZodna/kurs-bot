@@ -183,7 +183,8 @@ def clean_page_artifacts(content: str) -> str:
     - Orphaned page numbers: standalone numbers on their own line
     - Overlap across page boundaries (exact suffix/prefix overlap)
     """
-    page_marker_pattern = r'(?:WORKBOOK\s*\n\d+|PART\s+I\s*\n\d+)'
+    # Match common page/section markers (WORKBOOK, PART I with page numbers, etc.)
+    page_marker_pattern = r'(?:WORKBOOK\s*\n\d+|PART\s+I\s*\n\d+|PART\s+\d+\s*\n?\d*)'
 
     # Split by page markers to keep logical chunks
     parts = [p.strip() for p in re.split(page_marker_pattern, content, flags=re.IGNORECASE) if p.strip()]
@@ -201,7 +202,35 @@ def clean_page_artifacts(content: str) -> str:
     # Remove orphaned page numbers between content and the next section
     merged = re.sub(r'"\s*\n\d+\s*(?=[A-Z"])', r'"', merged)
 
+    # Remove standalone "Part" headers that sometimes appear at page tops
+    # e.g. "Part 1", "PART II", or when wrapped in markdown italics/bold like *PART I*.
+    # Use multiline + case-insensitive and allow 1-3 leading/trailing '*' markers.
+    merged = re.sub(
+        r'(?im)^\s*(?:\*{1,3})?\s*part(?:\s+|:)?(?:[ivx]+|\d+)\s*(?:\*{1,3})?\s*$\n?',
+        '',
+        merged
+    )
+
+    # Normalize excessive newlines introduced by removals
+    merged = re.sub(r'\n{3,}', '\n\n', merged)
+
     return merged
+
+
+def strip_trailing_star_lines(content: str) -> str:
+    """
+    Remove trailing lines that consist only of asterisks and whitespace (e.g. "* *").
+    Also trim trailing whitespace/newlines after removal.
+    """
+    if not content:
+        return content
+
+    lines = content.splitlines()
+    # Remove trailing lines that are only '*' and whitespace
+    while lines and re.fullmatch(r"[\*\s]+", lines[-1] or ""):
+        lines.pop()
+
+    return "\n".join(lines).rstrip()
 
 
 def merge_with_overlap(left: str, right: str, min_overlap: int = 60, max_overlap: int = 800) -> str:
@@ -314,6 +343,8 @@ def parse_lessons_from_text(text: str) -> list:
         title = title.replace('\\', '').replace('"', '').strip()
         # Preserve paragraph breaks and formatting in content
         content = clean_content_preserve_formatting(content)
+        # Remove trailing artifact lines like "* *" and trailing newlines
+        content = strip_trailing_star_lines(content)
         
         if not title or len(title) < 2:
             title = f"Lesson {start_num} to {end_num}"
@@ -393,6 +424,8 @@ def parse_lessons_from_text(text: str) -> list:
         title = title.replace('\\', '').replace('"', '').strip()
         # Preserve paragraph breaks and formatting in content
         content = clean_content_preserve_formatting(content)
+        # Remove trailing artifact lines like "* *" and trailing newlines
+        content = strip_trailing_star_lines(content)
         
         if not title or len(title) < 2:
             title = f"Lesson {lesson_num}"
