@@ -47,3 +47,20 @@ def setup_test_environment():
                     print("\n⚠️  Test session complete - test.db is locked (will be cleaned on next run)")
     else:
         print("\n✅ Test session complete")
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip manual tests that are intended to be run interactively.
+
+    The file `tests/test_embeddings_manual.py` is a manual/interactive script
+    that defines an async test function without pytest decorators. Skip it
+    during automated test runs.
+    """
+    for item in list(items):
+        try:
+            name = item.fspath.basename
+        except Exception:
+            continue
+        if name == "test_embeddings_manual.py":
+            import pytest as _pytest
+            item.add_marker(_pytest.mark.skip(reason="Manual test - skipped in CI"))

@@ -95,10 +95,12 @@ class SemanticSearchService:
             threshold = self.similarity_threshold
         
         # Build query for user's memories with embeddings
-        query = session.query(Memory).filter(
-            Memory.user_id == user_id,
-            Memory.is_active == True,
-            Memory.embedding.isnot(None)  # Only memories with embeddings
+        # Use chained filters so test mocks that expect chained calls work
+        query = (
+            session.query(Memory)
+            .filter(Memory.user_id == user_id)
+            .filter(Memory.is_active == True)
+            .filter(Memory.embedding.isnot(None))  # Only memories with embeddings
         )
         
         # Filter by categories if provided

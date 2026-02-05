@@ -2,12 +2,12 @@
 Test Onboarding and Scheduling Flow
 
 Tests the complete user journey:
-1. User arrives (new user)
-2. Onboarding prompts appear
-3. User commits to 365 lessons
-4. User provides preferred time
-5. Schedule is created
-6. Daily reminders are set up
+1. User arrives (new user) - gets name prompt
+2. User provides name - gets consent prompt  
+3. User consents to data storage - gets commitment prompt
+4. User commits to 365 lessons - gets lesson status prompt
+5. User provides lesson status - gets lesson 1 and completes onboarding
+6. Schedule is auto-created
 """
 
 import asyncio
@@ -96,8 +96,20 @@ async def test_onboarding_flow():
         status = onboarding.get_onboarding_status(user_id)
         print(f"\nOnboarding status: {status}")
         
-        # Step 3: User commits to lessons
-        print("\n[Step 3] User commits to 365 lessons")
+        # Step 3: User consents to data storage
+        print("\n[Step 3] User consents to data storage")
+        print("-" * 80)
+        user_msg = "Yes, I consent"
+        print(f"User: {user_msg}")
+        
+        response = await dialogue.process_message(user_id, user_msg, db)
+        print(f"Bot: {response[:200]}...")
+        
+        status = onboarding.get_onboarding_status(user_id)
+        print(f"\nOnboarding status: {status}")
+        
+        # Step 4: User commits to lessons
+        print("\n[Step 4] User commits to 365 lessons")
         print("-" * 80)
         user_msg = "Yes, I'm ready to commit to this journey!"
         print(f"User: {user_msg}")
@@ -108,8 +120,8 @@ async def test_onboarding_flow():
         status = onboarding.get_onboarding_status(user_id)
         print(f"\nOnboarding status: {status}")
         
-        # Step 4: User provides lesson status (new vs continuing)
-        print("\n[Step 4] User indicates they're new to ACIM")
+        # Step 5: User provides lesson status (new vs continuing)
+        print("\n[Step 5] User indicates they're new to ACIM")
         print("-" * 80)
         user_msg = "I'm new to ACIM"
         print(f"User: {user_msg}")

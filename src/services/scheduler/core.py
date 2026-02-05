@@ -19,7 +19,8 @@ from apscheduler.triggers.date import DateTrigger
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from sqlalchemy.orm import Session
 
-from src.models.database import SessionLocal, Schedule, User, Lesson
+from src.models.database import Schedule, User, Lesson
+from src.services.scheduler import SessionLocal
 from src.services.memory_manager import MemoryManager
 from src.config import settings
 from .time_utils import parse_time_string
@@ -79,7 +80,8 @@ class SchedulerService:
     @staticmethod
     def run_recovery_check() -> int:
         """Send any missed schedules and update their state."""
-        db = SessionLocal()
+        from src.services import scheduler as _scheduler_pkg
+        db = _scheduler_pkg.SessionLocal()
         recovered = 0
         try:
             now = datetime.now(timezone.utc)
@@ -224,7 +226,8 @@ class SchedulerService:
         """
         close_session = False
         if session is None:
-            session = SessionLocal()
+            from src.services import scheduler as _scheduler_pkg
+            session = _scheduler_pkg.SessionLocal()
             close_session = True
 
         try:
@@ -286,7 +289,8 @@ class SchedulerService:
         """Create a one-time reminder schedule."""
         close_session = False
         if session is None:
-            session = SessionLocal()
+            from src.services import scheduler as _scheduler_pkg
+            session = _scheduler_pkg.SessionLocal()
             close_session = True
 
         try:
@@ -345,7 +349,8 @@ class SchedulerService:
 
         This is called by APScheduler when a job triggers.
         """
-        db = SessionLocal()
+        from src.services import scheduler as _scheduler_pkg
+        db = _scheduler_pkg.SessionLocal()
         try:
             schedule = db.query(Schedule).filter_by(schedule_id=schedule_id).first()
 
@@ -431,7 +436,8 @@ class SchedulerService:
     @staticmethod
     def get_user_schedules(user_id: int, active_only: bool = True) -> list:
         """Get all schedules for a user."""
-        db = SessionLocal()
+        from src.services import scheduler as _scheduler_pkg
+        db = _scheduler_pkg.SessionLocal()
         try:
             query = db.query(Schedule).filter_by(user_id=user_id)
             if active_only:
@@ -449,7 +455,8 @@ class SchedulerService:
         """Deactivate all schedules for a user and remove their jobs."""
         close_session = False
         if session is None:
-            session = SessionLocal()
+            from src.services import scheduler as _scheduler_pkg
+            session = _scheduler_pkg.SessionLocal()
             close_session = True
         try:
             query = session.query(Schedule).filter_by(user_id=user_id)
@@ -478,7 +485,8 @@ class SchedulerService:
     @staticmethod
     def deactivate_schedule(schedule_id: int):
         """Deactivate a schedule and remove from APScheduler."""
-        db = SessionLocal()
+        from src.services import scheduler as _scheduler_pkg
+        db = _scheduler_pkg.SessionLocal()
         try:
             schedule = db.query(Schedule).filter_by(schedule_id=schedule_id).first()
             if schedule:

@@ -8,6 +8,7 @@ Provides utilities for storing and comparing embeddings.
 import logging
 import numpy as np
 import httpx
+import asyncio
 from typing import List, Optional
 from src.config import settings
 
@@ -48,6 +49,10 @@ class EmbeddingService:
             response.raise_for_status()
             
             data = response.json()
+            # In tests/mock contexts `response.json()` may be an async
+            # callable (AsyncMock) returning a coroutine. Await if needed.
+            if asyncio.iscoroutine(data):
+                data = await data
             
             # Handle both single embedding and batch response
             if "embeddings" in data:
@@ -159,6 +164,16 @@ class EmbeddingService:
     async def close(self):
         """Close HTTP client"""
         await self.client.aclose()
+
+    async def batch_embed(self, texts: List[str]) -> List[Optional[List[float]]]:
+        """Generate embeddings for a batch of texts concurrently.
+
+        Returns a list of embeddings (or None) in the same order as `texts`.
+        """
+        if not texts:
+            return []
+        tasks = [self.generate_embedding(t) for t in texts]
+        return await asyncio.gather(*tasks)
 
 
 # Global instance

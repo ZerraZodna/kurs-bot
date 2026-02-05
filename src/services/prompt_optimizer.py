@@ -84,3 +84,54 @@ class PromptOptimizer:
             truncated = truncated[:last_space]
         return truncated + "..."
     
+    def prioritize_memories(self, memories: List[Dict], max_count: int = 5) -> List[Dict]:
+        """Return up to `max_count` memories prioritized by confidence (desc).
+
+        Keeps original dict items but sorts by `confidence` when available.
+        """
+        if not memories:
+            return []
+        # Ensure confidence defaults to 0 if missing
+        sorted_mem = sorted(memories, key=lambda m: m.get("confidence", 0), reverse=True)
+        return sorted_mem[:max_count]
+
+    def compress_conversation_history(
+        self,
+        turns: List[tuple],
+        max_turns: int = 3,
+        strategy: str = "recent",
+    ) -> List[tuple]:
+        """Compress a list of (user, assistant) turns according to strategy.
+
+        Strategies supported:
+        - "recent": return the last `max_turns` turns
+        - "important": pick the longest exchanges (by combined length)
+        - "summary": pick first, middle, last turns to preserve overview
+        """
+        if not turns:
+            return []
+
+        if strategy == "recent":
+            return turns[-max_turns:]
+
+        if strategy == "important":
+            scored = sorted(turns, key=lambda t: len(t[0]) + len(t[1]), reverse=True)
+            return scored[:max_turns]
+
+        # summary
+        n = len(turns)
+        if max_turns >= n:
+            return turns
+        indices = [0]
+        if max_turns == 2:
+            indices.append(n - 1)
+        else:
+            # Spread indices evenly: first, middle(s), last
+            step = max(1, (n - 1) // (max_turns - 1))
+            for i in range(1, max_turns - 1):
+                indices.append(min(n - 2, i * step))
+            indices.append(n - 1)
+
+        chosen = [turns[i] for i in sorted(set(indices))][:max_turns]
+        return chosen
+    

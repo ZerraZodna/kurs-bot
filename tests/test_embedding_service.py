@@ -4,6 +4,7 @@ Tests for embedding service
 
 import pytest
 import numpy as np
+from src.config import settings
 from src.services.embedding_service import EmbeddingService
 from unittest.mock import AsyncMock, patch, MagicMock
 
@@ -21,7 +22,7 @@ class TestEmbeddingService:
     async def test_generate_embedding_success(self, embedding_service):
         """Test successful embedding generation"""
         mock_response = {
-            "embedding": [0.1] * 384,  # 384-dimensional vector
+            "embedding": [0.1] * settings.EMBEDDING_DIMENSION,
             "model": "nomic-embed-text:latest"
         }
         
@@ -32,7 +33,7 @@ class TestEmbeddingService:
             embedding = await embedding_service.generate_embedding("test text")
             
             assert embedding is not None
-            assert len(embedding) == 384
+            assert len(embedding) == settings.EMBEDDING_DIMENSION
             assert all(v == 0.1 for v in embedding)
     
     @pytest.mark.asyncio
@@ -57,7 +58,7 @@ class TestEmbeddingService:
     async def test_generate_embedding_dimension_mismatch(self, embedding_service):
         """Test embedding generation validates dimension"""
         mock_response = {
-            "embedding": [0.1] * 256,  # Wrong dimension
+            "embedding": [0.1] * (settings.EMBEDDING_DIMENSION - 128),  # Wrong dimension
             "model": "nomic-embed-text:latest"
         }
         
@@ -136,7 +137,7 @@ class TestEmbeddingService:
     async def test_batch_embed(self, embedding_service):
         """Test batch embedding generation"""
         mock_response = {
-            "embedding": [0.1] * 384,
+            "embedding": [0.1] * settings.EMBEDDING_DIMENSION,
             "model": "nomic-embed-text:latest"
         }
         
@@ -149,4 +150,4 @@ class TestEmbeddingService:
             
             assert len(embeddings) == 3
             assert all(e is not None for e in embeddings)
-            assert all(len(e) == 384 for e in embeddings if e is not None)
+            assert all(len(e) == settings.EMBEDDING_DIMENSION for e in embeddings if e is not None)

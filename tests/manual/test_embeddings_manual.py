@@ -1,6 +1,12 @@
 """
-Manual test for embeddings functionality
+Manual test for embeddings functionality (moved to tests/manual)
+Run with: `python tests/manual/test_embeddings_manual.py`
 """
+import sys
+from pathlib import Path
+# Ensure project root is on PYTHONPATH when running this script directly
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
 import asyncio
 from src.models.database import SessionLocal, User, init_db
 from src.services.memory_manager import MemoryManager
@@ -122,6 +128,7 @@ async def test_embeddings():
         
     finally:
         session.close()
+
 
 if __name__ == "__main__":
     asyncio.run(test_embeddings())

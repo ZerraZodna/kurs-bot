@@ -7,7 +7,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from src.config import settings
-from src.integrations.telegram import send_message
+# Use dynamic lookup for send_message so tests can monkeypatch the package symbol
 from src.models.database import MessageLog, User, Lesson
 from src.services.traffic_tracker import record_traffic_event
 
@@ -57,7 +57,8 @@ def send_outbound_message(db: Session, user: User, text: str) -> None:
     error = None
     try:
         if user.channel == "telegram":
-            asyncio.run(send_message(int(user.external_id), text))
+            from src.services import scheduler as _scheduler_pkg
+            asyncio.run(_scheduler_pkg.send_message(int(user.external_id), text))
             record_traffic_event()
         else:
             logger.warning(f"Unsupported channel for scheduled send: {user.channel}")
