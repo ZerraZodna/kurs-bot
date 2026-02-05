@@ -30,23 +30,25 @@ def detect_lesson_request(text: str) -> Optional[Dict[str, Any]]:
 
     lesson_patterns = [
         r"lesson\s+(\d+)",
+        r"leksjon\s+(\d+)",
         r"day\s+(\d+)",
         r"lesson\s+#(\d+)",
-        r"#(\d+)",
     ]
 
     for pattern in lesson_patterns:
         match = re.search(pattern, text_lower)
         if match:
             lesson_num = int(match.group(1))
-            if 1 <= lesson_num <= 365:
+            if 1 <= lesson_num <= 360:
                 return {"lesson_id": lesson_num}
+            if 361 <= lesson_num <= 365:
+                return {"lesson_id": 361}
 
     return None
 
 
 async def handle_lesson_request(
-    lesson_id: int, user_input: str, session: Session
+    lesson_id: int, user_input: str, session: Session, user_language: str = "english"
 ) -> str:
     """
     Handle requests for specific lesson content using RAG.
@@ -68,24 +70,47 @@ async def handle_lesson_request(
         if not lesson:
             return f"I couldn't find lesson {lesson_id} in my database. ACIM has 365 lessons - please ask for a lesson between 1 and 365."
 
-        # Build RAG-enhanced prompt with lesson content
+        # Detect if the user explicitly asks for the exact/raw lesson text
+        user_lower = user_input.lower()
+        raw_triggers = [
+            "text of lesson",
+            "text for lesson",
+            "the text of lesson",
+            "what is the text of",
+            "exact words",
+            "exact text",
+            "what exactly is",
+            "give me the exact words",
+            "give me the exact text",
+            "exactly what",
+        ]
+
+        is_raw_request = any(t in user_lower for t in raw_triggers) or bool(
+            re.search(r"\bwhat exactly is\b.*\blesson\b", user_lower)
+        )
+
+        if is_raw_request:
+            # Return raw lesson text directly (translate if needed)
+            return await format_lesson_message(lesson, user_language or "english", call_ollama)
+
+        # Otherwise (including plain "Give me lesson N"), use RAG/LLM to discuss the lesson
         system_prompt = f"""{settings.SYSTEM_PROMPT}
 
-### Requested Lesson Content [RAG CONTEXT - USE THIS]
-**Lesson {lesson.lesson_id}**: "{lesson.title}"
+    ### Requested Lesson Content [RAG CONTEXT - USE THIS]
+    **Lesson {lesson.lesson_id}**: "{lesson.title}"
 
-{lesson.content}
+    {lesson.content}
 
----
-The user is asking about this lesson. Use the above content to provide accurate, detailed information."""
+    ---
+    The user is asking about this lesson. Use the above content to provide accurate, detailed information."""
 
         prompt = f"""{system_prompt}
 
-### User Question
-{user_input}
+    ### User Question
+    {user_input}
 
-### Response
-Provide a thoughtful, detailed response about this ACIM lesson. Reference specific points from the lesson content above. Be warm and encouraging."""
+    ### Response
+    Provide a thoughtful, detailed response about this ACIM lesson. Reference specific points from the lesson content above. Be warm and encouraging."""
 
         response = await call_ollama(prompt)
         return response

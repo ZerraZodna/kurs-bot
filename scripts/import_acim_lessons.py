@@ -313,47 +313,76 @@ def parse_lessons_from_text(text: str) -> list:
     """
     lessons = {}  # Use dict to deduplicate by lesson_id
     
-    # First, check for special "lesson X to Y" pattern (e.g., "lesson 361 to 365")
-    lesson_range_pattern = r"lesson\s+(\d+)\s+to\s+(\d+)\n([^\n]+?)(?=\nlesson\s+\d+|$)"
-    range_matches = list(re.finditer(lesson_range_pattern, text, re.MULTILINE | re.IGNORECASE))
-    
-    for match in range_matches:
+    # First, check for special lesson ranges like "lesson 361 to 365", "lesson 361-365",
+    # and allow optional inline titles (e.g. "lesson 361-365: The Title"). Be flexible
+    # with separators (hyphen, en-dash, em-dash) and optional colon/whitespace.
+    range_pattern = re.compile(
+        r"lesson\s+(\d+)\s*(?:to|[-\u2013\u2014-])\s*(\d+)(?:\s*[:\-–—]?\s*([^\n]+))?",
+        re.IGNORECASE,
+    )
+
+    for match in range_pattern.finditer(text):
         start_num = int(match.group(1))
         end_num = int(match.group(2))
-        title = match.group(3).strip()
-        
-        # Extract content between this lesson and next lesson
+        title = (match.group(3) or "").strip()
+
+        # Extract content between this match and the next lesson header
         match_start = match.end()
-        next_lesson = re.search(r"\nlesson\s+\d+", text[match_start:])
+        next_lesson = re.search(r"\nlesson\s+\d+\b", text[match_start:], re.IGNORECASE)
         if next_lesson:
             match_end = match_start + next_lesson.start()
         else:
             match_end = len(text)
-        
+
         content = text[match_start:match_end].strip()
-        
+
         # Clean up content: remove page artifacts
         content = clean_page_artifacts(content)
-        
+
+        # If title looks like opening quoted lines (inline title actually content),
+        # move it into content so the lesson content starts with the quotation.
+        if title:
+            t_words = title.split()
+            title_looks_like_content = False
+            if title.startswith(('“', '"', '*')) or title.endswith(('”', '"')):
+                title_looks_like_content = True
+            if len(t_words) > 8:
+                title_looks_like_content = True
+            if re.search(r'[\.!?]$', title) and len(t_words) > 3:
+                title_looks_like_content = True
+
+            if title_looks_like_content:
+                if content:
+                    content = f"{title}\n{content}"
+                else:
+                    content = title
+                title = ''
+
+        # If title was not inline, try to pull the first line of content as title
+        if not title:
+            first_line_end = content.find('\n')
+            if first_line_end != -1:
+                candidate = content[:first_line_end].strip()
+                # If the candidate looks like a short title, use it and remove from content
+                if 2 < len(candidate) < 200:
+                    title = candidate
+                    content = content[first_line_end + 1 :].lstrip()
+
         # Fix title that wraps onto the first line of content
         title, content = merge_wrapped_title(title, content)
 
         # Clean up title and content
-        title = re.sub(r'\s+', ' ', title)
+        title = re.sub(r"\s+", " ", title)
         title = title.replace('\\', '').replace('"', '').strip()
-        # Preserve paragraph breaks and formatting in content
         content = clean_content_preserve_formatting(content)
-        # Remove trailing artifact lines like "* *" and trailing newlines
         content = strip_trailing_star_lines(content)
-        
+
         if not title or len(title) < 2:
             title = f"Lesson {start_num} to {end_num}"
-        
-        # Truncate if too long
+
         if len(content) > 20000:
             content = content[:20000] + "..."
-        
-        # Create same lesson for each day in the range
+
         for day_num in range(start_num, end_num + 1):
             lessons[day_num] = {
                 "lesson_id": day_num,
@@ -365,7 +394,9 @@ def parse_lessons_from_text(text: str) -> list:
     
     # Build a map of lesson occurrences: lesson_num -> list of match positions
     lesson_occurrences = {}
-    lesson_pattern = r"lesson\s+(\d+)\n"
+    # Match lesson headers generally — do not require a trailing newline so headers like
+    # "lesson 361 - 365" or "lesson 1: Title" are detected.
+    lesson_pattern = r"lesson\s+(\d+)\b"
     
     for match in re.finditer(lesson_pattern, text, re.MULTILINE | re.IGNORECASE):
         lesson_num = int(match.group(1))
@@ -394,7 +425,7 @@ def parse_lessons_from_text(text: str) -> list:
         if title_end == -1:
             title_end = len(text)
         title = text[title_start:title_end].strip()
-        
+
         # Find content start (after the title line)
         content_start = title_end + 1 if title_end < len(text) else len(text)
         
@@ -412,6 +443,29 @@ def parse_lessons_from_text(text: str) -> list:
                     break  # Found a valid boundary, stop searching
         
         content = text[content_start:content_end].strip()
+
+        # Heuristic: sometimes the PDF places the opening quoted lines of the lesson
+        # immediately after the lesson header on the same line. These are not titles
+        # but part of the lesson content (often a quotation). Detect cases where the
+        # extracted "title" looks like a sentence/quotation and move it into content.
+        title_words = title.split()
+        looks_like_content = False
+        if title:
+            if title.startswith(('“', '"', '*')) or title.endswith(('”', '"')):
+                looks_like_content = True
+            if len(title_words) > 8:
+                looks_like_content = True
+            if re.search(r'[\.!?]$', title) and len(title_words) > 3:
+                looks_like_content = True
+
+        if looks_like_content:
+            # Prepend the extracted "title" back into content and clear title so
+            # a generic title will be used later.
+            if content:
+                content = f"{title}\n{content}"
+            else:
+                content = title
+            title = ''
         
         # Clean up content: remove page artifacts
         content = clean_page_artifacts(content)

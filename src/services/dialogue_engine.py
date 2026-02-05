@@ -148,6 +148,17 @@ class DialogueEngine:
         if lesson_response:
             return lesson_response
 
+        # Check if user is asking about a specific lesson (run regardless of onboarding)
+        lesson_request = detect_lesson_request(text)
+        if lesson_request:
+            # Determine user language to decide whether to return raw lesson text
+            user_lang = get_user_language(self.memory_manager, user_id) if self.memory_manager else "english"
+            lesson_response = await handle_lesson_request(
+                lesson_request["lesson_id"], text, session, user_language=user_lang
+            )
+            if lesson_response:
+                return lesson_response
+            
         schedule_response = await handle_schedule_messages(
             user_id=user_id,
             text=text,
@@ -159,15 +170,6 @@ class DialogueEngine:
         )
         if schedule_response:
             return schedule_response
-        
-        # Check if user is asking about a specific lesson (LESSON REQUEST - BEFORE ONBOARDING)
-        lesson_request = detect_lesson_request(text)
-        if lesson_request:
-            lesson_response = await handle_lesson_request(
-                lesson_request["lesson_id"], text, session
-            )
-            if lesson_response:
-                return lesson_response
         
         # Check if user needs onboarding (new users)
         if self.onboarding_flow and self.onboarding.should_show_onboarding(user_id):
