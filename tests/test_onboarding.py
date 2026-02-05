@@ -156,6 +156,38 @@ async def test_onboarding_flow():
 
 
 @pytest.mark.asyncio
+async def test_consent_granted_continues_onboarding():
+    """Ensure consenting returns a localized thank-you and continues onboarding."""
+    db = SessionLocal()
+    try:
+        init_db()
+        user_id = create_new_test_user(db)
+
+        dialogue = DialogueEngine(db)
+        onboarding = OnboardingService(db)
+
+        # Trigger name prompt and provide name
+        await dialogue.process_message(user_id, "Hi", db)
+        await dialogue.process_message(user_id, "My name is Alex", db)
+
+        # Provide consent
+        user_msg = "Yes"
+        response = await dialogue.process_message(user_id, user_msg, db)
+
+        # Response should include the localized thank-you
+        assert "Thank you for consenting" in response or "Takk for at du samtykker" in response
+
+        # Onboarding status should now reflect consent given
+        status = onboarding.get_onboarding_status(user_id)
+        assert status.get("has_consent") is True
+
+        # And the bot should continue by asking commitment (commitment prompt contains 'Are you interested')
+        assert "Are you interested" in response
+    finally:
+        db.close()
+
+
+@pytest.mark.asyncio
 async def test_schedule_request():
     """Test that users can request reminders explicitly."""
     print("\n" + "=" * 80)
