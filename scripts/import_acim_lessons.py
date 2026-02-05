@@ -1,654 +1,187 @@
 """
-Import ACIM lessons from PDF into the database.
+Simple, focused ACIM lessons importer.
 
-This script extracts lessons from the ACIM PDF and populates the lessons table.
-Each lesson is stored with title, content, and metadata.
+This new script uses the bundled cleaning pipeline implemented in
+`scripts/make_clean_acim.py` to build a cleaned text representation of
+the PDF (including preserved markdown-style bold/italic markers), then
+splits lessons using a compact parser and imports them into the DB.
+
+It intentionally avoids the large, experimental extractor code that
+was preserved in `scripts/obsolete_import_lesson.py`.
 
 Usage:
-    python scripts/import_acim_lessons.py --pdf src/data/Sparkly\ ACIM\ lessons-extracted.pdf
-    python scripts/import_acim_lessons.py --pdf src/data/Sparkly\ ACIM\ lessons-extracted.pdf --clear
+  python scripts/import_acim_lessons.py --pdf src/data/Sparkly\ ACIM\ lessons-extracted.pdf [--clear]
 """
 
-import os
-import sys
+from __future__ import annotations
+
 import argparse
 import re
+import sys
 from pathlib import Path
 from datetime import datetime, timezone
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Ensure project root is on sys.path so `from src...` works when running
+# this script directly (e.g. `python scripts/import_acim_lessons.py`).
+# We insert the repo root (parent of `scripts/`) at the front of sys.path.
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from src.models.database import SessionLocal, Lesson, init_db
+from scripts import make_clean_acim as mc
 
 
-def extract_lessons_from_pdf(pdf_path: str) -> list:
-    """
-    Extract lessons from PDF file.
-    Uses pypdf for reliable text extraction with formatting preservation.
-    Preserves: bold, italics, and paragraph breaks.
-    """
-    try:
-        from pypdf import PdfReader
-        print("Using pypdf for formatted text extraction...")
-        reader = PdfReader(pdf_path)
-        
-        # Extract text with formatting
-        text_parts = []
-        
-        for page in reader.pages:
-            page_parts = []
-            prev_y = None
-            
-            def visitor_text(text, cm, tm, font_dict, font_size):
-                """Visitor to capture text with formatting."""
-                nonlocal prev_y
-                font_name = str(font_dict.get('/BaseFont', '')) if font_dict else ''
-                font_name_lower = font_name.lower()
-                
-                # Check formatting (case-insensitive)
-                is_bold = 'bold' in font_name_lower
-                is_italic = 'italic' in font_name_lower or 'oblique' in font_name_lower
-                
-                # Get vertical position for paragraph detection
-                y_pos = tm[5] if tm else 0
-                
-                # Add paragraph break if Y position changed significantly
-                if prev_y is not None and abs(y_pos - prev_y) > 5:
-                    page_parts.append({'text': '\n\n', 'bold': False, 'italic': False})
-                
-                prev_y = y_pos
-                
-                page_parts.append({
-                    'text': text,
-                    'bold': is_bold,
-                    'italic': is_italic
-                })
-            
-            page.extract_text(visitor_text=visitor_text)
-            text_parts.extend(page_parts)
-        
-        # Convert formatted parts to markdown-like text
-        text = format_text_parts_to_markdown(text_parts)
-        return parse_lessons_from_text(text)
-    except ImportError:
-        print("ERROR: 'pypdf' is not installed.")
-        print("Install with: pip install pypdf")
-        sys.exit(1)
+def load_cleaner_module() -> object:
+    # Prefer the local scripts.make_clean_acim module
+    return mc
 
 
-def format_text_parts_to_markdown(parts: list) -> str:
-    """
-    Convert text parts with formatting info to markdown-like text.
-    Preserves bold (**text**), italics (*text*), and paragraph breaks.
-    """
-    runs = []
-    buffer = []
-    current_fmt = None
+def build_clean_text(mc: object, pdf_path: str) -> str:
+    # Use the cleaner's functions to extract raw text, styled paragraphs,
+    # merge styling back into raw and perform final cleaning.
+    raw = mc.extract_raw_text(pdf_path)
+    paras = mc.extract_preserve_styles(pdf_path)
+    extracted = "\n\n".join(paras) if paras else ""
+    merged = mc.merge_styles_into_raw(extracted, raw)
+    cleaned = mc.clean_merged_text(merged)
+    return cleaned
 
-    def flush_buffer():
-        nonlocal buffer, current_fmt
-        if buffer:
-            runs.append((current_fmt, ''.join(buffer)))
-            buffer = []
 
-    for part in parts:
-        text = part['text']
-        if not text:
-            continue
+def parse_lessons_simple(text: str) -> list:
+    # Very simple splitter: match header-only lines like "Lesson 1" and
+    # take everything until the next header as the lesson content. This
+    # matches the cleaned text format that uses isolated header lines.
+    pattern = re.compile(r"(?im)^\s*lesson\s+(\d+)\s*$", re.M)
+    matches = list(pattern.finditer(text))
+    lessons = []
+    if not matches:
+        return lessons
 
-        # Preserve explicit paragraph breaks
-        if text == '\n\n':
-            flush_buffer()
-            runs.append((None, '\n\n'))
-            current_fmt = None
-            continue
+    for i, m in enumerate(matches):
+        lesson_num = int(m.group(1))
 
-        fmt = (part['bold'], part['italic'])
-        if current_fmt is None:
-            current_fmt = fmt
-
-        if fmt != current_fmt:
-            # Avoid formatting changes in the middle of a word
-            if buffer and buffer[-1] and buffer[-1][-1].isalnum() and text[0].isalnum():
-                fmt = current_fmt
-            else:
-                flush_buffer()
-                current_fmt = fmt
-
-        buffer.append(text)
-
-    flush_buffer()
-
-    result = []
-    for fmt, text in runs:
-        if text == '\n\n':
-            result.append(text)
-            continue
-
-        bold, italic = fmt if fmt else (False, False)
-        if bold and italic:
-            result.append(f"***{text}***")
-        elif bold:
-            result.append(f"**{text}**")
-        elif italic:
-            result.append(f"*{text}*")
+        # Content starts after the end of the header line
+        line_end_idx = text.find('\n', m.end())
+        if line_end_idx == -1:
+            content_start = m.end()
         else:
-            result.append(text)
+            content_start = line_end_idx + 1
 
-    # Join and clean up excessive whitespace (but preserve paragraph breaks)
-    formatted = ''.join(result)
-
-    # Normalize multiple newlines to double newlines (paragraph breaks)
-    formatted = re.sub(r'\n{3,}', '\n\n', formatted)
-
-    # Remove spaces before/after newlines but preserve the newlines
-    formatted = re.sub(r' *\n *', '\n', formatted)
-
-    return formatted
-
-
-def clean_content_preserve_formatting(content: str) -> str:
-    """
-    Clean content while preserving formatting (bold, italics, paragraphs).
-    - Preserves markdown formatting: **bold**, *italic*
-    - Preserves paragraph breaks (double newlines)
-    - Removes excessive whitespace on single lines
-    """
-    # Split into lines
-    lines = content.split('\n')
-    cleaned_lines = []
-    
-    for line in lines:
-        # Clean excessive spaces within a line but preserve formatting markers
-        line = re.sub(r' {2,}', ' ', line).strip()
-        cleaned_lines.append(line)
-    
-    # Rejoin with newlines
-    result = '\n'.join(cleaned_lines)
-    
-    # Normalize paragraph breaks (multiple newlines -> double newline)
-    result = re.sub(r'\n{3,}', '\n\n', result)
-    
-    return result.strip()
-
-
-def clean_page_artifacts(content: str) -> str:
-    """
-    Remove PDF page artifacts from lesson content.
-    
-    Removes:
-    - WORKBOOK markers with page numbers: "WORKBOOK \n##"
-    - PART I markers with page numbers: "PART I\n##"
-    - Orphaned page numbers: standalone numbers on their own line
-    - Overlap across page boundaries (exact suffix/prefix overlap)
-    """
-    # Match common page/section markers (WORKBOOK, PART I with page numbers, etc.)
-    page_marker_pattern = r'(?:WORKBOOK\s*\n\d+|PART\s+I\s*\n\d+|PART\s+\d+\s*\n?\d*)'
-
-    # Split by page markers to keep logical chunks
-    parts = [p.strip() for p in re.split(page_marker_pattern, content, flags=re.IGNORECASE) if p.strip()]
-
-    if not parts:
-        return content
-
-    merged = parts[0]
-    for part in parts[1:]:
-        merged = merge_with_overlap(merged, part)
-
-    # Remove standalone page numbers at the end (just digits on a line)
-    merged = re.sub(r'\s*\n\d+\s*$', '', merged)
-
-    # Remove orphaned page numbers between content and the next section
-    merged = re.sub(r'"\s*\n\d+\s*(?=[A-Z"])', r'"', merged)
-
-    # Remove standalone "Part" headers that sometimes appear at page tops
-    # e.g. "Part 1", "PART II", or when wrapped in markdown italics/bold like *PART I*.
-    # Use multiline + case-insensitive and allow 1-3 leading/trailing '*' markers.
-    merged = re.sub(
-        r'(?im)^\s*(?:\*{1,3})?\s*part(?:\s+|:)?(?:[ivx]+|\d+)\s*(?:\*{1,3})?\s*$\n?',
-        '',
-        merged
-    )
-
-    # Normalize excessive newlines introduced by removals
-    merged = re.sub(r'\n{3,}', '\n\n', merged)
-
-    return merged
-
-
-def strip_trailing_star_lines(content: str) -> str:
-    """
-    Remove trailing lines that consist only of asterisks and whitespace (e.g. "* *").
-    Also trim trailing whitespace/newlines after removal.
-    """
-    if not content:
-        return content
-
-    lines = content.splitlines()
-    # Remove trailing lines that are only '*' and whitespace
-    while lines and re.fullmatch(r"[\*\s]+", lines[-1] or ""):
-        lines.pop()
-
-    return "\n".join(lines).rstrip()
-
-
-def merge_with_overlap(left: str, right: str, min_overlap: int = 60, max_overlap: int = 800) -> str:
-    """
-    Merge two strings by removing suffix/prefix overlap (whitespace-insensitive).
-
-    This handles page-boundary overlap where the end of one page repeats at the start of the next,
-    even when whitespace or line breaks differ.
-    """
-    left_sq, _ = squash_with_map(left)
-    right_sq, right_map = squash_with_map(right)
-
-    max_len = min(max_overlap, len(left_sq), len(right_sq))
-
-    for overlap_len in range(max_len, min_overlap - 1, -1):
-        if left_sq[-overlap_len:] == right_sq[:overlap_len]:
-            cut_idx = right_map[overlap_len - 1] + 1
-            return left + right[cut_idx:]
-
-    return left + " " + right
-
-
-def squash_with_map(text: str) -> tuple[str, list[int]]:
-    """
-    Remove whitespace for overlap detection while keeping a map to original indices.
-    """
-    mapping = []
-    squashed_chars = []
-    for idx, ch in enumerate(text):
-        if ch.isspace():
-            continue
-        squashed_chars.append(ch)
-        mapping.append(idx)
-    return "".join(squashed_chars), mapping
-
-
-def merge_wrapped_title(title: str, content: str) -> tuple[str, str]:
-    """
-    If the title is split across lines, pull the continuation from the start of content.
-
-    Example:
-      title: “I have given everything I see in this room [on this street, from this
-      content starts: window, in this place] all the meaning that it has for me.” ...
-    """
-    title_stripped = title.strip()
-    content_stripped = content.lstrip()
-
-    if not title_stripped or not content_stripped:
-        return title, content
-
-    # If title has an opening quote but no closing quote, pull until closing quote
-    has_open = "“" in title_stripped or '"' in title_stripped
-    has_close = "”" in title_stripped or title_stripped.count('"') >= 2
-
-    if has_open and not has_close:
-        # Find closing quote in the content
-        for quote in ["”", '"']:
-            end_idx = content_stripped.find(quote)
-            if end_idx != -1:
-                # Include closing quote in title
-                title = f"{title_stripped} {content_stripped[:end_idx + 1]}"
-                content = content_stripped[end_idx + 1:].lstrip()
-                return title, content
-
-    return title, content
-
-
-def parse_lessons_from_text(text: str) -> list:
-    """
-    Parse lesson text into structured format.
-    Looks for patterns like "lesson 1" or numbered lessons.
-    
-    Note: PDF has duplicate lesson headers for page layout (lesson headers appear
-    multiple times). We build a map of all occurrences and use specific logic to 
-    extract complete content.
-    
-    Page artifacts are cleaned up:
-    - Removes "WORKBOOK \n##" (page markers)
-    - Removes "PART I ##" (section markers at page breaks)
-    """
-    lessons = {}  # Use dict to deduplicate by lesson_id
-    
-    # First, check for special lesson ranges like "lesson 361 to 365", "lesson 361-365",
-    # and allow optional inline titles (e.g. "lesson 361-365: The Title"). Be flexible
-    # with separators (hyphen, en-dash, em-dash) and optional colon/whitespace.
-    range_pattern = re.compile(
-        r"lesson\s+(\d+)\s*(?:to|[-\u2013\u2014-])\s*(\d+)(?:\s*[:\-–—]?\s*([^\n]+))?",
-        re.IGNORECASE,
-    )
-
-    for match in range_pattern.finditer(text):
-        start_num = int(match.group(1))
-        end_num = int(match.group(2))
-        title = (match.group(3) or "").strip()
-
-        # Extract content between this match and the next lesson header
-        match_start = match.end()
-        next_lesson = re.search(r"\nlesson\s+\d+\b", text[match_start:], re.IGNORECASE)
-        if next_lesson:
-            match_end = match_start + next_lesson.start()
+        if i + 1 < len(matches):
+            end = matches[i + 1].start()
         else:
-            match_end = len(text)
+            end = len(text)
 
-        content = text[match_start:match_end].strip()
+        content = text[content_start:end].strip()
+        content = re.sub(r"\n{3,}", "\n\n", content).strip()
 
-        # Clean up content: remove page artifacts
-        content = clean_page_artifacts(content)
+        title = f"Lesson {lesson_num}"
 
-        # If title looks like opening quoted lines (inline title actually content),
-        # move it into content so the lesson content starts with the quotation.
-        if title:
-            t_words = title.split()
-            title_looks_like_content = False
-            if title.startswith(('“', '"', '*')) or title.endswith(('”', '"')):
-                title_looks_like_content = True
-            if len(t_words) > 8:
-                title_looks_like_content = True
-            if re.search(r'[\.!?]$', title) and len(t_words) > 3:
-                title_looks_like_content = True
-
-            if title_looks_like_content:
-                if content:
-                    content = f"{title}\n{content}"
-                else:
-                    content = title
-                title = ''
-
-        # If title was not inline, try to pull the first line of content as title
-        if not title:
-            first_line_end = content.find('\n')
-            if first_line_end != -1:
-                candidate = content[:first_line_end].strip()
-                # If the candidate looks like a short title, use it and remove from content
-                if 2 < len(candidate) < 200:
-                    title = candidate
-                    content = content[first_line_end + 1 :].lstrip()
-
-        # Fix title that wraps onto the first line of content
-        title, content = merge_wrapped_title(title, content)
-
-        # Clean up title and content
-        title = re.sub(r"\s+", " ", title)
-        title = title.replace('\\', '').replace('"', '').strip()
-        content = clean_content_preserve_formatting(content)
-        content = strip_trailing_star_lines(content)
-
-        if not title or len(title) < 2:
-            title = f"Lesson {start_num} to {end_num}"
-
-        if len(content) > 20000:
-            content = content[:20000] + "..."
-
-        for day_num in range(start_num, end_num + 1):
-            lessons[day_num] = {
-                "lesson_id": day_num,
-                "title": title,
-                "content": content or f"Lesson {day_num}: {title}",
-                "difficulty_level": "beginner",
-                "duration_minutes": 15,
-            }
-    
-    # Build a map of lesson occurrences: lesson_num -> list of match positions
-    lesson_occurrences = {}
-    # Match lesson headers generally — do not require a trailing newline so headers like
-    # "lesson 361 - 365" or "lesson 1: Title" are detected.
-    lesson_pattern = r"lesson\s+(\d+)\b"
-    
-    for match in re.finditer(lesson_pattern, text, re.MULTILINE | re.IGNORECASE):
-        lesson_num = int(match.group(1))
-        if lesson_num not in lesson_occurrences:
-            lesson_occurrences[lesson_num] = []
-        lesson_occurrences[lesson_num].append(match)
-    
-    # Process each lesson
-    for lesson_num in sorted(lesson_occurrences.keys()):
-        # Skip if already processed (from range lessons)
-        if lesson_num in lessons:
-            continue
-        
-        matches = lesson_occurrences[lesson_num]
-        if not matches:
-            continue
-        
-        # Use the FIRST occurrence of this lesson header
-        # PDF may have duplicate headers across pages, so we want the first
-        # canonical appearance of the lesson
-        match = matches[0]
-        
-        # Extract title (text after "lesson X\n")
-        title_start = match.end()
-        title_end = text.find('\n', title_start)
-        if title_end == -1:
-            title_end = len(text)
-        title = text[title_start:title_end].strip()
-
-        # Find content start (after the title line)
-        content_start = title_end + 1 if title_end < len(text) else len(text)
-        
-        # Find where next lesson starts
-        # Search for the NEXT lesson number that appears AFTER the current match
-        content_end = len(text)  # Default to end of text
-        for next_num in range(lesson_num + 1, lesson_num + 100):  # Check next ~100 lesson numbers
-            if next_num in lesson_occurrences and lesson_occurrences[next_num]:
-                # Find the FIRST occurrence of next lesson that is AFTER current match
-                for next_match in lesson_occurrences[next_num]:
-                    if next_match.start() > match.start():
-                        content_end = next_match.start()
-                        break
-                if content_end != len(text):
-                    break  # Found a valid boundary, stop searching
-        
-        content = text[content_start:content_end].strip()
-
-        # Heuristic: sometimes the PDF places the opening quoted lines of the lesson
-        # immediately after the lesson header on the same line. These are not titles
-        # but part of the lesson content (often a quotation). Detect cases where the
-        # extracted "title" looks like a sentence/quotation and move it into content.
-        title_words = title.split()
-        looks_like_content = False
-        if title:
-            if title.startswith(('“', '"', '*')) or title.endswith(('”', '"')):
-                looks_like_content = True
-            if len(title_words) > 8:
-                looks_like_content = True
-            if re.search(r'[\.!?]$', title) and len(title_words) > 3:
-                looks_like_content = True
-
-        if looks_like_content:
-            # Prepend the extracted "title" back into content and clear title so
-            # a generic title will be used later.
-            if content:
-                content = f"{title}\n{content}"
-            else:
-                content = title
-            title = ''
-        
-        # Clean up content: remove page artifacts
-        content = clean_page_artifacts(content)
-        
-        # Fix title that wraps onto the first line of content
-        title, content = merge_wrapped_title(title, content)
-
-        # Clean up title and content
-        title = re.sub(r'\s+', ' ', title)
-        title = title.replace('\\', '').replace('"', '').strip()
-        # Preserve paragraph breaks and formatting in content
-        content = clean_content_preserve_formatting(content)
-        # Remove trailing artifact lines like "* *" and trailing newlines
-        content = strip_trailing_star_lines(content)
-        
-        if not title or len(title) < 2:
-            title = f"Lesson {lesson_num}"
-        
-        # Truncate if too long
-        if len(content) > 20000:
-            content = content[:20000] + "..."
-        
-        lessons[lesson_num] = {
+        lessons.append({
             "lesson_id": lesson_num,
             "title": title,
             "content": content or f"Lesson {lesson_num}: {title}",
             "difficulty_level": "beginner",
             "duration_minutes": 15,
-        }
-    
-    return sorted(lessons.values(), key=lambda x: x["lesson_id"])
+        })
+
+    # Deduplicate by lesson_id, prefer first occurrence
+    seen = set()
+    out = []
+    for l in lessons:
+        if l["lesson_id"] in seen:
+            continue
+        seen.add(l["lesson_id"])
+        out.append(l)
+    return sorted(out, key=lambda x: x["lesson_id"])
 
 
 def import_lessons_to_db(lessons: list, clear_existing: bool = False) -> int:
-    """
-    Import lessons into the database.
-    
-    Args:
-        lessons: List of lesson dicts with title, content, etc.
-        clear_existing: If True, delete all existing lessons before importing
-    
-    Returns:
-        Number of lessons imported
-    """
     session = SessionLocal()
     try:
         init_db()
-        
         if clear_existing:
             session.query(Lesson).delete()
             session.commit()
-            print(f"Cleared existing lessons")
-        
-        count = 0
+
         now = datetime.now(timezone.utc)
-        
-        for lesson_data in lessons:
-            # Check if lesson already exists
-            existing = session.query(Lesson).filter(
-                Lesson.lesson_id == lesson_data.get("lesson_id")
-            ).first()
-            
+        count = 0
+        for ld in lessons:
+            existing = session.query(Lesson).filter(Lesson.lesson_id == ld["lesson_id"]).first()
             if existing:
-                # Update existing lesson
-                for key, value in lesson_data.items():
-                    if key != "lesson_id" and hasattr(existing, key):
-                        setattr(existing, key, value)
+                existing.title = ld["title"]
+                existing.content = ld["content"]
+                existing.difficulty_level = ld.get("difficulty_level")
+                existing.duration_minutes = ld.get("duration_minutes")
                 session.add(existing)
             else:
-                # Create new lesson
                 lesson = Lesson(
-                    lesson_id=lesson_data.get("lesson_id"),
-                    title=lesson_data["title"],
-                    content=lesson_data["content"],
-                    difficulty_level=lesson_data.get("difficulty_level", "beginner"),
-                    duration_minutes=lesson_data.get("duration_minutes", 15),
+                    lesson_id=ld["lesson_id"],
+                    title=ld["title"],
+                    content=ld["content"],
+                    difficulty_level=ld.get("difficulty_level"),
+                    duration_minutes=ld.get("duration_minutes"),
                     created_at=now,
                 )
                 session.add(lesson)
-            
             count += 1
             if count % 50 == 0:
                 session.commit()
-                print(f"  Imported {count} lessons...")
-        
         session.commit()
-        print(f"\n[OK] Successfully imported {count} lessons")
         return count
-    
-    except Exception as e:
-        session.rollback()
-        print(f"[ERROR] Error importing lessons: {e}")
-        raise
     finally:
         session.close()
 
 
-def verify_lessons(expected_count: int = 365) -> None:
-    """Verify that lessons were imported correctly."""
+def verify(expected_count: int):
     session = SessionLocal()
     try:
-        count = session.query(Lesson).count()
-        print(f"\n[DB] Database now contains {count} lessons")
-        
-        if count == expected_count:
-            print(f"[OK] All {expected_count} ACIM lessons successfully imported!")
-        elif count > 0:
-            print(f"[WARN] Expected {expected_count} lessons, found {count}")
+        c = session.query(Lesson).count()
+        print(f"[DB] Database now contains {c} lessons")
+        if c == expected_count:
+            print(f"[OK] All {expected_count} lessons present")
         else:
-            print(f"[ERROR] No lessons found in database")
-        
-        # Show a sample
-        sample = session.query(Lesson).order_by(Lesson.lesson_id).limit(3).all()
-        if sample:
-            print(f"\nSample lessons:")
-            for lesson in sample:
-                print(f"  - Lesson {lesson.lesson_id}: {lesson.title}")
-                print(f"    Content preview: {lesson.content[:100]}...")
+            print(f"[WARN] expected {expected_count}, found {c}")
     finally:
         session.close()
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Import ACIM lessons from PDF to database")
-    parser.add_argument(
-        "--pdf",
-        default="src/data/Sparkly ACIM lessons-extracted.pdf",
-        help="Path to the ACIM lessons PDF file"
-    )
-    parser.add_argument(
-        "--clear",
-        action="store_true",
-        default=True,
-        help="Clear existing lessons before importing (default: True)"
-    )
-    parser.add_argument(
-        "--no-clear",
-        action="store_false",
-        dest="clear",
-        help="Do not clear existing lessons"
-    )
-    parser.add_argument(
-        "--verify",
-        action="store_true",
-        default=True,
-        help="Verify lessons after import"
-    )
+def main(argv=None):
+    p = argparse.ArgumentParser(description="Clean ACIM PDF and import lessons into DB")
+    p.add_argument("--pdf", default="src/data/Sparkly ACIM lessons-extracted.pdf")
+    # Clear existing lessons by default; provide `--no-clear` to opt out
+    p.add_argument("--no-clear", action="store_false", dest="clear", help="Do not clear existing lessons before import")
+    p.set_defaults(clear=True)
+    p.add_argument("--verify", action="store_true", help="Verify after import")
+    args = p.parse_args(argv)
+
+    pdf = args.pdf
+    if not Path(pdf).exists():
+        print(f"[ERROR] PDF not found: {pdf}")
+        raise SystemExit(1)
+
+    print(f"[PDF] {pdf}")
+    mc = load_cleaner_module()
+    print("[INFO] Building cleaned text from PDF...")
+    cleaned = build_clean_text(mc, pdf)
+    with open("clean_lessons.txt", 'w', encoding='utf-8') as f:
+        f.write(cleaned)
     
-    args = parser.parse_args()
-    
-    # Check if PDF exists
-    if not os.path.exists(args.pdf):
-        print(f"[ERROR] PDF file not found: {args.pdf}")
-        sys.exit(1)
-    
-    print(f"[PDF] Reading ACIM lessons from: {args.pdf}")
-    print(f"File size: {os.path.getsize(args.pdf) / 1024 / 1024:.2f} MB")
-    
-    # Extract lessons
-    print("\n[INFO] Extracting lessons from PDF...")
-    lessons = extract_lessons_from_pdf(args.pdf)
-    print(f"Found {len(lessons)} lessons in PDF")
-    
+    print("[INFO] Parsing lessons...")
+    lessons = parse_lessons_simple(cleaned)
+    print(f"Found {len(lessons)} lessons")
     if not lessons:
-        print("[ERROR] No lessons could be extracted from the PDF")
-        print("\nTroubleshooting:")
-        print("1. Ensure the PDF is in the correct format")
-        print("2. Try installing: pip install pypdf pdfplumber")
-        sys.exit(1)
-    
-    # Show first few lessons
-    print("\nFirst 3 lessons found:")
-    for lesson in lessons[:3]:
-        print(f"  - Lesson {lesson['lesson_id']}: {lesson['title']}")
-    
-    # Import to database
-    print("\n[DB] Importing lessons to database...")
-    count = import_lessons_to_db(lessons, clear_existing=args.clear)
-    
-    # Verify
+        raise SystemExit("No lessons extracted")
+
+    print("[DB] Importing lessons...")
+    cnt = import_lessons_to_db(lessons, clear_existing=args.clear)
+    print(f"Imported {cnt} lessons")
+
     if args.verify:
-        verify_lessons(expected_count=len(lessons))
+        verify(len(lessons))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
+
