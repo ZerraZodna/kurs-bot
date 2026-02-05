@@ -29,6 +29,12 @@ def delete_user_and_data(db: Session, user_id: int) -> bool:
     """
     try:
         from src.models.database import User, Memory, MessageLog, Schedule
+        from src.services.admin_notifier import send_admin_notification
+
+        user = db.query(User).filter_by(user_id=user_id).first()
+        name = " ".join([n for n in [getattr(user, "first_name", None), getattr(user, "last_name", None)] if n])
+        if not name:
+            name = str(user_id)
 
         # Delete in order of dependencies
         db.query(Memory).filter_by(user_id=user_id).delete()
@@ -38,6 +44,7 @@ def delete_user_and_data(db: Session, user_id: int) -> bool:
 
         db.commit()
         logger.info(f"✓ Deleted user {user_id} and all associated data")
+        send_admin_notification(f"[INFO] User left: {name} (reason: declined).")
         return True
 
     except Exception as e:

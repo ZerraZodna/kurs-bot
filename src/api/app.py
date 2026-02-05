@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request, HTTPException
 from src.services.memory_manager import MemoryManager
-from src.services.maintenance import run_daily_maintenance, purge_message_logs, run_gdpr_retention
+from src.services.maintenance import run_daily_maintenance, purge_message_logs, run_gdpr_retention, purge_expired_batch_locks
 from src.middleware.consent import ConsentMiddleware
 from src.middleware.api_key_auth import ApiKeyAuthMiddleware
 from src.middleware.logging_redaction import apply_logging_redaction
@@ -9,6 +9,9 @@ from src.models.database import SessionLocal, User, MessageLog, BatchLock
 from src.config import settings
 from src.integrations.telegram import TelegramHandler, send_message
 from src.services.dialogue_engine import DialogueEngine
+from src.services.admin_notifier import set_admin_chat_id, send_admin_notification
+from src.services.traffic_tracker import record_traffic_event
+from src.services.downtime_monitor import run_downtime_monitor
 from src.api.dialogue_routes import router as dialogue_router
 from src.api.gdpr_routes import router as gdpr_router
 import threading
@@ -86,6 +89,7 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
 
             # Send response back to user
             await send_message(int(external_id), ai_response)
+            record_traffic_event()
 
             # Log outbound and mark processed
             try:
@@ -133,6 +137,13 @@ async def telegram_webhook(request: Request, secret_token: str):
     if secret_token != settings.TELEGRAM_BOT_TOKEN.split(":")[1]:
         raise HTTPException(status_code=403, detail="Forbidden")
     payload = await request.json()
+    admin_username = (settings.ADMIN_TELEGRAM_USERNAME or "").lstrip("@").strip().lower()
+    if admin_username:
+        from_user = payload.get("message", {}).get("from", {})
+        if (from_user.get("username") or "").lower() == admin_username:
+            chat_id = payload.get("message", {}).get("chat", {}).get("id")
+            if chat_id:
+                set_admin_chat_id(int(chat_id))
     # Use TelegramHandler to normalize
     parsed = TelegramHandler.parse_webhook(payload)
     if not parsed:
@@ -162,6 +173,8 @@ async def telegram_webhook(request: Request, secret_token: str):
         db.add(db_user)
         db.commit()
         print(f"[user added] {uid} {first_name} {last_name}")
+        name = " ".join([n for n in [first_name, last_name] if n]) or str(uid)
+        send_admin_notification(f"[INFO] New user joined: {name}.")
     else:
         updated = False
         if first_name and db_user.first_name != first_name:
@@ -211,6 +224,8 @@ async def telegram_webhook(request: Request, secret_token: str):
         _retry_db_op("messagelog", _log_message, attempts=3, delay_seconds=0.1)
     except Exception as e:
         print("[messagelog error]", e)
+
+    record_traffic_event()
 
     # Schedule background batch processing to allow more messages to arrive
     def _create_batch_lock():
@@ -292,26 +307,6 @@ def purge_old_messages(hour_utc: int = 2):
             time.sleep(60)
 
 
-def purge_expired_batch_locks():
-    """Remove expired batch locks from the database."""
-    try:
-        def _do_purge():
-            db = SessionLocal()
-            try:
-                deleted = db.query(BatchLock).filter(
-                    BatchLock.expires_at < datetime.now(timezone.utc)
-                ).delete(synchronize_session=False)
-                if deleted:
-                    print(f"[purge] Deleted {deleted} expired batch locks.")
-                db.commit()
-            finally:
-                db.close()
-
-        _retry_db_op("batch lock purge", _do_purge)
-    except Exception as e:
-        print(f"[batch lock purge error] {e}")
-
-
 def nightly_memory_purge(days_keep: int = settings.MEMORY_ARCHIVE_RETENTION_DAYS, hour_utc: int = 2):
     """Run maintenance at fixed UTC hour (02:00 AM). Skip first run on startup."""
     first_run = True
@@ -346,7 +341,7 @@ def start_purge_thread():
     t = threading.Thread(target=purge_old_messages, daemon=True)
     t.start()
 
-    t2 = threading.Thread(target=nightly_memory_purge, daemon=True)
+    t2 = threading.Thread(target=run_downtime_monitor, daemon=True)
     t2.start()
 
     return {"ok": True}

@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./src/data/prod.db"
     TELEGRAM_BOT_TOKEN: str = ""
+    ADMIN_TELEGRAM_USERNAME: str = ""
     SLACK_BOT_TOKEN: str = ""
     SENDGRID_API_KEY: str = ""
     OLLAMA_URL: str = "http://localhost:11434/api/generate"
@@ -25,6 +26,7 @@ class Settings(BaseSettings):
     GDPR_VERIFICATION_TTL_MINUTES: int = 10
     GDPR_VERIFICATION_MAX_ATTEMPTS: int = 3
     GDPR_VERIFICATION_CODE_LENGTH: int = 6
+    DOWNTIME_GRACE_MINUTES: int = 10
     
     SYSTEM_PROMPT: str = "You are a spiritual coach specializing in A Course in Miracles. Respond with wisdom, compassion, and practical spiritual guidance."
     SYSTEM_PROMPT_RAG: str = "You are a helpful personal assistant. Use the provided memories and context to give clear, concise answers. Be conversational and practical. Avoid lengthy spiritual lectures unless asked."

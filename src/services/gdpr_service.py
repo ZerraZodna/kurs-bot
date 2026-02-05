@@ -385,10 +385,13 @@ def erase_user_data(
     reason: Optional[str],
     actor: str,
 ) -> None:
+    from src.services.admin_notifier import send_admin_notification
     user = session.query(User).filter_by(user_id=user_id).first()
     if not user:
         raise ValueError("User not found")
     user = cast(Any, user)
+
+    name = " ".join([n for n in [user.first_name, user.last_name] if n]) or str(user_id)
 
     session.query(Memory).filter_by(user_id=user_id).delete(synchronize_session=False)
     session.query(MessageLog).filter_by(user_id=user_id).delete(synchronize_session=False)
@@ -406,6 +409,8 @@ def erase_user_data(
     user.deleted_at = _utc_now()
     session.add(user)
     session.commit()
+
+    send_admin_notification(f"[INFO] User left: {name} (reason: GDPR exit).")
 
     record_gdpr_request(
         session=session,

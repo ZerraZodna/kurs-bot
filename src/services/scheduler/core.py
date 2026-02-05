@@ -47,6 +47,125 @@ class SchedulerService:
     """Manages background scheduling for lessons and reminders."""
 
     @staticmethod
+    def _build_schedule_message(
+        db: Session,
+        schedule: Schedule,
+        memory_manager: MemoryManager,
+    ) -> Optional[str]:
+        """Build the outbound message for a schedule (without sending)."""
+        if schedule.schedule_type.startswith("one_time"):
+            message = get_schedule_message(memory_manager, schedule.user_id, schedule.schedule_id)
+            return message or "Reminder"
+
+        language = get_user_language(memory_manager, schedule.user_id)
+        pending = get_pending_confirmation(memory_manager, schedule.user_id)
+        if pending:
+            lesson_id = pending.get("lesson_id")
+            next_id = pending.get("next_lesson_id")
+            return build_confirmation_prompt(lesson_id, next_id, language)
+
+        last_sent = get_last_sent_lesson_id(memory_manager, schedule.user_id)
+        if not last_sent:
+            lesson = db.query(Lesson).filter(Lesson.lesson_id == 1).first()
+            if lesson:
+                set_last_sent_lesson_id(memory_manager, schedule.user_id, 1)
+                return format_lesson_message(lesson, language)
+            return None
+
+        next_id = (last_sent % 365) + 1
+        set_pending_confirmation(memory_manager, schedule.user_id, last_sent, next_id)
+        return build_confirmation_prompt(last_sent, next_id, language)
+
+    @staticmethod
+    def run_recovery_check() -> int:
+        """Send any missed schedules and update their state."""
+        db = SessionLocal()
+        recovered = 0
+        try:
+            now = datetime.now(timezone.utc)
+            due = (
+                db.query(Schedule)
+                .filter(
+                    Schedule.is_active == True,
+                    Schedule.next_send_time != None,
+                    Schedule.next_send_time <= now,
+                )
+                .all()
+            )
+            if not due:
+                return 0
+
+            # For one-time reminders, only send the latest per user
+            latest_one_time = {}
+            to_deactivate = []
+            ready = []
+            for schedule in due:
+                if schedule.schedule_type.startswith("one_time"):
+                    existing = latest_one_time.get(schedule.user_id)
+                    if not existing:
+                        latest_one_time[schedule.user_id] = schedule
+                    else:
+                        if (schedule.next_send_time or now) > (existing.next_send_time or now):
+                            to_deactivate.append(existing)
+                            latest_one_time[schedule.user_id] = schedule
+                        else:
+                            to_deactivate.append(schedule)
+                else:
+                    ready.append(schedule)
+
+            ready.extend(latest_one_time.values())
+
+            scheduler = SchedulerService.get_scheduler()
+            for schedule in to_deactivate:
+                schedule.is_active = False
+                schedule.next_send_time = None
+                schedule.last_sent_at = now
+                job_id = f"schedule_{schedule.schedule_id}"
+                try:
+                    scheduler.remove_job(job_id)
+                except Exception as e:
+                    logger.warning(f"Could not remove job {job_id}: {e}")
+
+            if to_deactivate:
+                db.commit()
+
+            memory_manager = MemoryManager(db)
+            apology = "Sorry I was not able to send this on time, due to down time of the server."
+            for schedule in ready:
+                user = db.query(User).filter_by(user_id=schedule.user_id).first()
+                if not user:
+                    continue
+                message = SchedulerService._build_schedule_message(db, schedule, memory_manager)
+                if not message:
+                    continue
+                message = f"{message}\n\n{apology}"
+                send_outbound_message(db, user, message)
+
+                if schedule.schedule_type.startswith("one_time"):
+                    schedule.last_sent_at = now
+                    schedule.next_send_time = None
+                    schedule.is_active = False
+                    job_id = f"schedule_{schedule.schedule_id}"
+                    try:
+                        scheduler.remove_job(job_id)
+                    except Exception as e:
+                        logger.warning(f"Could not remove job {job_id}: {e}")
+                else:
+                    schedule.last_sent_at = now
+                    schedule.next_send_time = now + timedelta(days=1)
+
+                db.commit()
+                recovered += 1
+
+            return recovered
+        except Exception as e:
+            logger.error("Recovery check failed: %s", e)
+            db.rollback()
+            return recovered
+        finally:
+            db.close()
+
+    @staticmethod
     def init_scheduler():
         """Initialize the APScheduler background scheduler."""
         global _scheduler

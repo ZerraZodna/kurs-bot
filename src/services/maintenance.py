@@ -50,6 +50,28 @@ def purge_expired_ttl_memories(session: Optional[Session] = None) -> int:
             session.close()
 
 
+def purge_expired_batch_locks() -> None:
+    """Remove expired batch locks from the database."""
+    try:
+        def _do_purge():
+            db = SessionLocal()
+            try:
+                from src.models.database import BatchLock
+
+                deleted = db.query(BatchLock).filter(
+                    BatchLock.expires_at < datetime.now(timezone.utc)
+                ).delete(synchronize_session=False)
+                if deleted:
+                    logger.info("Purged %s expired batch locks", deleted)
+                db.commit()
+            finally:
+                db.close()
+
+        _do_purge()
+    except Exception as e:
+        logger.warning("Batch lock purge error: %s", e)
+
+
 def purge_message_logs(days_keep: int = 30, session: Optional[Session] = None) -> int:
     """Delete message logs older than days_keep. Returns number deleted."""
     close_session = False

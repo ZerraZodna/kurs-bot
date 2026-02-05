@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from src.config import settings
 from src.integrations.telegram import send_message
 from src.models.database import MessageLog, User, Lesson
+from src.services.traffic_tracker import record_traffic_event
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,7 @@ def send_outbound_message(db: Session, user: User, text: str) -> None:
     try:
         if user.channel == "telegram":
             asyncio.run(send_message(int(user.external_id), text))
+            record_traffic_event()
         else:
             logger.warning(f"Unsupported channel for scheduled send: {user.channel}")
             status = "failed"
