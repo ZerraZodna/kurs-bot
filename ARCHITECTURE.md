@@ -153,65 +153,74 @@ User Input (Message)
         User Receives Response
 ```
 
+## GDPR Implementation Status & Documentation
+
+GDPR compliance is now fully implemented in the system. All major requirements for data subject rights, consent management, data retention, and audit logging are supported. The architecture and codebase have been updated to ensure personal data is handled according to GDPR principles.
+
+**For detailed information, refer to the following documentation in the `docs/` directory:**
+
+- [PRIVACY_NOTICE.md](docs/PRIVACY_NOTICE.md): Explains how personal data is collected, used, and protected.
+- [RETENTION_SCHEDULE.md](docs/RETENTION_SCHEDULE.md): Details data retention periods and deletion policies.
+- [DSR_ID_VERIFICATION.md](docs/DSR_ID_VERIFICATION.md): Describes the process for handling Data Subject Requests (DSR), including identity verification.
+- [ROPA.md](docs/ROPA.md): Records of Processing Activities for GDPR compliance.
+- [DPIA.md](docs/DPIA.md): Data Protection Impact Assessment.
+- [IMPLEMENTATION_SUMMARY.md](docs/IMPLEMENTATION_SUMMARY.md): Overview of GDPR implementation steps and controls.
+
+**Other relevant documents:**
+- [INCIDENT_RESPONSE_PLAN.md](docs/INCIDENT_RESPONSE_PLAN.md)
+- [VENDOR_SUBPROCESSORS.md](docs/VENDOR_SUBPROCESSORS.md)
+
+For technical details on data flows, storage, and processing, see the original section below:
+
 ## GDPR Data Inventory & Personal Data Flow
 
-This section documents where personal data is stored, logged, and transmitted.
+This section documents where personal data is stored, logged, and transmitted throughout the system, in accordance with GDPR requirements.
 
 ### Personal Data Inventory (by storage)
 
-**Core database models**
-- Users (src/models/database.py)
-        - Identifiers: user_id (internal), external_id (channel user id)
-        - Contact: email, phone_number
-        - Profile: first_name, last_name
-        - Consent/status: opted_in, processing_restricted, restriction_reason, is_deleted, deleted_at
-        - Metadata: channel, created_at, last_active_at
-- Memory (src/models/database.py)
-        - User-derived content: key, value (may contain personal data)
-        - Metadata: category, confidence, source, timestamps, TTL, embedding
-- MessageLog (src/models/database.py)
-        - Communication content: content (user and assistant text)
-        - Metadata: direction, channel, status, timestamps, thread id, message_role
-- Schedule (src/models/database.py)
-        - Delivery preferences: schedule_type, cron_expression, next_send_time, last_sent_at
-- Unsubscribe (src/models/database.py)
-        - Preference: channel, reason, compliance_required, unsubscribed_at
-- ConsentLog (src/models/database.py)
-        - Consent scope, granted flag, consent_version, source, created_at
-- GdprRequest / GdprAuditLog (src/models/database.py)
-        - DSR request metadata, actor, reasons, details, timestamps
+**Core Database Models:**
+- **Users**: Stores user identifiers (internal user_id, external_id from channels), contact info (email, phone_number), profile data (first_name, last_name), consent/status flags, and metadata (channel, created_at, last_active_at).
+- **Memory**: Stores user-derived content (key, value) which may contain personal data, along with metadata (category, confidence, source, timestamps, TTL, embedding).
+- **MessageLog**: Stores all communication content (user and assistant messages), direction, channel, status, timestamps, thread id, and message role.
+- **Schedule**: Stores user delivery preferences (schedule_type, cron_expression, next_send_time, last_sent_at).
+- **Unsubscribe**: Stores user opt-out preferences (channel, reason, compliance_required, unsubscribed_at).
+- **ConsentLog**: Records consent events (scope, granted flag, consent_version, source, created_at).
+- **GdprRequest / GdprAuditLog**: Stores Data Subject Request (DSR) metadata, actor, reasons, details, and audit timestamps.
 
-**Operational logs**
-- MessageLog rows act as conversation logs and retain content + metadata for a retention period.
+**Operational Logs:**
+- MessageLog rows act as conversation logs and retain content and metadata for a defined retention period.
 
-### Personal Data Flows (high level)
+### Personal Data Flows (High Level)
 
-1) **Inbound message**
-         - Source: Telegram/Slack/Email/Twilio integrations
-         - Data: external user id, message content, metadata
-         - Stored in: Users (external_id/channel), MessageLog (content/status)
+1. **Inbound Message**
+        - Source: Telegram, Slack, Email, Twilio, etc.
+        - Data: external user id, message content, metadata
+        - Stored in: Users (external_id/channel), MessageLog (content/status)
 
-2) **Processing & memory extraction**
-         - DialogueEngine + MemoryExtractor derive structured memories from content
-         - Stored in: Memory (key/value/category/metadata)
+2. **Processing & Memory Extraction**
+        - DialogueEngine and MemoryExtractor derive structured memories from message content
+        - Stored in: Memory (key/value/category/metadata)
 
-3) **Scheduling**
-         - User preferences and timing for reminders
-         - Stored in: Schedule (cron, next_send_time)
+3. **Scheduling**
+        - User preferences and timing for reminders
+        - Stored in: Schedule (cron, next_send_time)
 
-4) **Consent & GDPR requests**
-         - Consent events recorded in ConsentLog
-         - DSR requests recorded in GdprRequest and GdprAuditLog
+4. **Consent & GDPR Requests**
+        - Consent events recorded in ConsentLog
+        - DSR requests and audit logs recorded in GdprRequest and GdprAuditLog
 
-5) **Outbound response**
-         - Data: assistant response content, delivery metadata
-         - Stored in: MessageLog (content/status)
+5. **Outbound Response**
+        - Data: assistant response content, delivery metadata
+        - Stored in: MessageLog (content/status)
 
 ### Integrations That Receive/Send Personal Data
-- Telegram: inbound messages and outbound replies include user id and message content
-- Slack: same data types for workspace users
-- Email: address + message content
-- Twilio: phone number + message content
+- **Telegram**: Inbound messages and outbound replies include user id and message content
+- **Slack**: Same data types for workspace users
+- **Email**: Address and message content
+- **Twilio**: Phone number and message content
+
+For further details, see the GDPR documentation in the `docs/` directory.
+
 
 ## Memory System State Machine
 
@@ -392,12 +401,12 @@ System Prompt (Role Definition)
 │Buffer:   │    │History:    400   │
 │ 100      │    │(Total: 1000)     │
 └──────────┘    └──────────────────┘
-│Fixed=400│    │If over budget:    │
-│         │    │1. Trim history    │
-│Remaining│    │2. Trim progress   │
-│= 1600   │    │3. Trim goals      │
-│         │    │4. Trim profile    │
-└─────────┘    └──────────────────┘
+│Fixed=400│     │If over budget:   │
+│         │     │1. Trim history   │
+│Remaining│     │2. Trim progress  │
+│= 1600   │     │3. Trim goals     │
+│         │     │4. Trim profile   │
+└─────────┘     └──────────────────┘
 ```
 
 ## Database Schema Relationships
