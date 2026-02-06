@@ -8,6 +8,7 @@ from typing import Optional, Tuple, Any, Dict, List
 from zoneinfo import ZoneInfo
 
 from src.services.memory_manager import MemoryManager
+from src.models.database import User
 
 
 def _normalize_tz_name(tz_name: Optional[str]) -> Optional[str]:
@@ -50,6 +51,15 @@ def get_user_timezone_name(
     user_id: int,
     fallback_language: Optional[str] = None,
 ) -> str:
+    # First check DB user column (preferred)
+    try:
+        user = memory_manager.db.query(User).filter_by(user_id=user_id).first()
+        if user and getattr(user, "timezone", None):
+            return str(user.timezone)
+    except Exception:
+        pass
+
+    # Fallback to memory-stored timezone (older codepath)
     memories: List[Dict[str, Any]] = memory_manager.get_memory(  # type: ignore[reportUnknownMemberType]
         user_id, "user_timezone"
     )
@@ -77,6 +87,21 @@ def ensure_user_timezone(
             return str(value)
 
     tz_name = infer_timezone_from_language(language)
+    # Persist to DB if possible
+    try:
+        user = memory_manager.db.query(User).filter_by(user_id=user_id).first()
+        if user:
+            user.timezone = tz_name
+            memory_manager.db.add(user)
+            memory_manager.db.commit()
+            return tz_name
+    except Exception:
+        # ignore DB write errors and fall back to memory storage
+        try:
+            memory_manager.db.rollback()
+        except Exception:
+            pass
+
     memory_manager.store_memory(
         user_id=user_id,
         key="user_timezone",

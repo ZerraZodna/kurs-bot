@@ -13,6 +13,7 @@ import json
 import logging
 from typing import Optional
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
@@ -231,19 +232,33 @@ class SchedulerService:
             close_session = True
 
         try:
-            # Parse time
+            # Parse time (user-local hour/minute)
             hour, minute = parse_time_string(time_str)
 
-            # Create cron expression for daily at specified time
-            cron_expression = f"{minute} {hour} * * *"  # Every day at hour:minute
+            # Resolve user's timezone (default UTC) from DB if available
+            try:
+                user = session.query(User).filter_by(user_id=user_id).first()
+                tz_name = getattr(user, "timezone", "UTC") if user else "UTC"
+            except Exception:
+                tz_name = "UTC"
 
-            # Calculate next send time
-            now = datetime.now(timezone.utc)
-            next_send = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            try:
+                tzinfo = ZoneInfo(tz_name)
+            except Exception:
+                tzinfo = timezone.utc
 
-            # If time has passed today, schedule for tomorrow
-            if next_send <= now:
-                next_send += timedelta(days=1)
+            now_utc = datetime.now(timezone.utc)
+
+            # Build next send in user's local timezone then convert to UTC
+            local_now = now_utc.astimezone(tzinfo)
+            local_next = local_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            if local_next <= local_now:
+                local_next += timedelta(days=1)
+
+            next_send = local_next.astimezone(timezone.utc)
+
+            # Create cron expression in UTC (scheduler runs in UTC)
+            cron_expression = f"{next_send.minute} {next_send.hour} * * *"
 
             # Create schedule record
             schedule = Schedule(
@@ -253,7 +268,7 @@ class SchedulerService:
                 cron_expression=cron_expression,
                 next_send_time=next_send,
                 is_active=True,
-                created_at=now,
+                created_at=now_utc,
             )
 
             session.add(schedule)

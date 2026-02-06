@@ -29,7 +29,6 @@ from src.services.dialogue import (
     handle_forget_commands,
     handle_gdpr_commands,
     handle_debug_next_day,
-    handle_schedule_messages,
     maybe_send_next_lesson,
 )
 from src.config import settings
@@ -163,17 +162,7 @@ class DialogueEngine:
             if lesson_response:
                 return lesson_response
             
-        schedule_response = await handle_schedule_messages(
-            user_id=user_id,
-            text=text,
-            session=session,
-            memory_manager=self.memory_manager,
-            onboarding_service=self.onboarding,
-            schedule_request_handler=self._handle_schedule_request,
-            call_ollama=self.call_ollama,
-        )
-        if schedule_response:
-            return schedule_response
+        # Schedule handled after LLM response via trigger matching; skip pre-LLM scheduling
         
         # Check if user needs onboarding (new users)
         if self.onboarding_flow and self.onboarding.should_show_onboarding(user_id):
@@ -253,40 +242,10 @@ class DialogueEngine:
         # Call Ollama
         rag_model = settings.OLLAMA_CHAT_RAG_MODEL or settings.OLLAMA_MODEL
         response = await self.call_ollama(prompt, model=rag_model if use_rag_for_this_message else None)
-        # Trigger matching and dispatch (feature-flagged)
-        if settings.ENABLE_TRIGGER_MATCHER:
-            try:
-                # Prefer structured intent from LLM if present
-                intent = None
-                try:
-                    parsed = json.loads(response)
-                    if isinstance(parsed, dict) and parsed.get("intent"):
-                        intent = parsed.get("intent")
-                except Exception:
-                    intent = None
+        # Trigger matching and dispatch (always enabled)
+        from src.services.triggering import handle_triggers
 
-                dispatcher = get_trigger_dispatcher(session, self.memory_manager)
-
-                if intent:
-                    match = {
-                        "trigger_id": None,
-                        "name": intent.get("name"),
-                        "action_type": intent.get("action_type") or intent.get("name"),
-                        "score": 1.0,
-                        "threshold": settings.TRIGGER_SIMILARITY_THRESHOLD,
-                    }
-                    dispatcher.dispatch(match, {"user_id": user_id, "intent": intent, "original_text": original_text})
-                else:
-                    matcher = get_trigger_matcher()
-                    try:
-                        matches = await matcher.match_triggers(original_text)
-                        for m in matches:
-                            if m.get("score", 0.0) >= m.get("threshold", settings.TRIGGER_SIMILARITY_THRESHOLD):
-                                dispatcher.dispatch(m, {"user_id": user_id, "original_text": original_text})
-                    except Exception as e:
-                        logger.warning(f"Trigger matcher error: {e}")
-            except Exception as e:
-                logger.warning(f"Triggers failed: {e}")
+        await handle_triggers(response=response, original_text=original_text, session=session, memory_manager=self.memory_manager, user_id=user_id)
 
         return response
 
