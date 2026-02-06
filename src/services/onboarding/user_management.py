@@ -39,7 +39,12 @@ def delete_user_and_data(db: Session, user_id: int) -> bool:
         # Delete in order of dependencies
         db.query(Memory).filter_by(user_id=user_id).delete()
         db.query(MessageLog).filter_by(user_id=user_id).delete()
-        db.query(Schedule).filter_by(user_id=user_id).delete()
+
+        # Use single helper to delete schedules and remove any active jobs.
+        from src.services.scheduler import delete_user_schedules_and_remove_jobs
+
+        delete_user_schedules_and_remove_jobs(user_id=user_id, session=db)
+
         db.query(User).filter_by(user_id=user_id).delete()
 
         db.commit()

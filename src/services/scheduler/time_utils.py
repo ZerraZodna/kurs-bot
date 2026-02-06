@@ -66,3 +66,42 @@ def parse_time_string(time_str: str) -> tuple[int, int]:
     # Default to 9 AM if parsing fails
     logger.warning(f"Could not parse time '{time_str}', defaulting to 9:00 AM")
     return (9, 0)
+
+
+def compute_next_send_and_cron(time_str: str, tz_name: str = "UTC", now_utc=None):
+    """Compute next send time (UTC) and cron expression for a given local time string.
+
+    Args:
+        time_str: user-local time like "9:00", "10:15 AM", or named times
+        tz_name: IANA timezone name for the user (defaults to UTC)
+        now_utc: optional reference `datetime` in UTC; defaults to current UTC time
+
+    Returns:
+        (next_send_utc: datetime, cron_expression: str)
+    """
+    from datetime import datetime, timezone, timedelta
+    try:
+        from zoneinfo import ZoneInfo
+    except Exception:
+        ZoneInfo = None
+
+    hour, minute = parse_time_string(time_str)
+
+    if now_utc is None:
+        now_utc = datetime.now(timezone.utc)
+
+    # Resolve timezone
+    try:
+        tzinfo = ZoneInfo(tz_name) if ZoneInfo else timezone.utc
+    except Exception:
+        tzinfo = timezone.utc
+
+    # Compute local next occurrence then convert to UTC
+    local_now = now_utc.astimezone(tzinfo)
+    local_next = local_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if local_next <= local_now:
+        local_next += timedelta(days=1)
+
+    next_send = local_next.astimezone(timezone.utc)
+    cron_expression = f"{next_send.minute} {next_send.hour} * * *"
+    return next_send, cron_expression

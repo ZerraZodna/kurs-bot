@@ -16,11 +16,11 @@ def check_existing_schedule(db: Session, user_id: int) -> Optional[tuple]:
     Returns:
         (hour, minute) tuple if schedule exists, None otherwise
     """
-    from src.models.database import Schedule
+    from src.services.scheduler import manager as schedule_manager
 
-    existing = db.query(Schedule).filter_by(user_id=user_id, is_active=True).first()
-    if existing and existing.next_send_time:
-        return (existing.next_send_time.hour, existing.next_send_time.minute)
+    sched = schedule_manager.find_active_daily_schedule(user_id, session=db)
+    if sched and sched.next_send_time:
+        return (sched.next_send_time.hour, sched.next_send_time.minute)
     return None
 
 
@@ -31,13 +31,11 @@ def create_auto_schedule(db: Session, user_id: int) -> bool:
     Returns:
         True if schedule created, False if already exists or error
     """
-    from src.models.database import Schedule
     from src.services.scheduler import SchedulerService
+    from src.services.scheduler import manager as schedule_manager
 
     try:
-        existing = db.query(Schedule).filter_by(
-            user_id=user_id, is_active=True
-        ).first()
+        existing = schedule_manager.find_active_daily_schedule(user_id, session=db)
         if existing:
             logger.info(f"Schedule already exists for user {user_id}")
             return False

@@ -8,6 +8,7 @@ from src.services.scheduler.message_utils import translate_text_sync
 
 from src.services.memory_manager import MemoryManager
 from src.services import scheduler as _scheduler_pkg
+from src.services.scheduler import manager as schedule_manager
 from src.models.database import SessionLocal, Schedule, User
 from src.config import settings
 
@@ -61,7 +62,7 @@ class TriggerDispatcher:
                 # Idempotency: avoid creating duplicate schedule for same user/time
                 cron = spec.get("cron_expression")
                 if cron:
-                    existing = self.db.query(Schedule).filter_by(user_id=user_id, cron_expression=cron, is_active=True).first()
+                    existing = next((s for s in schedule_manager.get_user_schedules(user_id, active_only=True, session=self.db) if s.cron_expression == cron), None)
                     if existing:
                         result.update({"ok": True, "note": "already_exists", "schedule_id": existing.schedule_id})
                         self._audit(user_id, match.get("trigger_id"), action, {"note": "already_exists"})
@@ -90,7 +91,7 @@ class TriggerDispatcher:
                     # If user provided a new time in the original_text, apply it to their active schedule
                     original_text = context.get("original_text", "") or ""
                     # Try to find the user's active daily lesson schedule (don't touch other reminders)
-                    sched = self.db.query(Schedule).filter_by(user_id=user_id, is_active=True, schedule_type="daily").first()
+                    sched = schedule_manager.find_active_daily_schedule(user_id, session=self.db)
                     if not sched:
                         result.update({"ok": False, "error": "missing_schedule_id"})
                     else:
@@ -124,21 +125,25 @@ class TriggerDispatcher:
                                 )
                             except Exception:
                                 # best-effort; continue to attempt immediate schedule update
-                                pass
+                                  pass
 
                             try:
                                 # Also attempt immediate schedule recreation for responsiveness.
-                                new = _scheduler_pkg.SchedulerService.create_daily_schedule(
-                                    user_id=sched.user_id,
-                                    lesson_id=sched.lesson_id,
-                                    time_str=time_str,
-                                    session=self.db,
-                                )
-                                # deactivate old
-                                sched.is_active = False
-                                self.db.add(sched)
-                                self.db.commit()
-                                result.update({"ok": True, "schedule_id": new.schedule_id, "note": "preferred_time_set"})
+                                try:
+                                    print(f"[DEBUG trigger_dispatcher] update_schedule (inferred) user={user_id} sched_id={sched.schedule_id} time_str={time_str} ts={datetime.now(timezone.utc).isoformat()}")
+                                except Exception:
+                                    pass
+
+                                # Update the existing schedule in-place to avoid duplicates
+                                try:
+                                    updated = _scheduler_pkg.SchedulerService.update_daily_schedule(sched.schedule_id, time_str, session=self.db)
+                                    if updated:
+                                        result.update({"ok": True, "schedule_id": updated.schedule_id, "note": "preferred_time_set"})
+                                    else:
+                                        result.update({"ok": False, "error": "update_failed"})
+                                except Exception as e:
+                                    # If immediate update fails, still return ok since memory was set
+                                    result.update({"ok": True, "note": "preferred_time_set_but_update_failed", "error": str(e)})
                             except Exception as e:
                                 # If immediate recreation fails, we still return ok since memory was set
                                 result.update({"ok": True, "note": "preferred_time_set_but_create_failed", "error": str(e)})
@@ -151,17 +156,19 @@ class TriggerDispatcher:
                         if updates.get("time_str"):
                             # recreate daily schedule
                             try:
-                                new = _scheduler_pkg.SchedulerService.create_daily_schedule(
-                                    user_id=sched.user_id,
-                                    lesson_id=sched.lesson_id,
-                                    time_str=updates.get("time_str"),
-                                    session=self.db,
-                                )
-                                # deactivate old
-                                sched.is_active = False
-                                self.db.add(sched)
-                                self.db.commit()
-                                result.update({"ok": True, "schedule_id": new.schedule_id})
+                                try:
+                                    print(f"[DEBUG trigger_dispatcher] update_schedule (explicit) user={user_id} sched_id={sched.schedule_id} time_str={updates.get('time_str')} ts={datetime.now(timezone.utc).isoformat()}")
+                                except Exception:
+                                    pass
+                                # Update in-place rather than creating a new schedule
+                                try:
+                                    updated = _scheduler_pkg.SchedulerService.update_daily_schedule(sched.schedule_id, updates.get("time_str"), session=self.db)
+                                    if updated:
+                                        result.update({"ok": True, "schedule_id": updated.schedule_id})
+                                    else:
+                                        result.update({"ok": False, "error": "update_failed"})
+                                except Exception as e:
+                                    result.update({"ok": False, "error": str(e)})
                             except Exception as e:
                                 result.update({"ok": False, "error": str(e)})
                         else:
@@ -275,18 +282,18 @@ class TriggerDispatcher:
                                     else:
                                         time_str = None
 
-                                # deactivate old schedule and create a new one at same local time
+                                # Update existing schedule in-place to reflect new timezone/local time
                                 try:
-                                    SchedulerService.deactivate_schedule(sched.schedule_id)
+                                    updated = SchedulerService.update_daily_schedule(sched.schedule_id, time_str, session=self.db)
+                                    if not updated and time_str:
+                                        # Fallback: create a new schedule if update failed
+                                        try:
+                                            SchedulerService.create_daily_schedule(user_id=user_id, lesson_id=sched.lesson_id, time_str=time_str, session=self.db)
+                                        except Exception:
+                                            pass
                                 except Exception:
+                                    # ignore per-schedule failures
                                     pass
-
-                                if time_str:
-                                    try:
-                                        SchedulerService.create_daily_schedule(user_id=user_id, lesson_id=sched.lesson_id, time_str=time_str, session=self.db)
-                                    except Exception:
-                                        # ignore per-schedule failures
-                                        pass
 
                         except Exception:
                             # ignore scheduler update failures

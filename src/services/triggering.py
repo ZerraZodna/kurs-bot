@@ -24,6 +24,10 @@ async def handle_triggers(
     dispatched.
     """
     try:
+        try:
+            print(f"[DEBUG triggering] handle_triggers entry user={user_id} ts={__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat()}")
+        except Exception:
+            pass
 
         # Prefer structured intent from LLM if present
         intent = None
@@ -40,6 +44,10 @@ async def handle_triggers(
 
         if intent:
             logger.info(f"Triggering via structured intent for user={user_id} intent={intent}")
+            try:
+                print(f"[DEBUG triggering] structured intent for user={user_id} intent_name={intent.get('name')} action_type={intent.get('action_type')} ts={__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat()}")
+            except Exception:
+                pass
             match = {
                 "trigger_id": None,
                 "name": intent.get("name"),
@@ -61,6 +69,17 @@ async def handle_triggers(
             for m in matches:
                 if m.get("score", 0.0) >= m.get("threshold", settings.TRIGGER_SIMILARITY_THRESHOLD):
                     action = m.get("action_type")
+                    # Skip if this action was already dispatched in this dialogue turn
+                    if action in dispatched_actions:
+                        try:
+                            print(f"[DEBUG triggering] skipping duplicate original_text action={action} for user={user_id} match={m}")
+                        except Exception:
+                            pass
+                        continue
+                    try:
+                        print(f"[DEBUG triggering] dispatching from original_text user={user_id} action={action} match={m} ts={__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat()}")
+                    except Exception:
+                        pass
                     logger.info(f"Dispatching match from original_text: {m}")
                     res = dispatcher.dispatch(m, {"user_id": user_id, "original_text": original_text})
                     if res and res.get("ok"):
@@ -94,8 +113,16 @@ async def handle_triggers(
                     action = m.get("action_type")
                     # Skip if this action was already dispatched for original_text
                     if action in dispatched_actions:
+                        try:
+                            print(f"[DEBUG triggering] skipping action {action} because already dispatched in this turn for user={user_id}")
+                        except Exception:
+                            pass
                         continue
                     if m.get("score", 0.0) >= m.get("threshold", settings.TRIGGER_SIMILARITY_THRESHOLD):
+                        try:
+                            print(f"[DEBUG triggering] dispatching from assistant_response user={user_id} action={action} match={m} ts={__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat()}")
+                        except Exception:
+                            pass
                         logger.info(f"Dispatching match from assistant response: {m}")
                         res = dispatcher.dispatch(m, {"user_id": user_id, "original_text": original_text, "assistant_response": response})
                         if res and res.get("ok"):

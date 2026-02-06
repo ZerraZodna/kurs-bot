@@ -38,6 +38,8 @@ from .message_utils import (
     format_lesson_message,
     send_outbound_message,
 )
+from . import manager as schedule_manager
+from . import jobs as schedule_jobs
 
 logger = logging.getLogger(__name__)
 
@@ -123,11 +125,12 @@ class SchedulerService:
                 schedule.is_active = False
                 schedule.next_send_time = None
                 schedule.last_sent_at = now
-                job_id = f"schedule_{schedule.schedule_id}"
                 try:
-                    scheduler.remove_job(job_id)
+                    from . import jobs as schedule_jobs
+
+                    schedule_jobs.remove_job_for_schedule(schedule.schedule_id)
                 except Exception as e:
-                    logger.warning(f"Could not remove job {job_id}: {e}")
+                    logger.warning(f"Could not remove job schedule_{schedule.schedule_id}: {e}")
 
             if to_deactivate:
                 db.commit()
@@ -148,11 +151,12 @@ class SchedulerService:
                     schedule.last_sent_at = now
                     schedule.next_send_time = None
                     schedule.is_active = False
-                    job_id = f"schedule_{schedule.schedule_id}"
                     try:
-                        scheduler.remove_job(job_id)
+                        from . import jobs as schedule_jobs
+
+                        schedule_jobs.remove_job_for_schedule(schedule.schedule_id)
                     except Exception as e:
-                        logger.warning(f"Could not remove job {job_id}: {e}")
+                        logger.warning(f"Could not remove job schedule_{schedule.schedule_id}: {e}")
                 else:
                     schedule.last_sent_at = now
                     schedule.next_send_time = now + timedelta(days=1)
@@ -232,63 +236,113 @@ class SchedulerService:
             close_session = True
 
         try:
-            # Parse time (user-local hour/minute)
-            hour, minute = parse_time_string(time_str)
-
-            # Resolve user's timezone (default UTC) from DB if available
+            # Debug: trace schedule creation attempts
+            try:
+                print(f"[DEBUG scheduler] create_daily_schedule called user={user_id} time_str={time_str} ts={datetime.now(timezone.utc).isoformat()}")
+            except Exception:
+                pass
+            # Compute next send time and cron expression for the user's timezone
             try:
                 user = session.query(User).filter_by(user_id=user_id).first()
                 tz_name = getattr(user, "timezone", "UTC") if user else "UTC"
             except Exception:
                 tz_name = "UTC"
 
-            try:
-                tzinfo = ZoneInfo(tz_name)
-            except Exception:
-                tzinfo = timezone.utc
+            from .time_utils import compute_next_send_and_cron
 
-            now_utc = datetime.now(timezone.utc)
-
-            # Build next send in user's local timezone then convert to UTC
-            local_now = now_utc.astimezone(tzinfo)
-            local_next = local_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-            if local_next <= local_now:
-                local_next += timedelta(days=1)
-
-            next_send = local_next.astimezone(timezone.utc)
-
-            # Create cron expression in UTC (scheduler runs in UTC)
-            cron_expression = f"{next_send.minute} {next_send.hour} * * *"
+            next_send, cron_expression = compute_next_send_and_cron(time_str, tz_name)
 
             # Create schedule record
-            schedule = Schedule(
+            # Persist using manager and then sync APScheduler job
+            schedule = schedule_manager.create_schedule(
                 user_id=user_id,
                 lesson_id=lesson_id,
                 schedule_type=schedule_type,
                 cron_expression=cron_expression,
                 next_send_time=next_send,
-                is_active=True,
-                created_at=now_utc,
+                session=session,
             )
 
-            session.add(schedule)
-            session.commit()
+            try:
+                print(f"[DEBUG scheduler] persisted schedule id=<{getattr(schedule, 'schedule_id', None)}> user={user_id} next_send={next_send.isoformat()} cron='{cron_expression}' created_at={now_utc.isoformat()}")
+            except Exception:
+                pass
 
-            # Add job to APScheduler
-            scheduler = SchedulerService.get_scheduler()
-            job_id = f"schedule_{schedule.schedule_id}"
+            # Sync job to APScheduler
+            try:
+                schedule_jobs.sync_job_for_schedule(schedule)
+            except Exception as e:
+                logger.warning(f"Could not add job for schedule {getattr(schedule, 'schedule_id', None)}: {e}")
 
-            scheduler.add_job(
-                func=SchedulerService.execute_scheduled_task,
-                trigger=CronTrigger.from_crontab(cron_expression, timezone="UTC"),
-                args=[schedule.schedule_id],
-                id=job_id,
-                replace_existing=True,
-            )
+            # For logging, parse the time string into hour/minute if available
+            try:
+                hour, minute = parse_time_string(time_str)
+            except Exception:
+                hour = getattr(schedule, 'next_send_time', None).hour if getattr(schedule, 'next_send_time', None) else 0
+                minute = getattr(schedule, 'next_send_time', None).minute if getattr(schedule, 'next_send_time', None) else 0
 
             logger.info(f"✓ Created daily schedule for user {user_id} at {hour}:{minute:02d} UTC")
 
             return schedule
+
+        finally:
+            if close_session:
+                session.close()
+
+    @staticmethod
+    def update_daily_schedule(
+        schedule_id: int,
+        time_str: str,
+        session: Optional[Session] = None,
+    ) -> Optional[Schedule]:
+        """
+        Update an existing daily schedule in-place (cron_expression and next_send_time).
+
+        This avoids creating duplicate Schedule rows when a user updates their
+        default reminder time.
+        """
+        close_session = False
+        if session is None:
+            from src.services import scheduler as _scheduler_pkg
+            session = _scheduler_pkg.SessionLocal()
+            close_session = True
+
+        try:
+            sched = session.query(Schedule).filter_by(schedule_id=schedule_id).first()
+            if not sched:
+                return None
+
+            # Only support updating daily schedules
+            if not sched.schedule_type.startswith("daily"):
+                return None
+
+            # Compute new next_send and cron_expression using helper
+            from .time_utils import compute_next_send_and_cron
+
+            try:
+                user = session.query(User).filter_by(user_id=sched.user_id).first()
+                tz_name = getattr(user, "timezone", "UTC") if user else "UTC"
+            except Exception:
+                tz_name = "UTC"
+
+            next_send, cron_expression = compute_next_send_and_cron(time_str, tz_name)
+
+            updates = {
+                "cron_expression": cron_expression,
+                "next_send_time": next_send,
+                "is_active": True,
+            }
+            updated = schedule_manager.update_schedule(schedule_id, updates, session=session)
+
+            # Update APScheduler job (replace existing job)
+            try:
+                if updated:
+                    schedule_jobs.sync_job_for_schedule(updated)
+            except Exception as e:
+                logger.warning(f"Could not update job {schedule_id}: {e}")
+
+            logger.info(f"✓ Updated daily schedule {schedule_id} for user {getattr(updated, 'user_id', 'unknown')} to {hour}:{minute:02d} UTC")
+            return updated
 
         finally:
             if close_session:
@@ -312,18 +366,15 @@ class SchedulerService:
             now = datetime.now(timezone.utc)
             run_at = run_at.astimezone(timezone.utc)
 
-            schedule = Schedule(
+            # Persist via manager
+            schedule = schedule_manager.create_schedule(
                 user_id=user_id,
                 lesson_id=None,
                 schedule_type="one_time_reminder",
                 cron_expression=f"once:{run_at.isoformat()}",
                 next_send_time=run_at,
-                is_active=True,
-                created_at=now,
+                session=session,
             )
-
-            session.add(schedule)
-            session.commit()
 
             # Store reminder message
             memory_manager = MemoryManager(session)
@@ -338,16 +389,11 @@ class SchedulerService:
                 allow_duplicates=True,
             )
 
-            # Add job to APScheduler
-            scheduler = SchedulerService.get_scheduler()
-            job_id = f"schedule_{schedule.schedule_id}"
-            scheduler.add_job(
-                func=SchedulerService.execute_scheduled_task,
-                trigger=DateTrigger(run_date=run_at, timezone="UTC"),
-                args=[schedule.schedule_id],
-                id=job_id,
-                replace_existing=True,
-            )
+            # Sync job to APScheduler
+            try:
+                schedule_jobs.sync_job_for_schedule(schedule)
+            except Exception as e:
+                logger.warning(f"Could not add one-time job for schedule {getattr(schedule, 'schedule_id', None)}: {e}")
 
             logger.info(f"✓ Created one-time reminder for user {user_id} at {run_at.isoformat()}")
 
@@ -393,13 +439,13 @@ class SchedulerService:
                 schedule.is_active = False
                 db.commit()
 
-                # Remove job from scheduler
-                scheduler = SchedulerService.get_scheduler()
-                job_id = f"schedule_{schedule.schedule_id}"
+                # Remove job from scheduler (use jobs helper)
                 try:
-                    scheduler.remove_job(job_id)
+                    from . import jobs as schedule_jobs
+
+                    schedule_jobs.remove_job_for_schedule(schedule.schedule_id)
                 except Exception as e:
-                    logger.warning(f"Could not remove job {job_id}: {e}")
+                    logger.warning(f"Could not remove job schedule_{schedule.schedule_id}: {e}")
 
                 logger.info(f"✓ Executed one-time reminder {schedule_id}")
                 return
@@ -451,15 +497,8 @@ class SchedulerService:
     @staticmethod
     def get_user_schedules(user_id: int, active_only: bool = True) -> list:
         """Get all schedules for a user."""
-        from src.services import scheduler as _scheduler_pkg
-        db = _scheduler_pkg.SessionLocal()
-        try:
-            query = db.query(Schedule).filter_by(user_id=user_id)
-            if active_only:
-                query = query.filter_by(is_active=True)
-            return query.all()
-        finally:
-            db.close()
+        # Delegate to manager for pure-DB access
+        return schedule_manager.get_user_schedules(user_id, active_only=active_only)
 
     @staticmethod
     def deactivate_user_schedules(
@@ -474,25 +513,12 @@ class SchedulerService:
             session = _scheduler_pkg.SessionLocal()
             close_session = True
         try:
-            query = session.query(Schedule).filter_by(user_id=user_id)
-            if active_only:
-                query = query.filter_by(is_active=True)
-            schedules = query.all()
-            if not schedules:
-                return 0
+            from src.services.scheduler import deactivate_user_schedules_and_remove_jobs
 
-            scheduler = SchedulerService.get_scheduler()
-            for schedule in schedules:
-                schedule.is_active = False
-                job_id = f"schedule_{schedule.schedule_id}"
-                try:
-                    scheduler.remove_job(job_id)
-                except Exception as e:
-                    logger.warning(f"Could not remove job {job_id}: {e}")
-
-            session.commit()
-            logger.info(f"✓ Deactivated {len(schedules)} schedule(s) for user {user_id}")
-            return len(schedules)
+            count = deactivate_user_schedules_and_remove_jobs(user_id=user_id, active_only=active_only, session=session)
+            if count:
+                logger.info(f"✓ Deactivated {count} schedule(s) for user {user_id}")
+            return count
         finally:
             if close_session:
                 session.close()
@@ -500,22 +526,15 @@ class SchedulerService:
     @staticmethod
     def deactivate_schedule(schedule_id: int):
         """Deactivate a schedule and remove from APScheduler."""
-        from src.services import scheduler as _scheduler_pkg
-        db = _scheduler_pkg.SessionLocal()
+        # Delegate DB change to manager and remove job via jobs module
         try:
-            schedule = db.query(Schedule).filter_by(schedule_id=schedule_id).first()
-            if schedule:
-                schedule.is_active = False
-                db.commit()
-
-                # Remove from APScheduler
-                scheduler = SchedulerService.get_scheduler()
-                job_id = f"schedule_{schedule_id}"
+            changed = schedule_manager.deactivate_schedule(schedule_id)
+            if changed:
                 try:
-                    scheduler.remove_job(job_id)
+                    schedule_jobs.remove_job_for_schedule(schedule_id)
                 except Exception as e:
-                    logger.warning(f"Could not remove job {job_id}: {e}")
-
+                    logger.warning(f"Could not remove job schedule_{schedule_id}: {e}")
                 logger.info(f"✓ Deactivated schedule {schedule_id}")
-        finally:
-            db.close()
+        except Exception:
+            # Ensure we don't bubble DB exceptions here
+            logger.exception(f"Error deactivating schedule {schedule_id}")

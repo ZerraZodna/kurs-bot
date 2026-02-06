@@ -226,27 +226,12 @@ class MemoryManager:
         if generate_embedding:
             self._schedule_embedding_generation(new.memory_id, new.value)
         
-        # If this memory indicates a preferred lesson time, update schedules
+        # If this memory indicates a preferred lesson time, do NOT modify schedules here.
+        # Creating schedules is the responsibility of the schedule/triggering codepath
+        # (e.g. TriggerDispatcher) to avoid unexpected side-effects from memory writes.
         try:
             if key == "preferred_lesson_time":
-                # Import SchedulerService lazily to avoid circular import
-                try:
-                    from src.services.scheduler import SchedulerService
-                except Exception:
-                    SchedulerService = None
-
-                if SchedulerService:
-                    try:
-                        # Deactivate existing active schedules for the user in this session
-                        SchedulerService.deactivate_user_schedules(user_id, session=self.db)
-                    except Exception:
-                        # ignore deactivation errors
-                        pass
-                    try:
-                        SchedulerService.create_daily_schedule(user_id=user_id, lesson_id=None, time_str=value, session=self.db)
-                        logger.info(f"Auto-updated schedule for user {user_id} to {value} from memory store")
-                    except Exception as e:
-                        logger.warning(f"Failed to auto-create schedule from preferred_lesson_time for user {user_id}: {e}")
+                logger.info(f"Stored preferred_lesson_time for user {user_id} (no auto-schedule created)")
         except Exception:
             pass
 
