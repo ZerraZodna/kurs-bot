@@ -76,6 +76,17 @@ class Memory(Base):
     embedding_generated_at = Column(DateTime(timezone=True), nullable=True)  # When embedding was generated
     user = relationship('User', back_populates='memories')
 
+
+class TriggerEmbedding(Base):
+    __tablename__ = 'trigger_embeddings'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    action_type = Column(String(64), nullable=False)
+    embedding = Column(LargeBinary, nullable=False)
+    threshold = Column(Float, default=0.75, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+
 class Lesson(Base):
     __tablename__ = 'lessons'
     lesson_id = Column(Integer, primary_key=True)

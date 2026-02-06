@@ -30,6 +30,12 @@ def setup_test_environment():
             print("\n⚠️  Old test database locked, will be overwritten")
     
     print(f"🧪 Using test database: {TEST_DB_URL}")
+    # Ensure schema exists in test DB
+    try:
+        from src.models.database import init_db
+        init_db()
+    except Exception as e:
+        print(f"⚠️  Could not initialize test DB schema: {e}")
     
     yield
     

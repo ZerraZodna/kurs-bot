@@ -5,6 +5,8 @@ from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from langdetect import detect, LangDetectException
 from src.services.memory_manager import MemoryManager
+from src.services.trigger_matcher import get_trigger_matcher
+from src.services.trigger_dispatcher import get_trigger_dispatcher
 from src.services.prompt_builder import PromptBuilder
 from src.services.semantic_search import get_semantic_search_service
 from src.services.memory_extractor import MemoryExtractor
@@ -82,6 +84,8 @@ class DialogueEngine:
         if not user:
             return "User not found."
 
+        # Keep original user text for trigger matching
+        original_text = text
         gdpr_response = await handle_gdpr_commands(
             text=text,
             session=session,
@@ -249,7 +253,41 @@ class DialogueEngine:
         # Call Ollama
         rag_model = settings.OLLAMA_CHAT_RAG_MODEL or settings.OLLAMA_MODEL
         response = await self.call_ollama(prompt, model=rag_model if use_rag_for_this_message else None)
-        
+        # Trigger matching and dispatch (feature-flagged)
+        if settings.ENABLE_TRIGGER_MATCHER:
+            try:
+                # Prefer structured intent from LLM if present
+                intent = None
+                try:
+                    parsed = json.loads(response)
+                    if isinstance(parsed, dict) and parsed.get("intent"):
+                        intent = parsed.get("intent")
+                except Exception:
+                    intent = None
+
+                dispatcher = get_trigger_dispatcher(session, self.memory_manager)
+
+                if intent:
+                    match = {
+                        "trigger_id": None,
+                        "name": intent.get("name"),
+                        "action_type": intent.get("action_type") or intent.get("name"),
+                        "score": 1.0,
+                        "threshold": settings.TRIGGER_SIMILARITY_THRESHOLD,
+                    }
+                    dispatcher.dispatch(match, {"user_id": user_id, "intent": intent, "original_text": original_text})
+                else:
+                    matcher = get_trigger_matcher()
+                    try:
+                        matches = await matcher.match_triggers(original_text)
+                        for m in matches:
+                            if m.get("score", 0.0) >= m.get("threshold", settings.TRIGGER_SIMILARITY_THRESHOLD):
+                                dispatcher.dispatch(m, {"user_id": user_id, "original_text": original_text})
+                    except Exception as e:
+                        logger.warning(f"Trigger matcher error: {e}")
+            except Exception as e:
+                logger.warning(f"Triggers failed: {e}")
+
         return response
 
 

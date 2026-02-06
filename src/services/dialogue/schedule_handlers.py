@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from src.services.scheduler import SchedulerService
 from src.services.timezone_utils import ensure_user_timezone
+import re
 
 from .reminder_handler import detect_one_time_reminder
 from .pause_handler import detect_pause_request

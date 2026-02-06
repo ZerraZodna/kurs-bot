@@ -31,6 +31,8 @@
                     │ DialogueEngine    │
                     │ (orchestration)   │
                     └────────┬──────────┘
+                    │ Trigger Matcher & Dispatcher
+                    │ (embedding-driven trigger matching and idempotent action dispatch)
                              │
         ┌────────────────────┼────────────────────┐
         │                    │                    │

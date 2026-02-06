@@ -140,3 +140,4 @@ cython_debug/
 # System files
 .DS_Store
 Thumbs.db
+clean_lessons.txt

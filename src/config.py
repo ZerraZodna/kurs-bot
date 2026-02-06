@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     EMBEDDING_DIMENSION: int = 768
     SEMANTIC_SEARCH_THRESHOLD: float = 0.4
     SEMANTIC_SEARCH_MAX_RESULTS: int = 5
+    # Trigger matcher feature flag and defaults
+    ENABLE_TRIGGER_MATCHER: bool = True
+    TRIGGER_SIMILARITY_THRESHOLD: float = 0.75
+    TRIGGER_MATCHER_REFRESH_SECS: int = 300
     GDPR_ADMIN_TOKEN: str = ""
     API_AUTH_TOKEN: str = ""
     MESSAGE_LOG_RETENTION_DAYS: int = 30

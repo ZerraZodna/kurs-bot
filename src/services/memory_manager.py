@@ -258,6 +258,16 @@ class MemoryManager:
         self.db.commit()
         return count
 
+    def set_next_lesson(self, user_id: int, lesson_id: int) -> None:
+        """Helper: set the last sent / next lesson id for a user (used by trigger dispatcher)."""
+        self.store_memory(
+            user_id=user_id,
+            key="last_sent_lesson_id",
+            value=str(lesson_id),
+            category="progress",
+            source="trigger_dispatcher",
+        )
+
 
 if __name__ == '__main__':
     # quick manual test
