@@ -27,7 +27,7 @@ if prod_db_path.exists():
 os.environ['DATABASE_URL'] = 'sqlite:///./src/data/prod.db'
 
 # Import after setting environment
-from src.models.database import init_db, Base, engine
+from src.models.database import Base, engine
 
 print("🗄️  Creating production database schema...")
 Base.metadata.drop_all(bind=engine)

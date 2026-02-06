@@ -50,6 +50,24 @@ class MemoryManager:
         except Exception as e:
             logger.error(f"Error generating embedding for memory {memory_id}: {e}")
 
+    def _schedule_embedding_generation(self, memory_id: int, value: str):
+        """Schedule embedding generation safely.
+
+        If an asyncio event loop is running, schedule as a background task.
+        Otherwise run the coroutine synchronously so it is awaited.
+        """
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self._generate_and_store_embedding(memory_id, value))
+        except RuntimeError:
+            # No running loop (e.g. tests or simple script) — run synchronously
+            try:
+                asyncio.run(self._generate_and_store_embedding(memory_id, value))
+            except Exception as ex:
+                logger.warning(f"Could not run embedding generation synchronously: {ex}")
+        except Exception as ex:
+            logger.warning(f"Could not schedule embedding generation: {ex}")
+
     def get_memory(self, user_id: int, key: str) -> List[Dict]:
         now = datetime.now(timezone.utc)
         q = self.db.query(Memory).filter(
@@ -132,12 +150,9 @@ class MemoryManager:
                 self.db.add(e)
                 self.db.commit()
                 
-                # Generate embedding asynchronously if needed
+                # Generate embedding if needed
                 if generate_embedding:
-                    try:
-                        asyncio.create_task(self._generate_and_store_embedding(e.memory_id, e.value))
-                    except Exception as ex:
-                        logger.warning(f"Could not schedule embedding generation: {ex}")
+                    self._schedule_embedding_generation(e.memory_id, e.value)
                 
                 return e.memory_id
 
@@ -157,12 +172,9 @@ class MemoryManager:
             self.db.add(new)
             self.db.commit()
             
-            # Generate embedding asynchronously if needed
+            # Generate embedding if needed
             if generate_embedding:
-                try:
-                    asyncio.create_task(self._generate_and_store_embedding(new.memory_id, new.value))
-                except Exception as ex:
-                    logger.warning(f"Could not schedule embedding generation: {ex}")
+                self._schedule_embedding_generation(new.memory_id, new.value)
             
             return new.memory_id
 
@@ -189,12 +201,9 @@ class MemoryManager:
             self.db.add(new)
             self.db.commit()
             
-            # Generate embedding asynchronously if needed
+            # Generate embedding if needed
             if generate_embedding:
-                try:
-                    asyncio.create_task(self._generate_and_store_embedding(new.memory_id, new.value))
-                except Exception as ex:
-                    logger.warning(f"Could not schedule embedding generation: {ex}")
+                self._schedule_embedding_generation(new.memory_id, new.value)
             
             return new.memory_id
 
@@ -213,12 +222,9 @@ class MemoryManager:
         self.db.add(new)
         self.db.commit()
         
-        # Generate embedding asynchronously if needed
+        # Generate embedding if needed
         if generate_embedding:
-            try:
-                asyncio.create_task(self._generate_and_store_embedding(new.memory_id, new.value))
-            except Exception as ex:
-                logger.warning(f"Could not schedule embedding generation: {ex}")
+            self._schedule_embedding_generation(new.memory_id, new.value)
         
         return new.memory_id
 

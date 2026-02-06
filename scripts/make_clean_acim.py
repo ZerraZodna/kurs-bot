@@ -177,7 +177,7 @@ def find_next(raw, snippet, start=0, _cache={}) -> int:
 
 
 def merge_styles_into_raw(extracted_text: str, raw_text: str) -> str:
-    spans = []
+    spans: list[tuple[str, int]] = []
     for m in re.finditer(r"(\*{1,3})(.+?)\1", extracted_text, flags=re.S):
         stars = len(m.group(1))
         inner = m.group(2)
@@ -206,7 +206,7 @@ def merge_styles_into_raw(extracted_text: str, raw_text: str) -> str:
 
 def clean_merged_text(merged: str) -> str:
     lines = merged.splitlines(keepends=True)
-    out = []
+    out: List[str] = []
     i = 0
     while i < len(lines):
         line = lines[i]
@@ -240,7 +240,7 @@ def clean_merged_text(merged: str) -> str:
     return ''.join(out)
 
 
-def main_cli_extract(pdf_path: str, out_path: str | None = None) -> None:
+def main_cli_extract(pdf_path: str, out_path: str | None = None) -> str | None:
     raw = extract_raw_text(pdf_path)
     paras = extract_preserve_styles(pdf_path)
     extracted_text = "\n\n".join(paras)
