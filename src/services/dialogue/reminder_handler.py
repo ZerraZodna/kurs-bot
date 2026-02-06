@@ -13,56 +13,6 @@ from src.services.memory_manager import MemoryManager
 logger = logging.getLogger(__name__)
 
 
-def detect_one_time_reminder(text: str) -> Optional[Dict[str, Any]]:
-    """
-    Detect if user is requesting a one-time reminder.
-
-    Examples:
-    - "Remind me in 2 hours"
-    - "Send me a message in 30 minutes"
-    - "Ping me at 3 PM"
-
-    Returns:
-        Dict with run_at datetime and message if detected, None otherwise
-    """
-    import re
-
-    text_lower = text.lower()
-
-    # Simple pattern: "remind|ping|send me" + time_period
-    if not any(
-        keyword in text_lower for keyword in ["remind", "ping", "send me", "tell me"]
-    ):
-        return None
-
-    # Pattern: "in X minutes/hours"
-    minute_match = re.search(r"in\s+(\d+)\s+minutes?", text_lower)
-    if minute_match:
-        minutes = int(minute_match.group(1))
-        run_at = datetime.now(timezone.utc) + timezone.utc.localize(
-            datetime.timedelta(minutes=minutes)
-        )
-        return {
-            "run_at": run_at,
-            "message": f"Reminder: {text}",
-            "confirmation": f"I'll remind you in {minutes} minutes.",
-        }
-
-    hour_match = re.search(r"in\s+(\d+)\s+hours?", text_lower)
-    if hour_match:
-        hours = int(hour_match.group(1))
-        run_at = datetime.now(timezone.utc) + timezone.utc.localize(
-            datetime.timedelta(hours=hours)
-        )
-        return {
-            "run_at": run_at,
-            "message": f"Reminder: {text}",
-            "confirmation": f"I'll remind you in {hours} hours.",
-        }
-
-    return None
-
-
 def get_pending_confirmation(
     memory_manager: MemoryManager, user_id: int
 ) -> Optional[dict]:

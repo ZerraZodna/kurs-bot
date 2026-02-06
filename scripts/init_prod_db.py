@@ -38,3 +38,13 @@ print("\n📝 Next steps:")
 print("1. Make sure your .env has: DATABASE_URL=sqlite:///./src/data/prod.db")
 print("2. Restart your uvicorn server")
 print("3. Send a message via Telegram to create your first user")
+
+# Seed trigger embeddings into the new production DB
+try:
+    print("\n✨ Seeding default trigger embeddings...")
+    import asyncio
+    from scripts.seed_triggers import main as _seed_main
+    asyncio.run(_seed_main())
+    print("✅ Trigger embeddings seeded")
+except Exception as e:
+    print(f"⚠️  Failed to seed trigger embeddings: {e}")

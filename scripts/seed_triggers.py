@@ -20,6 +20,22 @@ STARTER = [
     {"name": "exit_rag", "action_type": "exit_rag", "utterance": "Stop using RAG", "threshold": 0.75},
 ]
 
+# Examples for users asking about their current reminders/schedules
+SCHEDULE_STATUS_EXAMPLES = [
+    "do i have any reminders",
+    "which reminders do i have",
+    "what reminders do i have",
+    "do i have a schedule",
+    "what is my schedule",
+    "show my reminders",
+    "list my reminders",
+    "which schedules do i have",
+]
+
+# Add schedule-status examples as a query_schedule trigger
+for ex in SCHEDULE_STATUS_EXAMPLES:
+    STARTER.append({"name": "query_schedule", "action_type": "query_schedule", "utterance": ex, "threshold": 0.75})
+
 
 # Add a small curated set of assistant-confirmation utterances for update_schedule
 CURATED_CONFIRMATIONS = [

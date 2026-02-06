@@ -8,7 +8,7 @@ from src.services.scheduler import SchedulerService
 from src.services.timezone_utils import ensure_user_timezone
 import re
 
-from .reminder_handler import detect_one_time_reminder
+# One-time reminder keyword parsing removed — handled by assistant + triggers
 from .pause_handler import detect_pause_request
 from .schedule_query_handler import detect_schedule_status_request, build_schedule_status_response
 from .memory_helpers import get_user_language
@@ -25,21 +25,13 @@ async def handle_schedule_messages(
     schedule_request_handler: Callable[[int, str, Session], Optional[str]],
     call_ollama,
 ) -> Optional[str]:
-    reminder = detect_one_time_reminder(text)
-    if reminder:
-        SchedulerService.create_one_time_schedule(
-            user_id=user_id,
-            run_at=reminder["run_at"],
-            message=reminder["message"],
-            session=session,
-        )
-        confirmation = reminder["confirmation"]
-        language = get_user_language(memory_manager, user_id)
-        if language.lower() not in ["english", "en"]:
-            confirmation = await translate_text(confirmation, language, call_ollama)
-        return confirmation
+    # NOTE: We no longer pre-process one-time reminder keywords here.
+    # One-time reminders and schedule changes should be handled by the
+    # assistant (LLM) first and then dispatched via the trigger system.
+    # This avoids premature/incorrect handling of user phrases like
+    # "Add another reminder: Tell me 'I am loved!' in 5 minutes."
 
-    if detect_schedule_status_request(text):
+    if await detect_schedule_status_request(text):
         schedules = SchedulerService.get_user_schedules(user_id)
         tz_name = ensure_user_timezone(
             memory_manager,

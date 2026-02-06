@@ -8,7 +8,6 @@ from .lesson_handler import (
     translate_text,
 )
 from .reminder_handler import (
-    detect_one_time_reminder,
     get_pending_confirmation,
     resolve_pending_confirmation,
     handle_lesson_confirmation,
@@ -38,7 +37,6 @@ __all__ = [
     "handle_lesson_request",
     "format_lesson_message",
     "translate_text",
-    "detect_one_time_reminder",
     "get_pending_confirmation",
     "resolve_pending_confirmation",
     "handle_lesson_confirmation",

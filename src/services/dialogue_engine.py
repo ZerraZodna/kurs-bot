@@ -161,18 +161,6 @@ class DialogueEngine:
             )
             if lesson_response:
                 return lesson_response
-        # Check if user is explicitly asking to set up reminders/schedules
-        # Handle schedule requests early so users who have provided commitment
-        # and preferred time memory can create schedules without completing
-        # the full onboarding flow.
-        try:
-            if self.onboarding and self.onboarding.detect_schedule_request(text):
-                sched_resp = await self._handle_schedule_request(user_id, text, session)
-                if sched_resp:
-                    return sched_resp
-        except Exception:
-            # best-effort: fallback to normal flow on errors
-            pass
 
         # Schedule handled after LLM response via trigger matching; skip pre-LLM scheduling
         

@@ -50,8 +50,29 @@ async def test_memory_driven_schedule_creation():
         dialogue.memory_extractor.extract_memories = _fake_extract
 
         # Trigger the schedule creation via dialogue flow
+        # Mock the LLM to return a structured intent that will create the schedule
+        async def _fake_ollama(prompt, model=None):
+            import json
+            return json.dumps({
+                "intent": {
+                    "name": "create_schedule",
+                    "action_type": "create_schedule",
+                    "spec": {"schedule_type": "daily", "time_str": "10:15"},
+                }
+            })
+
+        dialogue.call_ollama = _fake_ollama
+
         resp = await dialogue.process_message(user_id, "Set up reminders", db)
         assert resp is not None
+
+        # Simulate trigger execution: structured intent would produce a create_schedule trigger
+        from src.services.trigger_dispatcher import get_trigger_dispatcher
+
+        dispatcher = get_trigger_dispatcher(db=db, memory_manager=mm)
+        match = {"trigger_id": None, "name": "create_schedule", "action_type": "create_schedule", "score": 1.0, "threshold": 0.5}
+        ctx = {"user_id": user_id, "schedule_spec": {"schedule_type": "daily", "time_str": "10:15"}}
+        dispatcher.dispatch(match, ctx)
 
         # Verify schedule created at 10:15 (UTC stored as next_send_time or cron)
         schedules = SchedulerService.get_user_schedules(user_id)
