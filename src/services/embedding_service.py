@@ -46,7 +46,10 @@ class EmbeddingService:
                     "input": text.strip()
                 }
             )
-            response.raise_for_status()
+            # Some test mocks may make `raise_for_status` an async mock.
+            _rs = response.raise_for_status()
+            if asyncio.iscoroutine(_rs):
+                await _rs
             
             data = response.json()
             # In tests/mock contexts `response.json()` may be an async

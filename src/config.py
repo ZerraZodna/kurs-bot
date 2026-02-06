@@ -1,5 +1,6 @@
 
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./src/data/prod.db"
@@ -36,8 +37,9 @@ class Settings(BaseSettings):
     SYSTEM_PROMPT_RAG: str = "You are a helpful personal assistant. Use the provided memories and context to give clear, concise answers. Be conversational and practical. Avoid lengthy spiritual lectures unless asked."
     # Add more config as needed
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config: ConfigDict = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
 
 settings = Settings()

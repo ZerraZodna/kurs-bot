@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request, HTTPException
+from contextlib import asynccontextmanager
 from src.services.memory_manager import MemoryManager
 from src.services.maintenance import run_daily_maintenance, purge_message_logs, run_gdpr_retention, purge_expired_batch_locks
 from src.middleware.consent import ConsentMiddleware
@@ -22,7 +23,33 @@ import logging
 import httpx
 from sqlalchemy.exc import OperationalError
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Start background threads
+    t = threading.Thread(target=purge_old_messages, daemon=True)
+    t.start()
+
+    t2 = threading.Thread(target=run_downtime_monitor, daemon=True)
+    t2.start()
+
+    # Startup info and health checks
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+    apply_logging_redaction()
+    verify_secrets_config()
+    ollama_url = "http://localhost:11434"
+    try:
+        response = httpx.get(f"{ollama_url}/api/tags", timeout=2.0)
+        if response.status_code == 200:
+            logging.info(f"Ollama AI server is running at {ollama_url} (model: {settings.OLLAMA_MODEL})")
+        else:
+            logging.warning(f"Ollama AI server responded with status {response.status_code} at {ollama_url}")
+    except Exception as e:
+        logging.error(f"Ollama AI server is NOT reachable at {ollama_url}: {e}")
+
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(ConsentMiddleware)
 app.add_middleware(ApiKeyAuthMiddleware)
@@ -335,29 +362,4 @@ def nightly_memory_purge(days_keep: int = settings.MEMORY_ARCHIVE_RETENTION_DAYS
             print(f"[purge error] {e}")
             time.sleep(60)
 
-# Start the purge thread when the app starts
-@app.on_event("startup")
-def start_purge_thread():
-    t = threading.Thread(target=purge_old_messages, daemon=True)
-    t.start()
-
-    t2 = threading.Thread(target=run_downtime_monitor, daemon=True)
-    t2.start()
-
-    return {"ok": True}
-
-@app.on_event("startup")
-def startup_info():
-    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
-    apply_logging_redaction()
-    verify_secrets_config()
-    ollama_url = "http://localhost:11434"
-    try:
-        # Try to GET /api/tags as a lightweight check
-        response = httpx.get(f"{ollama_url}/api/tags", timeout=2.0)
-        if response.status_code == 200:
-            logging.info(f"Ollama AI server is running at {ollama_url} (model: {settings.OLLAMA_MODEL})")
-        else:
-            logging.warning(f"Ollama AI server responded with status {response.status_code} at {ollama_url}")
-    except Exception as e:
-        logging.error(f"Ollama AI server is NOT reachable at {ollama_url}: {e}")
+# Startup handled by lifespan

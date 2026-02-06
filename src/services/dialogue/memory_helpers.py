@@ -129,18 +129,25 @@ async def detect_and_store_language(
 
         lang_name = lang_names.get(detected_lang, detected_lang.upper()) if detected_lang else None
 
+        # If we already have a stored language, avoid changing it based on
+        # very short messages (<= 4 words). This prevents accidental
+        # overrides from brief replies like "yes" or a short name.
         should_update = False
         if is_probable_name:
             should_update = False
         elif not existing_value and lang_name:
             should_update = True
         elif lang_name and lang_name != existing_value:
-            if word_count >= 4 and (has_no_keywords or has_en_keywords):
-                should_update = True
-            elif has_no_keywords and lang_name == "Norwegian":
-                should_update = True
-            elif has_en_keywords and lang_name == "English":
-                should_update = True
+            # Do not overwrite an existing detected language for short messages
+            if existing_value and word_count <= 4:
+                should_update = False
+            else:
+                if word_count >= 4 and (has_no_keywords or has_en_keywords):
+                    should_update = True
+                elif has_no_keywords and lang_name == "Norwegian":
+                    should_update = True
+                elif has_en_keywords and lang_name == "English":
+                    should_update = True
 
         if should_update:
             memory_manager.store_memory(
