@@ -13,7 +13,6 @@ import json
 import logging
 from typing import Optional
 from datetime import datetime, timezone, timedelta
-from zoneinfo import ZoneInfo
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
@@ -340,6 +339,17 @@ class SchedulerService:
                     schedule_jobs.sync_job_for_schedule(updated)
             except Exception as e:
                 logger.warning(f"Could not update job {schedule_id}: {e}")
+
+            # Ensure hour/minute are defined for logging (may not exist if parse failed)
+            try:
+                hour, minute = parse_time_string(time_str)
+            except Exception:
+                if getattr(updated, 'next_send_time', None):
+                    hour = getattr(updated.next_send_time, 'hour', 0)
+                    minute = getattr(updated.next_send_time, 'minute', 0)
+                else:
+                    hour = 0
+                    minute = 0
 
             logger.info(f"✓ Updated daily schedule {schedule_id} for user {getattr(updated, 'user_id', 'unknown')} to {hour}:{minute:02d} UTC")
             return updated

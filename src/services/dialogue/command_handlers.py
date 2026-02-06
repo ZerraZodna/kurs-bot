@@ -25,32 +25,48 @@ logger = logging.getLogger(__name__)
 
 def handle_rag_mode_toggle(text: str, memory_manager, user_id: int) -> Optional[str]:
     text_lower = text.strip().lower()
-    if text_lower == "rag_mode":
+    # Normalize: accept both 'rag_mode' and 'rag mode' (and plain 'rag')
+    normalized = text_lower.replace("_", " ").strip()
+
+    if normalized in ("rag_mode", "rag mode", "rag"):
         rag_mode_memory = memory_manager.get_memory(user_id, "rag_mode_enabled")
         is_on = bool(rag_mode_memory and rag_mode_memory[0].get("value") == "true")
         return f"RAG mode is {'on' if is_on else 'off'}."
-    if text_lower.startswith("rag_mode "):
-        mode_cmd = text_lower.replace("rag_mode", "").strip()
-        if mode_cmd == "on":
-            memory_manager.store_memory(
-                user_id=user_id,
-                key="rag_mode_enabled",
-                value="true",
-                confidence=1.0,
-                source="user_command",
-                category="conversation",
-            )
-            return "RAG mode enabled. I will use semantic search for all future messages."
-        if mode_cmd == "off":
-            memory_manager.store_memory(
-                user_id=user_id,
-                key="rag_mode_enabled",
-                value="false",
-                confidence=1.0,
-                source="user_command",
-                category="conversation",
-            )
-            return "RAG mode disabled. Back to standard workflow."
+
+    # Support commands like 'rag_mode on', 'rag mode on', 'rag on', and also 'rag:on' via parse fallback
+    mode_cmd = ""
+    if normalized.startswith("rag mode "):
+        mode_cmd = normalized[len("rag mode "):].strip()
+    elif normalized.startswith("rag "):
+        mode_cmd = normalized[len("rag "):].strip()
+    # Also allow 'rag: on' style (colon)
+    elif text_lower.startswith("rag:"):
+        mode_cmd = text_lower.split(":", 1)[1].strip()
+
+    if not mode_cmd:
+        return None
+
+    if mode_cmd == "on":
+        memory_manager.store_memory(
+            user_id=user_id,
+            key="rag_mode_enabled",
+            value="true",
+            confidence=1.0,
+            source="user_command",
+            category="conversation",
+        )
+        return "RAG mode enabled. I will use semantic search for all future messages."
+    if mode_cmd == "off":
+        memory_manager.store_memory(
+            user_id=user_id,
+            key="rag_mode_enabled",
+            value="false",
+            confidence=1.0,
+            source="user_command",
+            category="conversation",
+        )
+        return "RAG mode disabled. Back to standard workflow."
+
     return None
 
 

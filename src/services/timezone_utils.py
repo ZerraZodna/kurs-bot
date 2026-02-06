@@ -125,3 +125,15 @@ def format_dt_in_timezone(dt: datetime, tz_name: Optional[str]) -> Tuple[datetim
         dt = dt.replace(tzinfo=timezone.utc)
 
     return dt.astimezone(tzinfo), resolved_name
+
+
+def validate_timezone_name(tz_name: Optional[str]) -> bool:
+    """Return True if tz_name is a valid IANA timezone (or UTC), False otherwise."""
+    if not tz_name:
+        return False
+    try:
+        # Try resolving with ZoneInfo; if it fails an exception will be raised
+        ZoneInfo(str(tz_name))
+        return True
+    except Exception:
+        return False

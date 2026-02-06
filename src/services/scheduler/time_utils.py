@@ -80,24 +80,15 @@ def compute_next_send_and_cron(time_str: str, tz_name: str = "UTC", now_utc=None
         (next_send_utc: datetime, cron_expression: str)
     """
     from datetime import datetime, timezone, timedelta
-    try:
-        from zoneinfo import ZoneInfo
-    except Exception:
-        ZoneInfo = None
+    from src.services.timezone_utils import format_dt_in_timezone
 
     hour, minute = parse_time_string(time_str)
 
     if now_utc is None:
         now_utc = datetime.now(timezone.utc)
 
-    # Resolve timezone
-    try:
-        tzinfo = ZoneInfo(tz_name) if ZoneInfo else timezone.utc
-    except Exception:
-        tzinfo = timezone.utc
-
-    # Compute local next occurrence then convert to UTC
-    local_now = now_utc.astimezone(tzinfo)
+    # Resolve timezone and compute local now
+    local_now, _ = format_dt_in_timezone(now_utc, tz_name)
     local_next = local_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
     if local_next <= local_now:
         local_next += timedelta(days=1)

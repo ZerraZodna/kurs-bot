@@ -29,6 +29,17 @@ async def handle_triggers(
         except Exception:
             pass
 
+        # Log assistant response for debugging and guard against None
+        try:
+            logger.info(f"Assistant response: %r", response)
+        except Exception:
+            pass
+
+        # Guard: if response is None, skip matching
+        if response is None:
+            logger.warning("Assistant response is None; skipping trigger matching")
+            return
+
         # Prefer structured intent from LLM if present
         intent = None
         try:

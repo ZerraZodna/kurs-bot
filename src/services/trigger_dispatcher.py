@@ -2,7 +2,7 @@ import logging
 import json
 from typing import Dict, Any
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
+from src.services.timezone_utils import validate_timezone_name, format_dt_in_timezone
 from src.services.scheduler.memory_utils import get_user_language
 from src.services.scheduler.message_utils import translate_text_sync
 
@@ -284,10 +284,8 @@ class TriggerDispatcher:
         else:
             tz_name = tz_raw.replace(" ", "_")
 
-        try:
-            from zoneinfo import ZoneInfo
-            ZoneInfo(tz_name)
-        except Exception:
+        # Validate timezone name
+        if not validate_timezone_name(tz_name):
             result.update({"ok": False, "error": f"invalid_timezone: {tz_name}"})
             return result
 
@@ -310,7 +308,7 @@ class TriggerDispatcher:
                     else:
                         if sched.next_send_time:
                             try:
-                                local_dt = sched.next_send_time.astimezone(ZoneInfo(tz_name))
+                                local_dt, _ = format_dt_in_timezone(sched.next_send_time, tz_name)
                                 time_str = f"{local_dt.hour:02d}:{local_dt.minute:02d}"
                             except Exception:
                                 time_str = None

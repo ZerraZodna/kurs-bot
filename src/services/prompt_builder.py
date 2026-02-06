@@ -6,6 +6,7 @@ Supports dynamic context assembly for Ollama LLM with token optimization.
 from typing import Dict, List, Optional, Any, Tuple
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
+from src.services.timezone_utils import get_user_timezone_name, format_dt_in_timezone
 from src.models.database import Memory, MessageLog, User, Lesson
 from src.services.memory_manager import MemoryManager
 import json
@@ -166,6 +167,9 @@ class PromptBuilder:
             if user.last_name:
                 name += f" {user.last_name}"
             context_parts.append(f"\n### User\n{name}")
+            local_time = self._get_user_local_time_str(user)
+            if local_time:
+                context_parts.append(f"\n{local_time}")
         
         # 2. Semantically relevant memories only
         semantic_context = self._build_semantic_memory_context(relevant_memories or [], max_items=max_memories)
@@ -369,6 +373,26 @@ class PromptBuilder:
             "previous_lesson_id": None,
         }
 
+    def _get_user_local_time_str(self, user: Any) -> Optional[str]:
+        """Return a compact local time string for the user, or None if unavailable.
+
+        Example: "Local time: 2026-02-06 18:30 (Europe/Oslo)"
+        """
+        try:
+            # Prefer resolved timezone from helper which checks DB, memories, and language
+            tz_name = None
+            if self.memory_manager:
+                tz_name = get_user_timezone_name(self.memory_manager, user.user_id, getattr(user, "language", None))
+
+            if not tz_name:
+                return None
+
+            now_utc = datetime.now(timezone.utc)
+            local_dt, resolved_name = format_dt_in_timezone(now_utc, tz_name)
+            return f"Local time: {local_dt.strftime('%Y-%m-%d %H:%M')} ({resolved_name})"
+        except Exception:
+            return None
+
     def _get_debug_day_offset(self, user_id: int) -> int:
         """Return temporary day offset for testing (e.g., via 'next_day' command)."""
         debug_offsets = self.memory_manager.get_memory(user_id, "debug_day_offset")
@@ -451,6 +475,11 @@ class PromptBuilder:
                 created = created.replace(tzinfo=timezone.utc)
             days_active = (datetime.now(timezone.utc) - created).days
             parts.append(f"User since: {days_active} days ago")
+
+        # Add user's local current date/time when available to help the assistant
+        local_time = self._get_user_local_time_str(user)
+        if local_time:
+            parts.append(local_time)
         
         return "\n".join(parts) if parts else ""
     
