@@ -225,6 +225,11 @@ class DialogueEngine:
                         }
                         for memory, score in results
                     ]
+                    # If this message is explicitly using RAG, remove transient lesson
+                    # context such as `current_lesson` — RAG mode should rely only on
+                    # semantic search results and not inject the active lesson state.
+                    if use_rag_for_this_message:
+                        relevant_memories = [m for m in relevant_memories if m.get("key") != "current_lesson"]
                 finally:
                     search_session.close()
             except Exception as ex:

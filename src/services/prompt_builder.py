@@ -268,13 +268,18 @@ class PromptBuilder:
         signals: List[Dict[str, Any]] = []
 
         current_lesson_memories = self.memory_manager.get_memory(user_id, "current_lesson")
+        # Prefer an explicit `current_lesson` memory regardless of other signals.
         if current_lesson_memories:
             most_recent = max(current_lesson_memories, key=lambda x: _normalize_dt(x.get("created_at")))
-            signals.append({
-                "type": "current_lesson",
-                "value": str(most_recent.get("value", "")).strip(),
-                "created_at": _normalize_dt(most_recent.get("created_at")),
-            })
+            parsed = self._parse_lesson_id(str(most_recent.get("value", "")).strip())
+            if parsed:
+                return {
+                    "lesson_id": parsed,
+                    "progress_note": None,
+                    "advanced_by_day": False,
+                    "previous_lesson_id": None,
+                }
+            # If parsing failed, fall through to other signals
 
         lessons_completed = self.memory_manager.get_memory(user_id, "lesson_completed")
         if lessons_completed:
