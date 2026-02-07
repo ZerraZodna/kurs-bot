@@ -20,6 +20,7 @@ from src.services.dialogue import (
     format_lesson_message,
     translate_text,
     handle_lesson_confirmation,
+    handle_schedule_messages,
     get_user_language,
     detect_and_store_language,
     extract_and_store_memories,
@@ -161,6 +162,19 @@ class DialogueEngine:
             )
             if lesson_response:
                 return lesson_response
+
+        # Handle schedule follow-ups (e.g., user clarifying a previous deferred schedule request)
+        schedule_response = await handle_schedule_messages(
+            user_id=user_id,
+            text=text,
+            session=session,
+            memory_manager=self.memory_manager,
+            onboarding_service=self.onboarding,
+            schedule_request_handler=self._handle_schedule_request,
+            call_ollama=self.call_ollama,
+        )
+        if schedule_response:
+            return schedule_response
 
         # Schedule handled after LLM response via trigger matching; skip pre-LLM scheduling
         
