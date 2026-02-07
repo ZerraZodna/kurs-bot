@@ -3,6 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from src.models.database import Base, User, Memory
 from src.services.memory_manager import MemoryManager
+from src.services.maintenance import purge_archived_memories
 import datetime
 
 @pytest.fixture(scope="function")
@@ -73,7 +74,7 @@ def test_purge_expired(db_session):
     )
     db_session.add(mem)
     db_session.commit()
-    purged = mm.purge_expired(days_keep=365)
+    purged = purge_archived_memories(days_keep=365, session=db_session)
     assert purged == 1
     # Should be deleted
     assert db_session.query(Memory).filter_by(key="old_key").count() == 0

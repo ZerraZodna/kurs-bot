@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from src.config import settings
 from src.services.job_state import get_state_datetime, set_state_datetime
 from src.services.traffic_tracker import get_last_message_at, is_today_lowest_traffic
-from src.services.maintenance import run_daily_maintenance, run_gdpr_retention, purge_expired_batch_locks
+from src.services.maintenance import perform_maintenance
 from src.services.scheduler import SchedulerService
 from src.services.admin_notifier import send_admin_notification
 
@@ -66,9 +66,7 @@ def run_downtime_monitor(poll_seconds: int = 60) -> None:
             # GDPR daily job
             if _gdpr_due():
                 if _is_idle(min_minutes=20) or _should_force_run():
-                    run_daily_maintenance(days_keep=settings.MEMORY_ARCHIVE_RETENTION_DAYS)
-                    run_gdpr_retention()
-                    purge_expired_batch_locks()
+                    perform_maintenance(days_keep=settings.MEMORY_ARCHIVE_RETENTION_DAYS)
                     set_state_datetime(_GDPR_RUN_KEY, _utc_now())
                     send_admin_notification(
                         f"[INFO] GDPR cleanup completed at {_utc_now().strftime('%Y-%m-%d %H:%M')}"

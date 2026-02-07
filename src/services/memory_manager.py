@@ -254,18 +254,6 @@ class MemoryManager:
         self.db.commit()
         return updated
 
-    def purge_expired(self, days_keep: int = 365) -> int:
-        """Delete archived rows older than days_keep. Returns number deleted."""
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days_keep)
-        q = self.db.query(Memory).filter(
-            Memory.is_active == False,
-            Memory.archived_at != None,
-            Memory.archived_at < cutoff,
-        )
-        count = q.count()
-        q.delete(synchronize_session=False)
-        self.db.commit()
-        return count
 
     def set_next_lesson(self, user_id: int, lesson_id: int) -> None:
         """Helper: set the last sent / next lesson id for a user (used by trigger dispatcher)."""

@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, HTTPException
 from contextlib import asynccontextmanager
 from src.services.memory_manager import MemoryManager
-from src.services.maintenance import run_daily_maintenance, purge_message_logs, run_gdpr_retention, purge_expired_batch_locks
+from src.services.maintenance import nightly_memory_purge
 from src.middleware.consent import ConsentMiddleware
 from src.middleware.api_key_auth import ApiKeyAuthMiddleware
 from src.middleware.logging_redaction import apply_logging_redaction
@@ -26,7 +26,7 @@ from sqlalchemy.exc import OperationalError
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Start background threads
-    t = threading.Thread(target=purge_old_messages, daemon=True)
+    t = threading.Thread(target=nightly_memory_purge, daemon=True)
     t.start()
 
     t2 = threading.Thread(target=run_downtime_monitor, daemon=True)
@@ -297,69 +297,6 @@ def _retry_db_op(op_name: str, func, attempts: int = 3, delay_seconds: float = 1
             time.sleep(delay_seconds * attempt)
 
 
-def purge_old_messages(hour_utc: int = 2):
-    """Purge old messages at maintenance time (02:00 UTC). Skip first run on startup."""
-    first_run = True
-    while True:
-        try:
-            now = datetime.now(timezone.utc)
-            next_run = now.replace(hour=hour_utc, minute=0, second=0, microsecond=0)
-            if next_run <= now:
-                next_run += timedelta(days=1)
-            
-            # Skip purge on first startup to avoid conflicts
-            if not first_run:
-                sleep_seconds = (next_run - now).total_seconds()
-                time.sleep(sleep_seconds)
-                
-                def _do_purge():
-                    db = SessionLocal()
-                    try:
-                        deleted = purge_message_logs(session=db, days_keep=settings.MESSAGE_LOG_RETENTION_DAYS)
-                        if deleted:
-                            print(f"[purge] Deleted {deleted} old messages from MessageLog.")
-                    finally:
-                        db.close()
-
-                _retry_db_op("purge", _do_purge)
-            else:
-                # First run: calculate sleep to next 02:00 UTC without running
-                sleep_seconds = (next_run - now).total_seconds()
-                print(f"[purge] Next message purge scheduled at {next_run.isoformat()}")
-                time.sleep(sleep_seconds)
-            
-            first_run = False
-        except Exception as e:
-            print(f"[purge error] {e}")
-            time.sleep(60)
-
-
-def nightly_memory_purge(days_keep: int = settings.MEMORY_ARCHIVE_RETENTION_DAYS, hour_utc: int = 2):
-    """Run maintenance at fixed UTC hour (02:00 AM). Skip first run on startup."""
-    first_run = True
-    while True:
-        try:
-            now = datetime.now(timezone.utc)
-            next_run = now.replace(hour=hour_utc, minute=0, second=0, microsecond=0)
-            if next_run <= now:
-                next_run += timedelta(days=1)
-            
-            # Skip purge on first startup to avoid conflicts with normal operations
-            if not first_run:
-                sleep_seconds = (next_run - now).total_seconds()
-                time.sleep(sleep_seconds)
-                run_daily_maintenance(days_keep=days_keep)
-                run_gdpr_retention()
-                purge_expired_batch_locks()
-            else:
-                # First run: just schedule for next maintenance window
-                sleep_seconds = (next_run - now).total_seconds()
-                print(f"[purge] Scheduled nightly maintenance at {next_run.isoformat()}")
-                time.sleep(sleep_seconds)
-            
-            first_run = False
-        except Exception as e:
-            print(f"[purge error] {e}")
-            time.sleep(60)
+# `nightly_memory_purge` moved to `src/services/maintenance.py`.
 
 # Startup handled by lifespan
