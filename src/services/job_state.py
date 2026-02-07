@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from src.models.database import SessionLocal, JobState, init_db
+from src.services.timezone_utils import to_utc
 
 
 def _utc_now() -> datetime:
@@ -57,9 +58,7 @@ def get_state_datetime(key: str) -> Optional[datetime]:
         return None
     try:
         dt = datetime.fromisoformat(raw)
-        if dt.tzinfo is None:
-            return dt.replace(tzinfo=timezone.utc)
-        return dt
+        return to_utc(dt)
     except Exception:
         return None
 

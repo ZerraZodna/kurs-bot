@@ -72,11 +72,12 @@ def is_user_new(db: Session, user_id: int, threshold_minutes: int = 10) -> bool:
     """
     from datetime import datetime, timezone
     from src.models.database import User
+    from src.services.timezone_utils import to_utc
 
     user = db.query(User).filter_by(user_id=user_id).first()
     if not user:
         return False
 
     now = datetime.now(timezone.utc)
-    time_diff = now - user.created_at.replace(tzinfo=timezone.utc)
+    time_diff = now - to_utc(user.created_at)
     return time_diff.total_seconds() < (threshold_minutes * 60)

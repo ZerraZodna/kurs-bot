@@ -14,7 +14,7 @@ _MAX_BUCKETS = 21  # 3-week rolling buffer
 
 
 def _today_str() -> str:
-    return datetime.now().date().isoformat()
+    return datetime.now(timezone.utc).date().isoformat()
 
 
 def _load_buckets() -> List[Dict[str, int]]:
@@ -56,7 +56,7 @@ def get_today_bucket_count() -> int:
 
 def is_today_lowest_traffic() -> bool:
     """Return True if today's count is <= min of prior same weekday buckets."""
-    today = datetime.now().date()
+    today = datetime.now(timezone.utc).date()
     today_str = today.isoformat()
     buckets = _load_buckets()
     today_count = 0

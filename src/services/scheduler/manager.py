@@ -5,9 +5,10 @@ This module contains functions that perform CRUD operations on the
 be a thin, testable layer so the APScheduler wiring can live separately.
 """
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.models.database import SessionLocal, Schedule
+from src.services.timezone_utils import to_utc
 
 
 def create_schedule(
@@ -24,7 +25,12 @@ def create_schedule(
         close = True
 
     try:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
+
+        # Ensure next_send_time persisted as UTC-aware datetime
+        if next_send_time is not None:
+            next_send_time = to_utc(next_send_time)
+
         sched = Schedule(
             user_id=user_id,
             lesson_id=lesson_id,
@@ -62,6 +68,9 @@ def update_schedule(schedule_id: int, updates: Dict[str, Any], session=None) -> 
         changed = False
         for k, v in updates.items():
             if k in allowed:
+                # Ensure next_send_time is stored in UTC if provided
+                if k == "next_send_time" and v is not None:
+                    v = to_utc(v)
                 setattr(sched, k, v)
                 changed = True
 

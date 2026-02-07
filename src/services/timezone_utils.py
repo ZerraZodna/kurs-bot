@@ -52,12 +52,9 @@ def get_user_timezone_name(
     fallback_language: Optional[str] = None,
 ) -> str:
     # First check DB user column (preferred)
-    try:
-        user = memory_manager.db.query(User).filter_by(user_id=user_id).first()
-        if user and getattr(user, "timezone", None):
-            return str(user.timezone)
-    except Exception:
-        pass
+    user = memory_manager.db.query(User).filter_by(user_id=user_id).first()
+    if user and getattr(user, "timezone", None):
+        return str(user.timezone)
 
     # Fallback to memory-stored timezone (older codepath)
     memories: List[Dict[str, Any]] = memory_manager.get_memory(  # type: ignore[reportUnknownMemberType]
@@ -88,19 +85,12 @@ def ensure_user_timezone(
 
     tz_name = infer_timezone_from_language(language)
     # Persist to DB if possible
-    try:
-        user = memory_manager.db.query(User).filter_by(user_id=user_id).first()
-        if user:
-            user.timezone = tz_name
-            memory_manager.db.add(user)
-            memory_manager.db.commit()
-            return tz_name
-    except Exception:
-        # ignore DB write errors and fall back to memory storage
-        try:
-            memory_manager.db.rollback()
-        except Exception:
-            pass
+    user = memory_manager.db.query(User).filter_by(user_id=user_id).first()
+    if user:
+        user.timezone = tz_name
+        memory_manager.db.add(user)
+        memory_manager.db.commit()
+        return tz_name
 
     memory_manager.store_memory(
         user_id=user_id,
@@ -125,6 +115,91 @@ def format_dt_in_timezone(dt: datetime, tz_name: Optional[str]) -> Tuple[datetim
         dt = dt.replace(tzinfo=timezone.utc)
 
     return dt.astimezone(tzinfo), resolved_name
+
+
+def to_utc(dt: datetime, tz_name: Optional[str] = None) -> datetime:
+    """Return an aware UTC datetime.
+
+    - If ``dt`` has tzinfo, convert it to UTC.
+    - If ``dt`` is naive and ``tz_name`` is provided, interpret it as local
+      time in that timezone and convert to UTC.
+    - If ``dt`` is naive and no ``tz_name`` provided, assume UTC.
+    """
+    if dt is None:
+        raise ValueError("dt must be a datetime")
+
+    if dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc)
+
+    # naive
+    if tz_name:
+        try:
+            tz = ZoneInfo(tz_name)
+        except Exception:
+            tz = timezone.utc
+        local = dt.replace(tzinfo=tz)
+        return local.astimezone(timezone.utc)
+
+    # assume UTC
+    return dt.replace(tzinfo=timezone.utc)
+
+
+def from_utc(dt: datetime, tz_name: Optional[str]) -> datetime:
+    """Convert an aware UTC datetime to the given timezone.
+
+    If dt is naive it is assumed to be UTC.
+    """
+    if dt is None:
+        raise ValueError("dt must be a datetime")
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    resolved_name = tz_name or "UTC"
+    try:
+        tz = ZoneInfo(resolved_name)
+    except Exception:
+        tz = timezone.utc
+
+    return dt.astimezone(tz)
+
+
+def parse_local_time_to_utc(time_str: str, tz_name: str, now_utc: Optional[datetime] = None) -> datetime:
+    """Parse a user-local time string and return the next occurrence in UTC.
+
+    Uses the scheduler's simple parser to interpret strings like "9:00", "10:15 AM",
+    or named times (morning/evening). The returned datetime is timezone-aware UTC.
+    """
+    from datetime import timedelta
+    # import parser from scheduler to reuse parsing rules
+    try:
+        from src.services.scheduler.time_utils import parse_time_string
+    except Exception:
+        # fallback simple parser
+        def parse_time_string(ts: str):
+            parts = ts.split(":")
+            if len(parts) == 2:
+                return int(parts[0]), int(parts[1])
+            return int(ts), 0
+
+    hour, minute = parse_time_string(time_str)
+
+    if now_utc is None:
+        from datetime import datetime as _dt
+
+        now_utc = _dt.now(timezone.utc)
+
+    try:
+        tz = ZoneInfo(tz_name or "UTC")
+    except Exception:
+        tz = timezone.utc
+
+    local_now = now_utc.astimezone(tz)
+    local_next = local_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if local_next <= local_now:
+        local_next = local_next + timedelta(days=1)
+
+    return local_next.astimezone(timezone.utc)
 
 
 def validate_timezone_name(tz_name: Optional[str]) -> bool:

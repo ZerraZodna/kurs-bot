@@ -79,20 +79,13 @@ def compute_next_send_and_cron(time_str: str, tz_name: str = "UTC", now_utc=None
     Returns:
         (next_send_utc: datetime, cron_expression: str)
     """
-    from datetime import datetime, timezone, timedelta
-    from src.services.timezone_utils import format_dt_in_timezone
+    from datetime import datetime, timezone
+    from src.services.timezone_utils import parse_local_time_to_utc
 
     hour, minute = parse_time_string(time_str)
 
-    if now_utc is None:
-        now_utc = datetime.now(timezone.utc)
+    # compute next_send (UTC)
+    next_send = parse_local_time_to_utc(time_str, tz_name, now_utc=now_utc)
 
-    # Resolve timezone and compute local now
-    local_now, _ = format_dt_in_timezone(now_utc, tz_name)
-    local_next = local_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    if local_next <= local_now:
-        local_next += timedelta(days=1)
-
-    next_send = local_next.astimezone(timezone.utc)
     cron_expression = f"{next_send.minute} {next_send.hour} * * *"
     return next_send, cron_expression

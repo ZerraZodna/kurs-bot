@@ -37,10 +37,7 @@ async def call_ollama(prompt: str, model: str | None = None) -> str:
             response = await client.post(OLLAMA_URL, json=payload, timeout=30.0)
 
             # Log status and response body (truncated)
-            try:
-                logger.info("Ollama HTTP %s", response.status_code)
-            except Exception:
-                pass
+            logger.info("Ollama HTTP %s", response.status_code)
             try:
                 text = response.text
                 preview = text if len(text) <= 2000 else text[:2000] + "..."

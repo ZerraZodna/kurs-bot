@@ -3,6 +3,7 @@ import json
 from typing import Dict, Any
 from datetime import datetime, timezone
 from src.services.timezone_utils import validate_timezone_name, format_dt_in_timezone
+from src.services.timezone_utils import ensure_user_timezone, to_utc
 from src.services.scheduler.memory_utils import get_user_language
 from src.services.scheduler.message_utils import translate_text_sync
 
@@ -46,23 +47,19 @@ class TriggerDispatcher:
 
     def _parse_run_at(self, run_at_val) -> "datetime | None":
         """Attempt to parse run_at values from multiple formats."""
-        try:
-            if run_at_val is None:
-                return None
-            if isinstance(run_at_val, str):
-                try:
-                    return datetime.fromisoformat(run_at_val)
-                except Exception:
-                    try:
-                        from dateutil import parser as _dp
-
-                        return _dp.parse(run_at_val)
-                    except Exception:
-                        return None
-            if isinstance(run_at_val, (int, float)):
-                return datetime.fromtimestamp(int(run_at_val), timezone.utc)
-        except Exception:
+        if run_at_val is None:
             return None
+        if isinstance(run_at_val, str):
+            try:
+                dt = datetime.fromisoformat(run_at_val)
+            except Exception:
+                from dateutil import parser as _dp
+
+                dt = _dp.parse(run_at_val)
+            return to_utc(dt)
+        if isinstance(run_at_val, (int, float)):
+            return to_utc(datetime.fromtimestamp(int(run_at_val), timezone.utc))
+        return None
 
     def _create_one_time_from_spec(self, user_id: int, spec: Dict[str, Any]) -> Dict[str, Any]:
         """Create a one-time schedule from structured spec. Returns a partial result dict."""
@@ -70,31 +67,19 @@ class TriggerDispatcher:
         run_at_dt = self._parse_run_at(run_at_val)
         if run_at_dt is None:
             # Could not parse run_at -> defer and ask assistant/user to clarify
-            try:
-                self.memory_manager.store_memory(user_id, "schedule_request_pending", "true", category="conversation")
-            except Exception:
-                pass
+            self.memory_manager.store_memory(user_id, "schedule_request_pending", "true", category="conversation")
             return {"ok": True, "note": "deferred", "error": "invalid_run_at"}
 
-        # Ensure timezone-aware UTC
-        if run_at_dt.tzinfo is None:
-            run_at_dt = run_at_dt.replace(tzinfo=timezone.utc)
+        # Normalize to UTC-aware datetime using helper
+        run_at_dt = to_utc(run_at_dt)
 
-        try:
-            schedule = _scheduler_pkg.SchedulerService.create_one_time_schedule(
-                user_id=user_id,
-                run_at=run_at_dt,
-                message=spec.get("message", "Reminder"),
-                session=self.db,
-            )
-            return {"ok": True, "schedule_id": schedule.schedule_id}
-        except Exception as e:
-            logger.warning(f"Failed to create one-time schedule: {e}")
-            try:
-                self.memory_manager.store_memory(user_id, "schedule_request_pending", "true", category="conversation")
-            except Exception:
-                pass
-            return {"ok": True, "note": "deferred", "error": str(e)}
+        schedule = _scheduler_pkg.SchedulerService.create_one_time_schedule(
+            user_id=user_id,
+            run_at=run_at_dt,
+            message=spec.get("message", "Reminder"),
+            session=self.db,
+        )
+        return {"ok": True, "schedule_id": schedule.schedule_id}
 
     def _handle_create_schedule(self, match: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         user_id = context.get("user_id")
@@ -111,6 +96,18 @@ class TriggerDispatcher:
 
         # Use scheduler helper - attempt daily creation when time_str provided
         if spec.get("schedule_type") == "daily" and spec.get("time_str"):
+            from src.services.scheduler.time_utils import compute_next_send_and_cron
+
+            # Resolve user's timezone and compute canonical cron in UTC
+            tz_name = ensure_user_timezone(self.memory_manager, user_id, None, source="trigger_dispatcher")
+            next_send, cron_expression = compute_next_send_and_cron(spec.get("time_str"), tz_name)
+
+            # Idempotency: avoid creating duplicate schedule for same cron
+            existing = next((s for s in schedule_manager.get_user_schedules(user_id, active_only=True, session=self.db) if s.cron_expression == cron_expression), None)
+            if existing:
+                result.update({"ok": True, "note": "already_exists", "schedule_id": existing.schedule_id})
+                return result
+
             schedule = _scheduler_pkg.SchedulerService.create_daily_schedule(
                 user_id=user_id,
                 lesson_id=spec.get("lesson_id"),
@@ -129,47 +126,35 @@ class TriggerDispatcher:
         assistant_resp = context.get("assistant_response", "") or ""
         text_to_search = f"{original_text}\n{assistant_resp}"
 
-        try:
-            import re
-            from datetime import timedelta
+        import re
+        from datetime import timedelta
 
-            m_min = re.search(r"in\s+(\d+)\s+minutes?", text_to_search, re.IGNORECASE)
-            m_hour = re.search(r"in\s+(\d+)\s+hours?", text_to_search, re.IGNORECASE)
-            run_at_dt = None
-            if m_min:
-                minutes = int(m_min.group(1))
-                run_at_dt = datetime.now(timezone.utc) + timedelta(minutes=minutes)
-            elif m_hour:
-                hours = int(m_hour.group(1))
-                run_at_dt = datetime.now(timezone.utc) + timedelta(hours=hours)
+        m_min = re.search(r"in\s+(\d+)\s+minutes?", text_to_search, re.IGNORECASE)
+        m_hour = re.search(r"in\s+(\d+)\s+hours?", text_to_search, re.IGNORECASE)
+        run_at_dt = None
+        if m_min:
+            minutes = int(m_min.group(1))
+            run_at_dt = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+        elif m_hour:
+            hours = int(m_hour.group(1))
+            run_at_dt = datetime.now(timezone.utc) + timedelta(hours=hours)
 
-            if run_at_dt:
-                # Try to extract a quoted message to use as the reminder message
-                qm = re.search(r"[\"'“](.+?)[\"'”]", text_to_search)
-                message_text = spec.get("message") or (qm.group(1) if qm else text_to_search.strip())
-                schedule = _scheduler_pkg.SchedulerService.create_one_time_schedule(
-                    user_id=user_id,
-                    run_at=run_at_dt,
-                    message=message_text,
-                    session=self.db,
-                )
-                result.update({"ok": True, "schedule_id": schedule.schedule_id, "note": "one_time_created_inferred"})
-                return result
-            else:
-                # Could not infer -> record request in memory for later handling
-                try:
-                    self.memory_manager.store_memory(user_id, "schedule_request_pending", "true", category="conversation")
-                except Exception:
-                    pass
-                result.update({"ok": True, "note": "deferred"})
-                return result
-        except Exception as e:
-            logger.warning(f"Failed to infer one-time schedule: {e}")
-            try:
-                self.memory_manager.store_memory(user_id, "schedule_request_pending", "true", category="conversation")
-            except Exception:
-                pass
-            result.update({"ok": True, "note": "deferred", "error": str(e)})
+        if run_at_dt:
+            # Try to extract a quoted message to use as the reminder message
+            qm = re.search(r"[\"'“](.+?)[\"'”]", text_to_search)
+            message_text = spec.get("message") or (qm.group(1) if qm else text_to_search.strip())
+            schedule = _scheduler_pkg.SchedulerService.create_one_time_schedule(
+                user_id=user_id,
+                run_at=run_at_dt,
+                message=message_text,
+                session=self.db,
+            )
+            result.update({"ok": True, "schedule_id": schedule.schedule_id, "note": "one_time_created_inferred"})
+            return result
+        else:
+            # Could not infer -> record request in memory for later handling
+            self.memory_manager.store_memory(user_id, "schedule_request_pending", "true", category="conversation")
+            result.update({"ok": True, "note": "deferred"})
             return result
 
     def _handle_update_schedule(self, match: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
@@ -201,16 +186,13 @@ class TriggerDispatcher:
                 result.update({"ok": False, "error": "missing_time"})
                 return result
 
-            try:
-                self.memory_manager.store_memory(
-                    user_id,
-                    "preferred_lesson_time",
-                    time_str,
-                    category="profile",
-                    source="trigger_dispatcher",
-                )
-            except Exception:
-                pass
+            self.memory_manager.store_memory(
+                user_id,
+                "preferred_lesson_time",
+                time_str,
+                category="profile",
+                source="trigger_dispatcher",
+            )
 
             try:
                 updated = _scheduler_pkg.SchedulerService.update_daily_schedule(sched.schedule_id, time_str, session=self.db)
@@ -298,63 +280,40 @@ class TriggerDispatcher:
 
             self.memory_manager.store_memory(user_id, "user_timezone", tz_name, category="profile", source="trigger_dispatcher")
 
-            try:
-                SchedulerService = _scheduler_pkg.SchedulerService
-                active_schedules = self.db.query(Schedule).filter_by(user_id=user_id, is_active=True, schedule_type="daily").all()
-                for sched in active_schedules:
-                    preferred = self.memory_manager.get_memory(user_id, "preferred_lesson_time")
-                    if preferred and preferred[0].get("value"):
-                        time_str = preferred[0].get("value")
+            SchedulerService = _scheduler_pkg.SchedulerService
+            active_schedules = self.db.query(Schedule).filter_by(user_id=user_id, is_active=True, schedule_type="daily").all()
+            for sched in active_schedules:
+                preferred = self.memory_manager.get_memory(user_id, "preferred_lesson_time")
+                if preferred and preferred[0].get("value"):
+                    time_str = preferred[0].get("value")
+                else:
+                    if sched.next_send_time:
+                        local_dt, _ = format_dt_in_timezone(sched.next_send_time, tz_name)
+                        time_str = f"{local_dt.hour:02d}:{local_dt.minute:02d}"
                     else:
-                        if sched.next_send_time:
-                            try:
-                                local_dt, _ = format_dt_in_timezone(sched.next_send_time, tz_name)
-                                time_str = f"{local_dt.hour:02d}:{local_dt.minute:02d}"
-                            except Exception:
-                                time_str = None
-                        else:
-                            time_str = None
+                        time_str = None
 
-                    try:
-                        updated = SchedulerService.update_daily_schedule(sched.schedule_id, time_str, session=self.db)
-                        if not updated and time_str:
-                            try:
-                                SchedulerService.create_daily_schedule(user_id=user_id, lesson_id=sched.lesson_id, time_str=time_str, session=self.db)
-                            except Exception:
-                                pass
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+                updated = SchedulerService.update_daily_schedule(sched.schedule_id, time_str, session=self.db)
+                if not updated and time_str:
+                    SchedulerService.create_daily_schedule(user_id=user_id, lesson_id=sched.lesson_id, time_str=time_str, session=self.db)
+            
 
             result.update({"ok": True, "timezone": tz_name})
 
-            try:
-                conf_text = f"Okay — timezone set to {tz_name}. I'll use local time for your reminders."
-                try:
-                    user_lang = get_user_language(self.memory_manager, user_id)
-                    if user_lang and user_lang.lower() not in ("english", "en"):
-                        try:
-                            conf_text = translate_text_sync(conf_text, user_lang)
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
+            conf_text = f"Okay — timezone set to {tz_name}. I'll use local time for your reminders."
+            user_lang = get_user_language(self.memory_manager, user_id)
+            if user_lang and user_lang.lower() not in ("english", "en"):
+                conf_text = translate_text_sync(conf_text, user_lang)
 
-                user = self.db.query(User).filter_by(user_id=user_id).first()
-                if user and getattr(user, 'external_id', None):
-                    import asyncio
-                    chat_id = int(user.external_id)
-                    asyncio.run(_scheduler_pkg.send_message(chat_id, conf_text))
-            except Exception:
-                pass
+            user = self.db.query(User).filter_by(user_id=user_id).first()
+            if user and getattr(user, 'external_id', None):
+                import asyncio
+                chat_id = int(user.external_id)
+                asyncio.run(_scheduler_pkg.send_message(chat_id, conf_text))
 
             return result
         except Exception as e:
-            try:
-                self.db.rollback()
-            except Exception:
-                pass
+            self.db.rollback()
             result.update({"ok": False, "error": str(e)})
             return result
 
@@ -363,11 +322,8 @@ class TriggerDispatcher:
         result: Dict[str, Any] = {"ok": False, "action": "query_schedule"}
         try:
             schedules = schedule_manager.get_user_schedules(user_id, session=self.db)
-            try:
-                user = self.db.query(User).filter_by(user_id=user_id).first()
-                tz_name = getattr(user, "timezone", "UTC") if user else "UTC"
-            except Exception:
-                tz_name = "UTC"
+            # Ensure we resolve the user's timezone (persist if unknown)
+            tz_name = ensure_user_timezone(self.memory_manager, user_id, None, source="trigger_dispatcher_query")
 
             try:
                 from src.services.dialogue.schedule_query_handler import build_schedule_status_response
@@ -375,24 +331,15 @@ class TriggerDispatcher:
             except Exception:
                 resp_text = "Here are your reminders."
 
-            try:
-                user_lang = get_user_language(self.memory_manager, user_id)
-                if user_lang and user_lang.lower() not in ("english", "en"):
-                    try:
-                        resp_text = translate_text_sync(resp_text, user_lang)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+            user_lang = get_user_language(self.memory_manager, user_id)
+            if user_lang and user_lang.lower() not in ("english", "en"):
+                resp_text = translate_text_sync(resp_text, user_lang)
 
-            try:
-                user = self.db.query(User).filter_by(user_id=user_id).first()
-                if user and getattr(user, 'external_id', None):
-                    import asyncio
-                    chat_id = int(user.external_id)
-                    asyncio.run(_scheduler_pkg.send_message(chat_id, resp_text))
-            except Exception:
-                pass
+            user = self.db.query(User).filter_by(user_id=user_id).first()
+            if user and getattr(user, 'external_id', None):
+                import asyncio
+                chat_id = int(user.external_id)
+                asyncio.run(_scheduler_pkg.send_message(chat_id, resp_text))
 
             result.update({"ok": True, "note": "sent"})
             return result

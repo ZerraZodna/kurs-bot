@@ -78,9 +78,6 @@ def send_outbound_message(db: Session, user: User, text: str) -> None:
         status=status,
         error_message=error,
     )
-    try:
-        log.message_role = "assistant"
-    except Exception:
-        pass
+    log.message_role = "assistant"
     db.add(log)
     db.commit()

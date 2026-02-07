@@ -130,10 +130,7 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                     status="sent",
                     error_message=None
                 )
-                try:
-                    log.message_role = "assistant"
-                except Exception:
-                    pass
+                log.message_role = "assistant"
                 db.add(log)
                 db.commit()
 

@@ -76,12 +76,9 @@ async def seed_triggers() -> None:
         for spec, emb in zip(STARTER, embeddings):
             if emb is None:
                 continue
-            try:
-                b = emb_svc.embedding_to_bytes(emb)
-                t = TriggerEmbedding(name=spec.get("name") or spec.get("utterance"), action_type=spec["action_type"], embedding=b, threshold=spec.get("threshold", 0.75))
-                db.add(t)
-            except Exception:
-                continue
+            b = emb_svc.embedding_to_bytes(emb)
+            t = TriggerEmbedding(name=spec.get("name") or spec.get("utterance"), action_type=spec["action_type"], embedding=b, threshold=spec.get("threshold", 0.75))
+            db.add(t)
         db.commit()
         logger.info("Seeded trigger_embeddings from STARTER")
     finally:
@@ -149,11 +146,8 @@ class TriggerMatcher:
 
         if not self._triggers:
             # Attempt to seed default triggers if DB is empty, then reload
-            try:
-                await self._ensure_triggers_populated()
-                self._load_triggers()
-            except Exception:
-                pass
+            await self._ensure_triggers_populated()
+            self._load_triggers()
 
         if not self._triggers:
             return []

@@ -2,7 +2,7 @@ import os
 import httpx
 import re
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from src.config import settings
 
 TELEGRAM_BOT_TOKEN = settings.TELEGRAM_BOT_TOKEN
@@ -27,7 +27,7 @@ class TelegramHandler:
             "channel": "telegram",
             "text": text,
             "external_message_id": str(msg.get("message_id")),
-            "timestamp": datetime.utcfromtimestamp(msg.get("date", 0)),
+            "timestamp": datetime.fromtimestamp(msg.get("date", 0), timezone.utc),
         }
 
 async def send_message(chat_id: int, text: str) -> Optional[dict]:

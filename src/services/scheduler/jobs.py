@@ -6,6 +6,7 @@ so job-management logic can be tested and moved independently of the
 """
 import logging
 from typing import Any
+from datetime import timezone
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 
@@ -50,13 +51,17 @@ def sync_job_for_schedule(schedule: Any) -> None:
             if run_at is None:
                 logger.warning("one_time schedule %s has no next_send_time", job_id)
                 return
-            trigger = DateTrigger(run_date=run_at, timezone="UTC")
+            # Ensure run_at is an aware UTC datetime
+            from src.services.timezone_utils import to_utc
+
+            run_at = to_utc(run_at)
+            trigger = DateTrigger(run_date=run_at, timezone=timezone.utc)
         else:
             cron = getattr(schedule, "cron_expression", None)
             if not cron:
                 logger.warning("schedule %s has no cron_expression", job_id)
                 return
-            trigger = CronTrigger.from_crontab(cron, timezone="UTC")
+            trigger = CronTrigger.from_crontab(cron, timezone=timezone.utc)
 
         scheduler.add_job(
             func=SchedulerService.execute_scheduled_task,

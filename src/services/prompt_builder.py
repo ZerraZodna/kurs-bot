@@ -6,7 +6,7 @@ Supports dynamic context assembly for Ollama LLM with token optimization.
 from typing import Dict, List, Optional, Any, Tuple
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
-from src.services.timezone_utils import get_user_timezone_name, format_dt_in_timezone
+from src.services.timezone_utils import get_user_timezone_name, format_dt_in_timezone, to_utc
 from src.models.database import Memory, MessageLog, User, Lesson
 from src.services.memory_manager import MemoryManager
 import json
@@ -262,8 +262,8 @@ class PromptBuilder:
 
         def _normalize_dt(value: Any) -> datetime:
             if isinstance(value, datetime):
-                return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
-            return datetime.min.replace(tzinfo=timezone.utc)
+                return to_utc(value)
+            return to_utc(datetime.min)
 
         signals: List[Dict[str, Any]] = []
 
@@ -310,7 +310,7 @@ class PromptBuilder:
                 "previous_lesson_id": None,
             }
 
-        latest = max(signals, key=lambda s: s.get("created_at", datetime.min.replace(tzinfo=timezone.utc)))
+        latest = max(signals, key=lambda s: s.get("created_at", to_utc(datetime.min)))
         signal_type = latest.get("type")
         parsed = self._parse_lesson_id(str(latest.get("value", "")).strip())
         if not parsed:
@@ -401,8 +401,8 @@ class PromptBuilder:
 
         def _normalize_dt(value: Any) -> datetime:
             if isinstance(value, datetime):
-                return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
-            return datetime.min.replace(tzinfo=timezone.utc)
+                return to_utc(value)
+            return to_utc(datetime.min)
 
         latest = max(debug_offsets, key=lambda x: _normalize_dt(x.get("created_at")))
         raw_value = str(latest.get("value", "")).strip()
@@ -470,9 +470,7 @@ class PromptBuilder:
             parts.append(f"Channel: {user.channel}")
         if user.created_at:
             # Handle both naive and timezone-aware datetimes
-            created = user.created_at
-            if created.tzinfo is None:
-                created = created.replace(tzinfo=timezone.utc)
+            created = to_utc(user.created_at)
             days_active = (datetime.now(timezone.utc) - created).days
             parts.append(f"User since: {days_active} days ago")
 

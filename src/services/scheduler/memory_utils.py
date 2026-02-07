@@ -2,6 +2,7 @@
 
 import json
 from datetime import datetime, timezone
+from src.services.timezone_utils import to_utc
 from typing import Optional
 
 from src.services.memory_manager import MemoryManager
@@ -52,8 +53,8 @@ def get_pending_confirmation(memory_manager: MemoryManager, user_id: int) -> Opt
 
     def _normalize_dt(value: Optional[datetime]) -> datetime:
         if isinstance(value, datetime):
-            return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
-        return datetime.min.replace(tzinfo=timezone.utc)
+            return to_utc(value)
+        return to_utc(datetime.min)
 
     latest = max(memories, key=lambda m: _normalize_dt(m.get("created_at")))
     raw = latest.get("value", "")

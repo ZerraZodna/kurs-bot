@@ -188,7 +188,7 @@ class SchedulerService:
         # Create scheduler
         _scheduler = BackgroundScheduler(
             jobstores=jobstores,
-            timezone="UTC",
+            timezone=timezone.utc,
         )
 
         _scheduler.start()
@@ -236,10 +236,7 @@ class SchedulerService:
 
         try:
             # Debug: trace schedule creation attempts
-            try:
-                print(f"[DEBUG scheduler] create_daily_schedule called user={user_id} time_str={time_str} ts={datetime.now(timezone.utc).isoformat()}")
-            except Exception:
-                pass
+            print(f"[DEBUG scheduler] create_daily_schedule called user={user_id} time_str={time_str} ts={datetime.now(timezone.utc).isoformat()}")
             # Compute next send time and cron expression for the user's timezone
             try:
                 user = session.query(User).filter_by(user_id=user_id).first()
@@ -262,10 +259,9 @@ class SchedulerService:
                 session=session,
             )
 
-            try:
-                print(f"[DEBUG scheduler] persisted schedule id=<{getattr(schedule, 'schedule_id', None)}> user={user_id} next_send={next_send.isoformat()} cron='{cron_expression}' created_at={now_utc.isoformat()}")
-            except Exception:
-                pass
+            created_at = getattr(schedule, 'created_at', None)
+            created_str = created_at.isoformat() if created_at is not None else __import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat()
+            print(f"[DEBUG scheduler] persisted schedule id=<{getattr(schedule, 'schedule_id', None)}> user={user_id} next_send={next_send.isoformat()} cron='{cron_expression}' created_at={created_str}")
 
             # Sync job to APScheduler
             try:
@@ -374,7 +370,9 @@ class SchedulerService:
 
         try:
             now = datetime.now(timezone.utc)
-            run_at = run_at.astimezone(timezone.utc)
+            from src.services.timezone_utils import to_utc
+
+            run_at = to_utc(run_at)
 
             # Persist via manager
             schedule = schedule_manager.create_schedule(

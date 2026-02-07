@@ -82,7 +82,9 @@ class MemoryManager:
                 ttl = r.ttl_expires_at
                 if ttl.tzinfo is None:
                     # assume UTC if naive
-                    ttl = ttl.replace(tzinfo=timezone.utc)
+                    from src.services.timezone_utils import to_utc
+
+                    ttl = to_utc(ttl)
                 if ttl < now:
                     # skip expired
                     continue
@@ -229,11 +231,8 @@ class MemoryManager:
         # If this memory indicates a preferred lesson time, do NOT modify schedules here.
         # Creating schedules is the responsibility of the schedule/triggering codepath
         # (e.g. TriggerDispatcher) to avoid unexpected side-effects from memory writes.
-        try:
-            if key == "preferred_lesson_time":
-                logger.info(f"Stored preferred_lesson_time for user {user_id} (no auto-schedule created)")
-        except Exception:
-            pass
+        if key == "preferred_lesson_time":
+            logger.info(f"Stored preferred_lesson_time for user {user_id} (no auto-schedule created)")
 
         return new.memory_id
 

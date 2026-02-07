@@ -16,10 +16,11 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+from src.services.timezone_utils import to_utc
+
+
 def _ensure_utc_aware(dt: datetime) -> datetime:
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+    return to_utc(dt)
 
 
 def _hash_code(code: str) -> str:

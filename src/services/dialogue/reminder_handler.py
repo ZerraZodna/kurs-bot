@@ -6,6 +6,7 @@ import json
 import logging
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
+from src.services.timezone_utils import to_utc
 from sqlalchemy.orm import Session
 from src.models.database import Lesson
 from src.services.memory_manager import MemoryManager
@@ -28,7 +29,7 @@ def get_pending_confirmation(
 
     def _normalize_dt(value: Optional[datetime]) -> datetime:
         if isinstance(value, datetime):
-            return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+            return to_utc(value)
         return datetime.min.replace(tzinfo=timezone.utc)
 
     latest = max(memories, key=lambda m: _normalize_dt(m.get("created_at")))
