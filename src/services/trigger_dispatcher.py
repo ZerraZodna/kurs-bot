@@ -98,9 +98,32 @@ class TriggerDispatcher:
         if spec.get("schedule_type") == "daily" and spec.get("time_str"):
             from src.services.scheduler.time_utils import compute_next_send_and_cron
 
+            # Normalize provided time_str to canonical HH:MM (local time) and persist
+            raw_time = spec.get("time_str")
+            try:
+                from src.services.scheduler.time_utils import parse_time_string
+
+                h, m = parse_time_string(raw_time)
+                normalized_time = f"{h:02d}:{m:02d}"
+            except Exception:
+                normalized_time = raw_time
+
+            # Persist user's preferred local time so reminders display as local time
+            try:
+                self.memory_manager.store_memory(
+                    user_id,
+                    "preferred_lesson_time",
+                    normalized_time,
+                    category="profile",
+                    source="trigger_dispatcher",
+                )
+            except Exception:
+                # swallow storage errors; schedule creation should still proceed
+                logger.exception("Could not store preferred_lesson_time memory for user %s", user_id)
+
             # Resolve user's timezone and compute canonical cron in UTC
             tz_name = ensure_user_timezone(self.memory_manager, user_id, None, source="trigger_dispatcher")
-            next_send, cron_expression = compute_next_send_and_cron(spec.get("time_str"), tz_name)
+            next_send, cron_expression = compute_next_send_and_cron(normalized_time, tz_name)
 
             # Idempotency: avoid creating duplicate schedule for same cron
             existing = next((s for s in schedule_manager.get_user_schedules(user_id, active_only=True, session=self.db) if s.cron_expression == cron_expression), None)
@@ -111,7 +134,7 @@ class TriggerDispatcher:
             schedule = _scheduler_pkg.SchedulerService.create_daily_schedule(
                 user_id=user_id,
                 lesson_id=spec.get("lesson_id"),
-                time_str=spec.get("time_str"),
+                time_str=normalized_time,
                 session=self.db,
             )
             result.update({"ok": True, "schedule_id": schedule.schedule_id})
@@ -266,10 +289,14 @@ class TriggerDispatcher:
         else:
             tz_name = tz_raw.replace(" ", "_")
 
-        # Validate timezone name
-        if not validate_timezone_name(tz_name):
+        # Resolve and validate timezone name (map Windows/local names to IANA when possible)
+        from src.services.timezone_utils import resolve_timezone_name
+
+        resolved = resolve_timezone_name(tz_name)
+        if not resolved:
             result.update({"ok": False, "error": f"invalid_timezone: {tz_name}"})
             return result
+        tz_name = resolved
 
         try:
             u = self.db.query(User).filter_by(user_id=user_id).first()
@@ -277,8 +304,6 @@ class TriggerDispatcher:
                 u.timezone = tz_name
                 self.db.add(u)
                 self.db.commit()
-
-            self.memory_manager.store_memory(user_id, "user_timezone", tz_name, category="profile", source="trigger_dispatcher")
 
             SchedulerService = _scheduler_pkg.SchedulerService
             active_schedules = self.db.query(Schedule).filter_by(user_id=user_id, is_active=True, schedule_type="daily").all()

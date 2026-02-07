@@ -261,7 +261,14 @@ class SchedulerService:
 
             created_at = getattr(schedule, 'created_at', None)
             created_str = created_at.isoformat() if created_at is not None else __import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat()
-            print(f"[DEBUG scheduler] persisted schedule id=<{getattr(schedule, 'schedule_id', None)}> user={user_id} next_send={next_send.isoformat()} cron='{cron_expression}' created_at={created_str}")
+            print(f"[DEBUG scheduler] persisted schedule id=<{getattr(schedule, 'schedule_id', None)}> user={user_id} next_send_local_input={next_send.isoformat()} cron='{cron_expression}' created_at={created_str}")
+            # Log the actual stored DB value for next_send_time (UTC-aware expected)
+            try:
+                stored_ns = getattr(schedule, 'next_send_time', None)
+                if stored_ns is not None:
+                    logger.debug(f"Stored next_send_time (iso): {stored_ns.isoformat()}, tzinfo={getattr(stored_ns, 'tzinfo', None)}")
+            except Exception:
+                logger.exception("Could not log stored next_send_time for schedule %s", getattr(schedule, 'schedule_id', None))
 
             # Sync job to APScheduler
             try:
@@ -276,7 +283,7 @@ class SchedulerService:
                 hour = getattr(schedule, 'next_send_time', None).hour if getattr(schedule, 'next_send_time', None) else 0
                 minute = getattr(schedule, 'next_send_time', None).minute if getattr(schedule, 'next_send_time', None) else 0
 
-            logger.info(f"✓ Created daily schedule for user {user_id} at {hour}:{minute:02d} UTC")
+            logger.info(f"✓ Created daily schedule for user {user_id} at {hour}:{minute:02d} ({tz_name})")
 
             return schedule
 
@@ -347,7 +354,12 @@ class SchedulerService:
                     hour = 0
                     minute = 0
 
-            logger.info(f"✓ Updated daily schedule {schedule_id} for user {getattr(updated, 'user_id', 'unknown')} to {hour}:{minute:02d} UTC")
+            logger.info(f"✓ Updated daily schedule {schedule_id} for user {getattr(updated, 'user_id', 'unknown')} to {hour}:{minute:02d} ({tz_name})")
+            try:
+                if getattr(updated, 'next_send_time', None):
+                    logger.debug(f"Updated schedule stored next_send_time (iso): {updated.next_send_time.isoformat()}, tzinfo={getattr(updated.next_send_time, 'tzinfo', None)}")
+            except Exception:
+                logger.exception("Could not log updated next_send_time for schedule %s", schedule_id)
             return updated
 
         finally:

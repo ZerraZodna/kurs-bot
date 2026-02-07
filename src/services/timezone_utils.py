@@ -56,14 +56,8 @@ def get_user_timezone_name(
     if user and getattr(user, "timezone", None):
         return str(user.timezone)
 
-    # Fallback to memory-stored timezone (older codepath)
-    memories: List[Dict[str, Any]] = memory_manager.get_memory(  # type: ignore[reportUnknownMemberType]
-        user_id, "user_timezone"
-    )
-    if memories:
-        value = memories[0].get("value")
-        if value:
-            return str(value)
+    # Do NOT use memory-stored timezone. Only use DB user timezone (preferred),
+    # otherwise infer from language or return UTC.
     if fallback_language:
         return infer_timezone_from_language(fallback_language)
     return "UTC"
@@ -75,31 +69,20 @@ def ensure_user_timezone(
     language: Optional[str],
     source: str = "onboarding_service",
 ) -> str:
-    existing: List[Dict[str, Any]] = memory_manager.get_memory(  # type: ignore[reportUnknownMemberType]
-        user_id, "user_timezone"
-    )
-    if existing:
-        value = existing[0].get("value")
-        if value:
-            return str(value)
-
+    # Only persist timezone to the User record. Do NOT write a memory entry.
     tz_name = infer_timezone_from_language(language)
-    # Persist to DB if possible
     user = memory_manager.db.query(User).filter_by(user_id=user_id).first()
     if user:
+        # If user has already a timezone set, return it.
+        if getattr(user, "timezone", None):
+            return str(user.timezone)
+
         user.timezone = tz_name
         memory_manager.db.add(user)
         memory_manager.db.commit()
         return tz_name
 
-    memory_manager.store_memory(
-        user_id=user_id,
-        key="user_timezone",
-        value=tz_name,
-        confidence=0.7,
-        source=source,
-        category="profile",
-    )
+    # No DB user available (e.g., ephemeral context) — do not persist to memories.
     return tz_name
 
 
@@ -212,3 +195,51 @@ def validate_timezone_name(tz_name: Optional[str]) -> bool:
         return True
     except Exception:
         return False
+
+
+def resolve_timezone_name(tz_name: Optional[str]) -> Optional[str]:
+    """Try to resolve a user-provided timezone to a canonical IANA name.
+
+    Strategy:
+    - If tz_name is already a valid IANA name, return it.
+    - Try some normalization (replace dots/spaces with underscores) and retry.
+    - Check a small mapping for common Windows timezone names -> IANA.
+    - Return None if no resolution found.
+    """
+    if not tz_name:
+        return None
+
+    candidate = tz_name.strip()
+    # Try as-is
+    try:
+        ZoneInfo(candidate)
+        return candidate
+    except Exception:
+        pass
+
+    # Normalize common punctuation/spacing
+    cand2 = candidate.replace(" ", "_").replace(".", "")
+    try:
+        ZoneInfo(cand2)
+        return cand2
+    except Exception:
+        pass
+
+    # Small mapping for common non-IANA names (including Windows tz names observed in the wild)
+    mapping = {
+        "w. europe standard time": "Europe/Berlin",
+        "w europe standard time": "Europe/Berlin",
+        "w europe": "Europe/Berlin",
+        "central europe standard time": "Europe/Berlin",
+        "romance standard time": "Europe/Paris",
+        "gmt standard time": "Europe/London",
+        "pacific standard time": "America/Los_Angeles",
+        "eastern standard time": "America/New_York",
+    }
+
+    key = candidate.strip().lower()
+    if key in mapping:
+        return mapping[key]
+
+    # Not resolved
+    return None
