@@ -1,5 +1,5 @@
 """
-Debug semantic search
+Inspect stored memories and verify embeddings.
 """
 from src.models.database import SessionLocal, Memory
 from src.services.embedding_service import get_embedding_service
