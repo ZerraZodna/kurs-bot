@@ -4,14 +4,12 @@ user memories from conversation messages. Language-agnostic (English, Norwegian,
 """
 
 import json
-import httpx
 from typing import Optional, Dict, Any, List
 from src.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_URL = settings.OLLAMA_URL or "http://localhost:11434/api/generate"
 MEMORY_EXTRACTOR_MODEL = settings.MEMORY_EXTRACTOR_MODEL or "qwen2.5-coder:7b"
 MEMORY_EXTRACTOR_RAG_MODEL = settings.MEMORY_EXTRACTOR_RAG_MODEL or MEMORY_EXTRACTOR_MODEL
 
@@ -96,18 +94,11 @@ class MemoryExtractor:
             prompt = f"""{MEMORY_EXTRACTION_PROMPT}
 User message: "{user_message}"{context_str}"""
             
-            # Call Ollama
-            payload = {
-                "model": model_override or MEMORY_EXTRACTOR_MODEL,
-                "prompt": prompt,
-                "stream": False,
-            }
-            
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(OLLAMA_URL, json=payload)
-                response.raise_for_status()
-                data = response.json()
-                response_text = data.get("response", "").strip()
+            # Call Ollama via shared client wrapper
+            model = model_override or MEMORY_EXTRACTOR_MODEL
+            # Lazy import to avoid circular imports during package initialization
+            from src.services.dialogue.ollama_client import call_ollama
+            response_text = await call_ollama(prompt, model=model)
             
             # Parse JSON response
             memories = MemoryExtractor._parse_ollama_response(response_text)

@@ -8,7 +8,10 @@ from src.config import settings
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
+# Read Ollama endpoint from settings so it's configurable like elsewhere
+OLLAMA_URL = getattr(settings, "OLLAMA_URL", "http://localhost:11434/api/generate")
+# Cache config flag at import time for fast checks
+#SHOW_AI_PROMPT = getattr(settings, "SHOW_AI_PROMPT", False)
 
 
 async def call_ollama(prompt: str, model: str | None = None) -> str:
@@ -25,12 +28,10 @@ async def call_ollama(prompt: str, model: str | None = None) -> str:
     model = model or settings.OLLAMA_MODEL
     payload = {"model": model, "prompt": prompt, "stream": False}
 
-    # Log the prompt (truncated) for debugging
-    try:
-        preview = prompt if prompt is None or len(prompt) <= 2000 else prompt[:2000] + "..."
-        logger.info("AI PROMPT (model=%s): %s", model, preview)
-    except Exception:
-        logger.info("AI PROMPT (model=%s): [unable to render prompt]", model)
+    # Log the prompt (truncated) for debugging when enabled via config
+    #if SHOW_AI_PROMPT:
+    #    preview = prompt if prompt is None or len(prompt) <= 2000 else prompt[:2000] + "..."
+    #    logger.info("AI PROMPT (model=%s): %s", model, preview)
 
     try:
         async with httpx.AsyncClient() as client:
@@ -38,12 +39,8 @@ async def call_ollama(prompt: str, model: str | None = None) -> str:
 
             # Log status and response body (truncated)
             logger.info("Ollama HTTP %s", response.status_code)
-            try:
-                text = response.text
-                preview = text if len(text) <= 2000 else text[:2000] + "..."
-                logger.debug("Ollama response body: %s", preview)
-            except Exception:
-                logger.debug("Ollama response body: [unreadable]")
+            #if SHOW_AI_PROMPT:
+            #    logger.info("Raw LLM response (repr): %r", response)
 
             try:
                 response.raise_for_status()

@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import httpx
 from typing import Optional
 from sqlalchemy.orm import Session
 
@@ -38,15 +37,11 @@ def translate_text_sync(text: str, language: str) -> str:
             "Preserve paragraph breaks and meaning. Return only the translation.\n\n"
             f"{text}"
         )
-        payload = {
-            "model": settings.OLLAMA_MODEL,
-            "prompt": prompt,
-            "stream": False,
-        }
-        r = httpx.post(settings.OLLAMA_URL, json=payload, timeout=60.0)
-        r.raise_for_status()
-        data = r.json()
-        return data.get("response", text) or text
+        model = settings.OLLAMA_MODEL
+        # Lazy import to avoid circular imports at module import time
+        from src.services.dialogue.ollama_client import call_ollama
+        resp = asyncio.run(call_ollama(prompt, model=model))
+        return resp or text
     except Exception as e:
         logger.warning(f"Translation failed, sending original text: {e}")
         return text

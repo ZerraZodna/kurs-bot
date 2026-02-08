@@ -261,8 +261,6 @@ class DialogueEngine:
         # Call Ollama
         rag_model = settings.OLLAMA_CHAT_RAG_MODEL or settings.OLLAMA_MODEL
         response = await self.call_ollama(prompt, model=rag_model if use_rag_for_this_message else None)
-        # Defensive: ensure we never propagate None responses
-        logger.info("Raw LLM response (repr): %r", response)
         if response is None:
             logger.warning("LLM returned None; coercing to placeholder string")
             response = "[No response from LLM]"

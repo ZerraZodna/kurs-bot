@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
     try:
         response = httpx.get(f"{ollama_url}/api/tags", timeout=2.0)
         if response.status_code == 200:
-            logging.info(f"Ollama AI server is running at {ollama_url} (model: {settings.OLLAMA_MODEL})")
+            logging.info(f"Ollama AI server is running at {ollama_url}")
         else:
             logging.warning(f"Ollama AI server responded with status {response.status_code} at {ollama_url}")
     except Exception as e:

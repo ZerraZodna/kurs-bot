@@ -9,6 +9,7 @@
 # Start FastAPI app (run in this window to see logs)
 Write-Host "To run the FastAPI app in the foreground (show logs here), execute:"
 Write-Host "uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000 --log-level debug"
+Start-Process powershell -ArgumentList '"uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000 --log-level debug"'
 
 # Start ngrok (in a new terminal window)
 Start-Process powershell -ArgumentList '"C:\Users\steen\AppData\Local\Microsoft\WinGet\Packages\Ngrok.Ngrok_Microsoft.Winget.Source_8wekyb3d8bbwe\ngrok.exe" http 8000'

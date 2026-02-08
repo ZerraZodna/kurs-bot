@@ -24,11 +24,6 @@ async def handle_triggers(
     dispatched.
     """
     try:
-        print(f"[DEBUG triggering] handle_triggers entry user={user_id} ts={__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat()}")
-
-        # Log assistant response for debugging and guard against None
-        logger.info(f"Assistant response: %r", response)
-
         # Guard: if response is None, skip matching
         if response is None:
             logger.warning("Assistant response is None; skipping trigger matching")
