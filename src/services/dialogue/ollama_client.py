@@ -45,8 +45,27 @@ async def call_ollama(prompt: str, model: str | None = None) -> str:
             except Exception:
                 logger.debug("Ollama response body: [unreadable]")
 
-            response.raise_for_status()
-            data = response.json()
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError:
+                # Log full response body on non-2xx status for easier debugging
+                try:
+                    body = response.text
+                except Exception:
+                    body = "[unreadable]"
+                logger.error(
+                    "Ollama returned non-2xx status %s. Body: %s",
+                    response.status_code,
+                    body,
+                )
+                return "[Sorry, I couldn't process your request right now.]"
+
+            # Parse JSON body
+            try:
+                data = response.json()
+            except Exception as ex:
+                logger.error("Failed to parse JSON from Ollama response: %s", ex)
+                return "[Sorry, I couldn't process your request right now.]"
 
             if data is None:
                 logger.warning("Ollama returned empty JSON body")
@@ -64,5 +83,6 @@ async def call_ollama(prompt: str, model: str | None = None) -> str:
             return resp_text or "[No response from Ollama]"
 
     except Exception as e:
-        logger.error(f"[Ollama error] {e}")
+        # Include full traceback in logs for diagnosis
+        logger.exception("[Ollama error] %s", e)
         return "[Sorry, I couldn't process your request right now.]"

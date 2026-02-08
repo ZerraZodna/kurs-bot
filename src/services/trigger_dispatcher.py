@@ -410,7 +410,7 @@ class TriggerDispatcher:
                 result.update({"ok": False, "error": "unknown_action"})
 
             # Audit every dispatch
-            self._audit(user_id, match.get("trigger_id"), action, {"context": context, "result": result})
+            ## SKIP MEMORY: self._audit(user_id, match.get("trigger_id"), action, {"context": context, "result": result})
 
         except Exception as e:
             logger.exception("Error dispatching trigger")

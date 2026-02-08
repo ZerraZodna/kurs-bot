@@ -116,7 +116,25 @@ class OnboardingFlow:
         )
 
     def _get_message(self, key: str, language: str = "en") -> str:
-        return MESSAGES.get(key, {}).get(language, MESSAGES[key]["en"])
+        # Normalize full-language names (e.g. 'Norwegian', 'English') to short codes used in MESSAGES
+        lang_key = language
+        if isinstance(language, str):
+            lname = language.lower()
+            if lname in ("norwegian", "nb", "nn"):
+                lang_key = "no"
+            elif lname in ("english", "en"):
+                lang_key = "en"
+            elif lname in ("swedish", "sv"):
+                lang_key = "sv"
+            elif lname in ("danish", "da"):
+                lang_key = "da"
+            elif lname in ("german", "de"):
+                lang_key = "de"
+            else:
+                # leave as-is (may already be a short code)
+                lang_key = language
+
+        return MESSAGES.get(key, {}).get(lang_key, MESSAGES[key]["en"])
 
     def _get_user_name(self, user_id: int) -> str:
         name_memories = self.memory_manager.get_memory(user_id, "first_name")

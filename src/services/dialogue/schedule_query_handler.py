@@ -6,70 +6,31 @@ from typing import Iterable
 
 from src.models.database import Schedule
 from src.services.timezone_utils import format_dt_in_timezone
-from src.services.embedding_service import get_embedding_service
+from src.services.trigger_matcher import get_trigger_matcher
 from src.config import settings
-import asyncio
-
-
-# Curated schedule-status examples (used to detect queries like "what reminders do I have?")
-_SCHEDULE_STATUS_EXAMPLES = [
-    "do i have any reminders",
-    "which reminders do i have",
-    "what reminders do i have",
-    "do i have a schedule",
-    "what is my schedule",
-    "show my reminders",
-    "list my reminders",
-    "which schedules do i have",
-]
-
-# Cached embeddings for the examples (computed once)
-_cached_example_embeddings = None
-# Lock to avoid parallel cache population
-_cache_lock = asyncio.Lock()
-
-
-async def _ensure_example_embeddings(emb_svc):
-    global _cached_example_embeddings
-    if _cached_example_embeddings is not None:
-        return
-    async with _cache_lock:
-        if _cached_example_embeddings is not None:
-            return
-        try:
-            embeds = await emb_svc.batch_embed(_SCHEDULE_STATUS_EXAMPLES)
-            # filter out any None embeddings and keep order
-            _cached_example_embeddings = [e for e in embeds if e is not None]
-        except Exception:
-            _cached_example_embeddings = []
-
-
 async def detect_schedule_status_request(text: str) -> bool:
-    """Use cached example embeddings and a single message embedding to detect
-    schedule-status queries. This is faster than embedding both message and
-    examples every call and avoids keyword hijacking.
+    """Detect whether `text` is a schedule-status query by delegating to
+    the central TriggerMatcher. Returns True when the top schedule-query
+    similarity exceeds the configured threshold and is not exceeded by
+    an update/create schedule trigger (avoid treating update requests as
+    status queries).
     """
     message = (text or "").strip()
     if not message:
         return False
 
-    emb_svc = get_embedding_service()
+    # Delegate matching to the central TriggerMatcher
 
-    try:
-        await _ensure_example_embeddings(emb_svc)
-        if not _cached_example_embeddings:
-            return False
-
-        # Embed only the incoming message
-        msg_emb = await emb_svc.generate_embedding(message)
-        if not msg_emb:
-            return False
-
-        sims = [emb_svc.cosine_similarity(msg_emb, e) for e in _cached_example_embeddings]
-        max_sim = max(sims) if sims else 0.0
-        return float(max_sim) >= float(getattr(settings, "TRIGGER_SIMILARITY_THRESHOLD", 0.75))
-    except Exception:
+    matcher = get_trigger_matcher()
+    matches = await matcher.match_triggers(message, top_k=3)
+    if not matches:
         return False
+
+    max_status = max((m["score"] for m in matches if m.get("action_type") == "query_schedule"), default=0.0)
+    max_change = max((m["score"] for m in matches if m.get("action_type") in ("update_schedule", "create_schedule")), default=0.0)
+
+    threshold = float(getattr(settings, "TRIGGER_SIMILARITY_THRESHOLD", 0.75))
+    return (max_status >= threshold) and (max_status >= max_change)
 
 
 def build_schedule_status_response(schedules: Iterable[Schedule], tz_name: str = "UTC") -> str:
