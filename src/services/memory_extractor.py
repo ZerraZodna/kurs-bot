@@ -36,6 +36,12 @@ Common memory keys to use:
 - "study_preference": How they prefer to study
 - "email": Email address
 - "phone": Phone number
+- "birth_date": User's birth date. When you detect an explicit birth date, store it under this key.
+    - Prefer ISO 8601 date format (YYYY-MM-DD) in the `value` when possible.
+    - Accept and parse common formats such as `DD.MM.YYYY`, `D M YYYY`, `Month D, YYYY`, `YYYY-MM-DD`.
+    - Example: "I was born on 23.05.1966" -> {"store": true, "key": "birth_date", "value": "1966-05-23", "confidence": 0.98}
+
+IMPORTANT: If a date is present in the message, prefer storing it under the `birth_date` key rather than `name` or `first_name`.
 
 LESSON PROGRESS EXAMPLES:
 - "I am currently on lesson 2" -> {"store": true, "key": "current_lesson", "value": "2", "confidence": 0.95}
@@ -67,6 +73,7 @@ class MemoryExtractor:
         user_message: str,
         user_context: Optional[Dict[str, Any]] = None,
         model_override: Optional[str] = None,
+        language: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Extract memories from a user message using Ollama.
@@ -93,11 +100,11 @@ class MemoryExtractor:
             prompt = f"""{MEMORY_EXTRACTION_PROMPT}
 User message: "{user_message}"{context_str}"""
             
-            # Call Ollama via shared client wrapper
-            model = model_override or settings.OLLAMA_MODEL
+            # Call Ollama via shared client wrapper, include language hint
+            model = model_override or None
             # Lazy import to avoid circular imports during package initialization
             from src.services.dialogue.ollama_client import call_ollama
-            response_text = await call_ollama(prompt, model=model)
+            response_text = await call_ollama(prompt, model=model, language=language)
             
             # Parse JSON response
             memories = MemoryExtractor._parse_ollama_response(response_text)

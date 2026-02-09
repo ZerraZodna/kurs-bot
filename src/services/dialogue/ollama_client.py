@@ -13,11 +13,14 @@ logger = logging.getLogger(__name__)
 OLLAMA_URL = getattr(settings, "OLLAMA_URL", "http://localhost:11434/api/generate")
 OLLAMA_TIMEOUT = getattr(settings, "OLLAMA_TIMEOUT", 30.0)
 OLLAMA_RETRIES = getattr(settings, "OLLAMA_RETRIES", 2)
+# Optional longer single timeout for very large models (no retries)
+OLLAMA_LONG_TIMEOUT = getattr(settings, "OLLAMA_LONG_TIMEOUT", 180.0)
+OLLAMA_LONG_RETRIES = getattr(settings, "OLLAMA_LONG_RETRIES", 0)
 # Cache config flag at import time for fast checks
 #SHOW_AI_PROMPT = getattr(settings, "SHOW_AI_PROMPT", False)
 
 
-async def call_ollama(prompt: str, model: str | None = None) -> str:
+async def call_ollama(prompt: str, model: str | None = None, language: str | None = None) -> str:
     """
     Call Ollama LLM with a prompt.
 
@@ -28,7 +31,15 @@ async def call_ollama(prompt: str, model: str | None = None) -> str:
     Returns:
         Response text from Ollama
     """
-    model = model or settings.OLLAMA_MODEL
+    # If an explicit model is provided, use it. Otherwise, choose based on language.
+    if language and language.lower() != "english":
+        chosen_model = getattr(settings, "NON_ENGLISH_OLLAMA_MODEL", settings.OLLAMA_MODEL)
+    else:
+        if model:
+            chosen_model = model
+        else:
+            chosen_model = settings.OLLAMA_MODEL
+    model = chosen_model
     payload = {"model": model, "prompt": prompt, "stream": False}
 
     # Log the prompt (truncated) for debugging when enabled via config
@@ -37,21 +48,32 @@ async def call_ollama(prompt: str, model: str | None = None) -> str:
     logger.info("AI PROMPT (model=%s): %s", model, preview)
 
     try:
+        # For very large models (e.g. gpt-oss) prefer a single long timeout
+        # instead of multiple short retries. Detect by model name.
+        model_lower = str(model).lower() if model else ""
+        if "gpt-oss" in model_lower or "gpt_oss" in model_lower:
+            timeout = OLLAMA_LONG_TIMEOUT
+            retries = OLLAMA_LONG_RETRIES
+        else:
+            timeout = OLLAMA_TIMEOUT
+            retries = OLLAMA_RETRIES
+
         async with httpx.AsyncClient() as client:
             # Retry on read timeouts with simple exponential backoff
             backoff = 0.5
-            for attempt in range(0, OLLAMA_RETRIES + 1):
+            response = None
+            for attempt in range(0, retries + 1):
                 try:
-                    response = await client.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT)
+                    response = await client.post(OLLAMA_URL, json=payload, timeout=timeout)
                     break
                 except httpx.ReadTimeout:
-                    if attempt < OLLAMA_RETRIES:
+                    if attempt < retries:
                         await asyncio.sleep(backoff)
                         backoff *= 2
                         logger.warning("Ollama read timeout, retrying (attempt=%s)", attempt + 1)
                         continue
                     else:
-                        logger.exception("Ollama read timeout after %s attempts", OLLAMA_RETRIES + 1)
+                        logger.exception("Ollama read timeout after %s attempts", retries + 1)
                         return "[Sorry, I couldn't process your request right now.]"
 
             # Log status and response body (truncated)

@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     OLLAMA_URL: str = "http://localhost:11434/api/generate"
     OLLAMA_MODEL: str = "qwen3:latest"
     OLLAMA_CHAT_RAG_MODEL: str = "llama3.2:3b"
+    NON_ENGLISH_OLLAMA_MODEL: str = "gpt-oss:20b"
     
     # Embedding settings for semantic search
     OLLAMA_EMBED_URL: str = "http://localhost:11434/api/embed"

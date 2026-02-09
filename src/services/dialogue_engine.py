@@ -59,9 +59,9 @@ class DialogueEngine:
         from src.services.trigger_dispatcher import get_trigger_dispatcher as _get
         return _get(db=db, memory_manager=memory_manager)
 
-    async def call_ollama(self, prompt: str, model: Optional[str] = None) -> str:
-        """Delegate to dialogue.ollama_client."""
-        return await call_ollama(prompt, model)
+    async def call_ollama(self, prompt: str, model: Optional[str] = None, language: Optional[str] = None) -> str:
+        """Delegate to dialogue.ollama_client with optional language hint."""
+        return await call_ollama(prompt, model, language)
 
     async def process_message(
         self,
@@ -108,15 +108,12 @@ class DialogueEngine:
         if user.processing_restricted or not user.opted_in:
             return "Your data processing is restricted. If you want to resume, please update your consent settings."
 
+        user_lang = await detect_and_store_language(self.memory_manager, user_id, text)
+
         # Handle RAG mode toggle: rag_mode on/off
         rag_toggle_response = handle_rag_mode_toggle(text, self.memory_manager, user_id)
         if rag_toggle_response:
             return rag_toggle_response
-
-        # Handle RAG prompt management commands: rag_prompt list|select|custom|show
-        prompt_cmd_response = handle_rag_prompt_command(text, self.memory_manager, user_id)
-        if prompt_cmd_response:
-            return prompt_cmd_response
 
         # Detect RAG prefix: "rag my question" or "rag: my question"
         text, use_rag_for_this_message = parse_rag_prefix(text)
@@ -130,6 +127,12 @@ class DialogueEngine:
             listMemories = handle_list_memories(text, self.memory_manager, session, user_id)
             if listMemories:
                 return listMemories;
+
+            # Handle RAG prompt management commands: rag_prompt list|select|custom|show
+            prompt_cmd_response = handle_rag_prompt_command(text, self.memory_manager, user_id)
+            if prompt_cmd_response:
+                return prompt_cmd_response
+
 
         # Handle forget commands (semantic memory deletion)
         forget_response = await handle_forget_commands(
@@ -158,8 +161,6 @@ class DialogueEngine:
             )
  
 
-        await detect_and_store_language(self.memory_manager, user_id, text)
-
         # Handle lesson confirmation replies (before onboarding/schedule logic)
         lesson_response = await handle_lesson_confirmation(
             user_id,
@@ -177,8 +178,6 @@ class DialogueEngine:
         # Check if user is asking about a specific lesson (run regardless of onboarding)
         lesson_request = detect_lesson_request(text)
         if lesson_request:
-            # Determine user language to decide whether to return raw lesson text
-            user_lang = get_user_language(self.memory_manager, user_id) if self.memory_manager else "english"
             lesson_response = await handle_lesson_request(
                 lesson_request["lesson_id"], text, session, user_language=user_lang
             )
@@ -284,9 +283,11 @@ class DialogueEngine:
                     relevant_memories=relevant_memories,
                 )
         
-        # Call Ollama
-        rag_model = settings.OLLAMA_CHAT_RAG_MODEL or settings.OLLAMA_MODEL
-        response = await self.call_ollama(prompt, model=rag_model if use_rag_for_this_message else None)
+        # Choose RAG model
+        rag_model = settings.OLLAMA_CHAT_RAG_MODEL
+        response = await self.call_ollama(
+            prompt, model=rag_model if use_rag_for_this_message else None, language=user_lang
+        )
         if response is None:
             logger.warning("LLM returned None; coercing to placeholder string")
             response = "[No response from LLM]"

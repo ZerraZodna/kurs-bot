@@ -23,7 +23,7 @@ def get_user_language(memory_manager: MemoryManager, user_id: int) -> str:
 
 async def detect_and_store_language(
     memory_manager: MemoryManager, user_id: int, user_message: str
-) -> None:
+) -> str:
     """
     Detect user's language from message and store if confident.
 
@@ -135,33 +135,26 @@ async def detect_and_store_language(
         should_update = False
         if is_probable_name:
             should_update = False
-        elif not existing_value and lang_name:
+        elif (not existing_value or word_count > 3) and lang_name:
             should_update = True
-        elif lang_name and lang_name != existing_value:
-            # Do not overwrite an existing detected language for short messages
-            if existing_value and word_count <= 4:
-                should_update = False
-            else:
-                if word_count >= 4 and (has_no_keywords or has_en_keywords):
-                    should_update = True
-                elif has_no_keywords and lang_name == "Norwegian":
-                    should_update = True
-                elif has_en_keywords and lang_name == "English":
-                    should_update = True
 
         if should_update:
-            memory_manager.store_memory(
-                user_id=user_id,
-                key="user_language",
-                value=lang_name,
-                confidence=0.9,
-                source="dialogue_engine_language_detection",
-                category="preference",
-            )
-            logger.info(f"Detected language for user {user_id}: {lang_name}")
+            if existing_value != lang_name:
+                memory_manager.store_memory(
+                    user_id=user_id,
+                    key="user_language",
+                    value=lang_name,
+                    confidence=0.9,
+                    source="dialogue_engine_language_detection",
+                    category="preference",
+                )
+                logger.info(f"Detected language for user {user_id}: {lang_name}")
+            return lang_name
+        return existing_value    
 
     except LangDetectException as e:
         logger.warning(f"Could not detect language: {e}")
+        return "English"
 
 
 async def extract_and_store_memories(
@@ -193,9 +186,14 @@ async def extract_and_store_memories(
             else None
         )
 
-        model_override = settings.OLLAMA_CHAT_RAG_MODEL if rag_mode else None
+        # Use the RAG chat model for memory extraction by default because it
+        # produces more reliable classification for factual extractions
+        model_override = settings.OLLAMA_CHAT_RAG_MODEL
+        # Determine user language from stored preference (fallback to English)
+        user_lang = get_user_language(memory_manager, user_id)
+
         extracted_memories = await memory_extractor.extract_memories(
-            user_message, user_context, model_override=model_override
+            user_message, user_context, model_override=model_override, language=user_lang
         )
 
         for memory in extracted_memories:
