@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import datetime
 import time
 
@@ -57,8 +56,8 @@ def generate_and_store_embedding(memory_id: int, text: str, force: bool = False)
         session.commit()
         logger.info("Stored embedding for memory %s", memory_id)
 
-        # Optional: push to vector index if configured via env variable
-        if os.getenv("VECTOR_INDEX_ENABLED", "false").lower() == "true":
+        # Optional: push to vector index if configured via feature flag
+        if settings.VECTOR_INDEX_ENABLED:
             try:
                 from src.services.vector_index import VectorIndexClient
 
@@ -126,7 +125,7 @@ def generate_and_store_embeddings_batch(memory_items: list, force: bool = False)
                 logger.info("Stored embedding for memory %s (batch)", mem_id)
 
                 # Optional: collect items for vector index bulk upsert if configured
-                if os.getenv("VECTOR_INDEX_ENABLED", "false").lower() == "true":
+                if settings.VECTOR_INDEX_ENABLED:
                     upsert_items.append((str(mem_id), emb))
 
             except Exception:
@@ -134,7 +133,7 @@ def generate_and_store_embeddings_batch(memory_items: list, force: bool = False)
                 raise
 
         # Perform bulk upsert if configured
-        if os.getenv("VECTOR_INDEX_ENABLED", "false").lower() == "true" and upsert_items:
+        if settings.VECTOR_INDEX_ENABLED and upsert_items:
             try:
                 from src.services.vector_index import VectorIndexClient
 

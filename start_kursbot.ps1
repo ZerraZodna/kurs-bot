@@ -17,6 +17,30 @@ param(
 	[switch]$StartInfra  # if set, will call scripts\start_all.ps1 before starting app/ngrok
 )
 
+# Load .env into environment so scripts and child processes inherit settings
+function Load-DotEnv {
+	$envFile = Join-Path -Path (Get-Location) -ChildPath ".env"
+	if (-not (Test-Path $envFile)) { return }
+	Get-Content $envFile | ForEach-Object {
+		$line = $_.Trim()
+		if ([string]::IsNullOrWhiteSpace($line)) { return }
+		if ($line.StartsWith('#')) { return }
+		$parts = $line -split '=', 2
+		if ($parts.Count -lt 2) { return }
+		$key = $parts[0].Trim()
+		$value = $parts[1].Trim()
+		# strip surrounding single or double quotes
+		if ($value.Length -ge 2) {
+			if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+				$value = $value.Substring(1, $value.Length - 2)
+			}
+		}
+		if (-not [string]::IsNullOrWhiteSpace($key)) { ${env:$key} = $value }
+	}
+}
+
+Load-DotEnv
+
 function Resolve-VenvActivate {
 	$candidate = Join-Path -Path (Get-Location) -ChildPath ".venv\Scripts\Activate.ps1"
 	if (Test-Path $candidate) { return $candidate }
@@ -88,7 +112,7 @@ if ($needStartInfra) {
 # Wait helpers used only by this startup script
 function Wait-ForTcpPort {
 	param(
-		[string]$Host = '127.0.0.1',
+		[string]$HostName = '127.0.0.1',
 		[int]$Port,
 		[int]$TimeoutSeconds = 30
 	)
@@ -96,7 +120,7 @@ function Wait-ForTcpPort {
 	while ((Get-Date) -lt $start.AddSeconds($TimeoutSeconds)) {
 		try {
 			$client = New-Object System.Net.Sockets.TcpClient
-			$iar = $client.BeginConnect($Host, $Port, $null, $null)
+			$iar = $client.BeginConnect($HostName, $Port, $null, $null)
 			$ok = $iar.AsyncWaitHandle.WaitOne(500)
 			if ($ok) {
 				$client.EndConnect($iar)
@@ -170,7 +194,7 @@ Write-Host "Kurs Bot helper started. Uvicorn and ngrok are running in separate w
 # If we started infra, wait for Redis and the worker to become available
 if ($needStartInfra) {
 	Write-Host "Waiting for infra readiness checks..."
-	$redisReady = Wait-ForTcpPort -Host '127.0.0.1' -Port 6379 -TimeoutSeconds 60
+	$redisReady = Wait-ForTcpPort -HostName '127.0.0.1' -Port 6379 -TimeoutSeconds 60
 	if ($redisReady) { Write-Host "Redis is reachable." } else { Write-Host "Redis did not become reachable within timeout." -ForegroundColor Yellow }
 
 	$workerReady = Wait-ForWorker -TimeoutSeconds 60
@@ -178,5 +202,5 @@ if ($needStartInfra) {
 }
 
 # Wait for uvicorn to start responding on port 8000 (startup-only check)
-$apiReady = Wait-ForTcpPort -Host '127.0.0.1' -Port 8000 -TimeoutSeconds 30
+	$apiReady = Wait-ForTcpPort -HostName '127.0.0.1' -Port 8000 -TimeoutSeconds 30
 if ($apiReady) { Write-Host "Uvicorn is accepting connections on port 8000." } else { Write-Host "Uvicorn did not accept connections within timeout." -ForegroundColor Yellow }

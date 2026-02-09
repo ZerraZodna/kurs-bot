@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     EMBEDDING_VERSION: int = 1
     SEMANTIC_SEARCH_THRESHOLD: float = 0.5
     SEMANTIC_SEARCH_MAX_RESULTS: int = 5
+    # Vector index settings
+    VECTOR_INDEX_BACKEND: str = "local"
+    # Feature flag to enable writing/reading from the external vector index
+    VECTOR_INDEX_ENABLED: bool = False
     # Trigger matcher feature flag and defaults
     ENABLE_TRIGGER_MATCHER: bool = True
     TRIGGER_SIMILARITY_THRESHOLD: float = 0.75

@@ -102,6 +102,8 @@ See `DEPLOYMENT.md` for production deployment notes and recommended startup orde
 - `TELEGRAM_BOT_TOKEN` - Telegram bot token
 - `SLACK_BOT_TOKEN` - Slack bot token
 - `SENDGRID_API_KEY` - SendGrid API key
+ - `VECTOR_INDEX_BACKEND` - Vector index backend to use (`local`, `faiss`, or `redis`). Default: `local` for dev.
+ - `VECTOR_INDEX_ENABLED` - Set to `true` to enable vector-index reads/writes when infra is ready.
 
 ## Project Structure
 - `src/models/database.py` - SQLAlchemy ORM models

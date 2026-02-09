@@ -15,16 +15,22 @@ function Wait-DockerReady {
     )
     $start = Get-Date
     while ((Get-Date) -lt $start.AddSeconds($TimeoutSeconds)) {
+        $now = Get-Date -Format o
+        Write-Host "[$now] Wait-DockerReady: checking for 'docker' CLI..."
         $cmd = Get-Command docker -ErrorAction SilentlyContinue
         if (-not $cmd) {
+            Write-Host "[$now] docker CLI not found in PATH. Waiting..."
             Start-Sleep -Seconds $IntervalSeconds
             continue
         }
         try {
+            Write-Host "[$now] Running 'docker info' to check daemon..."
             docker info > $null 2>&1
-            if ($LASTEXITCODE -eq 0) { return $true }
+            $code = $LASTEXITCODE
+            Write-Host "[$now] 'docker info' exit-code: $code"
+            if ($code -eq 0) { Write-Host "[$now] Docker daemon responding"; return $true }
         } catch {
-            # docker CLI exists but daemon not responding yet
+            Write-Host "[$now] docker info threw: $($_.Exception.Message)" -ForegroundColor Yellow
         }
         Start-Sleep -Seconds $IntervalSeconds
     }
@@ -33,6 +39,11 @@ function Wait-DockerReady {
 
 if (-not (Wait-DockerReady -TimeoutSeconds 60 -IntervalSeconds 3)) {
     Write-Host "Docker CLI/daemon not available after waiting; please start Docker Desktop or ensure Docker is running." -ForegroundColor Yellow
+    # Print some diagnostics to help debugging
+    Write-Host "Diagnostics:"
+    $dockCmd = Get-Command docker -ErrorAction SilentlyContinue
+    if ($dockCmd) { Write-Host " docker path: $($dockCmd.Source)" } else { Write-Host " docker not found in PATH" }
+    try { docker --version 2>&1 | Write-Host } catch { Write-Host "docker --version failed" }
     exit 1
 }
 

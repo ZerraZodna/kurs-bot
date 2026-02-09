@@ -30,6 +30,62 @@ This document describes recommended steps and considerations for deploying Kurs 
   - Create a migration plan to regenerate embeddings: run a backfill via the queue in low-traffic windows.
   - Set `EMBEDDING_VERSION` and backfill; workers should check `embedding_version` before regenerating.
 
+Redis Stack quickstart (local)
+
+If you're testing the vector index locally, Redis Stack provides vector capabilities without extra infra. Quick Docker-based setup:
+
+1. Minimal `docker-compose.yml` (create in repo root):
+
+```yaml
+version: '3.8'
+services:
+  redisstack:
+    image: redis/redis-stack:latest
+    ports:
+      - '6379:6379'
+      - '8001:8001' # (optional) RedisInsight web UI
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+
+volumes:
+  redisdata:
+```
+
+2. Start Redis Stack:
+
+```powershell
+docker compose up -d
+```
+
+3. Update your `.env` (or environment) before starting services:
+
+```dotenv
+VECTOR_INDEX_BACKEND=redis
+VECTOR_INDEX_ENABLED=true
+REDIS_URL=redis://localhost:6379
+```
+
+4. Populate the index from the DB (reindex):
+
+```powershell
+.\scripts\run_reindex.ps1 --batch 100
+# or
+python scripts/reindex_vectors.py --batch 100
+```
+
+Canary & cutover checklist
+
+- Provision Redis/Redis Stack and ensure connectivity from API and workers.
+- Enable `VECTOR_INDEX_ENABLED` in a canary deployment that receives a small percentage of traffic.
+- Run `scripts/reindex_vectors.py --batch N` to populate vectors before enabling reads.
+- Compare semantic-search latency and results between DB-scan and vector-index on canary users.
+- Monitor queue length, upsert latency, and search hit-rates; roll back by toggling `VECTOR_INDEX_ENABLED`.
+
+Notes
+- Use `local` backend for CI and development where persistence and scale are not required.
+- FAISS is useful for local benchmarking or batch reindexing but is in-process and not networked.
+
 5) Monitoring & observability
 - Collect metrics: queue length, job success/failure counts, embedding API latency, embedding age, vector index size, semantic-search latency.
 - Log structured events for embedding jobs (job_id, user_id, memory_ids, duration, retries).
