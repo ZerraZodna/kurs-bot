@@ -4,6 +4,7 @@ Vector Index adapter
 Provides a minimal adapter with pluggable backends. Current backends:
 - local: in-process brute-force index (good for dev / testing)
 - redis: stores vectors in Redis and performs client-side similarity scan (safe fallback)
+ - faiss: in-process brute-force index that emulates FAISS behavior (dev/local)
 
 Replace or extend with FAISS / Redis Vector for production.
 """
@@ -28,6 +29,14 @@ class VectorIndexClient:
             # In-memory dict of id -> np.ndarray
             self._vectors = {}
             self._lock = threading.Lock()
+        elif backend == "faiss":
+            # Emulate a FAISS-like local client: store dict + cached matrix for fast queries
+            # This is a pure-Python, numpy-based fallback for development and CI.
+            self._vectors = {}
+            self._lock = threading.Lock()
+            self._id_list = []
+            self._matrix = None
+            self._dirty = True
         elif backend == "redis":
             if Redis is None:
                 raise RuntimeError("redis package not available")
@@ -49,6 +58,13 @@ class VectorIndexClient:
                 self._vectors[id] = arr
             return True
 
+        if self.backend == "faiss":
+            with self._lock:
+                existed = id in self._vectors
+                self._vectors[id] = arr
+                self._dirty = True
+            return True
+
         # redis backend: store as pickled bytes (simple portable format)
         key = self._prefix + id
         data = pickle.dumps(arr, protocol=pickle.HIGHEST_PROTOCOL)
@@ -60,6 +76,13 @@ class VectorIndexClient:
             with self._lock:
                 for id, vector in items:
                     self._vectors[id] = np.array(vector, dtype=np.float32)
+            return True
+
+        if self.backend == "faiss":
+            with self._lock:
+                for id, vector in items:
+                    self._vectors[id] = np.array(vector, dtype=np.float32)
+                self._dirty = True
             return True
 
         pipe = self._redis.pipeline()
@@ -92,6 +115,32 @@ class VectorIndexClient:
                         continue
                     sim = float(np.dot(q, vec / v_norm))
                     results.append((id, sim))
+        elif self.backend == "faiss":
+            # Rebuild matrix if necessary
+            with self._lock:
+                if self._dirty:
+                    if self._vectors:
+                        self._id_list = list(self._vectors.keys())
+                        self._matrix = np.vstack([self._vectors[i] for i in self._id_list])
+                    else:
+                        self._id_list = []
+                        self._matrix = None
+                    self._dirty = False
+
+                if self._matrix is None:
+                    return []
+
+                # Normalize rows
+                norms = np.linalg.norm(self._matrix, axis=1)
+                valid = norms > 0
+                if not np.any(valid):
+                    return []
+                mat_normed = (self._matrix[valid] / norms[valid][:, None])
+                # compute dot product with query
+                sims = mat_normed.dot(q)
+                # map back to ids (filtering out zero-norm rows)
+                ids = [self._id_list[i] for i, ok in enumerate(valid) if ok]
+                results = list(zip(ids, [float(x) for x in sims]))
 
         else:
             # redis backend: fetch keys and scan client-side
@@ -102,7 +151,7 @@ class VectorIndexClient:
             for kkey in keys:
                 pipe.get(kkey)
             blobs = pipe.execute()
-            for raw in blobs:
+            for kkey, raw in zip(keys, blobs):
                 if not raw:
                     continue
                 try:
@@ -114,8 +163,9 @@ class VectorIndexClient:
                     continue
                 sim = float(np.dot(q, vec / v_norm))
                 # extract id from key by stripping prefix
-                # we have keys list same order as blobs
-                results.append((kkey.decode().replace(self._prefix, ""), sim))
+                # keys are bytes; decode to str
+                keystr = kkey.decode() if isinstance(kkey, (bytes, bytearray)) else str(kkey)
+                results.append((keystr.replace(self._prefix, ""), sim))
 
         # sort and return top-k
         results.sort(key=lambda x: x[1], reverse=True)

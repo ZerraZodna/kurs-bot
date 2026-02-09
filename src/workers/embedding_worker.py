@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import datetime
+import time
 
 # Optional imports: avoid failing test collection when redis/rq aren't installed.
 try:
@@ -62,8 +63,20 @@ def generate_and_store_embedding(memory_id: int, text: str, force: bool = False)
                 from src.services.vector_index import VectorIndexClient
 
                 idx = VectorIndexClient.from_env()
-                idx.upsert(str(memory_id), emb)
-                logger.info("Upserted vector index for memory %s", memory_id)
+                # Best-effort upsert with small retry/backoff and latency logging
+                attempts = 2
+                for attempt in range(attempts + 1):
+                    t0 = time.time()
+                    try:
+                        idx.upsert(str(memory_id), emb)
+                        latency = time.time() - t0
+                        logger.info("Upserted vector index for memory %s latency=%.3fs attempt=%d", memory_id, latency, attempt)
+                        break
+                    except Exception as e:
+                        latency = time.time() - t0
+                        logger.exception("Upsert attempt %d failed for memory %s (%.3fs): %s", attempt, memory_id, latency, e)
+                        if attempt < attempts:
+                            time.sleep(0.25 * (attempt + 1))
             except Exception as e:
                 logger.exception("Failed to upsert vector index for memory %s: %s", memory_id, e)
 
@@ -84,6 +97,7 @@ def generate_and_store_embeddings_batch(memory_items: list, force: bool = False)
 
     session = SessionLocal()
     try:
+        upsert_items = []
         for (mem_id, _text), emb in zip(memory_items, emb_list):
             if emb is None:
                 logger.error("Embedding generation failed for memory_id=%s (batch)", mem_id)
@@ -111,20 +125,35 @@ def generate_and_store_embeddings_batch(memory_items: list, force: bool = False)
                 session.commit()
                 logger.info("Stored embedding for memory %s (batch)", mem_id)
 
-                # Optional: push to vector index if configured via env variable
+                # Optional: collect items for vector index bulk upsert if configured
                 if os.getenv("VECTOR_INDEX_ENABLED", "false").lower() == "true":
-                    try:
-                        from src.services.vector_index import VectorIndexClient
-
-                        idx = VectorIndexClient.from_env()
-                        idx.upsert(str(mem_id), emb)
-                        logger.info("Upserted vector index for memory %s (batch)", mem_id)
-                    except Exception as e:
-                        logger.exception("Failed to upsert vector index for memory %s: %s", mem_id, e)
+                    upsert_items.append((str(mem_id), emb))
 
             except Exception:
                 session.rollback()
                 raise
+
+        # Perform bulk upsert if configured
+        if os.getenv("VECTOR_INDEX_ENABLED", "false").lower() == "true" and upsert_items:
+            try:
+                from src.services.vector_index import VectorIndexClient
+
+                idx = VectorIndexClient.from_env()
+                attempts = 2
+                for attempt in range(attempts + 1):
+                    t0 = time.time()
+                    try:
+                        idx.bulk_upsert(upsert_items)
+                        latency = time.time() - t0
+                        logger.info("Bulk upserted %d vectors latency=%.3fs attempt=%d", len(upsert_items), latency, attempt)
+                        break
+                    except Exception as e:
+                        latency = time.time() - t0
+                        logger.exception("Bulk upsert attempt %d failed (%.3fs): %s", attempt, latency, e)
+                        if attempt < attempts:
+                            time.sleep(0.25 * (attempt + 1))
+            except Exception as e:
+                logger.exception("Failed bulk upsert of vectors: %s", e)
 
         elapsed = (datetime.datetime.utcnow() - start).total_seconds()
         logger.info("Processed embedding batch size=%d elapsed=%.2fs", len(memory_items), elapsed)

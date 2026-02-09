@@ -17,22 +17,29 @@ Quick commands for common tasks:
   init-prod              Initialize production database
 
 Examples:
-  python cmd.py db status
-  python cmd.py db reset
-  python cmd.py debug memory
-  python cmd.py import-lessons
+  python cli.py db status
+  python cli.py db reset
+  python cli.py debug memory
+  python cli.py import-lessons
 """
 
 import sys
 import subprocess
 from pathlib import Path
 
+
 def run_command(script: str, args: list = None):
-    """Run a script in the scripts folder."""
-    cmd = [sys.executable, f"scripts/{script}"]
+    """Run a script located in the `scripts/` folder.
+
+    This builds an absolute path to the target script so the command works
+    regardless of the current working directory.
+    """
+    scripts_dir = Path(__file__).parent
+    script_path = scripts_dir / script
+    cmd = [sys.executable, str(script_path)]
     if args:
         cmd.extend(args)
-    
+
     result = subprocess.run(cmd, capture_output=False)
     sys.exit(result.returncode)
 
@@ -102,6 +109,23 @@ def main():
     # Initialize production database
     elif command == "init-prod":
         run_command("init_prod_db.py", args)
+    # RAG / memory listing
+    elif command == "rag":
+        # Subcommands: `memory` for listing memories via RAG helper
+        if not args:
+            print("RAG Commands:\n  rag memory --user 1 --query \"...\"")
+            return
+        sub = args[0].lower()
+        rest = args[1:]
+        if sub == "memory":
+            run_command("rag_memory.py", rest)
+        else:
+            print(f"Unknown rag subcommand: {sub}")
+            sys.exit(1)
+    # RAG prompt management (list/select/custom/show)
+    elif command in ("rag_prompt", "rag-prompt", "ragprompt"):
+        # forward to scripts/rag_prompt.py with remaining args
+        run_command("rag_prompt.py", args)
     
     # Help
     elif command in ["help", "-h", "--help"]:

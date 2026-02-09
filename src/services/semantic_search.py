@@ -94,7 +94,6 @@ class SemanticSearchService:
             limit = self.max_results
         if threshold is None:
             threshold = self.similarity_threshold
-        
         # Try vector index first (fast path)
         try:
             idx = VectorIndexClient.from_env()
@@ -154,7 +153,6 @@ class SemanticSearchService:
                     embedding,
                     memory_embedding
                 )
-                
                 # Only include if above threshold
                 if similarity >= threshold:
                     results.append((memory, similarity))

@@ -2,17 +2,17 @@
 
 ## Quick Command Runner (Root)
 
-**`cmd.py`** - Single entry point for all development commands
+**`cli.py`** - Single entry point for all development commands
 
 ```bash
-python cmd.py db status              # Show database status
-python cmd.py db reset               # Reset dev.db (keeps 365 lessons)
-python cmd.py db backup              # Create backup
-python cmd.py db fresh-start         # Complete fresh start
-python cmd.py import-lessons         # Import ACIM lessons
-python cmd.py debug memory           # Debug memory extraction
-python cmd.py debug schedule         # Debug schedule creation
-python cmd.py init-prod              # Initialize production database
+python cli.py db status              # Show database status
+python cli.py db reset               # Reset dev.db (keeps 365 lessons)
+python cli.py db backup              # Create backup
+python cli.py db fresh-start         # Complete fresh start
+python cli.py import-lessons         # Import ACIM lessons
+python cli.py debug memory           # Debug memory extraction
+python cli.py debug schedule         # Debug schedule creation
+python cli.py init-prod              # Initialize production database
 ```
 
 ## Database Scripts (`scripts/`)
@@ -40,7 +40,7 @@ python cmd.py init-prod              # Initialize production database
 | File | Purpose | Keep? |
 |------|---------|-------|
 | `main.py` | ✅ App entry point | **YES** |
-| `cmd.py` | ✅ Command runner | **YES** |
+| `cli.py` | ✅ Command runner | **YES** |
 | `conftest.py` | ✅ Pytest config | **YES** |
 | `debug_extraction.py` | Moved to scripts/debug/ | **DELETE** |
 | `debug_schedule.py` | Moved to scripts/debug/ | **DELETE** |
@@ -80,12 +80,12 @@ python scripts/import_acim_lessons.py
 
 ### After (Clean)
 ```bash
-python cmd.py debug memory
-python cmd.py db reset
-python cmd.py db fresh-start
-python cmd.py import-lessons
-python cmd.py db status
-python cmd.py init-prod
+python cli.py debug memory
+python cli.py db reset
+python cli.py db fresh-start
+python cli.py import-lessons
+python cli.py db status
+python cli.py init-prod
 ```
 
 ---
@@ -96,7 +96,7 @@ python cmd.py init-prod
 ```
 kurs-bot/
 ├── main.py              ← App entry point
-├── cmd.py               ← Command runner
+├── cli.py               ← Command runner
 ├── conftest.py          ← Pytest config
 ├── run_tests.ps1        ← Test runner
 ├── start_kursbot.ps1    ← App starter
@@ -114,7 +114,7 @@ kurs-bot/
 ### Scripts Organization
 ```
 scripts/
-├── cmd.py                       ← Entry point (copied to root as cmd.py)
+├── cmd.py                       ← Entry point (copied to root as cli.py)
 ├── db_manage.py                 ← DB utilities
 ├── reset_dev_db.py              ← Reset preserving lessons
 ├── reset_recipes.py             ← DB recipes
@@ -131,7 +131,7 @@ scripts/
 
 ## Benefits
 
-✅ **Single command interface** - `python cmd.py <command>`
+✅ **Single command interface** - `python cli.py <command>`
 ✅ **Clear organization** - Related scripts grouped in folders
 ✅ **Reduced root clutter** - Only essential files at root level
 ✅ **Easy discoverability** - All commands in one place
@@ -142,7 +142,7 @@ scripts/
 
 ## Migration Steps
 
-1. ✅ Created `cmd.py` as master command runner
+1. ✅ Created `cli.py` as master command runner
 2. ✅ Moved debug scripts to `scripts/debug/`
 3. ✅ Moved `init_prod_db.py` to `scripts/`
 4. ⏳ Delete redundant root scripts:

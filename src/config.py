@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     OLLAMA_EMBED_MODEL: str = "nomic-embed-text:latest"
     EMBEDDING_DIMENSION: int = 768
     EMBEDDING_VERSION: int = 1
-    SEMANTIC_SEARCH_THRESHOLD: float = 0.4
+    SEMANTIC_SEARCH_THRESHOLD: float = 0.5
     SEMANTIC_SEARCH_MAX_RESULTS: int = 5
     # Trigger matcher feature flag and defaults
     ENABLE_TRIGGER_MATCHER: bool = True

@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 import json
 from typing import Optional, Tuple
+import asyncio
+import threading
 
 from sqlalchemy.orm import Session
 from apscheduler.triggers.date import DateTrigger
@@ -270,6 +272,149 @@ def handle_debug_next_day(
     return "OK — simulating next day for 1 hour. No active daily schedule found."
 
 
+def handle_list_memories(text: str, memory_manager, session: Session, user_id: int) -> Optional[str]:
+    """Handle user commands that request listing memories.
+
+    Recognizes aliases like `list memories`, `list my memories`, `list_memories`.
+    Returns a formatted string when matched, otherwise `None`.
+    """
+    if not text or not text.strip():
+        return None
+    text_lower = text.strip().lower()
+    triggers = {
+        "list all my memories",
+        "list my memories",
+        "list memories",
+        "list_memories",
+        "list memory",
+    }
+    # Accept trigger optionally followed by extra query text (handled below)
+
+    try:
+        rows = (
+            session.query(Schedule).session.bind._engine.table_names and []
+        )
+    except Exception:
+        # We'll not rely on Schedule import here; perform the query directly
+        pass
+
+    try:
+        q = (
+            session.query()
+        )
+    except Exception:
+        pass
+
+    try:
+        # Query Memory model directly to build the list
+        from src.models.database import Memory as _Memory
+
+        def _format_mem_lines(mems: list) -> list:
+            out = []
+            for mem in mems:
+                date = getattr(mem, "created_at", None) or getattr(mem, "embedding_generated_at", None)
+                date_short = date.strftime("%Y-%m-%d %H:%M") if date is not None else "-"
+                key = getattr(mem, "key", "")
+                key_part = f" {key}" if key else ""
+                val = mem.value or ""
+                if len(val) > 400:
+                    val = val[:397] + "..."
+                out.append(f"{date_short}: {mem.category}{key_part}: \"{val}\"")
+            return out
+
+        # Determine whether the user provided a trailing query after the trigger
+        matched_trigger = False
+        query_tail = ""
+        for trig in triggers:
+            if text_lower == trig:
+                matched_trigger = True
+                query_tail = ""
+                break
+            if text_lower.startswith(trig + " "):
+                matched_trigger = True
+                # preserve original text after the trigger (not lowercased)
+                query_tail = text[len(trig) :].strip()
+                break
+        if not matched_trigger:
+            return None
+
+        # If no query provided or user asked for '*', list all memories as before
+        if not query_tail or query_tail.strip() == "*":
+            rows = (
+                session.query(_Memory)
+                .filter(_Memory.user_id == user_id)
+                .filter(_Memory.is_active == True)
+                .order_by(_Memory.created_at.asc())
+                .all()
+            )
+            if not rows:
+                return "You have no memories stored."
+            return "\n".join(_format_mem_lines(rows))
+
+        # Otherwise run a semantic search for the provided query tail and list matching memories
+        def _run_coro_sync(coro):
+            """Run coroutine `coro` synchronously.
+
+            If there's no running event loop in the current thread, use
+            `asyncio.run`. If there is a running loop, run the coroutine in a
+            fresh event loop on a new thread to avoid "asyncio.run() cannot be
+            called from a running event loop" errors.
+            """
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                return asyncio.run(coro)
+
+            result = {}
+            exc = {}
+
+            def _worker():
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    result["value"] = loop.run_until_complete(coro)
+                except Exception as e:
+                    exc["e"] = e
+                finally:
+                    try:
+                        loop.close()
+                    except Exception:
+                        pass
+
+            t = threading.Thread(target=_worker)
+            t.start()
+            t.join()
+            if "e" in exc:
+                raise exc["e"]
+            return result.get("value")
+
+        try:
+            search_service = get_semantic_search_service()
+            search_session = Session(bind=session.get_bind())
+            try:
+                results = _run_coro_sync(
+                    search_service.search_memories(
+                        user_id=user_id, query_text=query_tail, session=search_session, limit=20
+                    )
+                )
+            finally:
+                search_session.close()
+            if not results:
+                return "No results for query"
+            mems = [m for (m, s) in results]
+            return "\n".join(_format_mem_lines(mems))
+        except Exception as e:
+            logger.exception("Semantic search failed for list memories: %s", e)
+            # Include exception text to help debugging in dev environments
+            try:
+                return f"Failed to perform semantic search for memories: {e}"
+            except Exception:
+                return "Failed to perform semantic search for memories."
+    except Exception as e:
+        logger.exception("Failed to build memory list: %s", e)
+        return "Failed to list memories."
+
+
 def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> Optional[str]:
     """Handle `rag_prompt` CLI-style commands from users.
 
@@ -301,11 +446,56 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> Option
     db = SessionLocal()
     try:
         if sub == "list":
+            parts_out = []
+
+            # Resolve active prompt according to PromptRegistry logic: custom overrides selected key
+            active_type = None
+            active_key = None
+            try:
+                custom_mem = memory_manager.get_memory(user_id, "custom_rag_prompt")
+                custom_val = custom_mem[0].get("value") if custom_mem else None
+                if custom_val and custom_val.strip():
+                    active_type = "custom"
+            except Exception:
+                custom_val = None
+
+            try:
+                sel_mem = memory_manager.get_memory(user_id, "selected_rag_prompt_key")
+                sel_key = sel_mem[0].get("value") if sel_mem else None
+                if active_type is None and sel_key:
+                    active_type = "selected"
+                    active_key = sel_key
+            except Exception:
+                sel_key = None
+
+            # Include any ad-hoc custom prompt stored in user memory
+            if custom_val:
+                snippet = custom_val[:200] + ("..." if len(custom_val) > 200 else "")
+                suffix = " (active)" if active_type == "custom" else ""
+                parts_out.append(f"custom{suffix}: {snippet}")
+
+            # Include private templates owned by this user (owner stored as str(user_id))
+            try:
+                private_templates = db.query(PromptTemplate).filter(
+                    PromptTemplate.visibility == "private",
+                    PromptTemplate.owner == str(user_id),
+                ).all()
+                for t in private_templates:
+                    suffix = " (active)" if active_type == "selected" and active_key == t.key else ""
+                    parts_out.append(f"{t.key} (private){suffix}: {t.title}")
+            except Exception:
+                pass
+
+            # Finally include public templates
             templates = db.query(PromptTemplate).filter(PromptTemplate.visibility == "public").all()
-            if not templates:
-                return "No public prompt templates available."
-            lines = [f"{t.key}: {t.title}" for t in templates]
-            return "Available prompts:\n" + "\n".join(lines)
+            if templates:
+                for t in templates:
+                    suffix = " (active)" if active_type == "selected" and active_key == t.key else ""
+                    parts_out.append(f"{t.key}{suffix}: {t.title}")
+
+            if not parts_out:
+                return "No RAG prompts available."
+            return "Available prompts:\n" + "\n".join(parts_out)
 
         if sub == "select":
             if len(parts) < 3:
@@ -328,6 +518,8 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> Option
             rest = text.strip()[len(parts[0]) + len(parts[1]) + 2 :].strip()
             if not rest:
                 return "Usage: rag_prompt custom <text>"
+
+            # Store in user memory (keeps existing behavior)
             memory_manager.store_memory(
                 user_id=user_id,
                 key="custom_rag_prompt",
@@ -336,6 +528,32 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> Option
                 source="user_command",
                 category="conversation",
             )
+
+            # Also persist as a private PromptTemplate row so it appears in listings
+            try:
+                key = f"private_rag_user_{user_id}"
+                existing = db.query(PromptTemplate).filter(PromptTemplate.key == key).first()
+                if existing:
+                    existing.text = rest
+                    existing.title = f"Custom prompt (user {user_id})"
+                    existing.owner = str(user_id)
+                    existing.visibility = "private"
+                else:
+                    pt = PromptTemplate(
+                        key=key,
+                        title=f"Custom prompt (user {user_id})",
+                        text=rest,
+                        owner=str(user_id),
+                        visibility="private",
+                    )
+                    db.add(pt)
+                db.commit()
+            except Exception:
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
+
             return "Custom RAG prompt saved for your account."
 
         if sub == "show":

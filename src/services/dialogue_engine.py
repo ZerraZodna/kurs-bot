@@ -27,9 +27,10 @@ from src.services.dialogue import (
     handle_gdpr_commands,
     handle_debug_next_day,
     maybe_send_next_lesson,
+    handle_list_memories,
 )
 from src.config import settings
-from src.models.database import User
+from src.models.database import User, Memory
 from src.services.timezone_utils import ensure_user_timezone, format_dt_in_timezone
 from src.services.prompt_registry import get_prompt_registry
 
@@ -123,6 +124,12 @@ class DialogueEngine:
         # Check if RAG mode is persistently enabled
         if not use_rag_for_this_message and self.memory_manager:
             use_rag_for_this_message = is_rag_mode_enabled(self.memory_manager, user_id)
+
+        # If user is in RAG mode and asked to list memories, return full list
+        if use_rag_for_this_message:
+            listMemories = handle_list_memories(text, self.memory_manager, session, user_id)
+            if listMemories:
+                return listMemories;
 
         # Handle forget commands (semantic memory deletion)
         forget_response = await handle_forget_commands(
