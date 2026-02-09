@@ -10,8 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-MEMORY_EXTRACTOR_MODEL = settings.MEMORY_EXTRACTOR_MODEL or "qwen2.5-coder:7b"
-MEMORY_EXTRACTOR_RAG_MODEL = settings.MEMORY_EXTRACTOR_RAG_MODEL or MEMORY_EXTRACTOR_MODEL
+MEMORY_EXTRACTOR_RAG_MODEL = getattr(settings, "MEMORY_EXTRACTOR_RAG_MODEL", None) or settings.OLLAMA_MODEL
 
 # System prompt for memory extraction - language agnostic
 MEMORY_EXTRACTION_PROMPT = """You are a personal memory classifier. Your job is to extract meaningful facts and preferences from user messages.
@@ -95,7 +94,7 @@ class MemoryExtractor:
 User message: "{user_message}"{context_str}"""
             
             # Call Ollama via shared client wrapper
-            model = model_override or MEMORY_EXTRACTOR_MODEL
+            model = model_override or settings.OLLAMA_MODEL
             # Lazy import to avoid circular imports during package initialization
             from src.services.dialogue.ollama_client import call_ollama
             response_text = await call_ollama(prompt, model=model)

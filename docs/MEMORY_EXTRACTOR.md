@@ -25,7 +25,6 @@ In `.env`:
 ```
 OLLAMA_URL=http://localhost:11434/api/generate
 OLLAMA_MODEL=llama3.1:8b
-MEMORY_EXTRACTOR_MODEL=qwen2.5-coder:7b
 ```
 
 **Recommended Models for Memory Extraction:**
