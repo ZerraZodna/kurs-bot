@@ -10,7 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-MEMORY_EXTRACTOR_RAG_MODEL = getattr(settings, "MEMORY_EXTRACTOR_RAG_MODEL", None) or settings.OLLAMA_MODEL
+DEFAULT_RAG_MODEL = getattr(settings, "OLLAMA_CHAT_RAG_MODEL", None) or settings.OLLAMA_MODEL
 
 # System prompt for memory extraction - language agnostic
 MEMORY_EXTRACTION_PROMPT = """You are a personal memory classifier. Your job is to extract meaningful facts and preferences from user messages.

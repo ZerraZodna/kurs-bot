@@ -193,7 +193,7 @@ async def extract_and_store_memories(
             else None
         )
 
-        model_override = settings.MEMORY_EXTRACTOR_RAG_MODEL if rag_mode else None
+        model_override = settings.OLLAMA_CHAT_RAG_MODEL if rag_mode else None
         extracted_memories = await memory_extractor.extract_memories(
             user_message, user_context, model_override=model_override
         )
