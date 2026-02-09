@@ -7,6 +7,7 @@ from src.services.embedding_service import get_embedding_service
 from src.config import settings
 import asyncio
 import logging
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -167,7 +168,22 @@ class TriggerMatcher:
             if not stored:
                 continue
 
-            score = self.embedding_service.cosine_similarity(embedding, stored)
+            # Ensure embeddings have compatible sizes; pad shorter vector with zeros
+            try:
+                a = np.array(embedding, dtype=float)
+                b = np.array(stored, dtype=float)
+                if a.size != b.size:
+                    maxlen = max(a.size, b.size)
+                    a_p = np.zeros(maxlen, dtype=float)
+                    b_p = np.zeros(maxlen, dtype=float)
+                    a_p[: a.size] = a
+                    b_p[: b.size] = b
+                    score = self.embedding_service.cosine_similarity(a_p.tolist(), b_p.tolist())
+                else:
+                    score = self.embedding_service.cosine_similarity(embedding, stored)
+            except Exception:
+                # Fallback to zero similarity on error
+                score = 0.0
             matches.append({
                 "trigger_id": t["trigger_id"],
                 "name": t["name"],

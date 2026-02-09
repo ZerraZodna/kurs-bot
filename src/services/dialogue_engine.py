@@ -48,6 +48,15 @@ class DialogueEngine:
             if self.onboarding
             else None
         )
+    
+    def get_trigger_dispatcher(self, db=None, memory_manager: MemoryManager = None) -> object:
+        from src.services.trigger_dispatcher import get_trigger_dispatcher as _get
+        return _get(db=db, memory_manager=memory_manager)
+
+
+    def get_trigger_dispatcher(db=None, memory_manager: MemoryManager = None) -> object:
+        from src.services.trigger_dispatcher import get_trigger_dispatcher as _get
+        return _get(db=db, memory_manager=memory_manager)
 
     async def call_ollama(self, prompt: str, model: Optional[str] = None) -> str:
         """Delegate to dialogue.ollama_client."""
@@ -409,3 +418,9 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
             return "Welcome! What's your name?"
         
         return self.prompt_builder.build_onboarding_prompt(settings.SYSTEM_PROMPT)
+
+
+# Module-level wrapper so tests can monkeypatch `src.services.dialogue_engine.get_trigger_dispatcher`
+def get_trigger_dispatcher(db=None, memory_manager: MemoryManager = None) -> object:
+    from src.services.trigger_dispatcher import get_trigger_dispatcher as _get
+    return _get(db=db, memory_manager=memory_manager)
