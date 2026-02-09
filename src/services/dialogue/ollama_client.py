@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import asyncio
 import httpx
 import logging
 from src.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Read Ollama endpoint from settings so it's configurable like elsewhere
+# Configurable endpoint, timeout and retries
 OLLAMA_URL = getattr(settings, "OLLAMA_URL", "http://localhost:11434/api/generate")
+OLLAMA_TIMEOUT = getattr(settings, "OLLAMA_TIMEOUT", 30.0)
+OLLAMA_RETRIES = getattr(settings, "OLLAMA_RETRIES", 2)
 # Cache config flag at import time for fast checks
 #SHOW_AI_PROMPT = getattr(settings, "SHOW_AI_PROMPT", False)
 
@@ -35,7 +38,21 @@ async def call_ollama(prompt: str, model: str | None = None) -> str:
 
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.post(OLLAMA_URL, json=payload, timeout=30.0)
+            # Retry on read timeouts with simple exponential backoff
+            backoff = 0.5
+            for attempt in range(0, OLLAMA_RETRIES + 1):
+                try:
+                    response = await client.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT)
+                    break
+                except httpx.ReadTimeout:
+                    if attempt < OLLAMA_RETRIES:
+                        await asyncio.sleep(backoff)
+                        backoff *= 2
+                        logger.warning("Ollama read timeout, retrying (attempt=%s)", attempt + 1)
+                        continue
+                    else:
+                        logger.exception("Ollama read timeout after %s attempts", OLLAMA_RETRIES + 1)
+                        return "[Sorry, I couldn't process your request right now.]"
 
             # Log status and response body (truncated)
             logger.info("Ollama HTTP %s", response.status_code)

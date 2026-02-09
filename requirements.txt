@@ -18,3 +18,5 @@ ollama
 pydantic_core==2.41.5
 numpy
 pydantic-settings
+redis
+rq

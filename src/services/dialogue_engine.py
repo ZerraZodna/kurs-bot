@@ -20,6 +20,7 @@ from src.services.dialogue import (
     detect_and_store_language,
     extract_and_store_memories,
     handle_rag_mode_toggle,
+    handle_rag_prompt_command,
     parse_rag_prefix,
     is_rag_mode_enabled,
     handle_forget_commands,
@@ -30,6 +31,7 @@ from src.services.dialogue import (
 from src.config import settings
 from src.models.database import User
 from src.services.timezone_utils import ensure_user_timezone, format_dt_in_timezone
+from src.services.prompt_registry import get_prompt_registry
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,7 @@ class DialogueEngine:
     def __init__(self, db: Optional[Session] = None, memory_manager: Optional[MemoryManager] = None):
         self.db = db
         self.memory_manager = memory_manager or MemoryManager(db)
+        self.prompt_registry = get_prompt_registry()
         self.prompt_builder = PromptBuilder(db, self.memory_manager) if db else None
         self.memory_extractor = MemoryExtractor()
         self.onboarding = OnboardingService(db) if db else None
@@ -99,6 +102,11 @@ class DialogueEngine:
         rag_toggle_response = handle_rag_mode_toggle(text, self.memory_manager, user_id)
         if rag_toggle_response:
             return rag_toggle_response
+
+        # Handle RAG prompt management commands: rag_prompt list|select|custom|show
+        prompt_cmd_response = handle_rag_prompt_command(text, self.memory_manager, user_id)
+        if prompt_cmd_response:
+            return prompt_cmd_response
 
         # Detect RAG prefix: "rag my question" or "rag: my question"
         text, use_rag_for_this_message = parse_rag_prefix(text)
@@ -235,7 +243,11 @@ class DialogueEngine:
 
             # Use RAG prompt if RAG mode is active for this message
             if use_rag_for_this_message:
-                system_prompt = settings.SYSTEM_PROMPT_RAG
+                # Resolve per-user prompt via PromptRegistry (falls back to SYSTEM_PROMPT_RAG)
+                try:
+                    system_prompt = self.prompt_registry.get_prompt_for_user(self.memory_manager, user_id)
+                except Exception:
+                    system_prompt = settings.SYSTEM_PROMPT_RAG
                 prompt = self.prompt_builder.build_rag_prompt(
                     user_id=user_id,
                     user_input=text,

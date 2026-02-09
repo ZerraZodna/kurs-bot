@@ -24,6 +24,7 @@ from .schedule_handlers import handle_schedule_messages
 from .lesson_advance import maybe_send_next_lesson
 from .command_handlers import (
     handle_rag_mode_toggle,
+    handle_rag_prompt_command,
     parse_rag_prefix,
     is_rag_mode_enabled,
     handle_forget_commands,
@@ -48,6 +49,7 @@ __all__ = [
     "detect_schedule_status_request",
     "build_schedule_status_response",
     "handle_rag_mode_toggle",
+    "handle_rag_prompt_command",
     "parse_rag_prefix",
     "is_rag_mode_enabled",
     "handle_forget_commands",

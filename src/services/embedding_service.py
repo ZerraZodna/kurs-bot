@@ -189,3 +189,38 @@ def get_embedding_service() -> EmbeddingService:
     if _embedding_service is None:
         _embedding_service = EmbeddingService()
     return _embedding_service
+
+
+# --- Queue helper (optional; requires `redis` + `rq`) ---
+try:
+    import os
+    from redis import Redis
+    from rq import Queue
+    REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+    _redis_conn = Redis.from_url(REDIS_URL)
+    _embed_queue = Queue("embeddings", connection=_redis_conn)
+except Exception:
+    _redis_conn = None
+    _embed_queue = None
+
+
+def enqueue_embedding_for_memory(memory_id: int, text: str, delay: int = 0):
+    """
+    Enqueue an embedding generation job. Falls back to inline generation
+    if Redis/RQ is not configured.
+    Returns: job object when enqueued, or embedding list when run inline.
+    """
+    if _embed_queue is None:
+        logger.warning("Redis/RQ not configured; running embedding inline for memory_id=%s", memory_id)
+        svc = get_embedding_service()
+        return asyncio.run(svc.generate_embedding(text))
+
+    # Use import path so RQ worker can import the function
+    job = _embed_queue.enqueue(
+        "src.workers.embedding_worker.generate_and_store_embedding",
+        memory_id,
+        text,
+        retry=3,
+        timeout=120,
+    )
+    return job

@@ -19,6 +19,8 @@ from src.services.gdpr_service import (
     withdraw_consent,
 )
 from src.services.gdpr_verification import create_verification, verify_code
+from src.models.database import PromptTemplate, SessionLocal
+from src.services.prompt_registry import get_prompt_registry
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +30,8 @@ def handle_rag_mode_toggle(text: str, memory_manager, user_id: int) -> Optional[
     # Normalize: accept both 'rag_mode' and 'rag mode' (and plain 'rag')
     normalized = text_lower.replace("_", " ").strip()
 
-    if normalized in ("rag_mode", "rag mode", "rag"):
+    # Accept 'rag', 'rag mode', 'rag_mode', and 'ragmode' as aliases
+    if normalized in ("rag_mode", "rag mode", "rag", "ragmode"):
         rag_mode_memory = memory_manager.get_memory(user_id, "rag_mode_enabled")
         is_on = bool(rag_mode_memory and rag_mode_memory[0].get("value") == "true")
         return f"RAG mode is {'on' if is_on else 'off'}."
@@ -39,8 +42,10 @@ def handle_rag_mode_toggle(text: str, memory_manager, user_id: int) -> Optional[
         mode_cmd = normalized[len("rag mode "):].strip()
     elif normalized.startswith("rag "):
         mode_cmd = normalized[len("rag "):].strip()
-    # Also allow 'rag: on' style (colon)
-    elif text_lower.startswith("rag:"):
+    elif normalized.startswith("ragmode "):
+        mode_cmd = normalized[len("ragmode "):].strip()
+    # Also allow 'rag: on' or 'ragmode: on' style (colon)
+    elif text_lower.startswith("rag:") or text_lower.startswith("ragmode:"):
         mode_cmd = text_lower.split(":", 1)[1].strip()
 
     if not mode_cmd:
@@ -55,7 +60,14 @@ def handle_rag_mode_toggle(text: str, memory_manager, user_id: int) -> Optional[
             source="user_command",
             category="conversation",
         )
-        return "RAG mode enabled. I will use semantic search for all future messages."
+        return (
+            "RAG mode enabled. I will use semantic search over your memories for future messages.\n\n"
+            "You can customize RAG behavior:\n"
+            "- Use `rag_prompt list` to view available prompt templates.\n"
+            "- Use `rag_prompt select <key>` to pick a template from the library.\n"
+            "- Use `rag_prompt custom <text>` to set a personal RAG system prompt.\n\n"
+            "Tip: prefix a single message with `rag:` to use RAG only for that message."
+        )
     if mode_cmd == "off":
         memory_manager.store_memory(
             user_id=user_id,
@@ -256,3 +268,94 @@ def handle_debug_next_day(
             )
         return "OK — simulating next day for 1 hour and triggering the scheduled morning message now."
     return "OK — simulating next day for 1 hour. No active daily schedule found."
+
+
+def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> Optional[str]:
+    """Handle `rag_prompt` CLI-style commands from users.
+
+    Supported commands:
+      - `rag_prompt list` — list available public prompt templates
+      - `rag_prompt select <key>` — select a template for your account
+      - `rag_prompt custom <text>` — set a custom free-text prompt for RAG
+      - `rag_prompt show` — show current selection / custom prompt
+    """
+    if not text or not text.strip():
+        return None
+
+    parts = text.strip().split()
+    cmd = parts[0].lower()
+    if cmd not in ("rag_prompt", "ragprompt", "rag-prompt"):
+        return None
+
+    # no subcommand -> help
+    if len(parts) == 1:
+        return (
+            "RAG prompt commands:\n"
+            "- rag_prompt list\n"
+            "- rag_prompt select <key>\n"
+            "- rag_prompt custom <text>\n"
+            "- rag_prompt show"
+        )
+
+    sub = parts[1].lower()
+    db = SessionLocal()
+    try:
+        if sub == "list":
+            templates = db.query(PromptTemplate).filter(PromptTemplate.visibility == "public").all()
+            if not templates:
+                return "No public prompt templates available."
+            lines = [f"{t.key}: {t.title}" for t in templates]
+            return "Available prompts:\n" + "\n".join(lines)
+
+        if sub == "select":
+            if len(parts) < 3:
+                return "Usage: rag_prompt select <key>"
+            key = parts[2]
+            tmpl = db.query(PromptTemplate).filter(PromptTemplate.key == key).first()
+            if not tmpl:
+                return f"Prompt template '{key}' not found. Use 'rag_prompt list' to view available keys."
+            memory_manager.store_memory(
+                user_id=user_id,
+                key="selected_rag_prompt_key",
+                value=key,
+                confidence=1.0,
+                source="user_command",
+                category="conversation",
+            )
+            return f"Selected prompt '{key}' ({tmpl.title})."
+
+        if sub == "custom":
+            rest = text.strip()[len(parts[0]) + len(parts[1]) + 2 :].strip()
+            if not rest:
+                return "Usage: rag_prompt custom <text>"
+            memory_manager.store_memory(
+                user_id=user_id,
+                key="custom_rag_prompt",
+                value=rest,
+                confidence=1.0,
+                source="user_command",
+                category="conversation",
+            )
+            return "Custom RAG prompt saved for your account."
+
+        if sub == "show":
+            sel = memory_manager.get_memory(user_id, "selected_rag_prompt_key")
+            custom = memory_manager.get_memory(user_id, "custom_rag_prompt")
+            parts_out = []
+            if custom and custom[0].get("value"):
+                parts_out.append("Custom prompt: " + (custom[0].get("value")[:200] + ("..." if len(custom[0].get("value")) > 200 else "")))
+            if sel and sel[0].get("value"):
+                key = sel[0].get("value")
+                tmpl = db.query(PromptTemplate).filter(PromptTemplate.key == key).first()
+                if tmpl:
+                    parts_out.append(f"Selected template: {key} — {tmpl.title}")
+                else:
+                    parts_out.append(f"Selected template: {key} (not found)")
+            if not parts_out:
+                return "No RAG prompt selected for your account."
+            return "\n".join(parts_out)
+
+    finally:
+        db.close()
+
+    return None

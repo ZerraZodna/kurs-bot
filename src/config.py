@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     OLLAMA_EMBED_URL: str = "http://localhost:11434/api/embed"
     OLLAMA_EMBED_MODEL: str = "nomic-embed-text:latest"
     EMBEDDING_DIMENSION: int = 768
+    EMBEDDING_VERSION: int = 1
     SEMANTIC_SEARCH_THRESHOLD: float = 0.4
     SEMANTIC_SEARCH_MAX_RESULTS: int = 5
     # Trigger matcher feature flag and defaults

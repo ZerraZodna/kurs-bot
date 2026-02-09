@@ -6,7 +6,8 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict
 from sqlalchemy.orm import Session
 from src.models.database import SessionLocal, Memory, init_db
-from src.services.embedding_service import get_embedding_service
+from src.services.embedding_service import get_embedding_service, enqueue_embedding_for_memory
+from src.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -57,16 +58,49 @@ class MemoryManager:
         Otherwise run the coroutine synchronously so it is awaited.
         """
         try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(self._generate_and_store_embedding(memory_id, value))
-        except RuntimeError:
-            # No running loop (e.g. tests or simple script) — run synchronously
-            try:
-                asyncio.run(self._generate_and_store_embedding(memory_id, value))
-            except Exception as ex:
-                logger.warning(f"Could not run embedding generation synchronously: {ex}")
+            # Prefer enqueuing a background job via the queue helper. If Redis/RQ
+            # isn't configured, `enqueue_embedding_for_memory` falls back to
+            # inline embedding generation and will return the embedding.
+            job_or_result = enqueue_embedding_for_memory(memory_id, value)
+
+            # If the helper returned an embedding (inline fallback), persist it now.
+            if isinstance(job_or_result, list):
+                try:
+                    emb = job_or_result
+                    emb_bytes = self.embedding_service.embedding_to_bytes(emb)
+                    session = SessionLocal()
+                    try:
+                        mem = session.get(Memory, memory_id)
+                        if mem:
+                            mem.embedding = emb_bytes
+                            mem.embedding_version = settings.EMBEDDING_VERSION
+                            mem.embedding_generated_at = datetime.now(timezone.utc)
+                            session.add(mem)
+                            session.commit()
+                            logger.debug(f"Generated and stored embedding for memory {memory_id} (inline fallback)")
+                        else:
+                            logger.warning(f"Memory {memory_id} not found when storing inline embedding")
+                    finally:
+                        session.close()
+                except Exception as ex:
+                    logger.exception(f"Failed to persist inline embedding for memory {memory_id}: {ex}")
+            else:
+                logger.debug(f"Enqueued embedding job for memory {memory_id}: {getattr(job_or_result, 'id', str(job_or_result))}")
+
         except Exception as ex:
-            logger.warning(f"Could not schedule embedding generation: {ex}")
+            # On any error, fall back to the previous behavior of trying to
+            # schedule on the running loop or run synchronously to avoid losing
+            # embedding generation entirely.
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self._generate_and_store_embedding(memory_id, value))
+            except RuntimeError:
+                try:
+                    asyncio.run(self._generate_and_store_embedding(memory_id, value))
+                except Exception as ex2:
+                    logger.warning(f"Could not run embedding generation synchronously: {ex2}")
+            except Exception as ex2:
+                logger.warning(f"Could not schedule embedding generation after enqueue failure: {ex2}")
 
     def get_memory(self, user_id: int, key: str) -> List[Dict]:
         now = datetime.now(timezone.utc)

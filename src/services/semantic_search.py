@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from src.models.database import Memory
 from src.services.embedding_service import get_embedding_service
 from src.config import settings
+from src.services.vector_index import VectorIndexClient
 
 logger = logging.getLogger(__name__)
 
@@ -94,8 +95,37 @@ class SemanticSearchService:
         if threshold is None:
             threshold = self.similarity_threshold
         
-        # Build query for user's memories with embeddings
-        # Use chained filters so test mocks that expect chained calls work
+        # Try vector index first (fast path)
+        try:
+            idx = VectorIndexClient.from_env()
+            candidates = idx.query(embedding, k=limit * 3)
+            results = []
+            if candidates:
+                # Collect ids and fetch corresponding memories
+                ids = [int(cid) for cid, _ in candidates if cid.isdigit()]
+                query = session.query(Memory).filter(Memory.memory_id.in_(ids)).filter(Memory.user_id == user_id).filter(Memory.is_active == True)
+                if categories:
+                    query = query.filter(Memory.category.in_(categories))
+                mem_map = {m.memory_id: m for m in query.all()}
+                # Map back to candidate order and include only above threshold
+                for cid, score in candidates:
+                    try:
+                        mid = int(cid)
+                    except Exception:
+                        continue
+                    mem = mem_map.get(mid)
+                    if not mem:
+                        continue
+                    if score >= threshold:
+                        results.append((mem, float(score)))
+
+                # Sort & limit
+                results.sort(key=lambda x: x[1], reverse=True)
+                return results[:limit]
+        except Exception as e:
+            logger.debug("Vector index query failed or not configured: %s", e)
+
+        # Fallback: brute-force DB scan and cosine similarity
         query = (
             session.query(Memory)
             .filter(Memory.user_id == user_id)

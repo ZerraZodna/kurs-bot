@@ -27,6 +27,11 @@ if prod_db_path.exists():
 os.environ['DATABASE_URL'] = 'sqlite:///./src/data/prod.db'
 
 # Import after setting environment
+import sys
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
 from src.models.database import Base, engine
 
 print("🗄️  Creating production database schema...")
@@ -48,3 +53,12 @@ try:
     print("✅ Trigger embeddings seeded")
 except Exception as e:
     print(f"⚠️  Failed to seed trigger embeddings: {e}")
+
+# Seed prompt templates (default library)
+try:
+    print("\n✨ Seeding default prompt templates...")
+    from scripts.seed_prompt_templates import seed as _seed_prompts
+    _seed_prompts()
+    print("✅ Prompt templates seeded")
+except Exception as e:
+    print(f"⚠️  Failed to seed prompt templates: {e}")

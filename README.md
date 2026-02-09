@@ -69,6 +69,34 @@ python cmd.py init-prod              # Initialize production database
 
 See [docs/SCRIPTS_ORGANIZATION.md](docs/SCRIPTS_ORGANIZATION.md) for full script documentation.
 
+## Local development helper scripts
+
+The repository includes convenience scripts for getting a local development environment running quickly on Windows.
+
+- Start everything (Redis, worker, reindex, uvicorn, ngrok):
+   ```powershell
+   .\start_kursbot.ps1 -StartInfra
+   # or to skip the reindex step: .\scripts\start_all.ps1 -SkipReindex
+   ```
+
+- Start Redis (Docker):
+   ```powershell
+   .\scripts\start_redis.ps1
+   # or for Redis Stack (vector features): .\scripts\start_redis_stack.ps1
+   ```
+
+- Start an RQ worker in a new window:
+   ```powershell
+   .\scripts\start_worker.ps1
+   ```
+
+- Run the reindex script (upsert existing embeddings into the vector index):
+   ```powershell
+   .\scripts\run_reindex.ps1 --batch 100 --enqueue-missing
+   ```
+
+See `DEPLOYMENT.md` for production deployment notes and recommended startup order.
+
 ## Configuration (.env)
 - `DATABASE_URL` - Database connection string (default: SQLite for dev)
 - `TELEGRAM_BOT_TOKEN` - Telegram bot token
