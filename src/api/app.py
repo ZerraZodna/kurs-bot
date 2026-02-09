@@ -14,6 +14,7 @@ from src.services.admin_notifier import set_admin_chat_id, send_admin_notificati
 from src.services.traffic_tracker import record_traffic_event
 from src.services.downtime_monitor import run_downtime_monitor
 from src.api.dialogue_routes import router as dialogue_router
+from src.services.dialogue import extract_and_store_memories
 from src.api.gdpr_routes import router as gdpr_router
 import threading
 import time
@@ -121,6 +122,11 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
             # Log outbound and mark processed
             try:
                 db = SessionLocal()
+
+                # If onboarding is not required, extract and store memories from the combined text.
+                if 'dialogue' in locals() and dialogue.onboarding and not dialogue.onboarding.should_show_onboarding(user_id):
+                    await extract_and_store_memories(dialogue.memory_manager, dialogue.memory_extractor, user_id, combined_text, rag_mode=False)
+
                 log = MessageLog(
                     user_id=user_id,
                     direction="outbound",

@@ -1,12 +1,7 @@
-import httpx
 import logging
-import json
-from typing import Optional, Dict, Any
+from typing import Optional
 from sqlalchemy.orm import Session
-from langdetect import detect, LangDetectException
 from src.services.memory_manager import MemoryManager
-from src.services.trigger_matcher import get_trigger_matcher
-from src.services.trigger_dispatcher import get_trigger_dispatcher
 from src.services.prompt_builder import PromptBuilder
 from src.services.semantic_search import get_semantic_search_service
 from src.services.memory_extractor import MemoryExtractor
@@ -133,9 +128,12 @@ class DialogueEngine:
             return debug_response
 
         # FIRST: Extract memories from user message (this might store commitment, name, time, etc.)
-        await extract_and_store_memories(
-            self.memory_manager, self.memory_extractor, user_id, text, rag_mode=use_rag_for_this_message
-        )
+        if self.onboarding.should_show_onboarding(user_id):
+            await extract_and_store_memories(
+                self.memory_manager, self.memory_extractor, user_id, text, rag_mode=use_rag_for_this_message
+            )
+ 
+
         await detect_and_store_language(self.memory_manager, user_id, text)
 
         # Handle lesson confirmation replies (before onboarding/schedule logic)

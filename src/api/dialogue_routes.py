@@ -87,10 +87,7 @@ async def send_message(request: MessageRequest, db: Session = Depends(get_db)):
         history_turns=request.history_turns,
     )
     
-    return MessageResponse(
-        user_id=request.user_id,
-        response=response,
-    )
+    return MessageResponse(user_id=request.user_id, response=response,)
 
 
 @router.post("/onboard")

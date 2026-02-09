@@ -30,8 +30,8 @@ async def call_ollama(prompt: str, model: str | None = None) -> str:
 
     # Log the prompt (truncated) for debugging when enabled via config
     #if SHOW_AI_PROMPT:
-    #    preview = prompt if prompt is None or len(prompt) <= 2000 else prompt[:2000] + "..."
-    #    logger.info("AI PROMPT (model=%s): %s", model, preview)
+    preview = prompt if prompt is None or len(prompt) <= 100 else prompt[:100] + "..."
+    logger.info("AI PROMPT (model=%s): %s", model, preview)
 
     try:
         async with httpx.AsyncClient() as client:

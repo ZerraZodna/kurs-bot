@@ -6,7 +6,7 @@ from src.models.database import SessionLocal, TriggerEmbedding
 
 
 class DummyEmbedSvc:
-    def __init__(self, dim=4):
+    def __init__(self, dim=768):
         self.dim = dim
 
     async def generate_embedding(self, text: str):

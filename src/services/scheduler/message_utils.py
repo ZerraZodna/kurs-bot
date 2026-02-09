@@ -31,6 +31,7 @@ def format_lesson_message(lesson: Lesson, language: str) -> str:
 
 
 def translate_text_sync(text: str, language: str) -> str:
+    print("Translate to lng=%s", str)
     try:
         prompt = (
             f"Translate the following text to {language}. "
