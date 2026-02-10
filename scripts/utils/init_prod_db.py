@@ -1,23 +1,27 @@
 """
-Initialize a clean production database.
-Run this script when you want to start fresh with production data.
+Init production DB helper (moved into scripts/utils).
 
-Usage:
-    python scripts/init_prod_db.py
+This is the same as scripts/init_prod_db.py but located under scripts/utils.
+REPO_ROOT calculation adjusted so the script works from the new location.
 """
 import os
 import sys
+import argparse
 from pathlib import Path
 
 # Ensure we're using the production database
+parser = argparse.ArgumentParser(description='Initialize production database')
+parser.add_argument('--yes', '-y', action='store_true', help='Auto-confirm recreate without prompt')
+args = parser.parse_args()
+
 prod_db_path = Path("src/data/prod.db")
 
 if prod_db_path.exists():
-    confirm = input(f"⚠️  {prod_db_path} already exists. Delete and recreate? (yes/no): ")
-    if confirm.lower() != 'yes':
-        print("❌ Aborted. No changes made.")
-        sys.exit(0)
-    
+    if not args.yes:
+        confirm = input(f"⚠️  {prod_db_path} already exists. Delete and recreate? (yes/no): ")
+        if confirm.lower() != 'yes':
+            print("❌ Aborted. No changes made.")
+            sys.exit(0)
     # Backup existing database
     backup_path = prod_db_path.with_suffix('.db.backup')
     prod_db_path.rename(backup_path)
@@ -27,8 +31,7 @@ if prod_db_path.exists():
 os.environ['DATABASE_URL'] = 'sqlite:///./src/data/prod.db'
 
 # Import after setting environment
-import sys
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
