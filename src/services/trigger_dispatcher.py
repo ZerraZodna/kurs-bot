@@ -188,6 +188,19 @@ class TriggerDispatcher:
 
         if not schedule_id:
             original_text = context.get("original_text", "") or ""
+            assistant_response = context.get("assistant_response", "") or ""
+            # If the combined context contains explicit one-time indicators (e.g. "tomorrow",
+            # "in 2 hours", or a specific date), this likely refers to a one-time reminder
+            # and should not be interpreted as a change to the user's daily lesson reminder.
+            text_context = f"{original_text}\n{assistant_response}".lower()
+            import re
+            # Match clear one-time indicators like 'tomorrow', 'next', 'in 2 hours', or 'on <date>'
+            # Do NOT match plain time strings (e.g. '12:00') here because those are
+            # commonly used for daily schedule updates.
+            one_time_indicators = r"\b(tomorrow|next\b|in\s+\d+\s+(minutes?|hours?|days?)|on\s+\w+\s+\d{1,2})\b"
+            if re.search(one_time_indicators, text_context):
+                result.update({"ok": False, "error": "not_a_daily_update", "note": "suspected_one_time_request"})
+                return result
             sched = schedule_manager.find_active_daily_schedule(user_id, session=self.db)
             if not sched:
                 result.update({"ok": False, "error": "missing_schedule_id"})

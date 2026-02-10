@@ -205,14 +205,21 @@ class DialogueEngine:
             onboarding_service=self.onboarding,
             schedule_request_handler=self._handle_schedule_request,
             call_ollama=self.call_ollama,
+            use_rag_for_this_message=use_rag_for_this_message,
         )
         if schedule_response:
             return schedule_response
 
         # Schedule handled after LLM response via trigger matching; skip pre-LLM scheduling
         
-        # Check if user needs onboarding (new users)
-        if self.onboarding_flow and self.onboarding.should_show_onboarding(user_id):
+        # Check if user needs onboarding (new users). Do NOT run onboarding
+        # prompts when the current message explicitly requests RAG — RAG should
+        # not trigger onboarding or other profile prompts.
+        if (
+            self.onboarding_flow
+            and self.onboarding.should_show_onboarding(user_id)
+            and not use_rag_for_this_message
+        ):
             onboarding_response = await self.onboarding_flow.handle_onboarding(user_id, text, session)
             if onboarding_response:
                 return onboarding_response

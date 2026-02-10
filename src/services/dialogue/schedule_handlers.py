@@ -24,6 +24,7 @@ async def handle_schedule_messages(
     onboarding_service,
     schedule_request_handler: Callable[[int, str, Session], Optional[str]],
     call_ollama,
+    use_rag_for_this_message: bool = False,
 ) -> Optional[str]:
     # NOTE: We no longer pre-process one-time reminder keywords here.
     # One-time reminders and schedule changes should be handled by the
@@ -45,6 +46,8 @@ async def handle_schedule_messages(
             response = await translate_text(response, language, call_ollama)
         return response
 
+    # Note: don't short-circuit schedule handling for RAG messages here.
+    # RAG-specific behavior is handled later by the caller and prompt builder.
     if detect_pause_request(text):
         deactivated = SchedulerService.deactivate_user_schedules(user_id, session=session)
         if memory_manager:
