@@ -35,39 +35,44 @@ async def send_message(chat_id: int, text: str) -> Optional[dict]:
         print("[telegram] TELEGRAM_BOT_TOKEN not set")
         return None
     url = f"{API_BASE}/sendMessage"
-    try:
-        async with httpx.AsyncClient() as client:
-            # Telegram hard limit is 4096 chars; stay below to be safe
-            max_len = 3500
-            chunks = _split_text(text, max_len) or [""]
-            last_response = None
-            for chunk in chunks:
-                html_chunk = _markdown_to_html(chunk)
-                payload = {
-                    "chat_id": chat_id,
-                    "text": html_chunk,
-                    "parse_mode": "HTML"  # Use HTML instead of MarkdownV2
-                }
+    async with httpx.AsyncClient() as client:
+        # Telegram hard limit is 4096 chars; stay below to be safe
+        max_len = 3500
+        chunks = _split_text(text, max_len) or [""]
+        last_response = None
+        for chunk in chunks:
+            html_chunk = _markdown_to_html(chunk)
+            payload = {
+                "chat_id": chat_id,
+                "text": html_chunk,
+                "parse_mode": "HTML"  # Use HTML instead of MarkdownV2
+            }
+            try:
+                r = await client.post(url, json=payload, timeout=10.0)
+                r.raise_for_status()
+                last_response = r.json()
+            except httpx.HTTPStatusError as e:
+                # Log details for easier debugging
+                resp = e.response
+                body = None
                 try:
-                    r = await client.post(url, json=payload, timeout=10.0)
+                    body = resp.text if resp is not None else None
+                except Exception:
+                    body = None
+                print(f"[telegram] HTTPStatusError {getattr(resp, 'status_code', None)}; body={body}")
+                # Fallback: send plain text without parse_mode to avoid HTML errors
+                if resp is not None and resp.status_code == 400:
+                    fallback_payload = {
+                        "chat_id": chat_id,
+                        "text": chunk
+                    }
+                    r = await client.post(url, json=fallback_payload, timeout=10.0)
                     r.raise_for_status()
                     last_response = r.json()
-                except httpx.HTTPStatusError as e:
-                    # Fallback: send plain text without parse_mode to avoid HTML errors
-                    if e.response is not None and e.response.status_code == 400:
-                        fallback_payload = {
-                            "chat_id": chat_id,
-                            "text": chunk
-                        }
-                        r = await client.post(url, json=fallback_payload, timeout=10.0)
-                        r.raise_for_status()
-                        last_response = r.json()
-                    else:
-                        raise
-            return last_response
-    except Exception as e:
-        print("[telegram send error]", e)
-        return None
+                else:
+                    # Let the caller see the exception so they can mark the send as failed
+                    raise
+        return last_response
 
 
 def _markdown_to_html(text: str) -> str:
