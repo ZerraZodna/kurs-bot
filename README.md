@@ -73,26 +73,9 @@ See [docs/SCRIPTS_ORGANIZATION.md](docs/SCRIPTS_ORGANIZATION.md) for full script
 
 The repository includes convenience scripts for getting a local development environment running quickly on Windows.
 
-- Start everything (Redis, worker, reindex, uvicorn, ngrok):
+- Start everything (uvicorn, ngrok):
    ```powershell
    .\start_kursbot.ps1 -StartInfra
-   # or to skip the reindex step: .\scripts\start_all.ps1 -SkipReindex
-   ```
-
-- Start Redis (Docker):
-   ```powershell
-   .\scripts\start_redis.ps1
-   # or for Redis Stack (vector features): .\scripts\start_redis_stack.ps1
-   ```
-
-- Start an RQ worker in a new window:
-   ```powershell
-   .\scripts\start_worker.ps1
-   ```
-
-- Run the reindex script (upsert existing embeddings into the vector index):
-   ```powershell
-   .\scripts\run_reindex.ps1 --batch 100 --enqueue-missing
    ```
 
 See `DEPLOYMENT.md` for production deployment notes and recommended startup order.
@@ -102,8 +85,7 @@ See `DEPLOYMENT.md` for production deployment notes and recommended startup orde
 - `TELEGRAM_BOT_TOKEN` - Telegram bot token
 - `SLACK_BOT_TOKEN` - Slack bot token
 - `SENDGRID_API_KEY` - SendGrid API key
- - `VECTOR_INDEX_BACKEND` - Vector index backend to use (`local`, `faiss`, or `redis`). Default: `local` for dev.
- - `VECTOR_INDEX_ENABLED` - Set to `true` to enable vector-index reads/writes when infra is ready.
+- Note: vector-index configuration and runtime toggle have been removed in this branch; vector indexing is disabled by design.
 
 ## Project Structure
 - `src/models/database.py` - SQLAlchemy ORM models

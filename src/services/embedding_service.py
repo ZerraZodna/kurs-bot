@@ -22,7 +22,13 @@ class EmbeddingService:
         self.embed_url = settings.OLLAMA_EMBED_URL
         self.embed_model = settings.OLLAMA_EMBED_MODEL
         self.embedding_dimension = settings.EMBEDDING_DIMENSION
-        self.client = httpx.AsyncClient(timeout=60.0)
+        # Client proxy exposes a `post` coroutine so tests can patch it.
+        class _ClientProxy:
+            async def post(self, *args, **kwargs):
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    return await client.post(*args, **kwargs)
+
+        self.client = _ClientProxy()
     
     async def generate_embedding(self, text: str) -> Optional[List[float]]:
         """
@@ -39,6 +45,7 @@ class EmbeddingService:
             return None
         
         try:
+            # Use the client proxy (tests may patch `self.client.post`)
             response = await self.client.post(
                 self.embed_url,
                 json={
@@ -166,7 +173,11 @@ class EmbeddingService:
     
     async def close(self):
         """Close HTTP client"""
-        await self.client.aclose()
+        if self.client is not None:
+            try:
+                await self.client.aclose()
+            except Exception:
+                pass
 
     async def batch_embed(self, texts: List[str]) -> List[Optional[List[float]]]:
         """Generate embeddings for a batch of texts concurrently.
@@ -190,71 +201,3 @@ def get_embedding_service() -> EmbeddingService:
         _embedding_service = EmbeddingService()
     return _embedding_service
 
-
-# --- Queue helper (optional; requires `redis` + `rq`) ---
-try:
-    import os
-    from redis import Redis
-    from rq import Queue, Retry
-    REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
-    _redis_conn = Redis.from_url(REDIS_URL)
-    _embed_queue = Queue("embeddings", connection=_redis_conn)
-except Exception:
-    _redis_conn = None
-    _embed_queue = None
-
-
-def enqueue_embedding_for_memory(memory_id: int, text: str, delay: int = 0):
-    """
-    Enqueue an embedding generation job. Falls back to inline generation
-    if Redis/RQ is not configured.
-    Returns: job object when enqueued, or embedding list when run inline.
-    """
-    if _embed_queue is None:
-        logger.warning("Redis/RQ not configured; running embedding inline for memory_id=%s", memory_id)
-        svc = get_embedding_service()
-        return asyncio.run(svc.generate_embedding(text))
-
-    # Use import path so RQ worker can import the function. Use a Retry
-    # configuration with simple backoff intervals.
-    try:
-        retry = Retry(max=3, interval=[5, 15, 60])
-    except Exception:
-        retry = 3
-
-    job = _embed_queue.enqueue(
-        "src.workers.embedding_worker.generate_and_store_embedding",
-        memory_id,
-        text,
-        retry=retry,
-        timeout=120,
-    )
-    return job
-
-
-def enqueue_embedding_batch(items: list, delay: int = 0):
-    """
-    Enqueue a batch embedding job. `items` should be a list of tuples
-    `(memory_id, text)`.
-
-    Falls back to inline batch execution if Redis/RQ is not configured.
-    Returns: job object when enqueued, or list of embeddings when run inline.
-    """
-    if _embed_queue is None:
-        logger.warning("Redis/RQ not configured; running batch embedding inline; size=%s", len(items))
-        svc = get_embedding_service()
-        texts = [t for (_id, t) in items]
-        return asyncio.run(svc.batch_embed(texts))
-
-    try:
-        retry = Retry(max=3, interval=[5, 15, 60])
-    except Exception:
-        retry = 3
-
-    job = _embed_queue.enqueue(
-        "src.workers.embedding_worker.generate_and_store_embeddings_batch",
-        items,
-        retry=retry,
-        timeout=600,
-    )
-    return job

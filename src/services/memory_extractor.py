@@ -108,13 +108,20 @@ User message: "{user_message}"{context_str}"""
             
             # Parse JSON response
             memories = MemoryExtractor._parse_ollama_response(response_text)
-            
+
             # Filter and validate
             valid_memories = [
                 m for m in memories
                 if m.get("store") and m.get("key") and m.get("value")
             ]
-            
+
+            # If Ollama returned nothing useful, fall back to simple heuristics
+            if not valid_memories:
+                heur = MemoryExtractor._heuristic_extract(user_message)
+                if heur:
+                    logger.debug(f"Heuristic extracted {len(heur)} memories from message")
+                    return heur
+
             logger.debug(f"Extracted {len(valid_memories)} memories from message: {user_message[:50]}")
             return valid_memories
             
@@ -166,4 +173,41 @@ User message: "{user_message}"{context_str}"""
         
         logger.warning(f"Could not parse memory extraction response: {response_text[:100]}")
         return []
+
+    @staticmethod
+    def _heuristic_extract(message: str) -> List[Dict[str, Any]]:
+        """
+        Lightweight heuristic extractor used when Ollama is unavailable.
+        Targets common patterns for learning goals and preferred lesson times
+        in English and simple Norwegian phrases.
+        """
+        out: List[Dict[str, Any]] = []
+        msg = message.strip()
+        lower = msg.lower()
+
+        # Detect learning goal phrases (English/Norwegian)
+        import re
+        goal_patterns = [r"my goal is to (.+)", r"i want to (.+)", r"jeg ønsker(?: å| å)?(?: )?(?:lære|gjøre|bli) (.+)", r"lære (.+)"]
+        for pat in goal_patterns:
+            m = re.search(pat, lower)
+            if m:
+                val = m.group(1).strip().rstrip(".")
+                out.append({"store": True, "key": "learning_goal", "value": val, "confidence": 0.75, "ttl_hours": None})
+                break
+
+        # Detect preferred lesson time (morning/evening/time strings)
+        time_keywords = {
+            "morning": ["morning", "morgenen", "morgenen", "om morgenen", "morgen"],
+            "evening": ["evening", "evenings", "aften", "om kvelden", "kveld"],
+            "night": ["night", "nighttime", "natt"]
+        }
+        for canonical, kws in time_keywords.items():
+            for kw in kws:
+                if kw in lower:
+                    out.append({"store": True, "key": "preferred_lesson_time", "value": canonical, "confidence": 0.8, "ttl_hours": None})
+                    break
+            if any(kw in lower for kw in kws):
+                break
+
+        return out
 

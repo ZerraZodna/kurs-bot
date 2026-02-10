@@ -1,6 +1,8 @@
 # RAG Mode — Implementation & Embedding Search
 
-This document summarizes how RAG (Retrieval-Augmented Generation) mode is handled in the codebase, where embeddings are generated and stored, and how semantic search over the `memories` table works.
+> NOTICE: In this branch persistent memory embeddings and the runtime vector-index feature are disabled. RAG/semantic-search that relies on per-memory embeddings is not active. The notes below describe the previous implementation and how to re-enable vector indexing if needed.
+
+This document summarizes how RAG (Retrieval-Augmented Generation) mode is handled in the codebase, where embeddings were generated and stored historically, and how semantic search over the `memories` table worked.
 
 **Summary**
 - RAG mode can be toggled per-message (prefix) or persistently via a stored memory key `rag_mode_enabled`.
@@ -24,14 +26,11 @@ This document summarizes how RAG (Retrieval-Augmented Generation) mode is handle
 - Public API used by the dialogue engine: `search_memories(user_id, query_text, session, ...)`.
 - Implementation details:
   - Generates a query embedding via the embedding service (`generate_embedding`).
-  - Calls `search_by_embedding(...)` which queries the `Memory` rows for the user filtering `Memory.embedding IS NOT NULL` and `Memory.is_active == True`.
+  - Historically called an embedding-based search routine which queried `Memory` rows filtering `Memory.embedding IS NOT NULL` and `Memory.is_active == True`. In this branch that routine has been removed and semantic search over per-memory embeddings is disabled.
   - Loads all matching memories (`query.all()`), deserializes stored bytes to vectors with `bytes_to_embedding`, computes cosine similarity in Python, filters by configured threshold, sorts by similarity, and returns the top results (max controlled by config).
 
 **Memory embedding storage & generation**
-- Database model: `Memory` includes `embedding` (LargeBinary), `embedding_version`, and `embedding_generated_at` in [src/models/database.py](src/models/database.py#L1-L120).
-- `MemoryManager.store_memory(...)` (see [src/services/memory_manager.py](src/services/memory_manager.py#L1-L200)) will schedule embedding generation for the stored value by calling an async helper `_generate_and_store_embedding(memory_id, value)`.
-- `_generate_and_store_embedding` uses the embedding service to generate the vector, converts it to bytes with `embedding_to_bytes`, sets `memory.embedding`, `embedding_version`, and `embedding_generated_at`, then commits using a separate DB session.
-- Embedding generation is scheduled via asyncio (uses `loop.create_task` when an event loop is available, otherwise falls back to `asyncio.run`).
+- `MemoryManager.store_memory(...)` (see [src/services/memory_manager.py](src/services/memory_manager.py#L1-L200)) previously scheduled embedding generation for the stored value. In this branch embedding generation scheduling and per-memory persistence have been removed — embeddings are no longer written to `Memory` rows.
 
 **Embedding service & similarity**
 - Implemented at [src/services/embedding_service.py](src/services/embedding_service.py#L1-L200).
@@ -54,9 +53,7 @@ This document summarizes how RAG (Retrieval-Augmented Generation) mode is handle
   See [src/services/dialogue/command_handlers.py](src/services/dialogue/command_handlers.py#L1-L180).
 - Trigger matching/dispatcher also interacts with embeddings (trigger embeddings table and trigger matcher code use the same embedding tools).
 
-**Behavioral notes & caveats**
-- The semantic search implementation currently loads candidate memories into Python and computes similarity in-process. This is simpler and test-friendly but may become a performance bottleneck at scale; consider using a vector index (FAISS, Annoy, Redis/Vector DB) if memory counts grow.
-- Embeddings are generated asynchronously and may not be immediately available for newly created memories (the code schedules generation and writes back later). Search filters for `embedding IS NOT NULL`.
+
 
 **User-facing enable/disable message**
 - When RAG is enabled the system now returns a short, informative message to the user explaining what RAG does and how to customize it. Example:
@@ -83,8 +80,5 @@ This message is designed to help users discover prompt customization and per-mes
 - Embedding service (Ollama): [src/services/embedding_service.py](src/services/embedding_service.py#L1-L200)
 - Config and defaults: [src/config.py](src/config.py#L1-L120)
 
-If you'd like, I can:
-- Add a short diagram of the RAG dataflow.
-- Replace the in-memory similarity loop with a vector index integration (FAISS/Redis) and add tests.
 
 (Report generated from code inspection on repository.)

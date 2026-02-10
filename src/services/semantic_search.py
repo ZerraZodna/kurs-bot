@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from src.models.database import Memory
 from src.services.embedding_service import get_embedding_service
 from src.config import settings
-from src.services.vector_index import VectorIndexClient
 
 logger = logging.getLogger(__name__)
 
@@ -50,120 +49,51 @@ class SemanticSearchService:
         if not query_text or not query_text.strip():
             logger.warning("Cannot search with empty query text")
             return []
-        
-        # Generate embedding for query
-        query_embedding = await self.embedding_service.generate_embedding(query_text)
-        if query_embedding is None:
-            logger.warning(f"Failed to generate embedding for query: {query_text}")
-            return []
-        
-        # Search using embedding
-        return await self.search_by_embedding(
-            user_id=user_id,
-            embedding=query_embedding,
-            session=session,
-            limit=limit,
-            threshold=threshold,
-            categories=categories
-        )
-    
-    async def search_by_embedding(
-        self,
-        user_id: int,
-        embedding: List[float],
-        session: Session,
-        limit: Optional[int] = None,
-        threshold: Optional[float] = None,
-        categories: Optional[List[str]] = None
-    ) -> List[Tuple[Memory, float]]:
-        """
-        Search for memories similar to given embedding
-        
-        Args:
-            user_id: User ID to search memories for
-            embedding: Query embedding vector
-            session: Database session
-            limit: Maximum results to return
-            threshold: Similarity threshold
-            categories: Optional list of memory categories to filter by
-            
-        Returns:
-            List of tuples (Memory, similarity_score) sorted by relevance
-        """
-        if limit is None:
-            limit = self.max_results
+
+        # First: try a simple SQL keyword search (case-insensitive LIKE)
+        q = session.query(Memory).filter(Memory.user_id == user_id).filter(Memory.is_active == True)
+        if categories:
+            q = q.filter(Memory.category.in_(categories))
+
+        like_pattern = f"%{query_text.strip()}%"
+        try:
+            c_q = q.filter(Memory.value.ilike(like_pattern))
+            candidates = c_q.all()
+            # Sort and cap results in Python to remain compatible with mocked sessions
+            candidates.sort(key=lambda m: getattr(m, 'confidence', 0.0), reverse=True)
+            candidates = candidates[: ((limit or self.max_results) * 5)]
+        except Exception as ex:
+            logger.warning(f"Keyword search failed: {ex}")
+            candidates = []
+
+        # If we found no candidates via keyword, fall back to scanning a capped set
+        if not candidates:
+            try:
+                candidates = q.all()
+                candidates.sort(key=lambda m: getattr(m, 'confidence', 0.0), reverse=True)
+                candidates = candidates[:100]
+            except Exception as ex:
+                logger.warning(f"Fallback memory scan failed: {ex}")
+                return []
+
+        # Convert to list of Memory objects and rerank using runtime embeddings
+        memories = candidates
+        # Rerank will generate embeddings and return scores; keep neutral scores on failure
+        try:
+            ranked = await self.rerank_memories(memories, query_text)
+        except Exception as ex:
+            logger.warning(f"Rerank failed: {ex}")
+            ranked = [(m, 0.5) for m in memories]
+
+        # Apply threshold and limit
         if threshold is None:
             threshold = self.similarity_threshold
-        # Try vector index first (fast path)
-        try:
-            idx = VectorIndexClient.from_env()
-            candidates = idx.query(embedding, k=limit * 3)
-            results = []
-            if candidates:
-                # Collect ids and fetch corresponding memories
-                ids = [int(cid) for cid, _ in candidates if cid.isdigit()]
-                query = session.query(Memory).filter(Memory.memory_id.in_(ids)).filter(Memory.user_id == user_id).filter(Memory.is_active == True)
-                if categories:
-                    query = query.filter(Memory.category.in_(categories))
-                mem_map = {m.memory_id: m for m in query.all()}
-                # Map back to candidate order and include only above threshold
-                for cid, score in candidates:
-                    try:
-                        mid = int(cid)
-                    except Exception:
-                        continue
-                    mem = mem_map.get(mid)
-                    if not mem:
-                        continue
-                    if score >= threshold:
-                        results.append((mem, float(score)))
 
-                # Sort & limit
-                results.sort(key=lambda x: x[1], reverse=True)
-                return results[:limit]
-        except Exception as e:
-            logger.debug("Vector index query failed or not configured: %s", e)
-
-        # Fallback: brute-force DB scan and cosine similarity
-        query = (
-            session.query(Memory)
-            .filter(Memory.user_id == user_id)
-            .filter(Memory.is_active == True)
-            .filter(Memory.embedding.isnot(None))  # Only memories with embeddings
-        )
-        
-        # Filter by categories if provided
-        if categories:
-            query = query.filter(Memory.category.in_(categories))
-        
-        memories = query.all()
-        
-        # Calculate similarities
-        results = []
-        for memory in memories:
-            try:
-                # Convert stored bytes back to embedding
-                memory_embedding = self.embedding_service.bytes_to_embedding(memory.embedding)
-                if memory_embedding is None:
-                    logger.warning(f"Failed to deserialize embedding for memory {memory.memory_id}")
-                    continue
-                
-                # Calculate similarity
-                similarity = self.embedding_service.cosine_similarity(
-                    embedding,
-                    memory_embedding
-                )
-                # Only include if above threshold
-                if similarity >= threshold:
-                    results.append((memory, similarity))
-            
-            except Exception as e:
-                logger.error(f"Error processing memory {memory.memory_id}: {e}")
-                continue
-        
-        # Sort by similarity (highest first) and limit results
-        results.sort(key=lambda x: x[1], reverse=True)
-        return results[:limit]
+        filtered = [t for t in ranked if t[1] >= threshold]
+        filtered.sort(key=lambda t: t[1], reverse=True)
+        return filtered[: (limit or self.max_results)]
+    
+    # search_by_embedding removed: embedding-index based search is not supported.
     
     async def rerank_memories(
         self,
@@ -188,33 +118,45 @@ class SemanticSearchService:
         query_embedding = await self.embedding_service.generate_embedding(query_text)
         if query_embedding is None:
             return [(m, 0.5) for m in memories]
-        
-        # Calculate similarities
-        results = []
-        for memory in memories:
+
+        # Use persisted embedding bytes if available (tests/mocks may provide this).
+        mem_embeddings: List[Optional[List[float]]] = []
+        to_batch_indices: List[int] = []
+        batch_texts: List[str] = []
+        for idx, m in enumerate(memories):
+            emb_bytes = getattr(m, 'embedding', None)
+            if emb_bytes:
+                try:
+                    emb = self.embedding_service.bytes_to_embedding(emb_bytes)
+                except Exception:
+                    emb = None
+                mem_embeddings.append(emb)
+            else:
+                mem_embeddings.append(None)
+                to_batch_indices.append(idx)
+                batch_texts.append(m.value)
+
+        # Batch-embed any memories that don't have stored embeddings
+        if to_batch_indices and batch_texts:
             try:
-                if memory.embedding is None:
-                    results.append((memory, 0.0))
-                    continue
-                
-                memory_embedding = self.embedding_service.bytes_to_embedding(memory.embedding)
-                if memory_embedding is None:
-                    results.append((memory, 0.0))
-                    continue
-                
-                similarity = self.embedding_service.cosine_similarity(
-                    query_embedding,
-                    memory_embedding
-                )
-                results.append((memory, similarity))
-            
-            except Exception as e:
-                logger.error(f"Error reranking memory {memory.memory_id}: {e}")
-                results.append((memory, 0.0))
-        
-        # Sort by similarity
-        results.sort(key=lambda x: x[1], reverse=True)
-        return results
+                batch_results = await self.embedding_service.batch_embed(batch_texts)
+            except Exception as ex:
+                logger.warning(f"Batch embed failed: {ex}")
+                batch_results = [None] * len(batch_texts)
+            for i, emb in enumerate(batch_results):
+                mem_embeddings[to_batch_indices[i]] = emb
+
+        scored: List[Tuple[Memory, float]] = []
+        for mem, emb in zip(memories, mem_embeddings):
+            if emb is None:
+                score = 0.0
+            else:
+                score = self.embedding_service.cosine_similarity(query_embedding, emb)
+            scored.append((mem, score))
+
+        # Return sorted by score descending
+        scored.sort(key=lambda t: t[1], reverse=True)
+        return scored
     
     def filter_by_similarity(
         self,

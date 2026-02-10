@@ -19,7 +19,7 @@ if ROOT not in sys.path:
 
 from src.models.database import SessionLocal, Memory
 from src.services.semantic_search import get_semantic_search_service
-from src.services.embedding_service import get_embedding_service
+# Embeddings are no longer persisted on Memory; rely on vector index / semantic search
 
 
 def truncate(s: str, n: int = 200) -> str:
@@ -31,7 +31,7 @@ def main(user_id: int, query: str | None, top: int = 20):
     try:
         def _print_memories(mems: list):
             for mem in mems:
-                date = getattr(mem, "created_at", None) or getattr(mem, "embedding_generated_at", None)
+                date = getattr(mem, "created_at", None)
                 date_short = date.strftime("%Y-%m-%d %H:%M") if date is not None else "-"
                 key = getattr(mem, "key", "")
                 key_part = f" {key}" if key else ""
@@ -48,17 +48,16 @@ def main(user_id: int, query: str | None, top: int = 20):
                 return
             _print_memories([m for (m, s) in results])
         else:
-            # List the complete set of memories with embeddings, oldest first
+            # List the complete set of memories, oldest first
             q = (
                 session.query(Memory)
                 .filter(Memory.user_id == user_id)
                 .filter(Memory.is_active == True)
-                .filter(Memory.embedding.isnot(None))
                 .order_by(Memory.created_at.asc())
             )
             rows = q.all()
             if not rows:
-                print("No memories with embeddings found for user", user_id)
+                print("No memories found for user", user_id)
                 return
             _print_memories(rows)
     finally:

@@ -181,49 +181,7 @@ class TestSemanticSearchService:
             
                     assert len(results) == 0
     
-            @pytest.mark.asyncio
-            async def test_search_by_embedding(self, semantic_search_service, mock_session):
-                """Test search by embedding vector"""
-                with patch.object(
-                    semantic_search_service.embedding_service,
-                    'bytes_to_embedding',
-                    return_value=[0.1] * settings.EMBEDDING_DIMENSION
-                ):
-                    with patch.object(
-                        semantic_search_service.embedding_service,
-                        'cosine_similarity',
-                        return_value=0.85
-                    ):
-                        results = await semantic_search_service.search_by_embedding(
-                            user_id=1,
-                            embedding=[0.2] * settings.EMBEDDING_DIMENSION,
-                            session=mock_session
-                        )
-                
-                        assert len(results) == 1
-                        memory, score = results[0]
-                        assert score == 0.85
-    
-            @pytest.mark.asyncio
-            async def test_search_by_embedding_threshold_filtering(self, semantic_search_service, mock_session):
-                """Test that results below threshold are filtered"""
-                with patch.object(
-                    semantic_search_service.embedding_service,
-                    'bytes_to_embedding',
-                    return_value=[0.1] * settings.EMBEDDING_DIMENSION
-                ):
-                    with patch.object(
-                        semantic_search_service.embedding_service,
-                        'cosine_similarity',
-                        return_value=0.5  # Below default threshold of 0.7
-                    ):
-                        results = await semantic_search_service.search_by_embedding(
-                            user_id=1,
-                            embedding=[0.2] * settings.EMBEDDING_DIMENSION,
-                            session=mock_session
-                        )
-                
-                        assert len(results) == 0
+            # embedding-index based search tests removed: vector indexing disabled in this branch
     
             @pytest.mark.asyncio
             async def test_rerank_memories(self, semantic_search_service, mock_memory):

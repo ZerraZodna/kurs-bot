@@ -13,9 +13,7 @@ Usage: run the script from the repository root: `.\
 un_kursbot.ps1` or `.\start_kursbot.ps1`
 #>
 
-param(
-	[switch]$StartInfra  # if set, will call scripts\start_all.ps1 before starting app/ngrok
-)
+param()
 
 # Load .env into environment so scripts and child processes inherit settings
 function Load-DotEnv {
@@ -52,62 +50,7 @@ if (-not $venvActivate) {
 	Write-Host ".venv not found. Create a virtualenv and install requirements first." -ForegroundColor Yellow
 }
 
-function Test-RedisRunning {
-	try {
-		$client = New-Object System.Net.Sockets.TcpClient
-		$iar = $client.BeginConnect('127.0.0.1', 6379, $null, $null)
-		$ok = $iar.AsyncWaitHandle.WaitOne(500)
-		if (-not $ok) { $client.Close(); return $false }
-		$client.EndConnect($iar)
-		$client.Close()
-		return $true
-	} catch {
-		return $false
-	}
-}
-
-function Is-WorkerRunning {
-	try {
-		$procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue
-		if (-not $procs) { return $false }
-		foreach ($p in $procs) {
-			if ($p.CommandLine) {
-				if ($p.CommandLine -match 'rq\s+worker' -or $p.CommandLine -match 'rq.exe' -or $p.CommandLine -match 'rq\s') {
-					return $true
-				}
-			}
-		}
-		return $false
-	} catch {
-		return $false
-	}
-}
-
-# Decide whether to start infra. If user passed -StartInfra, always start. Otherwise
-# only start infra when Redis or the worker process is not running.
-$needStartInfra = $false
-if ($StartInfra) {
-	$needStartInfra = $true
-} else {
-	$redisOk = Test-RedisRunning
-	$workerOk = Is-WorkerRunning
-	if (-not $redisOk -or -not $workerOk) {
-		Write-Host "Infra not fully running (Redis:$redisOk, Worker:$workerOk) - will start infra..."
-		$needStartInfra = $true
-	} else {
-		Write-Host "Infra appears to be running (Redis:$redisOk, Worker:$workerOk)."
-	}
-}
-
-if ($needStartInfra) {
-	$startAll = Join-Path -Path (Get-Location) -ChildPath "scripts\start_all.ps1"
-	if (Test-Path $startAll) {
-		Write-Host "Starting infra (Redis, worker, reindex)..."
-		& $startAll
-	} else {
-		Write-Host "scripts\start_all.ps1 not found; skipping infra start." -ForegroundColor Yellow
-	}
-}
+# externally. This script focuses on starting the app and optional ngrok.
 
 # Wait helpers used only by this startup script
 function Wait-ForTcpPort {
@@ -136,16 +79,7 @@ function Wait-ForTcpPort {
 	return $false
 }
 
-function Wait-ForWorker {
-	param([int]$TimeoutSeconds = 30)
-	$start = Get-Date
-	while ((Get-Date) -lt $start.AddSeconds($TimeoutSeconds)) {
-		if (Is-WorkerRunning) { return $true }
-		Start-Sleep -Seconds 1
-	}
-	return $false
-}
-
+# Worker readiness check removed; function deleted.
 # Build activation fragment used when launching new windows so each window activates the venv
 $activateFragment = $null
 if ($venvActivate) {
@@ -191,15 +125,7 @@ if (Test-Path $ngrokPath) {
 }
 Write-Host "Kurs Bot helper started. Uvicorn and ngrok are running in separate windows."
 
-# If we started infra, wait for Redis and the worker to become available
-if ($needStartInfra) {
-	Write-Host "Waiting for infra readiness checks..."
-	$redisReady = Wait-ForTcpPort -HostName '127.0.0.1' -Port 6379 -TimeoutSeconds 60
-	if ($redisReady) { Write-Host "Redis is reachable." } else { Write-Host "Redis did not become reachable within timeout." -ForegroundColor Yellow }
-
-	$workerReady = Wait-ForWorker -TimeoutSeconds 60
-	if ($workerReady) { Write-Host "RQ worker process detected." } else { Write-Host "RQ worker not detected after timeout; check worker logs." -ForegroundColor Yellow }
-}
+# Infra readiness checks removed.
 
 # Wait for uvicorn to start responding on port 8000 (startup-only check)
 	$apiReady = Wait-ForTcpPort -HostName '127.0.0.1' -Port 8000 -TimeoutSeconds 30

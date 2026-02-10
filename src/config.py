@@ -17,13 +17,9 @@ class Settings(BaseSettings):
     OLLAMA_EMBED_URL: str = "http://localhost:11434/api/embed"
     OLLAMA_EMBED_MODEL: str = "nomic-embed-text:latest"
     EMBEDDING_DIMENSION: int = 768
-    EMBEDDING_VERSION: int = 1
     SEMANTIC_SEARCH_THRESHOLD: float = 0.5
     SEMANTIC_SEARCH_MAX_RESULTS: int = 5
-    # Vector index settings
-    VECTOR_INDEX_BACKEND: str = "local"
-    # Feature flag to enable writing/reading from the external vector index
-    VECTOR_INDEX_ENABLED: bool = False
+    # Vector index settings removed in this branch
     # Trigger matcher feature flag and defaults
     ENABLE_TRIGGER_MATCHER: bool = True
     TRIGGER_SIMILARITY_THRESHOLD: float = 0.75

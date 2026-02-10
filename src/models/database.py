@@ -72,9 +72,7 @@ class Memory(Base):
     ttl_expires_at = Column(DateTime(timezone=True))
     archived_at = Column(DateTime(timezone=True))
     # Embedding fields for semantic search
-    embedding = Column(LargeBinary, nullable=True)  # Stores 384-dim vector as bytes
-    embedding_version = Column(Integer, default=1)  # Track embedding model version
-    embedding_generated_at = Column(DateTime(timezone=True), nullable=True)  # When embedding was generated
+    # Embedding fields removed — embeddings are no longer persisted on Memory
     user = relationship('User', back_populates='memories')
 
 

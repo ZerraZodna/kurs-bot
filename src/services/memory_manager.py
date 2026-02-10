@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict
 from sqlalchemy.orm import Session
 from src.models.database import SessionLocal, Memory, init_db
-from src.services.embedding_service import get_embedding_service, enqueue_embedding_for_memory
+from src.services.embedding_service import get_embedding_service
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -20,87 +20,9 @@ class MemoryManager:
     def _hash_value(self, value: str) -> str:
         return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
-    async def _generate_and_store_embedding(self, memory_id: int, value: str):
-        """
-        Generate embedding for a memory and store it
-        
-        Args:
-            memory_id: ID of the memory to generate embedding for
-            value: Memory value to generate embedding from
-        """
-        try:
-            embedding = await self.embedding_service.generate_embedding(value)
-            if embedding:
-                # Create a new session for this async task
-                db = SessionLocal()
-                try:
-                    memory = db.query(Memory).filter(Memory.memory_id == memory_id).first()
-                    if memory:
-                        memory.embedding = self.embedding_service.embedding_to_bytes(embedding)
-                        memory.embedding_version = 1
-                        memory.embedding_generated_at = datetime.now(timezone.utc)
-                        db.add(memory)
-                        db.commit()
-                        logger.debug(f"Generated embedding for memory {memory_id}")
-                    else:
-                        logger.warning(f"Memory {memory_id} not found for embedding generation")
-                finally:
-                    db.close()
-            else:
-                logger.warning(f"Failed to generate embedding for memory {memory_id}")
-        except Exception as e:
-            logger.error(f"Error generating embedding for memory {memory_id}: {e}")
-
-    def _schedule_embedding_generation(self, memory_id: int, value: str):
-        """Schedule embedding generation safely.
-
-        If an asyncio event loop is running, schedule as a background task.
-        Otherwise run the coroutine synchronously so it is awaited.
-        """
-        try:
-            # Prefer enqueuing a background job via the queue helper. If Redis/RQ
-            # isn't configured, `enqueue_embedding_for_memory` falls back to
-            # inline embedding generation and will return the embedding.
-            job_or_result = enqueue_embedding_for_memory(memory_id, value)
-
-            # If the helper returned an embedding (inline fallback), persist it now.
-            if isinstance(job_or_result, list):
-                try:
-                    emb = job_or_result
-                    emb_bytes = self.embedding_service.embedding_to_bytes(emb)
-                    session = SessionLocal()
-                    try:
-                        mem = session.get(Memory, memory_id)
-                        if mem:
-                            mem.embedding = emb_bytes
-                            mem.embedding_version = settings.EMBEDDING_VERSION
-                            mem.embedding_generated_at = datetime.now(timezone.utc)
-                            session.add(mem)
-                            session.commit()
-                            logger.debug(f"Generated and stored embedding for memory {memory_id} (inline fallback)")
-                        else:
-                            logger.warning(f"Memory {memory_id} not found when storing inline embedding")
-                    finally:
-                        session.close()
-                except Exception as ex:
-                    logger.exception(f"Failed to persist inline embedding for memory {memory_id}: {ex}")
-            else:
-                logger.debug(f"Enqueued embedding job for memory {memory_id}: {getattr(job_or_result, 'id', str(job_or_result))}")
-
-        except Exception as ex:
-            # On any error, fall back to the previous behavior of trying to
-            # schedule on the running loop or run synchronously to avoid losing
-            # embedding generation entirely.
-            try:
-                loop = asyncio.get_running_loop()
-                loop.create_task(self._generate_and_store_embedding(memory_id, value))
-            except RuntimeError:
-                try:
-                    asyncio.run(self._generate_and_store_embedding(memory_id, value))
-                except Exception as ex2:
-                    logger.warning(f"Could not run embedding generation synchronously: {ex2}")
-            except Exception as ex2:
-                logger.warning(f"Could not schedule embedding generation after enqueue failure: {ex2}")
+    # Note: embedding generation scheduling and persistence removed.
+    # The private helpers that generated and stored embeddings were deleted
+    # to avoid persisting per-memory embedding bytes.
 
     def get_memory(self, user_id: int, key: str) -> List[Dict]:
         now = datetime.now(timezone.utc)
@@ -186,9 +108,7 @@ class MemoryManager:
                 self.db.add(e)
                 self.db.commit()
                 
-                # Generate embedding if needed
-                if generate_embedding:
-                    self._schedule_embedding_generation(e.memory_id, e.value)
+                # Generate embedding if needed — removed in this branch.
                 
                 return e.memory_id
 
@@ -208,9 +128,7 @@ class MemoryManager:
             self.db.add(new)
             self.db.commit()
             
-            # Generate embedding if needed
-            if generate_embedding:
-                self._schedule_embedding_generation(new.memory_id, new.value)
+            # Generate embedding if needed — removed in this branch.
             
             return new.memory_id
 
@@ -237,9 +155,7 @@ class MemoryManager:
             self.db.add(new)
             self.db.commit()
             
-            # Generate embedding if needed
-            if generate_embedding:
-                self._schedule_embedding_generation(new.memory_id, new.value)
+            # Generate embedding if needed — removed in this branch.
             
             return new.memory_id
 
@@ -258,9 +174,7 @@ class MemoryManager:
         self.db.add(new)
         self.db.commit()
         
-        # Generate embedding if needed
-        if generate_embedding:
-            self._schedule_embedding_generation(new.memory_id, new.value)
+        # Generate embedding if needed — removed in this branch.
         
         # If this memory indicates a preferred lesson time, do NOT modify schedules here.
         # Creating schedules is the responsibility of the schedule/triggering codepath

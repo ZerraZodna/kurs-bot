@@ -312,7 +312,7 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
         def _format_mem_lines(mems: list) -> list:
             out = []
             for mem in mems:
-                date = getattr(mem, "created_at", None) or getattr(mem, "embedding_generated_at", None)
+                date = getattr(mem, "created_at", None)
                 date_short = date.strftime("%Y-%m-%d %H:%M") if date is not None else "-"
                 key = getattr(mem, "key", "")
                 key_part = f" {key}" if key else ""

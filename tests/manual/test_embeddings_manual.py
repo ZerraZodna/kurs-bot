@@ -82,7 +82,6 @@ async def test_embeddings():
                 embedding = await embedding_service.generate_embedding(memory.value)
                 if embedding:
                     memory.embedding = embedding_service.embedding_to_bytes(embedding)
-                    memory.embedding_version = 1
                     print(f"   ✅ Generated embedding for: {memory.key}")
         
         session.commit()
