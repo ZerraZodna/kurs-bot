@@ -13,6 +13,7 @@ from src.services.dialogue_engine import DialogueEngine
 from src.services.admin_notifier import set_admin_chat_id, send_admin_notification
 from src.services.traffic_tracker import record_traffic_event
 from src.services.downtime_monitor import run_downtime_monitor
+from src.services.scheduler import SchedulerService
 from src.api.dialogue_routes import router as dialogue_router
 from src.services.dialogue import extract_and_store_memories
 from src.api.gdpr_routes import router as gdpr_router
@@ -32,6 +33,13 @@ async def lifespan(app: FastAPI):
 
     t2 = threading.Thread(target=run_downtime_monitor, daemon=True)
     t2.start()
+
+    # Ensure APScheduler is explicitly initialized at application startup
+    try:
+        SchedulerService.init_scheduler()
+    except Exception:
+        # Don't let scheduler initialization block app startup; log and continue
+        logging.exception("Could not initialize scheduler at startup")
 
     # Startup info and health checks
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
