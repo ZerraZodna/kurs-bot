@@ -132,6 +132,18 @@ async def handle_lesson_confirmation(
             source="dialogue_engine_lesson_confirmation",
         )
 
+    # Update explicit current_lesson state to the next lesson (if known).
+    if lesson_id:
+        next_id = lesson_id + 1 if lesson_id < 365 else 365
+        memory_manager.store_memory(
+            user_id=user_id,
+            key="current_lesson",
+            value=str(next_id),
+            category="progress",
+            confidence=1.0,
+            source="dialogue_engine_lesson_confirmation",
+        )
+
     lesson = (
         session.query(Lesson).filter(Lesson.lesson_id == next_id).first()
         if next_id

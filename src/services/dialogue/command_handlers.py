@@ -67,7 +67,8 @@ def handle_rag_mode_toggle(text: str, memory_manager, user_id: int) -> Optional[
             "You can customize RAG behavior:\n"
             "- Use `rag_prompt list` to view available prompt templates.\n"
             "- Use `rag_prompt select <key>` to pick a template from the library.\n"
-            "- Use `rag_prompt custom <text>` to set a personal RAG system prompt.\n\n"
+            "- Use `rag_prompt custom <text>` to set a personal RAG system prompt.\n"
+            "- Use `list memories` or `list memories <query>` to list or search your stored memories while RAG is active.\n\n"
             "Tip: prefix a single message with `rag:` to use RAG only for that message."
         )
     if mode_cmd == "off":

@@ -46,14 +46,6 @@ def get_last_message_at() -> datetime | None:
     return get_state_datetime(_LAST_MESSAGE_KEY)
 
 
-def get_today_bucket_count() -> int:
-    today = _today_str()
-    buckets = _load_buckets()
-    if buckets and buckets[-1].get("date") == today:
-        return int(buckets[-1].get("count", 0))
-    return 0
-
-
 def is_today_lowest_traffic() -> bool:
     """Return True if today's count is <= min of prior same weekday buckets."""
     today = datetime.now(timezone.utc).date()
