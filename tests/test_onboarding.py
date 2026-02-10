@@ -18,6 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.models.database import SessionLocal, User, init_db
+from tests.utils import create_test_user
 from src.services.dialogue_engine import DialogueEngine
 from src.services.onboarding_service import OnboardingService
 from src.services.scheduler import SchedulerService
@@ -25,35 +26,8 @@ from datetime import datetime, timezone
 
 
 def create_new_test_user(db) -> int:
-    """Create a fresh test user."""
-    # Delete existing test user and all their data if exists
-    existing_user = db.query(User).filter_by(external_id="test_onboarding_user").first()
-    if existing_user:
-        from src.models.database import Memory, Schedule
-        # Delete all memories
-        db.query(Memory).filter_by(user_id=existing_user.user_id).delete()
-        # Delete all schedules
-        db.query(Schedule).filter_by(user_id=existing_user.user_id).delete()
-        # Delete user
-        db.query(User).filter_by(user_id=existing_user.user_id).delete()
-        db.commit()
-    
-    user = User(
-        external_id="test_onboarding_user",
-        channel="test",
-        phone_number=None,
-        email="onboarding_test@example.com",
-        first_name=None,
-        last_name=None,
-        opted_in=True,
-        created_at=datetime.now(timezone.utc),
-        last_active_at=datetime.now(timezone.utc),
-    )
-    db.add(user)
-    db.commit()
-    
-    print(f"✓ Created new test user with ID: {user.user_id}")
-    return user.user_id
+    """Create a fresh test user using shared helper."""
+    return create_test_user(db, "test_onboarding_user")
 
 
 @pytest.mark.asyncio

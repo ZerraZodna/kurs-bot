@@ -134,6 +134,18 @@ class DialogueEngine:
                 return prompt_cmd_response
 
 
+        # Handle schedule deletion confirmation/commands (ask for confirmation first)
+        from src.services.dialogue import handle_schedule_deletion_commands
+
+        deletion_response = await handle_schedule_deletion_commands(
+            text,
+            self.memory_manager,
+            session,
+            user_id,
+        )
+        if deletion_response:
+            return deletion_response
+
         # Handle forget commands (semantic memory deletion)
         forget_response = await handle_forget_commands(
             text,
@@ -317,18 +329,18 @@ class DialogueEngine:
         # Check if they already have a schedule
         schedules = SchedulerService.get_user_schedules(user_id)
         if schedules:
-            schedule = schedules[0]
+            # Use the schedule query response builder to list all active reminders
+            from src.services.dialogue.schedule_query_handler import build_schedule_status_response
+
             tz_name = ensure_user_timezone(
                 self.memory_manager,
                 user_id,
                 get_user_language(self.memory_manager, user_id),
                 source="dialogue_engine_schedule_status",
             )
-            if schedule.next_send_time:
-                local_dt, _ = format_dt_in_timezone(schedule.next_send_time, tz_name)
-                time_display = f"{local_dt:%H:%M}"
-            else:
-                time_display = "(time not set)"
+
+            resp_text = build_schedule_status_response(schedules, tz_name)
+            # Clear any pending flag and translate if necessary
             if self.memory_manager:
                 self.memory_manager.store_memory(
                     user_id=user_id,
@@ -339,14 +351,12 @@ class DialogueEngine:
                     ttl_hours=1,
                     category="conversation",
                 )
-            return f"""You're already all set up! ✨
 
-You have a daily reminder for {time_display}.
+            user_lang = get_user_language(self.memory_manager, user_id)
+            if user_lang and user_lang.lower() not in ("english", "en"):
+                resp_text = await translate_text(resp_text, user_lang, self.call_ollama)
 
-Would you like to:
-• Change the time?
-• Add another reminder?
-• Cancel the current reminder?"""
+            return resp_text
 
         # Check if they have a preferred time stored
         time_memories = self.memory_manager.get_memory(user_id, "preferred_lesson_time")

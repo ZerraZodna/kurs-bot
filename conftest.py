@@ -70,3 +70,53 @@ def pytest_collection_modifyitems(config, items):
         if name == "test_embeddings_manual.py":
             import pytest as _pytest
             item.add_marker(_pytest.mark.skip(reason="Manual test - skipped in CI"))
+
+
+def pytest_configure(config):
+    """Allow overriding Ollama model settings for tests via environment variables.
+
+    Usage (example):
+      TEST_OLLAMA_MODEL="qwen3:test" \
+        TEST_OLLAMA_CHAT_RAG_MODEL="llama3.2:test" \
+        TEST_NON_ENGLISH_OLLAMA_MODEL="gpt-oss:test" \
+        pytest tests/...
+
+    This function copies any `TEST_*` overrides into the corresponding
+    runtime env var and reloads `src.config` so `settings` picks them up.
+    """
+    # Default all test models to `llama3.2:3b` unless a TEST_* override is provided.
+    defaults_model = "llama3.2:3b"
+
+    def choose_model(test_env_name: str) -> str:
+        # Respect explicit TEST_* overrides except for placeholder names
+        # often used in examples (e.g. 'llama3.2:test'). Treat those as
+        # not provided and fall back to the canonical test model.
+        val = os.getenv(test_env_name)
+        if not val:
+            return defaults_model
+        # Ignore placeholder model names that end with ':test'
+        if val.strip().endswith(":test"):
+            return defaults_model
+        return val
+
+    overrides = {
+        "OLLAMA_MODEL": choose_model("TEST_OLLAMA_MODEL"),
+        "OLLAMA_CHAT_RAG_MODEL": choose_model("TEST_OLLAMA_CHAT_RAG_MODEL"),
+        "NON_ENGLISH_OLLAMA_MODEL": choose_model("TEST_NON_ENGLISH_OLLAMA_MODEL"),
+    }
+    changed = False
+    for k, v in overrides.items():
+        if v:
+            os.environ[k] = v
+            changed = True
+    # Always apply the test defaults (or user-provided TEST_*) to ensure tests
+    # run with a consistent model selection.
+    if changed:
+        try:
+            import importlib
+            import src.config as cfg
+            importlib.reload(cfg)
+            applied = [k for k, v in overrides.items() if v]
+            print(f"🔧 Test overrides applied: {', '.join(applied)}")
+        except Exception as e:
+            print(f"⚠️ Could not reload src.config after env override: {e}")

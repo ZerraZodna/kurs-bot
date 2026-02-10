@@ -42,6 +42,8 @@ async def handle_triggers(
         # Track dispatched action_types per dialogue turn to avoid duplicate handling
         dispatched_actions: set = set()
 
+        # No ad-hoc heuristics here — rely on structured intent or trigger matching.
+
         if intent:
             logger.info(f"Triggering via structured intent for user={user_id} intent={intent}")
             print(f"[DEBUG triggering] structured intent for user={user_id} intent_name={intent.get('name')} action_type={intent.get('action_type')} ts={__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat()}")

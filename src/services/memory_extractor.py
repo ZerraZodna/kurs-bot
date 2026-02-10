@@ -117,7 +117,7 @@ User message: "{user_message}"{context_str}"""
 
             # If Ollama returned nothing useful, fall back to simple heuristics
             if not valid_memories:
-                heur = MemoryExtractor._heuristic_extract(user_message)
+                heur = MemoryExtractor._heuristic_extract(user_message, existing_memories if user_context else None)
                 if heur:
                     logger.debug(f"Heuristic extracted {len(heur)} memories from message")
                     return heur
@@ -175,7 +175,7 @@ User message: "{user_message}"{context_str}"""
         return []
 
     @staticmethod
-    def _heuristic_extract(message: str) -> List[Dict[str, Any]]:
+    def _heuristic_extract(message: str, existing_memories: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
         Lightweight heuristic extractor used when Ollama is unavailable.
         Targets common patterns for learning goals and preferred lesson times
@@ -184,6 +184,23 @@ User message: "{user_message}"{context_str}"""
         out: List[Dict[str, Any]] = []
         msg = message.strip()
         lower = msg.lower()
+
+        # Common single-word confirmations we should NOT treat as names
+        confirmations = {"yes", "no", "ja", "nei", "ok", "okay", "sure", "yep", "nope", "si", "sí"}
+        if lower in confirmations:
+            logger.debug("Heuristic skipped confirmation-like single-word message")
+            return out
+
+        # Heuristic: single-word capitalized names (e.g., "Live", "Jo")
+        words = msg.split()
+        if 1 <= len(words) <= 2 and all(w.isalpha() for w in words) and words[0][0].isupper():
+            # Do not overwrite existing first_name
+            if existing_memories and existing_memories.get("first_name"):
+                logger.debug("Heuristic would extract a first_name but user already has one; skipping")
+                return out
+            # Avoid saving common confirmations as names (already handled above), save as first_name
+            out.append({"store": True, "key": "first_name", "value": words[0], "confidence": 0.9, "ttl_hours": None})
+            return out
 
         # Detect learning goal phrases (English/Norwegian)
         import re

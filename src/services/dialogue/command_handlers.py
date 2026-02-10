@@ -133,6 +133,85 @@ async def handle_forget_commands(
     return None
 
 
+async def handle_schedule_deletion_commands(
+    text: str,
+    memory_manager,
+    session: Session,
+    user_id: int,
+) -> Optional[str]:
+    """Handle user requests to delete/deactivate schedules with confirmation.
+
+    Flow:
+    - User: "Delete reminders" -> store a pending memory and ask for confirmation.
+    - User: "Yes" / "Ja" -> if pending, deactivate schedules and confirm.
+    """
+    text_lower = (text or "").strip().lower()
+
+    # Check for an outstanding pending confirmation
+    pending = memory_manager.get_memory(user_id, "delete_schedules_pending")
+    affirmatives = {"yes", "y", "ja", "bekreft", "confirm", "ok", "okey", "sure"}
+    if pending and pending[0].get("value") == "true":
+        if text_lower in affirmatives:
+            # Perform deactivation
+            try:
+                SchedulerService = __import__("src.services.scheduler", fromlist=["SchedulerService"]).services.scheduler.SchedulerService
+            except Exception:
+                from src.services.scheduler import SchedulerService
+            # Deactivate all schedules for user
+            SchedulerService.deactivate_user_schedules(user_id)
+            # Clear pending flag
+            memory_manager.store_memory(
+                user_id=user_id,
+                key="delete_schedules_pending",
+                value="false",
+                confidence=1.0,
+                source="dialogue_engine",
+                category="conversation",
+            )
+            return "Okay — I've deleted your reminders. You won't receive further scheduled messages unless you set new reminders."
+
+        # If user responded something else, cancel pending
+        memory_manager.store_memory(
+            user_id=user_id,
+            key="delete_schedules_pending",
+            value="false",
+            confidence=1.0,
+            source="dialogue_engine",
+            category="conversation",
+        )
+        return "Okay — I won't delete your reminders."
+
+    # No pending: detect delete/reminder phrases
+    delete_phrases = [
+        "delete reminders",
+        "delete my reminders",
+        "remove reminders",
+        "remove my reminders",
+        "delete reminders",
+        "slett påminnelser",
+        "slett mine påminnelser",
+        "fjern påminnelser",
+    ]
+    if any(p in text_lower for p in delete_phrases):
+        # If user has schedules, ask for confirmation
+        from src.services.scheduler import SchedulerService
+        schedules = SchedulerService.get_user_schedules(user_id)
+        if not schedules:
+            return "You don't have any active reminders."
+
+        memory_manager.store_memory(
+            user_id=user_id,
+            key="delete_schedules_pending",
+            value="true",
+            confidence=1.0,
+            source="dialogue_engine",
+            category="conversation",
+        )
+        return "Are you sure you want to delete all your reminders? Reply 'yes' to confirm."
+
+    return None
+
+
 def _execute_verified_request(session: Session, user_id: int, verification) -> str:
     request_type = verification.request_type
     payload = {}

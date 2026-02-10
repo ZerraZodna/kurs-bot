@@ -66,6 +66,56 @@ async def handle_schedule_messages(
             response = await translate_text(response, language, call_ollama)
         return response
 
+    # Early explicit daily-set detection: handle explicit "daily" + time
+    # instructions immediately, even if a `schedule_request_pending` flag
+    # exists. This ensures user commands like "Set my daily reminder for
+    # lessons to 09:00" take effect deterministically.
+    lower = (text or "").lower()
+    daily_indicators = ["daily", "every day", "each day", "every morning", "every evening", "hver dag", "daglig"]
+
+    time_patterns = [r"(\d{1,2}:\d{2})", r"(\d{1,2}\s?(?:am|pm))", r"kl\s*(\d{1,2}(?::\d{2})?)", r"(\d{1,2})[.:](\d{2})"]
+    found_time = None
+    for pat in time_patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            found_time = m.group(0)
+            break
+
+    verb_indicators = ["set", "change", "change my", "set my", "endre", "endre min", "sett"]
+
+    if any(ind in lower for ind in daily_indicators) and found_time and any(v in lower for v in verb_indicators):
+        try:
+            h, m = SchedulerService.parse_time_string(found_time)
+            normalized = f"{h:02d}:{m:02d}"
+        except Exception:
+            normalized = found_time
+
+        # Persist preferred time if memory manager available
+        try:
+            if memory_manager:
+                memory_manager.store_memory(user_id, "preferred_lesson_time", normalized, category="profile", source="schedule_handlers")
+        except Exception:
+            pass
+
+        existing = SchedulerService.get_user_schedules(user_id)
+        daily_existing = next((s for s in existing if s.schedule_type and s.schedule_type.startswith("daily")), None)
+        if daily_existing:
+            SchedulerService.update_daily_schedule(daily_existing.schedule_id, normalized, session=session)
+            resp = f"Okay — I updated your daily reminder to {normalized}."
+        else:
+            SchedulerService.create_daily_schedule(user_id=user_id, lesson_id=None, time_str=normalized, session=session)
+            resp = f"Perfect — I've scheduled your daily lessons for {normalized}."
+
+        lang = None
+        try:
+            if memory_manager:
+                lang = get_user_language(memory_manager, user_id)
+        except Exception:
+            lang = None
+        if lang and lang.lower() not in ("english", "en"):
+            resp = await translate_text(resp, lang, call_ollama)
+        return resp
+
     if memory_manager:
         pending = memory_manager.get_memory(user_id, "schedule_request_pending")
         if pending and pending[0].get("value") == "true":
@@ -74,18 +124,28 @@ async def handle_schedule_messages(
                 return schedule_response
 
     if onboarding_service and onboarding_service.detect_schedule_request(text):
-        if memory_manager:
-            memory_manager.store_memory(
-                user_id=user_id,
-                key="schedule_request_pending",
-                value="true",
-                confidence=1.0,
-                source="dialogue_engine",
-                ttl_hours=1,
-                category="conversation",
-            )
-        schedule_response = await schedule_request_handler(user_id, text, session)
-        if schedule_response:
-            return schedule_response
+        # Only treat explicit "daily" style requests as pre-LLM daily schedule flows.
+        # One-time reminders (e.g., "Remind me tomorrow at 12:00") should be handled
+        # by the assistant and dispatched via triggers, not blocked by an existing
+        # daily schedule. We therefore require a clear daily indicator before
+        # invoking the schedule_request_handler here.
+        lower = (text or "").lower()
+        daily_indicators = ["daily", "every day", "each day", "every morning", "every evening", "hver dag", "daglig"]
+
+        # Fallback: when daily indicator is present but not deterministic, fall back to the prior behavior
+        if any(ind in lower for ind in daily_indicators):
+            if memory_manager:
+                memory_manager.store_memory(
+                    user_id=user_id,
+                    key="schedule_request_pending",
+                    value="true",
+                    confidence=1.0,
+                    source="dialogue_engine",
+                    ttl_hours=1,
+                    category="conversation",
+                )
+            schedule_response = await schedule_request_handler(user_id, text, session)
+            if schedule_response:
+                return schedule_response
 
     return None

@@ -1,29 +1,18 @@
 import pytest
 from src.models.database import SessionLocal, User, init_db
+from tests.utils import create_test_user
 from src.services.trigger_dispatcher import TriggerDispatcher
 from src.services.scheduler import SchedulerService
 
 
-def create_new_test_user(db) -> int:
-    existing = db.query(User).filter_by(external_id="td_update_user").first()
-    if existing:
-        from src.models.database import Memory, Schedule
-        db.query(Memory).filter_by(user_id=existing.user_id).delete()
-        db.query(Schedule).filter_by(user_id=existing.user_id).delete()
-        db.query(User).filter_by(user_id=existing.user_id).delete()
-        db.commit()
-
-    user = User(external_id="td_update_user", channel="test", opted_in=True)
-    db.add(user)
-    db.commit()
-    return user.user_id
+# Use shared test helper
 
 
 def test_update_schedule_infers_daily_change():
     db = SessionLocal()
     try:
         init_db()
-        user_id = create_new_test_user(db)
+        user_id = create_test_user(db, "trigger-dispatch-user")
 
         # create initial daily schedule
         SchedulerService.create_daily_schedule(user_id=user_id, lesson_id=None, time_str="09:00", session=db)

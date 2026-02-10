@@ -4,33 +4,14 @@ import pytest
 from pathlib import Path
 
 from src.models.database import SessionLocal, User, init_db
+from tests.utils import create_test_user
 from src.services.dialogue_engine import DialogueEngine
 from src.services.scheduler import SchedulerService
 from src.config import settings
 from src.services.trigger_dispatcher import get_trigger_dispatcher
 
 
-def create_new_test_user(db) -> int:
-    existing_user = db.query(User).filter_by(external_id="test_trigger_user").first()
-    if existing_user:
-        from src.models.database import Memory, Schedule
-        db.query(Memory).filter_by(user_id=existing_user.user_id).delete()
-        db.query(Schedule).filter_by(user_id=existing_user.user_id).delete()
-        db.query(User).filter_by(user_id=existing_user.user_id).delete()
-        db.commit()
-
-    user = User(
-        external_id="test_trigger_user",
-        channel="test",
-        phone_number=None,
-        email="trigger_test@example.com",
-        first_name="Test",
-        last_name="User",
-        opted_in=True,
-    )
-    db.add(user)
-    db.commit()
-    return user.user_id
+# Use shared `create_test_user` helper from tests.utils
 
 
 @pytest.mark.asyncio
@@ -38,15 +19,12 @@ async def test_trigger_based_schedule_edit(monkeypatch):
     db = SessionLocal()
     try:
         init_db()
-        user_id = create_new_test_user(db)
+        user_id = create_test_user(db, "trigger-schedule-user")
 
         # Create an initial schedule at 09:00 for the user
         SchedulerService.create_daily_schedule(user_id=user_id, lesson_id=None, time_str="09:00", session=db)
 
         dialogue = DialogueEngine(db)
-
-        # Enable trigger matcher for this test
-        monkeypatch.setattr(settings, "ENABLE_TRIGGER_MATCHER", True)
 
         # Make Ollama return a structured intent so the dispatcher is called directly
         async def fake_call_ollama_with_intent(prompt: str, model: str = None) -> str:

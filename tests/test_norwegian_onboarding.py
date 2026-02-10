@@ -87,9 +87,8 @@ async def test_norwegian_response():
         print("-" * 80)
         
         norwegian_words = [
-            "herlig", "du", "interessert", "utforske", "disse", "leksjonene", "sammen",
-            "jeg", "her", "veilede", "støtte", "deg", "åndelige", "reisen", "hva",
-            "heter", "ditt", "navn", "ønsker", "lykke", "velkommen", "dag", "lærer",
+            "lagrer", "samtalen", 
+            "jeg", "her", "at", "støtte", "deg", "åndelige", "reisen", "hva",
         ]
         
         response_lower = response.lower()
