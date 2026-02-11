@@ -110,8 +110,8 @@ async def detect_and_store_language(memory_manager: MemoryManager, user_id: int,
 
 	# Normalize code to short form
 	code = code.lower()
-    if not code in ("en", "no", "nb", "nn"):
-	    code = "en"
+    #if not code in ("en", "no", "nb", "nn"):
+	#    code = "en"
 
 	# 4) if no existing language -> accept with conservative threshold
 	if not existing_value:
