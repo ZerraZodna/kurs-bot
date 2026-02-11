@@ -61,6 +61,8 @@ async def extract_and_store_memories(
             user_message, user_context, model_override=model_override, language=user_lang
         )
 
+        print(f"[EXTRACT DEBUG] user_id={user_id} user_message={user_message!r} extracted={extracted_memories}")
+
         for memory in extracted_memories:
             try:
                 memory_manager.store_memory(
@@ -72,6 +74,7 @@ async def extract_and_store_memories(
                     source="dialogue_engine_extractor",
                     generate_embedding=False,  # Disable embedding to avoid lock contention
                 )
+                print(f"[EXTRACT DEBUG] stored memory for user {user_id}: {memory.get('key')}={memory.get('value')}")
                 logger.info(
                     f"Stored memory for user {user_id}: {memory.get('key')}="
                     f"{memory.get('value')[:50]}"

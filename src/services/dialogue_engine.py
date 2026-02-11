@@ -302,10 +302,8 @@ class DialogueEngine:
                     relevant_memories=relevant_memories,
                 )
         
-        # Choose RAG model
-        rag_model = settings.OLLAMA_CHAT_RAG_MODEL
         response = await self.call_ollama(
-            prompt, model=rag_model if use_rag_for_this_message else None, language=user_lang
+            prompt, model=settings.OLLAMA_CHAT_RAG_MODEL if use_rag_for_this_message else None, language=user_lang
         )
         if response is None:
             logger.warning("LLM returned None; coercing to placeholder string")

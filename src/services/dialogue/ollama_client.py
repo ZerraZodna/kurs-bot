@@ -13,12 +13,12 @@ logger = logging.getLogger(__name__)
 OLLAMA_URL = getattr(settings, "OLLAMA_URL", "http://localhost:11434/api/generate")
 OLLAMA_TIMEOUT = getattr(settings, "OLLAMA_TIMEOUT", 30.0)
 OLLAMA_RETRIES = getattr(settings, "OLLAMA_RETRIES", 2)
+OLLAMA_MODEL = getattr(settings, "OLLAMA_MODEL")
 # Optional longer single timeout for very large models (no retries)
 OLLAMA_LONG_TIMEOUT = getattr(settings, "OLLAMA_LONG_TIMEOUT", 180.0)
 OLLAMA_LONG_RETRIES = getattr(settings, "OLLAMA_LONG_RETRIES", 0)
 # Cache config flag at import time for fast checks
 #SHOW_AI_PROMPT = getattr(settings, "SHOW_AI_PROMPT", False)
-
 
 async def call_ollama(prompt: str, model: str | None = None, language: str | None = None) -> str:
     """
@@ -33,25 +33,24 @@ async def call_ollama(prompt: str, model: str | None = None, language: str | Non
     """
     # If an explicit model is provided, use it. Otherwise, choose based on ISO language code.
     # Treat `en` as English; any other ISO code selects the NON_ENGLISH model.
-    if language and language.lower() != "en":
-        chosen_model = getattr(settings, "NON_ENGLISH_OLLAMA_MODEL", settings.OLLAMA_MODEL)
+    if model:
+        chosen_model = model
     else:
-        if model:
-            chosen_model = model
-        else:
-            chosen_model = settings.OLLAMA_MODEL
-    model = chosen_model
-    payload = {"model": model, "prompt": prompt, "stream": False}
+        chosen_model = OLLAMA_MODEL
+        if language and language.lower() != "en":
+            chosen_model = getattr(settings, "NON_ENGLISH_OLLAMA_MODEL", settings.OLLAMA_MODEL)
+
+    payload = {"model": chosen_model, "prompt": prompt, "stream": False}
 
     # Log the prompt (truncated) for debugging when enabled via config
     #if SHOW_AI_PROMPT:
     preview = prompt if prompt is None or len(prompt) <= 100 else prompt[:100] + "..."
-    logger.info("AI PROMPT (model=%s): %s", model, preview)
+    logger.info("AI PROMPT (model=%s): %s", chosen_model, preview)
 
     try:
         # For very large models (e.g. gpt-oss) prefer a single long timeout
         # instead of multiple short retries. Detect by model name.
-        model_lower = str(model).lower() if model else ""
+        model_lower = str(chosen_model).lower() if chosen_model else ""
         if "gpt-oss" in model_lower or "gpt_oss" in model_lower:
             timeout = OLLAMA_LONG_TIMEOUT
             retries = OLLAMA_LONG_RETRIES
@@ -79,9 +78,16 @@ async def call_ollama(prompt: str, model: str | None = None, language: str | Non
 
             # Log status and response body (truncated)
             logger.info("Ollama HTTP %s", response.status_code)
-            #if SHOW_AI_PROMPT:
-            #    logger.info("Raw LLM response (repr): %r", response)
-
+            # Build a safe, truncated preview of the response body for logs
+            if response is None:
+                previewResponse = None
+            else:
+                try:
+                    body_text = response.text or ""
+                except Exception:
+                    body_text = "[unreadable]"
+                previewResponse = body_text if len(body_text) <= 50 else body_text[:50] + "..."
+            logger.info("AI RESPONSE: %s", previewResponse)
             try:
                 response.raise_for_status()
             except httpx.HTTPStatusError:

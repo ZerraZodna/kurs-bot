@@ -15,7 +15,7 @@ import re
 
 from langdetect import detect_langs
 from src.services.language.keyword_detector import detect_language as keyword_detect
-
+from src.config import settings
 
 # Comprehensive supported ISO-639-1 two-letter codes.
 # This whitelist is used to validate LLM outputs before accepting
@@ -63,7 +63,7 @@ async def detect_language(text: str):
 			# Import lazily to avoid circular package import at module import time
 			from src.services.dialogue.ollama_client import call_ollama
 
-			resp = await call_ollama(prompt, model=None, language="en")
+			resp = await call_ollama(prompt, model=settings.OLLAMA_CHAT_RAG_MODEL, language="en")
 		except Exception:
 			resp = ""
 		if resp:
@@ -105,29 +105,16 @@ async def detect_and_store_language(memory_manager: MemoryManager, user_id: int,
 
 	# 3) run detector
 	code, conf, meta = await detect_language(user_message)
-	if not code:
+	if not code and existing_value:
 		return existing_value
 
 	# Normalize code to short form
 	code = code.lower()
+    if not code in ("en", "no", "nb", "nn"):
+	    code = "en"
 
 	# 4) if no existing language -> accept with conservative threshold
 	if not existing_value:
-		threshold = 0.6 if len(user_message.split()) <= 3 else 0.7
-		if (conf or 0.0) >= threshold:
-			try:
-				memory_manager.store_memory(
-					user_id=user_id,
-					key="user_language",
-					value=code,
-					confidence=max(threshold, float(conf or 0.0)),
-					source="dialogue_engine_language_detection",
-					category="preference",
-				)
-			except Exception:
-				pass
-			return code
-		# if not confident, prefer en/no if detected
 		if code in ("en", "no", "nb", "nn"):
 			try:
 				memory_manager.store_memory(

@@ -36,132 +36,128 @@ async def test_onboarding_flow():
     print("=" * 80)
     
     db = SessionLocal()
-    try:
-        user_id = create_test_user(db, "test_onboarding_user-1")
+    user_id = create_test_user(db, "test_onboarding_user-1")
+    
+    dialogue = DialogueEngine(db)
+    onboarding = OnboardingService(db)
+    
+    # Step 1: First message - should get welcome prompt
+    print("\n[Step 1] User's first message")
+    print("-" * 80)
+    user_msg = "Hi there!"
+    print(f"User: {user_msg}")
+    
+    response = await dialogue.process_message(user_id, user_msg, db)
+    print(f"Bot: {response[:150]}...")
+    
+    # Check onboarding status
+    status = onboarding.get_onboarding_status(user_id)
+    print(f"\nOnboarding status: {status}")
+    
+    # Step 2: User provides name
+    print("\n[Step 2] User provides name")
+    print("-" * 80)
+    user_msg = "My name is Sarah"
+    print(f"User: {user_msg}")
+    
+    response = await dialogue.process_message(user_id, user_msg, db)
+    print(f"Bot: {response[:200]}...")
+    
+    status = onboarding.get_onboarding_status(user_id)
+    print(f"\nOnboarding status: {status}")
+    
+    # Step 3: User consents to data storage
+    print("\n[Step 3] User consents to data storage")
+    print("-" * 80)
+    user_msg = "Yes, I consent"
+    print(f"User: {user_msg}")
+    
+    response = await dialogue.process_message(user_id, user_msg, db)
+    print(f"Bot: {response[:200]}...")
+    
+    status = onboarding.get_onboarding_status(user_id)
+    print(f"\nOnboarding status: {status}")
+    
+    # Step 4: User commits to lessons
+    print("\n[Step 4] User commits to 365 lessons")
+    print("-" * 80)
+    user_msg = "Yes, I'm ready to commit to this journey!"
+    print(f"User: {user_msg}")
+    
+    response = await dialogue.process_message(user_id, user_msg, db)
+    print(f"Bot: {response[:200]}...")
+    
+    status = onboarding.get_onboarding_status(user_id)
+    print(f"\nOnboarding status: {status}")
+    
+    # Step 5: User provides lesson status (new vs continuing)
+    print("\n[Step 5] User indicates they're new to ACIM")
+    print("-" * 80)
+    user_msg = "I'm new to ACIM"
+    print(f"User: {user_msg}")
+    
+    response = await dialogue.process_message(user_id, user_msg, db)
+    print(f"Bot: {response[:300]}...")
+    
+    status = onboarding.get_onboarding_status(user_id)
+    print(f"\nOnboarding status: {status}")
+    
+    # Check if schedule was auto-created (should be created at completion)
+    schedules = SchedulerService.get_user_schedules(user_id)
+    print(f"\n📅 Schedules created: {len(schedules)}")
+    for schedule in schedules:
+        print(f"  • Schedule ID: {schedule.schedule_id}")
+        print(f"    Type: {schedule.schedule_type}")
+        print(f"    Cron: {schedule.cron_expression}")
+        print(f"    Next send: {schedule.next_send_time}")
+        print(f"    Active: {schedule.is_active}")
+    
+    if status["onboarding_complete"] and len(schedules) > 0:
+        print("\n✅ SUCCESS: Onboarding complete and auto-schedule created!")
+        return True
+    else:
+        print("\n❌ FAILED: Onboarding not complete or schedule not auto-created")
+        print(f"    Onboarding complete: {status['onboarding_complete']}")
+        print(f"    Schedules: {len(schedules)}")
+        return False
         
-        dialogue = DialogueEngine(db)
-        onboarding = OnboardingService(db)
-        
-        # Step 1: First message - should get welcome prompt
-        print("\n[Step 1] User's first message")
-        print("-" * 80)
-        user_msg = "Hi there!"
-        print(f"User: {user_msg}")
-        
-        response = await dialogue.process_message(user_id, user_msg, db)
-        print(f"Bot: {response[:150]}...")
-        
-        # Check onboarding status
-        status = onboarding.get_onboarding_status(user_id)
-        print(f"\nOnboarding status: {status}")
-        
-        # Step 2: User provides name
-        print("\n[Step 2] User provides name")
-        print("-" * 80)
-        user_msg = "My name is Sarah"
-        print(f"User: {user_msg}")
-        
-        response = await dialogue.process_message(user_id, user_msg, db)
-        print(f"Bot: {response[:200]}...")
-        
-        status = onboarding.get_onboarding_status(user_id)
-        print(f"\nOnboarding status: {status}")
-        
-        # Step 3: User consents to data storage
-        print("\n[Step 3] User consents to data storage")
-        print("-" * 80)
-        user_msg = "Yes, I consent"
-        print(f"User: {user_msg}")
-        
-        response = await dialogue.process_message(user_id, user_msg, db)
-        print(f"Bot: {response[:200]}...")
-        
-        status = onboarding.get_onboarding_status(user_id)
-        print(f"\nOnboarding status: {status}")
-        
-        # Step 4: User commits to lessons
-        print("\n[Step 4] User commits to 365 lessons")
-        print("-" * 80)
-        user_msg = "Yes, I'm ready to commit to this journey!"
-        print(f"User: {user_msg}")
-        
-        response = await dialogue.process_message(user_id, user_msg, db)
-        print(f"Bot: {response[:200]}...")
-        
-        status = onboarding.get_onboarding_status(user_id)
-        print(f"\nOnboarding status: {status}")
-        
-        # Step 5: User provides lesson status (new vs continuing)
-        print("\n[Step 5] User indicates they're new to ACIM")
-        print("-" * 80)
-        user_msg = "I'm new to ACIM"
-        print(f"User: {user_msg}")
-        
-        response = await dialogue.process_message(user_id, user_msg, db)
-        print(f"Bot: {response[:300]}...")
-        
-        status = onboarding.get_onboarding_status(user_id)
-        print(f"\nOnboarding status: {status}")
-        
-        # Check if schedule was auto-created (should be created at completion)
-        schedules = SchedulerService.get_user_schedules(user_id)
-        print(f"\n📅 Schedules created: {len(schedules)}")
-        for schedule in schedules:
-            print(f"  • Schedule ID: {schedule.schedule_id}")
-            print(f"    Type: {schedule.schedule_type}")
-            print(f"    Cron: {schedule.cron_expression}")
-            print(f"    Next send: {schedule.next_send_time}")
-            print(f"    Active: {schedule.is_active}")
-        
-        if status["onboarding_complete"] and len(schedules) > 0:
-            print("\n✅ SUCCESS: Onboarding complete and auto-schedule created!")
-            return True
-        else:
-            print("\n❌ FAILED: Onboarding not complete or schedule not auto-created")
-            print(f"    Onboarding complete: {status['onboarding_complete']}")
-            print(f"    Schedules: {len(schedules)}")
-            return False
-        
-    finally:
-        db.close()
+    db.close()
 
 
 @pytest.mark.asyncio
 async def test_consent_granted_continues_onboarding():
     """Ensure consenting returns a localized thank-you and continues onboarding."""
     db = SessionLocal()
-    try:
-        user_id = create_test_user(db, "test_onboarding_user-2")
+    user_id = create_test_user(db, "test_onboarding_user-2")
 
-        dialogue = DialogueEngine(db)
-        onboarding = OnboardingService(db)
+    dialogue = DialogueEngine(db)
+    onboarding = OnboardingService(db)
 
-        # Trigger name prompt and provide name
-        response = await dialogue.process_message(user_id, "Hi", db)
-        print(response)
-        response = await dialogue.process_message(user_id, "My name is Alex", db)
-        print(response)
+    # Trigger name prompt and provide name
+    response = await dialogue.process_message(user_id, "Hi", db)
+    print(response)
+    response = await dialogue.process_message(user_id, "My name is Alex", db)
+    print(response)
 
-        # Provide consent
-        user_msg = "Yes"
-        response = await dialogue.process_message(user_id, user_msg, db)
-        print(response)
+    # Provide consent
+    user_msg = "Yes"
+    response = await dialogue.process_message(user_id, user_msg, db)
+    print(response)
 
-        # Response should include the localized thank-you
-        assert "Thank you for consenting" in response
+    # Response should include the localized thank-you
+    assert "Thank you for consenting" in response
 
-        # Onboarding status should now reflect consent given
-        status = onboarding.get_onboarding_status(user_id)
-        assert status.get("has_consent") is True
+    # Onboarding status should now reflect consent given
+    status = onboarding.get_onboarding_status(user_id)
+    assert status.get("has_consent") is True
 
-        # And the bot should continue by asking commitment (accept a few equivalent phrasings)
-        assert (
-            "Are you interested" in response
-            or "Are you new to ACIM" in response
-            or "Are you ready" in response
-        )
-    finally:
-        db.close()
+    # And the bot should continue by asking commitment (accept a few equivalent phrasings)
+    assert (
+        "Are you interested" in response
+        or "Are you new to ACIM" in response
+        or "Are you ready" in response
+    )
+    db.close()
 
 
 @pytest.mark.asyncio
@@ -172,28 +168,26 @@ async def test_schedule_request():
     print("=" * 80)
     
     db = SessionLocal()
-    try:
-        user_id = create_test_user(db, "test_onboarding_user-3")
-        dialogue = DialogueEngine(db)
-        
-        # User asks for reminders
-        print("\nUser asks for reminders...")
-        user_msg = "Can you remind me to do my daily lesson?"
-        print(f"User: {user_msg}")
-        
-        response = await dialogue.process_message(user_id, user_msg, db)
-        print(f"Bot: {response[:200]}...")
-        
-        # Check if bot is guiding them through setup
-        if "commit" in response.lower() or "ready" in response.lower():
-            print("\n✅ SUCCESS: Bot detected schedule request and guiding user")
-            return True
-        else:
-            print("\n⚠️  Bot response doesn't seem to be handling schedule request")
-            return False
-        
-    finally:
-        db.close()
+    user_id = create_test_user(db, "test_onboarding_user-3")
+    dialogue = DialogueEngine(db)
+    
+    # User asks for reminders
+    print("\nUser asks for reminders...")
+    user_msg = "Can you remind me to do my daily lesson?"
+    print(f"User: {user_msg}")
+    
+    response = await dialogue.process_message(user_id, user_msg, db)
+    print(f"Bot: {response[:200]}...")
+    
+    # Check if bot is guiding them through setup
+    if "commit" in response.lower() or "ready" in response.lower():
+        print("\n✅ SUCCESS: Bot detected schedule request and guiding user")
+        return True
+    else:
+        print("\n⚠️  Bot response doesn't seem to be handling schedule request")
+        return False
+    
+    db.close()
 
 
 @pytest.mark.asyncio
@@ -232,40 +226,38 @@ async def test_time_parsing():
 async def test_onboarding_greeting_hei_detects_norwegian():
     """New user sends Norwegian greeting 'Hei' -> detect 'no' and respond in Norwegian."""
     db = SessionLocal()
-    try:
-        user_id = create_test_user(db, "test_onboarding_user-4")
-        mm = MemoryManager(db)
+    user_id = create_test_user(db, "test_onboarding_user-4")
+    mm = MemoryManager(db)
 
-        # initially no language memory
-        before_lang = mm.get_memory(user_id, "user_language")
-        assert not before_lang
+    # initially no language memory
+    before_lang = mm.get_memory(user_id, "user_language")
+    assert not before_lang
 
-        dialogue = DialogueEngine(db)
+    dialogue = DialogueEngine(db)
 
-        # send Norwegian greeting
-        response = await dialogue.process_message(user_id, "Hei", db)
-        print(response)
+    # send Norwegian greeting
+    response = await dialogue.process_message(user_id, "Hei", db)
+    print(response)
 
-        # after greeting, language memory should be Norwegian
-        lang_memories = mm.get_memory(user_id, "user_language")
-        assert lang_memories, "No user_language memory stored after greeting"
-        assert any(m["value"].lower().startswith("no") for m in lang_memories), (
-            f"Expected 'no' to be stored after message 'Hei', got: {[m['value'] for m in lang_memories]}"
-        )
+    # after greeting, language memory should be Norwegian
+    lang_memories = mm.get_memory(user_id, "user_language")
+    assert lang_memories, "No user_language memory stored after greeting"
+    assert any(m["value"].lower().startswith("no") for m in lang_memories), (
+        f"Expected 'no' to be stored after message 'Hei', got: {[m['value'] for m in lang_memories]}"
+    )
 
-        # name memory should not yet be set
-        name_mem = mm.get_memory(user_id, "first_name")
-        assert not name_mem or name_mem[0].get("value") in (None, ""), "Expected no first_name memory yet"
+    # name memory should not yet be set
+    name_mem = mm.get_memory(user_id, "first_name")
+    assert not name_mem or name_mem[0].get("value") in (None, ""), "Expected no first_name memory yet"
 
-        # The bot's response should be the Norwegian name prompt
-        prompts = get_onboarding_prompts("no", "")
-        expected = prompts.get("name")
-        assert expected and expected in response, (
-            f"Expected Norwegian onboarding prompt in response, got: {response}"
-        )
+    # The bot's response should be the Norwegian name prompt
+    prompts = get_onboarding_prompts("no", "")
+    expected = prompts.get("name")
+    assert expected and expected in response, (
+        f"Expected Norwegian onboarding prompt in response, got: {response}"
+    )
 
-    finally:
-        db.close()
+    db.close()
 
 
 async def run_all_tests():

@@ -112,7 +112,7 @@ async def handle_lesson_request(
     ### Response
     Provide a thoughtful, detailed response about this ACIM lesson. Reference specific points from the lesson content above. Be warm and encouraging."""
 
-        response = await call_ollama(prompt)
+        response = await call_ollama(prompt, None, user_language)
         return response
 
     except Exception as e:

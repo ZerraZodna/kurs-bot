@@ -76,6 +76,8 @@ class OnboardingFlow:
 
     def _get_pending_step(self, user_id: int) -> Optional[str]:
         pending_step = self.memory_manager.get_memory(user_id, "onboarding_step_pending")
+        # Debug trace
+        print(f"[ONBOARD DEBUG] _get_pending_step - user_id={user_id} -> {pending_step}")
         if pending_step:
             return str(pending_step[0].get("value", "")).lower()
         return None
@@ -90,6 +92,7 @@ class OnboardingFlow:
             source="dialogue_engine",
             allow_duplicates=False,
         )
+        print(f"[ONBOARD DEBUG] _resolve_pending_step - user_id={user_id}")
 
     def _set_pending_lesson_delivery(self, user_id: int, lesson_id: str = ""):
         ttl_hours = 0.1 if lesson_id == "" else 1
@@ -114,6 +117,7 @@ class OnboardingFlow:
             ttl_hours=ttl_hours,
             allow_duplicates=False,
         )
+        print(f"[ONBOARD DEBUG] _store_memory - user_id={user_id} key={key} value={value} category={category} ttl={ttl_hours}")
 
     def _get_message(self, key: str, language: str = "en") -> str:
         # Normalize full-language names (e.g. 'Norwegian', 'English') to short codes used in MESSAGES
@@ -140,7 +144,9 @@ class OnboardingFlow:
         name_memories = self.memory_manager.get_memory(user_id, "first_name")
         if not name_memories:
             name_memories = self.memory_manager.get_memory(user_id, "name")
-        return name_memories[0]["value"] if name_memories else "friend"
+        name = name_memories[0]["value"] if name_memories else "friend"
+        print(f"[ONBOARD DEBUG] _get_user_name - user_id={user_id} -> {name}")
+        return name
 
     def _get_commitment_prompt(self, language: str, name: str) -> str:
         prompt = self._get_message("commitment_prompt", language)
@@ -167,6 +173,7 @@ class OnboardingFlow:
         return None
 
     def _handle_consent_pending(self, user_id: int, text: str, session: Session) -> Optional[str]:
+        print(f"[ONBOARD DEBUG] _handle_consent_pending - user_id={user_id} text={text}")
         consent = self.onboarding.detect_consent_keywords(text)
         if consent is True:
             self._store_memory(user_id, "data_consent", "granted", category="profile")
@@ -174,6 +181,7 @@ class OnboardingFlow:
             self._resolve_pending_step(user_id)
             # Return a localized thank-you and continue onboarding flow
             language = get_user_language(self.memory_manager, user_id)
+            print(f"[ONBOARD DEBUG] consent granted - user_id={user_id} language={language}")
             thank_you = self._get_message("consent_granted", language)
             next_prompt = self.onboarding.get_onboarding_prompt(user_id)
             if next_prompt:
@@ -256,11 +264,13 @@ class OnboardingFlow:
             Onboarding response or None if not in onboarding flow
         """
         status = self.onboarding.get_onboarding_status(user_id)
+        print(f"[ONBOARD DEBUG] handle_onboarding - user_id={user_id} text={text} status={status}")
 
         # If there is a pending onboarding step, handle it first so replies
         # to prompts (e.g. consent "yes") are processed instead of re-asking.
         pending_step = self._get_pending_step(user_id)
         if pending_step:
+            print(f"[ONBOARD DEBUG] pending_step detected: {pending_step} for user {user_id}")
             response = await self._handle_pending_step(user_id, text, session, pending_step)
             if response:
                 return response
@@ -270,12 +280,14 @@ class OnboardingFlow:
         if not status.get("has_name"):
             language = get_user_language(self.memory_manager, user_id)
             self._store_memory(user_id, "onboarding_step_pending", "name", ttl_hours=2)
+            print(f"[ONBOARD DEBUG] asking for name (no name) user_id={user_id} language={language}")
             return self._get_message("name_prompt", language)
 
         # If no consent, ask for consent
         if not status.get("has_consent"):
             language = get_user_language(self.memory_manager, user_id)
             self._store_memory(user_id, "onboarding_step_pending", "consent", ttl_hours=2)
+            print(f"[ONBOARD DEBUG] asking for consent (no consent) user_id={user_id} language={language}")
             return self._get_message("consent_prompt", language)
 
         # If no commitment, ask for commitment

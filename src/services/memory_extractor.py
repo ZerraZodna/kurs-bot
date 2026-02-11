@@ -101,7 +101,7 @@ class MemoryExtractor:
 User message: "{user_message}"{context_str}"""
             
             # Call Ollama via shared client wrapper, include language hint
-            model = model_override or None
+            model = model_override or settings.OLLAMA_CHAT_RAG_MODEL
             # Lazy import to avoid circular imports during package initialization
             from src.services.dialogue.ollama_client import call_ollama
             response_text = await call_ollama(prompt, model=model, language=language)
