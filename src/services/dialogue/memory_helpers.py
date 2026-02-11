@@ -13,10 +13,11 @@ from src.config import settings
 logger = logging.getLogger(__name__)
 
 def get_user_language(memory_manager: MemoryManager, user_id: int) -> str:
-    """Get user's preferred language."""
-    memories = memory_manager.get_memory(user_id, "user_language")
-    # Stored values are ISO codes (e.g., 'en', 'no'). Return stored value or 'en'.
-    return memories[0].get("value", "en") if memories else "en"
+    return "en"
+    #"""Get user's preferred language."""
+    #memories = memory_manager.get_memory(user_id, "user_language")
+    ## Stored values are ISO codes (e.g., 'en', 'no'). Return stored value or 'en'.
+    #return memories[0].get("value", "en") if memories else "en"
 
 
 

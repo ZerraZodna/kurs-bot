@@ -108,7 +108,7 @@ class DialogueEngine:
         if user.processing_restricted or not user.opted_in:
             return "Your data processing is restricted. If you want to resume, please update your consent settings."
 
-        user_lang = await detect_and_store_language(self.memory_manager, user_id, text)
+        user_lang = "en" # await detect_and_store_language(self.memory_manager, user_id, text)
 
         # Handle RAG mode toggle: rag_mode on/off
         rag_toggle_response = handle_rag_mode_toggle(text, self.memory_manager, user_id)

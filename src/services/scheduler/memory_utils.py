@@ -21,8 +21,9 @@ def get_schedule_message(memory_manager: MemoryManager, user_id: int, schedule_i
 
 
 def get_user_language(memory_manager: MemoryManager, user_id: int) -> str:
-    memories = memory_manager.get_memory(user_id, "user_language")
-    return memories[0].get("value", "en") if memories else "en"
+    return "en"
+    #memories = memory_manager.get_memory(user_id, "user_language")
+    #return memories[0].get("value", "en") if memories else "en"
 
 
 def get_last_sent_lesson_id(memory_manager: MemoryManager, user_id: int) -> Optional[int]:

@@ -99,7 +99,7 @@ async def detect_and_store_language(memory_manager: MemoryManager, user_id: int,
 	or existing language code.
 	"""
 
-	existing = memory_manager.get_memory(user_id, "user_language")
+	existing = "en" #memory_manager.get_memory(user_id, "user_language")
 	existing_value = existing[0].get("value") if existing else None
 	existing_conf = existing[0].get("confidence", 0.0) if existing else 0.0
 
