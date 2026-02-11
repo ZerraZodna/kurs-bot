@@ -360,7 +360,7 @@ class DialogueEngine:
                 )
 
             user_lang = get_user_language(self.memory_manager, user_id)
-            if user_lang and user_lang.lower() not in ("english", "en"):
+            if user_lang and user_lang.lower() not in ("en",):
                 resp_text = await translate_text(resp_text, user_lang, self.call_ollama)
 
             return resp_text

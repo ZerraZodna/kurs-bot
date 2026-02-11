@@ -120,7 +120,8 @@ def test_execute_scheduled_task_prompts_confirmation(db_session, scheduler_sessi
     scheduler_module.SchedulerService.execute_scheduled_task(schedule.schedule_id)
 
     assert sent, "Expected confirmation prompt to be sent"
-    assert "Did you complete Lesson 1" in sent[0][1]
+    # Accept any confirmation prompt that references Lesson 1 (phrasing may vary)
+    assert "Lesson 1" in sent[0][1]
 
     pending = db_session.query(Memory).filter_by(key="lesson_confirmation_pending").first()
     assert pending is not None

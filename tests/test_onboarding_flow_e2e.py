@@ -40,7 +40,6 @@ async def test_onboarding_new_user_end_to_end_creates_daily_schedule():
     """End-to-end: New user goes through onboarding via messages and gets a daily schedule."""
     db = SessionLocal()
     try:
-        init_db()
         user_id = create_test_user(db, "test_onboarding_e2e_new", first_name="Eve")
 
         dialogue = DialogueEngine(db)
@@ -100,7 +99,6 @@ async def test_onboarding_continuing_user_end_to_end_lesson10_sets_memory_and_sc
     """End-to-end: Continuing user says 'I am on lesson 10' and onboarding creates memory and schedule."""
     db = SessionLocal()
     try:
-        init_db()
         user_id = create_test_user(db, "test_onboarding_e2e_continuing", first_name="Dan")
 
         # Pre-store consent and commitment so onboarding asks about lesson status

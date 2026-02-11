@@ -29,7 +29,6 @@ def test_parse_local_time_to_utc_basic():
 def test_create_schedule_stores_utc_and_displays_local():
     db = SessionLocal()
     try:
-        init_db()
         user_id = create_user_with_tz(db, tz_name="Europe/Oslo")
 
         sched = SchedulerService.create_daily_schedule(user_id=user_id, lesson_id=None, time_str="09:00", session=db)
@@ -49,7 +48,6 @@ def test_create_schedule_stores_utc_and_displays_local():
 def test_update_schedule_converts_to_utc():
     db = SessionLocal()
     try:
-        init_db()
         user_id = create_user_with_tz(db, tz_name="Europe/Oslo")
 
         sched = SchedulerService.create_daily_schedule(user_id=user_id, lesson_id=None, time_str="09:00", session=db)

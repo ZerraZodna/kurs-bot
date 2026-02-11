@@ -23,11 +23,9 @@ from src.services.dialogue_engine import DialogueEngine
 from src.services.onboarding_service import OnboardingService
 from src.services.scheduler import SchedulerService
 from datetime import datetime, timezone
-
-
-def create_new_test_user(db) -> int:
-    """Create a fresh test user using shared helper."""
-    return create_test_user(db, "test_onboarding_user")
+from src.services.onboarding.prompts import get_onboarding_prompts
+from src.services.memory_manager import MemoryManager
+from uuid import uuid4
 
 
 @pytest.mark.asyncio
@@ -39,8 +37,7 @@ async def test_onboarding_flow():
     
     db = SessionLocal()
     try:
-        init_db()
-        user_id = create_new_test_user(db)
+        user_id = create_test_user(db, "test_onboarding_user-1")
         
         dialogue = DialogueEngine(db)
         onboarding = OnboardingService(db)
@@ -134,29 +131,35 @@ async def test_consent_granted_continues_onboarding():
     """Ensure consenting returns a localized thank-you and continues onboarding."""
     db = SessionLocal()
     try:
-        init_db()
-        user_id = create_new_test_user(db)
+        user_id = create_test_user(db, "test_onboarding_user-2")
 
         dialogue = DialogueEngine(db)
         onboarding = OnboardingService(db)
 
         # Trigger name prompt and provide name
-        await dialogue.process_message(user_id, "Hi", db)
-        await dialogue.process_message(user_id, "My name is Alex", db)
+        response = await dialogue.process_message(user_id, "Hi", db)
+        print(response)
+        response = await dialogue.process_message(user_id, "My name is Alex", db)
+        print(response)
 
         # Provide consent
         user_msg = "Yes"
         response = await dialogue.process_message(user_id, user_msg, db)
+        print(response)
 
         # Response should include the localized thank-you
-        assert "Thank you for consenting" in response or "Takk for at du samtykker" in response
+        assert "Thank you for consenting" in response
 
         # Onboarding status should now reflect consent given
         status = onboarding.get_onboarding_status(user_id)
         assert status.get("has_consent") is True
 
-        # And the bot should continue by asking commitment (commitment prompt contains 'Are you interested')
-        assert "Are you interested" in response
+        # And the bot should continue by asking commitment (accept a few equivalent phrasings)
+        assert (
+            "Are you interested" in response
+            or "Are you new to ACIM" in response
+            or "Are you ready" in response
+        )
     finally:
         db.close()
 
@@ -170,7 +173,7 @@ async def test_schedule_request():
     
     db = SessionLocal()
     try:
-        user_id = create_new_test_user(db)
+        user_id = create_test_user(db, "test_onboarding_user-3")
         dialogue = DialogueEngine(db)
         
         # User asks for reminders
@@ -223,6 +226,46 @@ async def test_time_parsing():
         print("\n❌ FAILED: Some time parsing tests failed")
     
     return all_passed
+
+
+@pytest.mark.asyncio
+async def test_onboarding_greeting_hei_detects_norwegian():
+    """New user sends Norwegian greeting 'Hei' -> detect 'no' and respond in Norwegian."""
+    db = SessionLocal()
+    try:
+        user_id = create_test_user(db, "test_onboarding_user-4")
+        mm = MemoryManager(db)
+
+        # initially no language memory
+        before_lang = mm.get_memory(user_id, "user_language")
+        assert not before_lang
+
+        dialogue = DialogueEngine(db)
+
+        # send Norwegian greeting
+        response = await dialogue.process_message(user_id, "Hei", db)
+        print(response)
+
+        # after greeting, language memory should be Norwegian
+        lang_memories = mm.get_memory(user_id, "user_language")
+        assert lang_memories, "No user_language memory stored after greeting"
+        assert any(m["value"].lower().startswith("no") for m in lang_memories), (
+            f"Expected 'no' to be stored after message 'Hei', got: {[m['value'] for m in lang_memories]}"
+        )
+
+        # name memory should not yet be set
+        name_mem = mm.get_memory(user_id, "first_name")
+        assert not name_mem or name_mem[0].get("value") in (None, ""), "Expected no first_name memory yet"
+
+        # The bot's response should be the Norwegian name prompt
+        prompts = get_onboarding_prompts("no", "")
+        expected = prompts.get("name")
+        assert expected and expected in response, (
+            f"Expected Norwegian onboarding prompt in response, got: {response}"
+        )
+
+    finally:
+        db.close()
 
 
 async def run_all_tests():

@@ -16,7 +16,6 @@ async def test_process_message_creates_one_time_reminder_with_tomorrow(monkeypat
     """Regression test: a one-time reminder with 'tomorrow at 12:00' should create a one-time schedule via triggers and not modify daily schedule."""
     db = SessionLocal()
     try:
-        init_db()
 
         # Create a ready user (onboarding complete)
         from tests.utils import make_ready_user

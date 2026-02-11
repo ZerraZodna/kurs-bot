@@ -33,7 +33,6 @@ def create_new_test_user(db) -> int:
 async def test_memory_driven_schedule_creation():
     db = SessionLocal()
     try:
-        init_db()
         user_id = create_new_test_user(db)
 
         # Store commitment and preferred time as memories (no embedding generation)

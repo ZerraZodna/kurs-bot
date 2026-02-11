@@ -48,7 +48,7 @@ def detect_lesson_request(text: str) -> Optional[Dict[str, Any]]:
 
 
 async def handle_lesson_request(
-    lesson_id: int, user_input: str, session: Session, user_language: str = "english"
+    lesson_id: int, user_input: str, session: Session, user_language: str = "en"
 ) -> str:
     """
     Handle requests for specific lesson content using RAG.
@@ -91,7 +91,7 @@ async def handle_lesson_request(
 
         if is_raw_request:
             # Return raw lesson text directly (translate if needed)
-            return await format_lesson_message(lesson, user_language or "english", call_ollama)
+            return await format_lesson_message(lesson, user_language or "en", call_ollama)
 
         # Otherwise (including plain "Give me lesson N"), use RAG/LLM to discuss the lesson
         system_prompt = f"""{settings.SYSTEM_PROMPT}
@@ -133,7 +133,7 @@ async def format_lesson_message(lesson: Lesson, language: str, call_ollama_fn) -
         Formatted lesson text
     """
     text = f"Lesson {lesson.lesson_id}: {lesson.title}\n\n{lesson.content}"
-    if language.lower() in ["english", "en"]:
+    if language.lower() in ["en"]:
         return text
     return await translate_text(text, language, call_ollama_fn)
 

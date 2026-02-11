@@ -18,14 +18,14 @@ def build_confirmation_prompt(lesson_id: int, next_id: int, language: str) -> st
         f"Did you complete Lesson {lesson_id} yesterday? "
         f"Reply yes to receive Lesson {next_id}."
     )
-    if language.lower() in ["english", "en"]:
+    if language.lower() in ["en"]:
         return base
     return translate_text_sync(base, language)
 
 
 def format_lesson_message(lesson: Lesson, language: str) -> str:
     text = f"Lesson {lesson.lesson_id}: {lesson.title}\n\n{lesson.content}"
-    if language.lower() in ["english", "en"]:
+    if language.lower() in ["en"]:
         return text
     return translate_text_sync(text, language)
 

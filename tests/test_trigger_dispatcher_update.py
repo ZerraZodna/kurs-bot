@@ -11,7 +11,6 @@ from src.services.scheduler import SchedulerService
 def test_update_schedule_infers_daily_change():
     db = SessionLocal()
     try:
-        init_db()
         user_id = create_test_user(db, "trigger-dispatch-user")
 
         # create initial daily schedule

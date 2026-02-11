@@ -69,7 +69,7 @@ async def maybe_send_next_lesson(
     repeat_note = None
     if previous_lesson_id:
         repeat_note = f"If you'd like to repeat Lesson {previous_lesson_id} instead, just let me know."
-        if language.lower() not in ["english", "en"]:
+        if language.lower() not in ["en"]:
             repeat_note = await translate_text(repeat_note, language, call_ollama)
 
     if repeat_note:

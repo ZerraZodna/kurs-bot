@@ -18,7 +18,6 @@ from src.services.trigger_dispatcher import get_trigger_dispatcher
 async def test_trigger_based_schedule_edit(monkeypatch):
     db = SessionLocal()
     try:
-        init_db()
         user_id = create_test_user(db, "trigger-schedule-user")
 
         # Create an initial schedule at 09:00 for the user

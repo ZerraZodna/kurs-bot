@@ -117,7 +117,7 @@ async def handle_lesson_confirmation(
         resolve_pending_confirmation(memory_manager, user_id)
         message = "No problem. Take your time and reply 'yes' when you're ready to continue."
         language = get_language_fn(user_id)
-        if language.lower() not in ["english", "en"]:
+        if language and isinstance(language, str) and language.lower() not in ["en"]:
             message = await translate_fn(message, language)
         return message
 

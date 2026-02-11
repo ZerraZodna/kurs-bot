@@ -14,7 +14,6 @@ from src.services.scheduler.core import SchedulerService
 async def test_process_message_creates_one_time_reminder(monkeypatch):
     db = SessionLocal()
     try:
-        init_db()
 
         # Create a ready user (onboarding complete)
         from tests.utils import make_ready_user

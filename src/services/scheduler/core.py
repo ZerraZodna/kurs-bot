@@ -266,7 +266,7 @@ class SchedulerService:
             try:
                 stored_ns = getattr(schedule, 'next_send_time', None)
                 if stored_ns is not None:
-                    logger.debug(f"Stored next_send_time (iso): {stored_ns.isoformat()}, tzinfo={getattr(stored_ns, 'tzinfo', None)}")
+                    logger.info(f"Stored next_send_time (iso): {stored_ns.isoformat()}, tzinfo={getattr(stored_ns, 'tzinfo', None)}")
             except Exception:
                 logger.exception("Could not log stored next_send_time for schedule %s", getattr(schedule, 'schedule_id', None))
 
@@ -357,7 +357,7 @@ class SchedulerService:
             logger.info(f"✓ Updated daily schedule {schedule_id} for user {getattr(updated, 'user_id', 'unknown')} to {hour}:{minute:02d} ({tz_name})")
             try:
                 if getattr(updated, 'next_send_time', None):
-                    logger.debug(f"Updated schedule stored next_send_time (iso): {updated.next_send_time.isoformat()}, tzinfo={getattr(updated.next_send_time, 'tzinfo', None)}")
+                    logger.info(f"Updated schedule stored next_send_time (iso): {updated.next_send_time.isoformat()}, tzinfo={getattr(updated.next_send_time, 'tzinfo', None)}")
             except Exception:
                 logger.exception("Could not log updated next_send_time for schedule %s", schedule_id)
             return updated

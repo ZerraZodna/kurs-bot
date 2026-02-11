@@ -42,7 +42,7 @@ async def handle_schedule_messages(
         )
         response = build_schedule_status_response(schedules, tz_name)
         language = get_user_language(memory_manager, user_id)
-        if language.lower() not in ["english", "en"]:
+        if language.lower() not in ["en"]:
             response = await translate_text(response, language, call_ollama)
         return response
 
@@ -65,7 +65,7 @@ async def handle_schedule_messages(
         else:
             response = "You don’t have any active lesson schedules to pause."
         language = get_user_language(memory_manager, user_id)
-        if language.lower() not in ["english", "en"]:
+        if language.lower() not in ["en"]:
             response = await translate_text(response, language, call_ollama)
         return response
 
@@ -115,7 +115,7 @@ async def handle_schedule_messages(
                 lang = get_user_language(memory_manager, user_id)
         except Exception:
             lang = None
-        if lang and lang.lower() not in ("english", "en"):
+        if lang and lang.lower() not in ("en",):
             resp = await translate_text(resp, lang, call_ollama)
         return resp
 

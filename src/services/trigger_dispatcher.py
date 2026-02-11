@@ -340,7 +340,7 @@ class TriggerDispatcher:
 
             conf_text = f"Okay — timezone set to {tz_name}. I'll use local time for your reminders."
             user_lang = get_user_language(self.memory_manager, user_id)
-            if user_lang and user_lang.lower() not in ("english", "en"):
+            if user_lang and user_lang.lower() not in ("en",):
                 conf_text = translate_text_sync(conf_text, user_lang)
 
             user = self.db.query(User).filter_by(user_id=user_id).first()
@@ -370,7 +370,7 @@ class TriggerDispatcher:
                 resp_text = "Here are your reminders."
 
             user_lang = get_user_language(self.memory_manager, user_id)
-            if user_lang and user_lang.lower() not in ("english", "en"):
+            if user_lang and user_lang.lower() not in ("en",):
                 resp_text = translate_text_sync(resp_text, user_lang)
 
             user = self.db.query(User).filter_by(user_id=user_id).first()

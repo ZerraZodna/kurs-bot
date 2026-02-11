@@ -109,7 +109,6 @@ class MemoryManager:
                 self.db.commit()
                 
                 # Generate embedding if needed — removed in this branch.
-                
                 return e.memory_id
 
         # If allow_duplicates, just insert new memory
@@ -129,7 +128,6 @@ class MemoryManager:
             self.db.commit()
             
             # Generate embedding if needed — removed in this branch.
-            
             return new.memory_id
 
         if existing:
@@ -156,7 +154,6 @@ class MemoryManager:
             self.db.commit()
             
             # Generate embedding if needed — removed in this branch.
-            
             return new.memory_id
 
         # no existing -> insert
@@ -173,9 +170,7 @@ class MemoryManager:
         )
         self.db.add(new)
         self.db.commit()
-        
         # Generate embedding if needed — removed in this branch.
-        
         # If this memory indicates a preferred lesson time, do NOT modify schedules here.
         # Creating schedules is the responsibility of the schedule/triggering codepath
         # (e.g. TriggerDispatcher) to avoid unexpected side-effects from memory writes.

@@ -8,7 +8,6 @@ from src.services.scheduler import SchedulerService
 def test_one_time_creation_does_not_modify_daily():
     db = SessionLocal()
     try:
-        init_db()
         from tests.utils import make_ready_user
 
         # Create a ready user with onboarding completed

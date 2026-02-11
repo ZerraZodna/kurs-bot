@@ -191,6 +191,12 @@ User message: "{user_message}"{context_str}"""
             logger.debug("Heuristic skipped confirmation-like single-word message")
             return out
 
+        # Common single-word greetings we should NOT treat as names
+        greetings = {"hi", "hei", "hej", "hello", "hallo", "hey"}
+        if lower in greetings:
+            logger.debug("Heuristic skipped greeting-like single-word message")
+            return out
+
         # Heuristic: single-word capitalized names (e.g., "Live", "Jo")
         words = msg.split()
         if 1 <= len(words) <= 2 and all(w.isalpha() for w in words) and words[0][0].isupper():

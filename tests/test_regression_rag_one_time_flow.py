@@ -12,10 +12,11 @@ async def test_rag_mode_one_time_reminder_preserves_daily(monkeypatch):
     """RAG-mode flow: listing reminders, creating a one-time reminder should not overwrite daily lesson reminder."""
     db = SessionLocal()
     try:
-        init_db()
         from tests.utils import make_ready_user
 
         user_id = make_ready_user(db, external_id="rag_one_time_user", first_name="RagUser")
+        mm = MemoryManager(db)
+        mm.store_memory(user_id=user_id, key="user_language", value="en", confidence=0.7, source="test", category="preference")
 
         # Ensure a daily lesson schedule exists
         SchedulerService.create_daily_schedule(user_id=user_id, lesson_id=None, time_str="09:00", session=db)

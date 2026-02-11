@@ -35,7 +35,6 @@ def _create_test_user(db, timezone_name=None):
 def test_create_schedule_europe_oslo_0900():
     db = SessionLocal()
     try:
-        init_db()
         user_id = _create_test_user(db, timezone_name="Europe/Oslo")
 
         # Create schedule for 09:00 local time
@@ -63,7 +62,6 @@ def test_create_schedule_europe_oslo_0900():
 def test_parse_run_at_iso_and_epoch():
     db = SessionLocal()
     try:
-        init_db()
         mm = MemoryManager(db)
         dispatcher = TriggerDispatcher(db=db, memory_manager=mm)
 
@@ -88,7 +86,6 @@ def test_parse_run_at_iso_and_epoch():
 def test_update_schedule_persists_utc_aware():
     db = SessionLocal()
     try:
-        init_db()
         user_id = _create_test_user(db)
 
         # Create initial schedule

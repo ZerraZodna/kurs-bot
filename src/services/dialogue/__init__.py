@@ -14,10 +14,10 @@ from .reminder_handler import (
 )
 from .memory_helpers import (
     get_user_language,
-    detect_and_store_language,
     extract_and_store_memories,
     delete_user_and_data,
 )
+from src.services.language.language_service import detect_and_store_language
 from .pause_handler import detect_pause_request
 from .schedule_query_handler import detect_schedule_status_request, build_schedule_status_response
 from .schedule_handlers import handle_schedule_messages

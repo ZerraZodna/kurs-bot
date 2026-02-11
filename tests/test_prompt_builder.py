@@ -14,7 +14,6 @@ from src.services.context_utils import ContextOptimizer, MemoryKey, MemoryCatego
 @pytest.fixture
 def db_session():
     """Create a test database session."""
-    init_db()
     db = SessionLocal()
     yield db
     db.close()

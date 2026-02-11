@@ -31,8 +31,9 @@ async def call_ollama(prompt: str, model: str | None = None, language: str | Non
     Returns:
         Response text from Ollama
     """
-    # If an explicit model is provided, use it. Otherwise, choose based on language.
-    if language and language.lower() != "english":
+    # If an explicit model is provided, use it. Otherwise, choose based on ISO language code.
+    # Treat `en` as English; any other ISO code selects the NON_ENGLISH model.
+    if language and language.lower() != "en":
         chosen_model = getattr(settings, "NON_ENGLISH_OLLAMA_MODEL", settings.OLLAMA_MODEL)
     else:
         if model:

@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import logging
-import re
 from datetime import datetime, timezone
-from typing import Optional
-from langdetect import detect, LangDetectException
+
 from sqlalchemy.orm import Session
 from src.services.memory_manager import MemoryManager
 from src.services.memory_extractor import MemoryExtractor
@@ -14,147 +12,14 @@ from src.config import settings
 
 logger = logging.getLogger(__name__)
 
-
 def get_user_language(memory_manager: MemoryManager, user_id: int) -> str:
     """Get user's preferred language."""
     memories = memory_manager.get_memory(user_id, "user_language")
-    return memories[0].get("value", "English") if memories else "English"
+    # Stored values are ISO codes (e.g., 'en', 'no'). Return stored value or 'en'.
+    return memories[0].get("value", "en") if memories else "en"
 
 
-async def detect_and_store_language(
-    memory_manager: MemoryManager, user_id: int, user_message: str
-) -> str:
-    """
-    Detect user's language from message and store if confident.
 
-    Handles multipart names, Norwegian keywords, etc.
-    """
-    try:
-        existing_lang = memory_manager.get_memory(user_id, "user_language")
-        existing_value = existing_lang[0].get("value") if existing_lang else None
-
-        norwegian_keywords = [
-            "jeg heter",
-            "hvordan går",
-            "vær så snill",
-            "god morgen",
-            "god kveld",
-            "god ettermiddag",
-        ]
-        norwegian_single_words = {
-            "hei",
-            "jeg",
-            "heter",
-            "hvordan",
-            "takk",
-            "lyst",
-            "ikke",
-            "ja",
-            "nei",
-        }
-        english_keywords = [
-            "good morning",
-            "good evening",
-            "good afternoon",
-            "how are",
-            "what is",
-        ]
-        english_single_words = {
-            "hello",
-            "hi",
-            "i",
-            "you",
-            "the",
-            "and",
-            "please",
-            "thank",
-        }
-
-        msg_lower = user_message.lower()
-        tokens = re.findall(r"[a-zA-Z]+", msg_lower)
-        token_set = set(tokens)
-        word_count = len(user_message.split())
-
-        has_no_keywords = any(kw in msg_lower for kw in norwegian_keywords) or any(
-            kw in token_set for kw in norwegian_single_words
-        )
-        has_en_keywords = any(kw in msg_lower for kw in english_keywords) or any(
-            kw in token_set for kw in english_single_words
-        )
-
-        stripped_message = user_message.strip()
-        is_probable_name = (
-            word_count <= 2
-            and stripped_message[:1].isupper()
-            and stripped_message.replace(" ", "").isalpha()
-            and not (has_no_keywords or has_en_keywords)
-        )
-
-        detected_lang = None
-        if word_count <= 3 and has_no_keywords:
-            detected_lang = "no"
-        elif word_count <= 3 and has_en_keywords:
-            detected_lang = "en"
-        elif word_count < 4 and not (has_no_keywords or has_en_keywords):
-            detected_lang = None
-        else:
-            try:
-                detected_lang = detect(user_message)
-            except LangDetectException:
-                if has_no_keywords:
-                    detected_lang = "no"
-                elif has_en_keywords:
-                    detected_lang = "en"
-
-        # Guard against NL misclassification
-        if detected_lang in ["nl", "de", "sv", "da", "sl"] and has_no_keywords:
-            detected_lang = "no"
-
-        lang_names = {
-            "no": "Norwegian",
-            "nb": "Norwegian",
-            "nn": "Norwegian",
-            "en": "English",
-            "sv": "Swedish",
-            "da": "Danish",
-            "de": "German",
-            "fr": "French",
-            "es": "Spanish",
-            "it": "Italian",
-            "pt": "Portuguese",
-            "ru": "Russian",
-            "ja": "Japanese",
-            "zh-cn": "Chinese",
-        }
-
-        lang_name = lang_names.get(detected_lang, detected_lang.upper()) if detected_lang else None
-
-        # If we already have a stored language, avoid changing it based on
-        # very short messages (<= 4 words). This prevents accidental
-        # overrides from brief replies like "yes" or a short name.
-        should_update = False
-        if is_probable_name:
-            should_update = False
-        elif (not existing_value or word_count > 3) and lang_name:
-            should_update = True
-
-        if should_update:
-            if existing_value != lang_name:
-                memory_manager.store_memory(
-                    user_id=user_id,
-                    key="user_language",
-                    value=lang_name,
-                    confidence=0.9,
-                    source="dialogue_engine_language_detection",
-                    category="preference",
-                )
-                logger.info(f"Detected language for user {user_id}: {lang_name}")
-            return lang_name
-        return existing_value    
-
-    except LangDetectException as e:
-        logger.warning(f"Could not detect language: {e}")
-        return "English"
 
 
 async def extract_and_store_memories(

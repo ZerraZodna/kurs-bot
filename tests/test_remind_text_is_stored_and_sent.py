@@ -9,7 +9,6 @@ from src.services.trigger_dispatcher import get_trigger_dispatcher
 def test_remind_me_creates_one_time_with_correct_message():
     db = SessionLocal()
     try:
-        init_db()
 
         from tests.utils import make_ready_user
 

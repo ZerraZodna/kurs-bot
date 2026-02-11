@@ -57,17 +57,17 @@ async def test_short_message_does_not_overwrite_detected_language():
         norwegian_msg = "Hei! Jeg heter Johannes"
         await dialogue.process_message(user_id, norwegian_msg, db)
 
-        # Verify language was stored as Norwegian
+        # Verify language was stored as Norwegian (ISO code 'no')
         lang_memories = dialogue.memory_manager.get_memory(user_id, "user_language")
-        assert lang_memories and lang_memories[0]["value"].lower().startswith("norwegian")
+        assert lang_memories and lang_memories[0]["value"].lower().startswith("no")
 
         # Now send a short English reply (<=4 words)
         short_reply = "Yes, sounds good"
         await dialogue.process_message(user_id, short_reply, db)
 
-        # Language should remain Norwegian
+        # Language should remain Norwegian (ISO code 'no')
         lang_memories_after = dialogue.memory_manager.get_memory(user_id, "user_language")
-        assert lang_memories_after and lang_memories_after[0]["value"].lower().startswith("norwegian")
+        assert lang_memories_after and lang_memories_after[0]["value"].lower().startswith("no")
 
     finally:
         db.close()

@@ -114,7 +114,7 @@ class TriggerMatcher:
                 })
             self._triggers = results
             self._loaded_at = now
-            logger.debug(f"Loaded {len(self._triggers)} triggers for matcher")
+            logger.info(f"Loaded {len(self._triggers)} triggers for matcher")
         finally:
             db.close()
 

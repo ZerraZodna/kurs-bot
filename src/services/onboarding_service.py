@@ -98,7 +98,7 @@ class OnboardingService:
             return None
 
         lang_memories = self.memory_manager.get_memory(user_id, "user_language")
-        language = lang_memories[0]["value"] if lang_memories else "English"
+        language = lang_memories[0]["value"] if lang_memories else "en"
 
         next_step = status["next_step"]
         name_memories = self.memory_manager.get_memory(user_id, "first_name")
@@ -166,7 +166,7 @@ class OnboardingService:
         name = name_memories[0]["value"] if name_memories else "friend"
 
         lang_memories = self.memory_manager.get_memory(user_id, "user_language")
-        language = lang_memories[0]["value"] if lang_memories else "English"
+        language = lang_memories[0]["value"] if lang_memories else "en"
 
         ensure_user_timezone(self.memory_manager, user_id, language)
 
@@ -245,7 +245,7 @@ class OnboardingService:
         name = name_memories[0]["value"] if name_memories else "friend"
 
         lang_memories = self.memory_manager.get_memory(user_id, "user_language")
-        language = lang_memories[0]["value"] if lang_memories else "English"
+        language = lang_memories[0]["value"] if lang_memories else "en"
 
         return get_lesson_1_welcome_message(language, name)
 
@@ -257,6 +257,6 @@ class OnboardingService:
         name = name_memories[0]["value"] if name_memories else "friend"
 
         lang_memories = self.memory_manager.get_memory(user_id, "user_language")
-        language = lang_memories[0]["value"] if lang_memories else "English"
+        language = lang_memories[0]["value"] if lang_memories else "en"
 
         return get_continuation_welcome_message(language, name, lesson_id)

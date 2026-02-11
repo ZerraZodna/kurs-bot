@@ -19,7 +19,6 @@ async def test_onboarding_new_user_creates_daily_schedule():
     """New user (with a name) who answers consent+commitment then 'new' should get a daily schedule."""
     db = SessionLocal()
     try:
-        init_db()
         user_id = create_test_user(db, "test_onboarding_flow_new_user", first_name="Alice")
 
         dialogue = DialogueEngine(db)
@@ -56,7 +55,6 @@ async def test_onboarding_continuing_user_lesson10_sets_memory_and_schedule():
     """A returning user who says 'I am on lesson 10' should have current_lesson stored and receive a daily schedule."""
     db = SessionLocal()
     try:
-        init_db()
         user_id = create_test_user(db, "test_onboarding_flow_continuing_user", first_name="Bob")
 
         # Pre-store consent and commitment so onboarding asks about lesson status
