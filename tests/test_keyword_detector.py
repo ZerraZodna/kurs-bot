@@ -9,12 +9,6 @@ def test_keyword_detector_basic_english():
     assert conf is not None and conf > 0.5
 
 
-def test_keyword_detector_spanish_portuguese():
-    code, conf, meta = detect_language("Hola, ¿puedes buscar esto?")
-    assert code == "es"
-    assert conf is not None and conf > 0.5
-
-
 def test_keyword_detector_ambiguous_returns_none_low_confidence():
     code, conf, meta = detect_language("Ok")
     assert code is None

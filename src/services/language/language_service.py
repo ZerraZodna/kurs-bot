@@ -99,104 +99,74 @@ async def detect_and_store_language(memory_manager: MemoryManager, user_id: int,
 	or existing language code.
 	"""
 
-	existing = "en" #memory_manager.get_memory(user_id, "user_language")
-	existing_value = existing[0].get("value") if existing else None
-	existing_conf = existing[0].get("confidence", 0.0) if existing else 0.0
+	# Keep only Norwegian/English support. If user has an existing preference,
+	# return it. If not, run the lightweight `keyword_detect` and store only
+	# `en` or `no` (map `nb`/`nn` -> `no`). If detection fails, default to `en`.
 
-	# 3) run detector
-	code, conf, meta = await detect_language(user_message)
-	if not code and existing_value:
+	try:
+		existing = memory_manager.get_memory(user_id, "user_language")
+		existing_value = existing[0].get("value") if existing else None
+	except Exception:
+		existing_value = None
+
+	if existing_value:
+		# If the user explicitly requests a language change (e.g. "Set language to English"),
+		# allow overwriting the existing preference.
+		low = (user_message or "").strip().lower()
+		import re as _re
+		m = _re.search(r"(?:set|change) (?:my )?language to\s+([a-zA-Z]+)", low)
+		if m:
+			target = m.group(1).strip().lower()
+			if target in ("english", "en"):
+				chosen = "en"
+			elif target in ("norwegian", "norsk", "no", "nb", "nn"):
+				chosen = "no"
+			else:
+				chosen = None
+			if chosen:
+				try:
+					memory_manager.store_memory(
+						user_id=user_id,
+						key="user_language",
+						value=chosen,
+						confidence=1.0,
+						source="user_override",
+						category="preference",
+					)
+				except Exception:
+					pass
+				return chosen
+		# otherwise keep existing
 		return existing_value
 
-	# Normalize code to short form
-	code = code.lower()
-    #if not code in ("en", "no", "nb", "nn"):
-	#    code = "en"
+	# No existing preference -> use the keyword detector (fast, deterministic)
+	try:
+		code, conf, meta = keyword_detect(user_message)
+	except Exception:
+		code, conf, meta = None, 0.0, {}
 
-	# 4) if no existing language -> accept with conservative threshold
-	if not existing_value:
-		if code in ("en", "no", "nb", "nn"):
-			try:
-				memory_manager.store_memory(
-					user_id=user_id,
-					key="user_language",
-					value=code,
-					confidence=0.7,
-					source="dialogue_engine_language_detection",
-					category="preference",
-				)
-			except Exception:
-				pass
-			return code
-		return None
+	if code:
+		code = code.lower()
+		if code in ("nb", "nn", "no"):
+			chosen = "no"
+		elif code == "en":
+			chosen = "en"
+		else:
+			chosen = "en"
+	else:
+		chosen = "en"
 
-	# 5) if same as existing, nothing to do
-	if existing_value and existing_value.lower() == code.lower():
-		return existing_value
+	# store the chosen preference
+	try:
+		memory_manager.store_memory(
+			user_id=user_id,
+			key="user_language",
+			value=chosen,
+			confidence=float(conf or 1.0),
+			source="dialogue_engine_language_detection",
+			category="preference",
+		)
+	except Exception:
+		pass
 
-	# 6) Tiny N=3 voting: query last 2 inbound user messages (exclude current)
-	db = memory_manager.db
-	prev_rows = (
-		db.query(MessageLog)
-		.filter(MessageLog.user_id == user_id)
-		.order_by(MessageLog.created_at.desc())
-		.limit(2)
-		.all()
-	)
-	prev_texts = [r.content for r in prev_rows if r.content]
-
-	votes = [code]
-	for t in prev_texts:
-		c, cf, m = await detect_language(t)
-		if c:
-			votes.append(c.lower())
-
-	counts = Counter(votes)
-	most_common, most_count = counts.most_common(1)[0]
-	if most_count >= 2:
-		# accept majority
-		try:
-			memory_manager.store_memory(
-				user_id=user_id,
-				key="user_language",
-				value=most_common,
-				confidence=max(0.75, float(conf or 0.75)),
-				source="dialogue_engine_language_detection",
-				category="preference",
-			)
-		except Exception:
-			pass
-		return most_common
-
-	# 7) require confidence threshold; protect strong existing preference.
-	# For short replies, normally do not overwrite based on a single short
-	# message's confidence alone; only majority voting may accept. We allow
-	# overwrites when there is no existing preference or when the message
-	# is reasonably long.
-	det_conf = float(conf or 0.0)
-	word_count = len(user_message.split())
-	required_conf = 0.7 if (not existing_value or word_count >= 4) else 1.1
-
-	if det_conf >= required_conf:
-		# Protect a very strong existing preference only when the new
-		# detection is meaningfully weaker. This uses a small delta rather
-		# than an absolute hard cutoff so reasonable detections can overwrite.
-		# Relax protection: only protect very high-confidence existing preferences
-		# (>= 0.95). This lets reasonable detections (~0.7+) overwrite older
-		# preferences that were not extremely certain.
-		if existing_conf >= 0.95 and det_conf < (existing_conf - 0.05):
-			return existing_value
-		try:
-			memory_manager.store_memory(
-				user_id=user_id,
-				key="user_language",
-				value=code,
-				confidence=det_conf,
-				source="dialogue_engine_language_detection",
-				category="preference",
-			)
-		except Exception:
-			pass
-		return code
-
-	return existing_value
+	return chosen

@@ -12,12 +12,6 @@ from typing import Optional, Tuple, Dict
 _LANG_KEYWORDS = {
     "en": {"the", "and", "is", "you", "do", "search", "please", "hello", "hi", "hey", "thanks", "thank"},
     "no": {"og", "det", "ikke", "jeg", "hei", "takk", "venn"},
-    "pt": {"olá", "obrigado", "obrigada"},
-    "es": {"que", "por", "para", "hola", "gracias"},
-    "de": {"nicht", "und", "ist", "die", "das", "danke", "hallo"},
-    "fr": {"le", "la", "est", "bonjour", "merci"},
-    "sv": {"och", "inte", "hej"},
-    "it": {"ciao", "grazie", "il", "la"},
 }
 
 

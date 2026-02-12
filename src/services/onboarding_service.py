@@ -97,8 +97,9 @@ class OnboardingService:
         if status["onboarding_complete"]:
             return None
 
-        #lang_memories = find_user_language_memories(user_id)
-        language = "en" #lang_memories[0]["value"] if lang_memories else "en"
+        #language = get_user_language(self.memory_manager, user_id)
+        lang_memories = self.memory_manager.get_memory(user_id, "user_language")
+        language = lang_memories[0]["value"] if lang_memories else "en"
 
         next_step = status["next_step"]
         name_memories = self.memory_manager.get_memory(user_id, "first_name")
@@ -165,8 +166,8 @@ class OnboardingService:
             name_memories = self.memory_manager.get_memory(user_id, "name")
         name = name_memories[0]["value"] if name_memories else "friend"
 
-        #lang_memories = self.memory_manager.get_memory(user_id, "user_language")
-        language = "en" #lang_memories[0]["value"] if lang_memories else "en"
+        lang_memories = self.memory_manager.get_memory(user_id, "user_language")
+        language = lang_memories[0]["value"] if lang_memories else "en"
 
         ensure_user_timezone(self.memory_manager, user_id, language)
 
@@ -244,10 +245,10 @@ class OnboardingService:
             name_memories = self.memory_manager.get_memory(user_id, "name")
         name = name_memories[0]["value"] if name_memories else "friend"
 
-        #lang_memories = self.memory_manager.get_memory(user_id, "user_language")
-        #language = lang_memories[0]["value"] if lang_memories else "en"
+        lang_memories = self.memory_manager.get_memory(user_id, "user_language")
+        language = lang_memories[0]["value"] if lang_memories else "en"
 
-        return get_lesson_1_welcome_message("en", name)
+        return get_lesson_1_welcome_message(language, name)
 
     def get_continuation_welcome_message(self, user_id: int, lesson_id: int) -> str:
         """Welcome message for users continuing from a specific lesson."""
@@ -256,7 +257,7 @@ class OnboardingService:
             name_memories = self.memory_manager.get_memory(user_id, "name")
         name = name_memories[0]["value"] if name_memories else "friend"
 
-        #lang_memories = self.memory_manager.get_memory(user_id, "user_language")
-        #lang_memories[0]["value"] if lang_memories else "en"
+        lang_memories = self.memory_manager.get_memory(user_id, "user_language")
+        language = lang_memories[0]["value"] if lang_memories else "en"
 
-        return get_continuation_welcome_message("en", name, lesson_id)
+        return get_continuation_welcome_message(language, name, lesson_id)
