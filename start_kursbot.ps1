@@ -1,166 +1,96 @@
-<#
-start_kursbot.ps1
 
-Improved startup helper for local development.
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
+Set-Location $scriptRoot
 
-What it does:
-- Verifies and activates the virtualenv when launching processes in new windows.
-- Starts `uvicorn` in its own PowerShell window so logs remain visible.
-- Starts `ngrok` in a new PowerShell window. The `NGROK_PATH` environment variable
-  can be used to override the executable path.
+# Robust platform detection (works in Windows PowerShell and pwsh)
+$IsWindows = $false
+if ($env:OS -eq 'Windows_NT') { $IsWindows = $true }
+$IsLinux = $false
+if ($env:OS -eq 'Linux') { $IsLinux = $true }
 
-Usage: run the script from the repository root: `.\
-un_kursbot.ps1` or `.\start_kursbot.ps1`
-#>
+$uvicornCmd = "uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000"
+$ngrokCmd = "ngrok http 8000"
 
-param()
+$activateLinux = Join-Path $scriptRoot ".venv/bin/Activate.ps1"
+$activateWindows = Join-Path $scriptRoot ".venv/Scripts/Activate.ps1"
 
-# Load .env into environment so scripts and child processes inherit settings
-function Load-DotEnv {
-	$envFile = Join-Path -Path (Get-Location) -ChildPath ".env"
-	if (-not (Test-Path $envFile)) { return }
-	Get-Content $envFile | ForEach-Object {
-		$line = $_.Trim()
-		if ([string]::IsNullOrWhiteSpace($line)) { return }
-		if ($line.StartsWith('#')) { return }
-		$parts = $line -split '=', 2
-		if ($parts.Count -lt 2) { return }
-		$key = $parts[0].Trim()
-		$value = $parts[1].Trim()
-		# strip surrounding single or double quotes
-		if ($value.Length -ge 2) {
-			if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
-				$value = $value.Substring(1, $value.Length - 2)
-			}
-		}
-		if (-not [string]::IsNullOrWhiteSpace($key)) { ${env:$key} = $value }
-	}
-}
-
-Load-DotEnv
-
-function Resolve-VenvActivate {
-	$root = (Get-Location).Path
-	$candidates = @(
-		Join-Path -Path $root -ChildPath ".venv\Scripts\Activate.ps1",
-		Join-Path -Path $root -ChildPath ".venv/bin/Activate.ps1",
-		Join-Path -Path $root -ChildPath ".venv/bin/activate"
-	)
-	foreach ($c in $candidates) {
-		if (Test-Path $c) { return $c }
-	}
-	return $null
-}
-
-$venvActivate = Resolve-VenvActivate
-if (-not $venvActivate) {
-	Write-Host ".venv not found. Create a virtualenv and install requirements first." -ForegroundColor Yellow
-}
-
-# externally. This script focuses on starting the app and optional ngrok.
-
-# Wait helpers used only by this startup script
-function Wait-ForTcpPort {
+function Start-WindowedProcess {
 	param(
-		[string]$HostName = '127.0.0.1',
-		[int]$Port,
-		[int]$TimeoutSeconds = 30
+		[string]$Title,
+		[string]$ActivatePath,
+		[string]$Command
 	)
-	$start = Get-Date
-	while ((Get-Date) -lt $start.AddSeconds($TimeoutSeconds)) {
-		try {
-			$client = New-Object System.Net.Sockets.TcpClient
-			$iar = $client.BeginConnect($HostName, $Port, $null, $null)
-			$ok = $iar.AsyncWaitHandle.WaitOne(500)
-			if ($ok) {
-				$client.EndConnect($iar)
-				$client.Close()
-				return $true
+
+	if ($IsWindows) {
+		$psExe = "powershell.exe"
+		$wrapper = Join-Path $scriptRoot ("start-$Title.ps1")
+		$wrapperContent = "& '$ActivatePath'; $Command"
+		Set-Content -Path $wrapper -Value $wrapperContent -Encoding UTF8
+		Start-Process -FilePath $psExe -ArgumentList '-NoExit', '-File', $wrapper -WorkingDirectory $scriptRoot -WindowStyle Normal
+		Write-Output "Started $Title in new PowerShell window"
+		return
+	}
+
+	if ($IsLinux) {
+		# Prefer launching a graphical terminal if available
+		$terminals = @('gnome-terminal','konsole','xfce4-terminal','mate-terminal','tilix','xterm')
+		$found = $null
+		foreach ($t in $terminals) {
+			if (Get-Command $t -ErrorAction SilentlyContinue) { $found = $t; break }
+		}
+
+		if ($found) {
+			$wrapper = Join-Path $scriptRoot ("start-$Title.ps1")
+			$wrapperContent = "& '$ActivatePath'; $Command"
+			Set-Content -Path $wrapper -Value $wrapperContent -Encoding UTF8
+			switch ($found) {
+				'gnome-terminal' { Start-Process $found -ArgumentList '--', '--title', $Title, '--', 'pwsh', '-NoExit', '-File', $wrapper }
+				'konsole' { Start-Process $found -ArgumentList '-p', "tabtitle=$Title", '-e', 'pwsh', '-NoExit', '-File', $wrapper }
+				'xfce4-terminal' { Start-Process $found -ArgumentList '--title', $Title, '-e', 'pwsh', '-NoExit', '-File', $wrapper }
+				'mate-terminal' { Start-Process $found -ArgumentList '--title', $Title, '--', 'pwsh', '-NoExit', '-File', $wrapper }
+				'tilix' { Start-Process $found -ArgumentList '--title', $Title, '--', 'pwsh', '-NoExit', '-File', $wrapper }
+				'xterm' { Start-Process $found -ArgumentList '-T', $Title, '-e', 'pwsh', '-NoExit', '-File', $wrapper }
+				default { Start-Process $found -ArgumentList '-e', 'pwsh', '-NoExit', '-File', $wrapper }
 			}
-			$client.Close()
+			Write-Output "Started $Title in $found"
+			return
+		}
+
+		# No graphical terminal: start pwsh directly (detached from this host shell)
+		$log = Join-Path $scriptRoot ("$Title.log")
+		$wrapper = Join-Path $scriptRoot ("start-$Title.ps1")
+		$wrapperContent = "& '$ActivatePath'; $Command"
+		Set-Content -Path $wrapper -Value $wrapperContent -Encoding UTF8
+		try {
+			Start-Process -FilePath 'pwsh' -ArgumentList '-NoExit', '-File', $wrapper -WorkingDirectory $scriptRoot -RedirectStandardOutput $log -RedirectStandardError $log
+			Write-Output "Started $Title detached (logs: $log)"
 		} catch {
-			# ignore
+			Write-Output "Failed to start detached; running $Title inline"
+			& pwsh -NoExit -File $wrapper
 		}
-		Start-Sleep -Seconds 1
+		return
 	}
-	return $false
-}
 
-# Worker readiness check removed; function deleted.
-# Build activation fragment used when launching new windows so each window activates the venv
-$activateFragment = $null
-if ($venvActivate) {
-	$venvActivatePath = $venvActivate
-	if ($venvActivatePath -like '*Activate.ps1') {
-		$escaped = $venvActivatePath -replace "'","''"
-		$activateFragment = "& '$escaped';"
-		$venvType = 'ps'
+	# Unknown platform: try available shell, otherwise run inline
+	Write-Output "Platform not specifically supported; attempting available shell for $Title"
+	$wrapper = Join-Path $scriptRoot ("start-$Title.ps1")
+	$wrapperContent = "& '$ActivatePath'; $Command"
+	Set-Content -Path $wrapper -Value $wrapperContent -Encoding UTF8
+	if (Get-Command pwsh -ErrorAction SilentlyContinue) {
+		Start-Process -FilePath 'pwsh' -ArgumentList '-NoExit', '-File', $wrapper -WorkingDirectory $scriptRoot
+	} elseif (Get-Command powershell.exe -ErrorAction SilentlyContinue) {
+		Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoExit', '-File', $wrapper -WorkingDirectory $scriptRoot
 	} else {
-		$escaped = $venvActivatePath -replace "'","''"
-		$activateFragment = "source '$escaped' && "
-		$venvType = 'sh'
+		Write-Output "No suitable shell found; running $Title inline"
+		& $ActivatePath
+		Invoke-Expression $Command
 	}
 }
 
-# Resolve a PowerShell executable to use for new windows (pwsh -> powershell)
-$shellExe = $null
-	$pwshCmd = Get-Command pwsh -ErrorAction SilentlyContinue
-	if ($pwshCmd) { $shellExe = $pwshCmd.Source }
-	if (-not $shellExe) {
-		$psCmd = Get-Command powershell -ErrorAction SilentlyContinue
-		if ($psCmd) { $shellExe = $psCmd.Source }
-	}
-if (-not $shellExe) {
-	Write-Host "No PowerShell executable (pwsh/powershell) found in PATH; cannot start new windows." -ForegroundColor Red
-} else {
-	# Start uvicorn in its own window (keeps logs)
-	$uvicornCmd = "{0} uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000 --log-level debug" -f $activateFragment
-	if ($IsWindows) {
-		Write-Host "Starting uvicorn in a new PowerShell window using $shellExe..."
-		Start-Process -FilePath $shellExe -ArgumentList @('-Command', $uvicornCmd) -WorkingDirectory (Get-Location)
-	} else {
-		# Use bash to source the venv activate script then launch uvicorn so PATH is correct
-		$bashCmd = "$activateFragment uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000 --log-level debug"
-		Write-Host "Starting uvicorn as a background bash process..."
-		Start-Process -FilePath 'bash' -ArgumentList @('-lc', $bashCmd) -WorkingDirectory (Get-Location) | Out-Null
-	}
-}
+if ($IsWindows) { $activate = $activateWindows } else { $activate = $activateLinux }
 
-# Start ngrok in its own window. Allow overriding via NGROK_PATH env var.
-$ngrokPath = $env:NGROK_PATH
-if ([string]::IsNullOrWhiteSpace($ngrokPath)) {
-	# Try to find ngrok in PATH or common locations
-	$ngrokCmdInfo = Get-Command ngrok -ErrorAction SilentlyContinue
-	if ($ngrokCmdInfo) { $ngrokPath = $ngrokCmdInfo.Source }
-	else {
-		$candidates = @('/usr/bin/ngrok','/snap/bin/ngrok','/usr/local/bin/ngrok')
-		foreach ($c in $candidates) { if (Test-Path $c) { $ngrokPath = $c; break } }
-	}
-}
+# Start services in their own windows (or detached on headless Linux)
+Start-WindowedProcess -Title 'uvicorn' -ActivatePath $activate -Command $uvicornCmd
+Start-WindowedProcess -Title 'ngrok' -ActivatePath $activate -Command $ngrokCmd
 
-if (-not [string]::IsNullOrWhiteSpace($ngrokPath) -and (Test-Path $ngrokPath -PathType Leaf -ErrorAction SilentlyContinue)) {
-	$ngrokCmd = "& '$ngrokPath' http 8000"
-	if ($IsWindows) { Write-Host "Starting ngrok in a new PowerShell window..." }
-	else { Write-Host "Starting ngrok in background using: $ngrokPath" }
-	if ($IsWindows) {
-		if ($shellExe) {
-			Start-Process -FilePath $shellExe -ArgumentList @('-Command', $ngrokCmd) -WorkingDirectory (Get-Location)
-		} else {
-			Write-Host "Cannot start ngrok in new window because no PowerShell executable was found; please start ngrok manually:" -ForegroundColor Yellow
-			Write-Host $ngrokCmd
-		}
-	} else {
-		# Start ngrok under bash as a background process
-		$bashNgrok = "'$ngrokPath' http 8000"
-		Start-Process -FilePath 'bash' -ArgumentList @('-lc', $bashNgrok) -WorkingDirectory (Get-Location) | Out-Null
-	}
-} else {
-	Write-Host "ngrok executable not found. Set NGROK_PATH or install ngrok if you need external tunneling." -ForegroundColor Yellow
-}
-Write-Host "Kurs Bot helper started. Uvicorn and ngrok are running in separate windows."
-
-# Infra readiness checks removed.
-
-# Wait for uvicorn to start responding on port 8000 (startup-only check)
-	$apiReady = Wait-ForTcpPort -HostName '127.0.0.1' -Port 8000 -TimeoutSeconds 30
-if ($apiReady) { Write-Host "Uvicorn is accepting connections on port 8000." } else { Write-Host "Uvicorn did not accept connections within timeout." -ForegroundColor Yellow }
+Write-Output 'Spawn requests sent.'

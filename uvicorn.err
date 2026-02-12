@@ -1,0 +1,8 @@
+INFO:     Will watch for changes in these directories: ['D:\\dev\\kurs-bot']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [18820] using StatReload
+INFO:     Started server process [30932]
+INFO:     Waiting for application startup.
+INFO: HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+INFO: Ollama AI server is running at http://localhost:11434
+INFO:     Application startup complete.
