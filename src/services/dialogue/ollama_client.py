@@ -58,13 +58,19 @@ async def call_ollama(prompt: str, model: str | None = None, language: str | Non
             timeout = OLLAMA_TIMEOUT
             retries = OLLAMA_RETRIES
 
+        # Build request headers; include Authorization if an API key is configured
+        headers = {}
+        api_key = getattr(settings, "OLLAMA_API_KEY", None)
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
         async with httpx.AsyncClient() as client:
             # Retry on read timeouts with simple exponential backoff
             backoff = 0.5
             response = None
             for attempt in range(0, retries + 1):
                 try:
-                    response = await client.post(OLLAMA_URL, json=payload, timeout=timeout)
+                    response = await client.post(OLLAMA_URL, json=payload, headers=headers or None, timeout=timeout)
                     break
                 except httpx.ReadTimeout:
                     if attempt < retries:

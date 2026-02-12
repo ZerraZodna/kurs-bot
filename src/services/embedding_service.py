@@ -46,12 +46,19 @@ class EmbeddingService:
         
         try:
             # Use the client proxy (tests may patch `self.client.post`)
+            # Include Authorization header when OLLAMA_API_KEY is configured
+            headers = {}
+            api_key = getattr(settings, "OLLAMA_API_KEY", None)
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+
             response = await self.client.post(
                 self.embed_url,
                 json={
                     "model": self.embed_model,
                     "input": text.strip()
-                }
+                },
+                headers=headers or None,
             )
             # Some test mocks may make `raise_for_status` an async mock.
             _rs = response.raise_for_status()

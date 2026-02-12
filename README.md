@@ -69,7 +69,14 @@ sudo apt install -y powershell
 3) Clone the repository and create a Python virtual environment (step 1 from the Windows script adapted):
 
 ```bash
-git clone <your-repo-url> kurs-bot
+
+ssh-keygen -t ed25519 -C "your.email@example.com"   # Generate a new SSH key (press Enter for defaults, no passphrase for simplicity)
+cat ~/.ssh/id_ed25519.pub                          # Copy the output (this is your public key)
+# Go to GitHub.com → Settings → SSH and GPG keys → New SSH key.
+# Paste the copied public key and save.
+ssh -T git@github.com              # Should say "Hi username! You've successfully authenticated..."
+
+git clone git@github.com:ZerraZodna/kurs-bot.git
 cd kurs-bot
 python3 -m venv .venv
 source .venv/bin/activate
@@ -91,9 +98,18 @@ nano .env
 
 ```bash
 # example using the official install script
+curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+  | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null \
+  && echo "deb https://ngrok-agent.s3.amazonaws.com stable main" \
+  | sudo tee /etc/apt/sources.list.d/ngrok.list \
+  && sudo apt update \
+  && sudo apt install ngrok
+
+or:
 curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
 echo "deb https://ngrok-agent.s3.amazonaws.com/apt/ stable main" | sudo tee /etc/apt/sources.list.d/ngrok.list
 sudo apt update && sudo apt install -y ngrok
+
 ngrok config add-authtoken <your-ngrok-token>
 ```
 
