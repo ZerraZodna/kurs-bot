@@ -40,8 +40,15 @@ function Load-DotEnv {
 Load-DotEnv
 
 function Resolve-VenvActivate {
-	$candidate = Join-Path -Path (Get-Location) -ChildPath ".venv\Scripts\Activate.ps1"
-	if (Test-Path $candidate) { return $candidate }
+	$root = Get-Location
+	$candidates = @(
+		Join-Path -Path $root -ChildPath ".venv\Scripts\Activate.ps1",
+		Join-Path -Path $root -ChildPath ".venv/bin/Activate.ps1",
+		Join-Path -Path $root -ChildPath ".venv/bin/activate"
+	)
+	foreach ($c in $candidates) {
+		if (Test-Path $c) { return $c }
+	}
 	return $null
 }
 
@@ -83,45 +90,68 @@ function Wait-ForTcpPort {
 # Build activation fragment used when launching new windows so each window activates the venv
 $activateFragment = $null
 if ($venvActivate) {
-	$escaped = $venvActivate -replace "'","''"
-	$activateFragment = "& '$escaped';"
+	# If Activate.ps1 use PowerShell activation; if shell activate script use dot-sourcing
+	if ($venvActivate -like '*Activate.ps1') {
+		$escaped = $venvActivate -replace "'","''"
+		$activateFragment = "& '$escaped';"
+	} else {
+		# shell-style activate (bash/sh)
+		$escaped = $venvActivate -replace "'","''"
+		$activateFragment = ". '$escaped';"
+	}
 }
 
 # Resolve a PowerShell executable to use for new windows (pwsh -> powershell)
 $shellExe = $null
-$pwshCmd = Get-Command pwsh -ErrorAction SilentlyContinue
-if ($pwshCmd) { $shellExe = $pwshCmd.Source }
-if (-not $shellExe) {
-	$psCmd = Get-Command powershell -ErrorAction SilentlyContinue
-	if ($psCmd) { $shellExe = $psCmd.Source }
-}
+	$pwshCmd = Get-Command pwsh -ErrorAction SilentlyContinue
+	if ($pwshCmd) { $shellExe = $pwshCmd.Source }
+	if (-not $shellExe) {
+		$psCmd = Get-Command powershell -ErrorAction SilentlyContinue
+		if ($psCmd) { $shellExe = $psCmd.Source }
+	}
 if (-not $shellExe) {
 	Write-Host "No PowerShell executable (pwsh/powershell) found in PATH; cannot start new windows." -ForegroundColor Red
 } else {
 	# Start uvicorn in its own window (keeps logs)
 	$uvicornCmd = "{0} uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000 --log-level debug" -f $activateFragment
-	Write-Host "Starting uvicorn in a new PowerShell window using $shellExe..."
-	Start-Process -FilePath $shellExe -ArgumentList @('-Command', $uvicornCmd) -WorkingDirectory (Get-Location)
+	if ($IsWindows) {
+		Write-Host "Starting uvicorn in a new PowerShell window using $shellExe..."
+		Start-Process -FilePath $shellExe -ArgumentList @('-Command', $uvicornCmd) -WorkingDirectory (Get-Location)
+	} else {
+		# On non-Windows systems prefer background process (no new GUI window)
+		Write-Host "Starting uvicorn as a background process using $shellExe..."
+		Start-Process -FilePath $shellExe -ArgumentList @('-NoProfile','-Command', $uvicornCmd) -WorkingDirectory (Get-Location) | Out-Null
+	}
 }
 
 # Start ngrok in its own window. Allow overriding via NGROK_PATH env var.
 $ngrokPath = $env:NGROK_PATH
 if ([string]::IsNullOrWhiteSpace($ngrokPath)) {
-	# default path (user-specific); leave as-is if not available
-	$ngrokPath = "C:\Users\steen\AppData\Local\Microsoft\WinGet\Packages\Ngrok.Ngrok_Microsoft.Winget.Source_8wekyb3d8bbwe\ngrok.exe"
+	# Try to find ngrok in PATH or common locations
+	$ngrokCmdInfo = Get-Command ngrok -ErrorAction SilentlyContinue
+	if ($ngrokCmdInfo) { $ngrokPath = $ngrokCmdInfo.Source }
+	else {
+		$candidates = @('/usr/bin/ngrok','/snap/bin/ngrok','/usr/local/bin/ngrok')
+		foreach ($c in $candidates) { if (Test-Path $c) { $ngrokPath = $c; break } }
+	}
 }
 
-if (Test-Path $ngrokPath) {
+if (-not [string]::IsNullOrWhiteSpace($ngrokPath) -and (Test-Path $ngrokPath -PathType Leaf -ErrorAction SilentlyContinue)) {
 	$ngrokCmd = "& '$ngrokPath' http 8000"
-	Write-Host "Starting ngrok in a new PowerShell window..."
+	if ($IsWindows) { Write-Host "Starting ngrok in a new PowerShell window..." }
+	else { Write-Host "Starting ngrok in background using: $ngrokPath" }
 	if ($shellExe) {
-		Start-Process -FilePath $shellExe -ArgumentList @('-Command', $ngrokCmd) -WorkingDirectory (Get-Location)
+		if ($IsWindows) {
+			Start-Process -FilePath $shellExe -ArgumentList @('-Command', $ngrokCmd) -WorkingDirectory (Get-Location)
+		} else {
+			Start-Process -FilePath $shellExe -ArgumentList @('-NoProfile','-Command', $ngrokCmd) -WorkingDirectory (Get-Location) | Out-Null
+		}
 	} else {
-		Write-Host "Cannot start ngrok in new window because no PowerShell executable was found; please start ngrok manually:" -ForegroundColor Yellow
+		Write-Host "Cannot start ngrok automatically; please start it manually:" -ForegroundColor Yellow
 		Write-Host $ngrokCmd
 	}
 } else {
-	Write-Host "ngrok executable not found at '$ngrokPath'. Set NGROK_PATH or install ngrok if you need external tunneling." -ForegroundColor Yellow
+	Write-Host "ngrok executable not found. Set NGROK_PATH or install ngrok if you need external tunneling." -ForegroundColor Yellow
 }
 Write-Host "Kurs Bot helper started. Uvicorn and ngrok are running in separate windows."
 

@@ -129,6 +129,8 @@ alembic upgrade head
 uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
 # in another terminal, expose with ngrok
 ngrok http 8000
+# or as process: see "jobs" & sudo kill 
+ngrok http 8000 > ngrok.log 2>&1 &
 ```
 
 7) Example: set Telegram webhook using the ngrok URL returned from `ngrok http 8000`:
