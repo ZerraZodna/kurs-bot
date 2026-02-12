@@ -2,9 +2,9 @@ import pytest
 from datetime import datetime, timezone, timedelta
 
 from src.models.database import SessionLocal, init_db, Schedule
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 from src.services.dialogue_engine import DialogueEngine
-from src.services.scheduler.core import SchedulerService
+from src.scheduler.core import SchedulerService
 
 
 @pytest.mark.asyncio
@@ -40,7 +40,7 @@ async def test_rag_mode_one_time_reminder_preserves_daily(monkeypatch):
             memory_manager = kwargs.get("memory_manager") if kwargs.get("memory_manager") is not None else (args[3] if len(args) > 3 else None)
             user_id_arg = kwargs.get("user_id") if kwargs.get("user_id") is not None else (args[4] if len(args) > 4 else None)
 
-            from src.services.trigger_dispatcher import get_trigger_dispatcher
+            from src.triggers.trigger_dispatcher import get_trigger_dispatcher
             dispatcher = get_trigger_dispatcher(session_arg, memory_manager)
             # Build a one-time schedule spec inferred from user's text
             run_at = (datetime.now(timezone.utc) + timedelta(days=1)).replace(hour=12, minute=0, second=0, microsecond=0)
@@ -52,7 +52,7 @@ async def test_rag_mode_one_time_reminder_preserves_daily(monkeypatch):
             match = {"trigger_id": None, "name": "create_schedule", "action_type": "create_schedule", "score": 1.0, "threshold": 0.0}
             dispatcher.dispatch(match, {"user_id": user_id_arg, "schedule_spec": spec, "original_text": original_text})
 
-        monkeypatch.setattr("src.services.triggering.handle_triggers", fake_handle_triggers)
+        monkeypatch.setattr("src.triggers.triggering.handle_triggers", fake_handle_triggers)
 
         # Prevent pre-LLM schedule detection
         monkeypatch.setattr(dialogue.onboarding, "detect_schedule_request", lambda text: False)

@@ -6,9 +6,9 @@ from pathlib import Path
 from src.models.database import SessionLocal, User, init_db
 from tests.utils import create_test_user
 from src.services.dialogue_engine import DialogueEngine
-from src.services.scheduler import SchedulerService
+from src.scheduler import SchedulerService
 from src.config import settings
-from src.services.trigger_dispatcher import get_trigger_dispatcher
+from src.triggers.trigger_dispatcher import get_trigger_dispatcher
 
 
 # Use shared `create_test_user` helper from tests.utils

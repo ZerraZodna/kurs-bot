@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from src.models.database import SessionLocal, User, init_db
 from src.services.timezone_utils import parse_local_time_to_utc, format_dt_in_timezone
-from src.services.scheduler import SchedulerService
+from src.scheduler import SchedulerService
 
 
 def create_user_with_tz(db, tz_name="Europe/Oslo") -> int:

@@ -5,8 +5,7 @@ from datetime import datetime, timezone
 from src.services.timezone_utils import to_utc
 from typing import Optional
 
-from src.services.memory_manager import MemoryManager
-
+from src.memories import MemoryManager
 
 def get_schedule_message(memory_manager: MemoryManager, user_id: int, schedule_id: int) -> Optional[str]:
     memories = memory_manager.get_memory(user_id=user_id, key="schedule_message")
@@ -19,12 +18,10 @@ def get_schedule_message(memory_manager: MemoryManager, user_id: int, schedule_i
             continue
     return None
 
-
 def get_user_language(memory_manager: MemoryManager, user_id: int) -> str:
     return "en"
     #memories = memory_manager.get_memory(user_id, "user_language")
     #return memories[0].get("value", "en") if memories else "en"
-
 
 def get_last_sent_lesson_id(memory_manager: MemoryManager, user_id: int) -> Optional[int]:
     memories = memory_manager.get_memory(user_id, "last_sent_lesson_id")
@@ -36,7 +33,6 @@ def get_last_sent_lesson_id(memory_manager: MemoryManager, user_id: int) -> Opti
     except ValueError:
         return None
 
-
 def set_last_sent_lesson_id(memory_manager: MemoryManager, user_id: int, lesson_id: int) -> None:
     memory_manager.store_memory(
         user_id=user_id,
@@ -45,7 +41,6 @@ def set_last_sent_lesson_id(memory_manager: MemoryManager, user_id: int, lesson_
         category="progress",
         source="scheduler",
     )
-
 
 def get_pending_confirmation(memory_manager: MemoryManager, user_id: int) -> Optional[dict]:
     memories = memory_manager.get_memory(user_id, "lesson_confirmation_pending")
@@ -66,7 +61,6 @@ def get_pending_confirmation(memory_manager: MemoryManager, user_id: int) -> Opt
     except Exception:
         return None
     return None
-
 
 def set_pending_confirmation(
     memory_manager: MemoryManager,

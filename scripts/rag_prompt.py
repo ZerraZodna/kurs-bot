@@ -17,7 +17,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from src.services.dialogue.command_handlers import handle_rag_prompt_command
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 
 
 def main():

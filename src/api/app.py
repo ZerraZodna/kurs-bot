@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request, HTTPException
 from contextlib import asynccontextmanager
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 from src.services.maintenance import nightly_memory_purge
 from src.middleware.consent import ConsentMiddleware
 from src.middleware.api_key_auth import ApiKeyAuthMiddleware
@@ -13,7 +13,7 @@ from src.services.dialogue_engine import DialogueEngine
 from src.services.admin_notifier import set_admin_chat_id, send_admin_notification
 from src.services.traffic_tracker import record_traffic_event
 from src.services.downtime_monitor import run_downtime_monitor
-from src.services.scheduler import SchedulerService
+from src.scheduler import SchedulerService
 from src.api.dialogue_routes import router as dialogue_router
 from src.services.dialogue import extract_and_store_memories
 from src.api.gdpr_routes import router as gdpr_router

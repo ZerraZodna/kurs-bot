@@ -1,8 +1,8 @@
 import pytest
 from src.models.database import SessionLocal, User, init_db
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 from src.services.dialogue_engine import DialogueEngine
-from src.services.scheduler import SchedulerService
+from src.scheduler import SchedulerService
 
 
 def create_new_test_user(db) -> int:
@@ -66,7 +66,7 @@ async def test_memory_driven_schedule_creation():
         assert resp is not None
 
         # Simulate trigger execution: structured intent would produce a create_schedule trigger
-        from src.services.trigger_dispatcher import get_trigger_dispatcher
+        from src.triggers.trigger_dispatcher import get_trigger_dispatcher
 
         dispatcher = get_trigger_dispatcher(db=db, memory_manager=mm)
         match = {"trigger_id": None, "name": "create_schedule", "action_type": "create_schedule", "score": 1.0, "threshold": 0.5}

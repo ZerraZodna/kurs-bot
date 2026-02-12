@@ -1,8 +1,8 @@
 import pytest
 
 from src.models.database import SessionLocal
-from src.services.memory_manager import MemoryManager
-from src.services.scheduler import SchedulerService
+from src.memories import MemoryManager
+from src.scheduler import SchedulerService
 from src.services.dialogue_engine import DialogueEngine
 from tests.utils import make_ready_user
 

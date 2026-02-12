@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
 from src.services.timezone_utils import get_user_timezone_name, format_dt_in_timezone, to_utc
 from src.models.database import Memory, MessageLog, User, Lesson
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 import json
 
 

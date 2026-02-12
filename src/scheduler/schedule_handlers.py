@@ -4,15 +4,15 @@ from typing import Optional, Callable
 
 from sqlalchemy.orm import Session
 
-from src.services.scheduler import SchedulerService
+from src.scheduler import SchedulerService
 from src.services.timezone_utils import ensure_user_timezone
 import re
 
 # One-time reminder keyword parsing removed — handled by assistant + triggers
-from .pause_handler import detect_pause_request
-from .schedule_query_handler import detect_schedule_status_request, build_schedule_status_response
-from .memory_helpers import get_user_language
-from .lesson_handler import translate_text
+from src.services.dialogue.pause_handler import detect_pause_request
+from src.scheduler.schedule_query_handler import detect_schedule_status_request, build_schedule_status_response
+from src.services.dialogue.memory_helpers import get_user_language
+from src.services.dialogue.lesson_handler import translate_text
 
 
 async def handle_schedule_messages(

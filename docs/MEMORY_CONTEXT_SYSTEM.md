@@ -264,7 +264,7 @@ print(response)
 ### Storing User Goals
 
 ```python
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 from src.services.context_utils import MemoryKey, MemoryCategory
 
 memory_manager = MemoryManager(db)

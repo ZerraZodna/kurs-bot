@@ -152,7 +152,7 @@ User Input → DialogueEngine
 
 ### Store User Memory
 ```python
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 from src.models.database import SessionLocal
 
 db = SessionLocal()

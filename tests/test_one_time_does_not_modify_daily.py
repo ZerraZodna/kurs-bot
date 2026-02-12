@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime, timezone, timedelta
 
 from src.models.database import SessionLocal, User, init_db, Memory, Schedule
-from src.services.scheduler import SchedulerService
+from src.scheduler import SchedulerService
 
 
 def test_one_time_creation_does_not_modify_daily():

@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.models.database import SessionLocal, User, init_db
 from src.services.dialogue_engine import DialogueEngine
-from src.services.onboarding_service import OnboardingService
+from src.onboarding.service import OnboardingService
 from datetime import datetime, timezone
 from tests.utils import create_test_user
 

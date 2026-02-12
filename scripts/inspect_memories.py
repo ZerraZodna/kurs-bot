@@ -7,7 +7,7 @@ If USER_ID is omitted, defaults to 7.
 import sys
 import json
 from src.models.database import init_db, Memory
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 
 
 def is_lesson_memory(m):

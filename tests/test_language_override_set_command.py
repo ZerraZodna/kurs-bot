@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.models.database import SessionLocal
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 from src.services.dialogue_engine import DialogueEngine
 from tests.utils import make_ready_user
 

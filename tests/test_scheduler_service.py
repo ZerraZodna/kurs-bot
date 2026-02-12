@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timezone
 
 from src.models.database import Base, User, Lesson, Schedule, Memory, MessageLog
-from src.services import scheduler as scheduler_module
+from src import scheduler as scheduler_module
 
 
 @pytest.fixture(scope="function")

@@ -1,13 +1,13 @@
 import logging
 from typing import Optional
 from sqlalchemy.orm import Session
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 from src.services.prompt_builder import PromptBuilder
 from src.services.semantic_search import get_semantic_search_service
-from src.services.memory_extractor import MemoryExtractor
-from src.services.onboarding_service import OnboardingService
-from src.services.onboarding.flow import OnboardingFlow
-from src.services.scheduler import SchedulerService
+from src.memories import MemoryExtractor
+from src.onboarding.service import OnboardingService
+from src.onboarding.flow import OnboardingFlow
+from src.scheduler import SchedulerService
 from src.services.dialogue import (
     call_ollama,
     detect_lesson_request,
@@ -51,12 +51,12 @@ class DialogueEngine:
         )
     
     def get_trigger_dispatcher(self, db=None, memory_manager: MemoryManager = None) -> object:
-        from src.services.trigger_dispatcher import get_trigger_dispatcher as _get
+        from src.triggers import get_trigger_dispatcher as _get
         return _get(db=db, memory_manager=memory_manager)
 
 
     def get_trigger_dispatcher(db=None, memory_manager: MemoryManager = None) -> object:
-        from src.services.trigger_dispatcher import get_trigger_dispatcher as _get
+        from src.triggers import get_trigger_dispatcher as _get
         return _get(db=db, memory_manager=memory_manager)
 
     async def call_ollama(self, prompt: str, model: Optional[str] = None, language: Optional[str] = None) -> str:
@@ -309,7 +309,7 @@ class DialogueEngine:
             logger.warning("LLM returned None; coercing to placeholder string")
             response = "[No response from LLM]"
         # Trigger matching and dispatch (always enabled)
-        from src.services.triggering import handle_triggers
+        from src.triggers.triggering import handle_triggers
 
         await handle_triggers(response=response, original_text=original_text, session=session, memory_manager=self.memory_manager, user_id=user_id)
 
@@ -335,7 +335,7 @@ class DialogueEngine:
         schedules = SchedulerService.get_user_schedules(user_id)
         if schedules:
             # Use the schedule query response builder to list all active reminders
-            from src.services.dialogue.schedule_query_handler import build_schedule_status_response
+            from src.scheduler.schedule_query_handler import build_schedule_status_response
 
             tz_name = ensure_user_timezone(
                 self.memory_manager,
@@ -445,5 +445,5 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
 
 # Module-level wrapper so tests can monkeypatch `src.services.dialogue_engine.get_trigger_dispatcher`
 def get_trigger_dispatcher(db=None, memory_manager: MemoryManager = None) -> object:
-    from src.services.trigger_dispatcher import get_trigger_dispatcher as _get
+    from src.triggers import get_trigger_dispatcher as _get
     return _get(db=db, memory_manager=memory_manager)

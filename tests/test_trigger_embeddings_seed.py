@@ -1,7 +1,7 @@
 import asyncio
 import pytest
 
-from src.services.trigger_matcher import TriggerMatcher
+from src.triggers.trigger_matcher import TriggerMatcher
 from src.models.database import SessionLocal, TriggerEmbedding
 
 

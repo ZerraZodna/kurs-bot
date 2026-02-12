@@ -1,8 +1,8 @@
 import pytest
 from src.models.database import SessionLocal, User, init_db
 from tests.utils import create_test_user
-from src.services.trigger_dispatcher import TriggerDispatcher
-from src.services.scheduler import SchedulerService
+from src.triggers.trigger_dispatcher import TriggerDispatcher
+from src.scheduler import SchedulerService
 
 
 # Use shared test helper

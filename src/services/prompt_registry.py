@@ -9,7 +9,7 @@ Prototype implementation:
 import logging
 from typing import Optional
 from src.models.database import PromptTemplate
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 from src.models.database import SessionLocal
 from src.config import settings
 

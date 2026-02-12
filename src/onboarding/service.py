@@ -1,36 +1,31 @@
-"""
-Onboarding Service - Guide users through setup and commitment
+"""Onboarding service - guide users through setup and commitment.
 
-Delegates to helper modules for:
-- Status checking
-- Prompt generation
-- Detector logic
-- Schedule setup
-- User management
+Provides the `OnboardingService` implementation that coordinates
+detectors, prompt generation, schedule setup, and user management.
 """
 
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 import logging
 
-from src.services.onboarding.detectors import (
+from src.onboarding.detectors import (
     detect_commitment_keywords,
     detect_consent_keywords,
     detect_decline_keywords,
     detect_schedule_request,
     handle_lesson_status_response,
 )
-from src.services.onboarding.prompts import (
+from src.onboarding.prompts import (
     get_continuation_welcome_message,
     get_lesson_1_welcome_message,
     get_onboarding_complete_message_text,
     get_onboarding_prompts,
 )
-from src.services.onboarding.status import get_onboarding_status_dict
-from src.services.onboarding.schedule_setup import create_auto_schedule
+from src.onboarding.status import get_onboarding_status_dict
+from src.onboarding.schedule_setup import create_auto_schedule
 from src.services.timezone_utils import ensure_user_timezone
-from src.services.onboarding.user_management import delete_user_and_data, is_user_new
+from src.onboarding.user_management import delete_user_and_data, is_user_new
 
 logger = logging.getLogger(__name__)
 
@@ -261,3 +256,4 @@ class OnboardingService:
         language = lang_memories[0]["value"] if lang_memories else "en"
 
         return get_continuation_welcome_message(language, name, lesson_id)
+__all__ = ["OnboardingService"]

@@ -20,8 +20,8 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from sqlalchemy.orm import Session
 
 from src.models.database import Schedule, User, Lesson
-from src.services.scheduler import SessionLocal
-from src.services.memory_manager import MemoryManager
+from src.models.database import SessionLocal
+from src.memories import MemoryManager
 from src.config import settings
 from .time_utils import parse_time_string
 from .memory_utils import (
@@ -82,7 +82,7 @@ class SchedulerService:
     @staticmethod
     def run_recovery_check() -> int:
         """Send any missed schedules and update their state."""
-        from src.services import scheduler as _scheduler_pkg
+        from src import scheduler as _scheduler_pkg
         db = _scheduler_pkg.SessionLocal()
         recovered = 0
         try:
@@ -230,7 +230,7 @@ class SchedulerService:
         """
         close_session = False
         if session is None:
-            from src.services import scheduler as _scheduler_pkg
+            from src import scheduler as _scheduler_pkg
             session = _scheduler_pkg.SessionLocal()
             close_session = True
 
@@ -305,7 +305,7 @@ class SchedulerService:
         """
         close_session = False
         if session is None:
-            from src.services import scheduler as _scheduler_pkg
+            from src import scheduler as _scheduler_pkg
             session = _scheduler_pkg.SessionLocal()
             close_session = True
 
@@ -357,7 +357,7 @@ class SchedulerService:
             logger.info(f"✓ Updated daily schedule {schedule_id} for user {getattr(updated, 'user_id', 'unknown')} to {hour}:{minute:02d} ({tz_name})")
             try:
                 if getattr(updated, 'next_send_time', None):
-                    logger.info(f"Updated schedule stored next_send_time (iso): {updated.next_send_time.isoformat()}, tzinfo={getattr(updated.next_send_time, 'tzinfo', None)}")
+                    logger.info(f"Updated schedule stored next_send_time (iso): {updated.next_send_time.isoformat()}, tzinfo={getattr(updated, 'next_send_time', None)}")
             except Exception:
                 logger.exception("Could not log updated next_send_time for schedule %s", schedule_id)
             return updated
@@ -376,7 +376,7 @@ class SchedulerService:
         """Create a one-time reminder schedule."""
         close_session = False
         if session is None:
-            from src.services import scheduler as _scheduler_pkg
+            from src import scheduler as _scheduler_pkg
             session = _scheduler_pkg.SessionLocal()
             close_session = True
 
@@ -430,7 +430,7 @@ class SchedulerService:
 
         This is called by APScheduler when a job triggers.
         """
-        from src.services import scheduler as _scheduler_pkg
+        from src import scheduler as _scheduler_pkg
         db = _scheduler_pkg.SessionLocal()
         try:
             schedule = db.query(Schedule).filter_by(schedule_id=schedule_id).first()
@@ -529,11 +529,11 @@ class SchedulerService:
         """Deactivate all schedules for a user and remove their jobs."""
         close_session = False
         if session is None:
-            from src.services import scheduler as _scheduler_pkg
+            from src import scheduler as _scheduler_pkg
             session = _scheduler_pkg.SessionLocal()
             close_session = True
         try:
-            from src.services.scheduler import deactivate_user_schedules_and_remove_jobs
+            from src.scheduler import deactivate_user_schedules_and_remove_jobs
 
             count = deactivate_user_schedules_and_remove_jobs(user_id=user_id, active_only=active_only, session=session)
             if count:

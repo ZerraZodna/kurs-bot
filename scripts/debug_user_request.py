@@ -4,7 +4,7 @@ import sys
 from datetime import datetime
 
 from src.models.database import SessionLocal, User, Memory, Schedule, init_db
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 from src.services.dialogue_engine import DialogueEngine
 
 

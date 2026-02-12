@@ -1,5 +1,5 @@
 import pytest
-from src.services.trigger_dispatcher import TriggerDispatcher
+from src.triggers.trigger_dispatcher import TriggerDispatcher
 from src.models.database import SessionLocal, Schedule
 
 

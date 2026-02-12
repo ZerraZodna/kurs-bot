@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import asyncio
 from src.models.database import SessionLocal, User, init_db
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 from src.services.embedding_service import get_embedding_service
 from src.services.semantic_search import get_semantic_search_service
 

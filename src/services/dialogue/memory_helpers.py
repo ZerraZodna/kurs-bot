@@ -6,8 +6,7 @@ import logging
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
-from src.services.memory_manager import MemoryManager
-from src.services.memory_extractor import MemoryExtractor
+from src.memories import MemoryManager, MemoryExtractor
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -96,7 +95,7 @@ def delete_user_and_data(db: Session, user_id: int) -> None:
         db.query(Memory).filter_by(user_id=user_id).delete(synchronize_session=False)
 
         # Use single helper to delete schedules and remove any active jobs.
-        from src.services.scheduler import delete_user_schedules_and_remove_jobs
+        from src.scheduler import delete_user_schedules_and_remove_jobs
 
         delete_user_schedules_and_remove_jobs(user_id=user_id, session=db)
 

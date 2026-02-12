@@ -2,8 +2,8 @@ import json
 import logging
 from typing import Optional, Dict, Any
 
-from src.services.trigger_matcher import get_trigger_matcher
-from src.services.trigger_dispatcher import get_trigger_dispatcher
+from src.triggers.trigger_matcher import get_trigger_matcher
+from src.triggers.trigger_dispatcher import get_trigger_dispatcher
 from src.config import settings
 
 logger = logging.getLogger(__name__)

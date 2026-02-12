@@ -5,10 +5,10 @@ from datetime import datetime, timezone, timedelta
 import pytest
 
 from src.models.database import SessionLocal, init_db, Schedule
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 from src.services.dialogue_engine import DialogueEngine
-from src.services.trigger_dispatcher import get_trigger_dispatcher
-from src.services.scheduler.core import SchedulerService
+from src.triggers.trigger_dispatcher import get_trigger_dispatcher
+from src.scheduler.core import SchedulerService
 
 
 @pytest.mark.asyncio
@@ -45,7 +45,7 @@ async def test_process_message_creates_one_time_reminder_with_tomorrow(monkeypat
             match = {"trigger_id": None, "name": "create_schedule", "action_type": "create_schedule", "score": 1.0, "threshold": 0.0}
             dispatcher.dispatch(match, {"user_id": user_id_arg, "schedule_spec": spec, "original_text": original_text})
 
-        monkeypatch.setattr("src.services.triggering.handle_triggers", fake_handle_triggers)
+        monkeypatch.setattr("src.triggers.triggering.handle_triggers", fake_handle_triggers)
 
         # Prevent pre-LLM schedule detection so the flow reaches the LLM + trigger path
         monkeypatch.setattr(dialogue.onboarding, "detect_schedule_request", lambda text: False)

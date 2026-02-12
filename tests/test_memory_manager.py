@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from src.models.database import Base, User, Memory
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 from src.services.maintenance import purge_archived_memories
 import datetime
 

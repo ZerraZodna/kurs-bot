@@ -4,12 +4,12 @@ from typing import Dict, Any
 from datetime import datetime, timezone
 from src.services.timezone_utils import validate_timezone_name, format_dt_in_timezone
 from src.services.timezone_utils import ensure_user_timezone, to_utc
-from src.services.scheduler.memory_utils import get_user_language
-from src.services.scheduler.message_utils import translate_text_sync
+from src.scheduler.memory_utils import get_user_language
+from src.scheduler.message_utils import translate_text_sync
 
-from src.services.memory_manager import MemoryManager
-from src.services import scheduler as _scheduler_pkg
-from src.services.scheduler import manager as schedule_manager
+from src.memories.manager import MemoryManager
+from src import scheduler as _scheduler_pkg
+from src.scheduler import manager as schedule_manager
 from src.models.database import SessionLocal, Schedule, User
 from src.config import settings
 
@@ -96,12 +96,12 @@ class TriggerDispatcher:
 
         # Use scheduler helper - attempt daily creation when time_str provided
         if spec.get("schedule_type") == "daily" and spec.get("time_str"):
-            from src.services.scheduler.time_utils import compute_next_send_and_cron
+            from src.scheduler.time_utils import compute_next_send_and_cron
 
             # Normalize provided time_str to canonical HH:MM (local time) and persist
             raw_time = spec.get("time_str")
             try:
-                from src.services.scheduler.time_utils import parse_time_string
+                from src.scheduler.time_utils import parse_time_string
 
                 h, m = parse_time_string(raw_time)
                 normalized_time = f"{h:02d}:{m:02d}"
@@ -364,7 +364,7 @@ class TriggerDispatcher:
             tz_name = ensure_user_timezone(self.memory_manager, user_id, None, source="trigger_dispatcher_query")
 
             try:
-                from src.services.dialogue.schedule_query_handler import build_schedule_status_response
+                from src.scheduler.schedule_query_handler import build_schedule_status_response
                 resp_text = build_schedule_status_response(schedules, tz_name)
             except Exception:
                 resp_text = "Here are your reminders."
@@ -441,4 +441,3 @@ def get_trigger_dispatcher(db=None, memory_manager: MemoryManager = None) -> Tri
     if _dispatcher is None:
         _dispatcher = TriggerDispatcher(db=db, memory_manager=memory_manager)
     return _dispatcher
-

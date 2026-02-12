@@ -11,7 +11,7 @@ from apscheduler.triggers.date import DateTrigger
 from datetime import datetime, timezone
 
 from src.services.semantic_search import get_semantic_search_service
-from src.services.scheduler import SchedulerService
+from src.scheduler import SchedulerService
 from src.models.database import Schedule
 from src.services.gdpr_service import (
     export_user_data,
@@ -155,9 +155,9 @@ async def handle_schedule_deletion_commands(
         if text_lower in affirmatives:
             # Perform deactivation
             try:
-                SchedulerService = __import__("src.services.scheduler", fromlist=["SchedulerService"]).services.scheduler.SchedulerService
+                SchedulerService = __import__("src.scheduler", fromlist=["SchedulerService"]).scheduler.SchedulerService
             except Exception:
-                from src.services.scheduler import SchedulerService
+                from src.scheduler import SchedulerService
             # Deactivate all schedules for user
             SchedulerService.deactivate_user_schedules(user_id)
             # Clear pending flag
@@ -195,7 +195,7 @@ async def handle_schedule_deletion_commands(
     ]
     if any(p in text_lower for p in delete_phrases):
         # If user has schedules, ask for confirmation
-        from src.services.scheduler import SchedulerService
+        from src.scheduler import SchedulerService
         schedules = SchedulerService.get_user_schedules(user_id)
         if not schedules:
             return "You don't have any active reminders."

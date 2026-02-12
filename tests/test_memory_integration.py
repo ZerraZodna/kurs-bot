@@ -2,8 +2,8 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from src.models.database import Base, User
-from src.services.memory_manager import MemoryManager
-from src.services.memory_extractor import MemoryExtractor
+from src.memories import MemoryManager
+from src.memories.memory_extractor import MemoryExtractor
 from src.services.dialogue.memory_helpers import extract_and_store_memories
 
 

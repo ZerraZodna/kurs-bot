@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from src.services.scheduler import jobs
+from src.scheduler import jobs
 
 
 class _FakeSchedule:

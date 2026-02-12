@@ -1,7 +1,7 @@
 import pytest
 
-from src.services import dialogue
-import src.services.trigger_matcher as trigger_matcher
+from src.scheduler import schedule_query_handler
+import src.triggers.trigger_matcher as trigger_matcher
 
 
 class DummyEmbedSvc:
@@ -71,17 +71,17 @@ async def test_change_phrase_not_detected_as_status(monkeypatch):
 
     # This should NOT be classified as a schedule-status query
     text = "Change lesson reminder to 09:00"
-    is_status = await dialogue.schedule_query_handler.detect_schedule_status_request(text)
+    is_status = await schedule_query_handler.detect_schedule_status_request(text)
     assert not is_status
 
     # Typo variant ("remder") should also NOT be classified as status
     typo_text = "Change lesson remder to 09:00"
-    is_status_typo = await dialogue.schedule_query_handler.detect_schedule_status_request(typo_text)
+    is_status_typo = await schedule_query_handler.detect_schedule_status_request(typo_text)
     assert not is_status_typo
 
     # Control: a status-like query should be detected
     status_text = "What reminders do I have?"
-    is_status2 = await dialogue.schedule_query_handler.detect_schedule_status_request(status_text)
+    is_status2 = await schedule_query_handler.detect_schedule_status_request(status_text)
     assert is_status2
 
 
@@ -110,5 +110,5 @@ async def test_explicit_change_phrase_not_detected(monkeypatch):
     monkeypatch.setattr(trigger_matcher, "get_trigger_matcher", lambda: DummyMatcher2(svc))
 
     text = "Change lesson reminder to 09:00"
-    is_status = await dialogue.schedule_query_handler.detect_schedule_status_request(text)
+    is_status = await schedule_query_handler.detect_schedule_status_request(text)
     assert not is_status

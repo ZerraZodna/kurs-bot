@@ -6,7 +6,7 @@ import pytest
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
 from src.models.database import SessionLocal, User, Memory, MessageLog, init_db
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 from src.services.prompt_builder import PromptBuilder
 from src.services.context_utils import ContextOptimizer, MemoryKey, MemoryCategory
 

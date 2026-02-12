@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from src.services.timezone_utils import to_utc
 from sqlalchemy.orm import Session
 from src.models.database import Lesson
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 
 logger = logging.getLogger(__name__)
 

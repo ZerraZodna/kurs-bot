@@ -20,11 +20,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.models.database import SessionLocal, User, init_db
 from tests.utils import create_test_user
 from src.services.dialogue_engine import DialogueEngine
-from src.services.onboarding_service import OnboardingService
-from src.services.scheduler import SchedulerService
+from src.onboarding.service import OnboardingService
+from src.scheduler import SchedulerService
 from datetime import datetime, timezone
-from src.services.onboarding.prompts import get_onboarding_prompts
-from src.services.memory_manager import MemoryManager
+from src.onboarding.prompts import get_onboarding_prompts
+from src.memories import MemoryManager
 from uuid import uuid4
 
 

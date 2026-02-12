@@ -88,7 +88,7 @@ async def detect_language(text: str):
 		return None, None, {"method": "langdetect"}
 
 
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 from src.models.database import MessageLog
 
 

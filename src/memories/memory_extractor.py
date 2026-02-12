@@ -197,6 +197,19 @@ User message: "{user_message}"{context_str}"""
             logger.debug("Heuristic skipped greeting-like single-word message")
             return out
 
+        # Heuristic: common name introduction patterns (e.g., "my name is Alex", "I'm Alex", "jeg heter Alex")
+        import re
+        name_patterns = [r"my name is ([A-Z][a-zA-Z\-']+)", r"i'm ([A-Z][a-zA-Z\-']+)", r"i am ([A-Z][a-zA-Z\-']+)", r"jeg heter ([A-ZØÆÅøæå][a-zA-Z\-']+)"]
+        for pat in name_patterns:
+            m = re.search(pat, message, re.IGNORECASE)
+            if m:
+                candidate = m.group(1).strip()
+                if existing_memories and existing_memories.get("first_name"):
+                    logger.debug("Heuristic would extract a first_name but user already has one; skipping")
+                    return out
+                out.append({"store": True, "key": "first_name", "value": candidate, "confidence": 0.9, "ttl_hours": None})
+                return out
+
         # Heuristic: single-word capitalized names (e.g., "Live", "Jo")
         words = msg.split()
         if 1 <= len(words) <= 2 and all(w.isalpha() for w in words) and words[0][0].isupper():
@@ -233,4 +246,3 @@ User message: "{user_message}"{context_str}"""
                 break
 
         return out
-

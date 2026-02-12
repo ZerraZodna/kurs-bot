@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.models.database import Base, User, Lesson, Schedule
-from src.services.scheduler import manager
+from src.scheduler import manager
 
 
 @pytest.fixture(scope="function")

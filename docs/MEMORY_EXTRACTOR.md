@@ -131,7 +131,7 @@ response = await dialogue.process_message(
 ### Manual (Direct)
 
 ```python
-from src.services.memory_extractor import MemoryExtractor
+from src.memories.memory_extractor import MemoryExtractor
 
 memories = await MemoryExtractor.extract_memories(
     user_message="I want to improve my coding skills",

@@ -96,3 +96,6 @@ def decide_memory_store(
         ttl_hours = 24 if "today" in message or "tomorrow" in message else None
 
     return MemoryDecision(True, key, value, confidence, ttl_hours, source)
+
+
+__all__ = ["MemoryDecision", "decide_memory_store"]

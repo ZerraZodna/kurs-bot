@@ -2,10 +2,10 @@ import pytest
 from datetime import datetime, timezone, timedelta
 
 from src.models.database import SessionLocal, User, Schedule, init_db
-from src.services.memory_manager import MemoryManager
-from src.services.scheduler import SchedulerService
-from src.services.scheduler import manager as schedule_manager
-from src.services.trigger_dispatcher import TriggerDispatcher
+from src.memories import MemoryManager
+from src.scheduler import SchedulerService
+from src.scheduler import manager as schedule_manager
+from src.triggers.trigger_dispatcher import TriggerDispatcher
 from src.services.timezone_utils import format_dt_in_timezone, to_utc, parse_local_time_to_utc
 
 

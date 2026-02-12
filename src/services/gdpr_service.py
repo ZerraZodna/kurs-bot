@@ -397,7 +397,7 @@ def erase_user_data(
     session.query(MessageLog).filter_by(user_id=user_id).delete(synchronize_session=False)
 
     # Use scheduler helper to delete schedules and remove any active jobs.
-    from src.services.scheduler import delete_user_schedules_and_remove_jobs
+    from src.scheduler import delete_user_schedules_and_remove_jobs
 
     deleted_schedule_ids = delete_user_schedules_and_remove_jobs(user_id=user_id, session=session)
 

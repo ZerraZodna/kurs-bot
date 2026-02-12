@@ -7,7 +7,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.models.database import SessionLocal, User, Memory, init_db
 from src.services.dialogue_engine import DialogueEngine
-from src.services.onboarding_service import OnboardingService
+from src.onboarding.service import OnboardingService
 
 
 def create_new_test_user(db) -> int:
@@ -15,7 +15,7 @@ def create_new_test_user(db) -> int:
     if existing:
         # Use the GDPR-safe delete helper to remove the user and all related data
         try:
-            from src.services.onboarding.user_management import delete_user_and_data
+            from src.onboarding.user_management import delete_user_and_data
 
             delete_user_and_data(db, existing.user_id)
         except Exception:

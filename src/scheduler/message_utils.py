@@ -53,7 +53,7 @@ def send_outbound_message(db: Session, user: User, text: str) -> None:
     error = None
     try:
         if user.channel == "telegram":
-            from src.services import scheduler as _scheduler_pkg
+            from src import scheduler as _scheduler_pkg
             asyncio.run(_scheduler_pkg.send_message(int(user.external_id), text))
             record_traffic_event()
         else:

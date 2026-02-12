@@ -4,7 +4,7 @@ Tests for the Memory Extractor service
 
 import pytest
 import asyncio
-from src.services.memory_extractor import MemoryExtractor
+from src.memories.memory_extractor import MemoryExtractor
 
 
 @pytest.mark.asyncio

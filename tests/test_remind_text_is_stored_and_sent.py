@@ -2,8 +2,8 @@ import json
 from datetime import datetime, timezone, timedelta
 
 from src.models.database import SessionLocal, User, init_db, Memory, Schedule
-from src.services.memory_manager import MemoryManager
-from src.services.trigger_dispatcher import get_trigger_dispatcher
+from src.memories import MemoryManager
+from src.triggers.trigger_dispatcher import get_trigger_dispatcher
 
 
 def test_remind_me_creates_one_time_with_correct_message():

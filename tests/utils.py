@@ -1,5 +1,5 @@
 from src.models.database import User
-from src.services.memory_manager import MemoryManager
+from src.memories import MemoryManager
 
 
 def create_test_user(db, external_id: str, first_name: str = "Test") -> int:

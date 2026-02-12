@@ -44,6 +44,107 @@ A chatbot/consultant with persistent memory that delivers daily lessons and inte
    .\run_tests.ps1
    ```
 
+## Ubuntu Preparation (clean install)
+
+Follow these steps on a fresh Ubuntu system (20.04+ / 22.04+). Commands are copy-paste ready.
+
+1) Update packages and install system prerequisites:
+
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y git curl build-essential libpq-dev python3 python3-venv python3-pip
+```
+
+2) (Optional) Install PowerShell (if you want to use provided PowerShell helpers on Ubuntu):
+
+```bash
+# Install Microsoft package repository and pwsh
+curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/ubuntu/$(lsb_release -rs)/prod $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/microsoft-prod.list
+sudo apt update
+sudo apt install -y powershell
+# Start PowerShell with: pwsh
+```
+
+3) Clone the repository and create a Python virtual environment (step 1 from the Windows script adapted):
+
+```bash
+git clone <your-repo-url> kurs-bot
+cd kurs-bot
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+4) Environment variables and ngrok auth:
+
+- Copy the example env and edit secrets:
+
+```bash
+cp .env.template .env
+# Edit .env and set TELEGRAM_BOT_TOKEN, SLACK_BOT_TOKEN, API_AUTH_TOKEN, GDPR_ADMIN_TOKEN, etc.
+nano .env
+```
+
+- Ngrok: install from https://ngrok.com/download or via snap/apt if available. Authenticate your ngrok client with your authtoken (replace <your-ngrok-token>):
+
+```bash
+# example using the official install script
+curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+echo "deb https://ngrok-agent.s3.amazonaws.com/apt/ stable main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+sudo apt update && sudo apt install -y ngrok
+ngrok config add-authtoken <your-ngrok-token>
+```
+
+- The `NGROK_AUTH_TOKEN` is not required in `.env` for the local client once you run `ngrok config add-authtoken`. If you prefer keeping the token in `.env`, set `NGROK_AUTH_TOKEN` there.
+
+5) Database migrations (alembic):
+
+```bash
+# Ensure .venv is active
+alembic upgrade head
+```
+
+6) Start the app (development):
+
+```bash
+# from the project root with the virtualenv active
+uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
+# in another terminal, expose with ngrok
+ngrok http 8000
+```
+
+7) Example: set Telegram webhook using the ngrok URL returned from `ngrok http 8000`:
+
+```bash
+# set TELEGRAM_BOT_TOKEN in .env first
+# then call Telegram setWebhook API (substitute <ngrok-url> and token)
+curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" -d "url=https://<ngrok-id>.ngrok.io/webhook/telegram"
+```
+
+Notes:
+- The application loads `.env` via `pydantic` settings (see `src/config.py`). Keep secrets in `.env` (do not commit).
+- If you prefer PowerShell helper scripts, run them from `pwsh` after installing `powershell` package above.
+
+## Where to put the ngrok key
+
+- Preferred: authenticate ngrok locally using `ngrok config add-authtoken <token>`; no env var needed.
+- Alternative: set `NGROK_AUTH_TOKEN` in `.env` if you want the project to be explicit. Example in your `.env`:
+
+```
+NGROK_AUTH_TOKEN=your_ngrok_token_here
+```
+
+## Start-up summary (quick)
+
+1. Activate venv: `source .venv/bin/activate`
+2. Start app: `uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000`
+3. Start ngrok: `ngrok http 8000`
+4. Set Telegram webhook to `https://<ngrok-id>.ngrok.io/webhook/telegram`
+
+--
+
 ## Development Commands
 
 Use `cli.py` for common development tasks:

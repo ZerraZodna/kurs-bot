@@ -6,15 +6,13 @@ from src.models.database import SessionLocal, TriggerEmbedding
 from src.services.embedding_service import get_embedding_service
 from src.config import settings
 import asyncio
-import logging
 import numpy as np
+
 
 logger = logging.getLogger(__name__)
 
 
-# Canonical starter trigger specs. This was previously defined in
-# scripts/seed_triggers.py; keeping it here centralizes seeding logic
-# so the TriggerMatcher is the single source of truth for starter data.
+# Canonical starter trigger specs. Centralized seeding logic for starter data.
 STARTER = [
     {"name": "create_schedule", "action_type": "create_schedule", "utterance": "Please remind me every day at 9am" , "threshold": 0.75},
     {"name": "update_schedule", "action_type": "update_schedule", "utterance": "Change my reminder to 8pm", "threshold": 0.75},
@@ -61,8 +59,7 @@ for c in CURATED_CONFIRMATIONS:
 async def seed_triggers() -> None:
     """Embed and persist the canonical `STARTER` triggers into the DB.
 
-    This centralizes the seeding logic so external scripts can delegate to
-    `src.services.trigger_matcher.seed_triggers` without duplicating behavior.
+    Centralized seeding logic for starter trigger data.
     """
     # Import inside the function so tests can monkeypatch the embedding
     # service factory (`src.services.embedding_service.get_embedding_service`)

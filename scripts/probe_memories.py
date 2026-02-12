@@ -1,5 +1,5 @@
 import asyncio
-from src.services.memory_extractor import MemoryExtractor
+from src.memories.memory_extractor import MemoryExtractor
 from src.config import settings
 
 

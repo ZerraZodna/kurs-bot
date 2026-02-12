@@ -1,4 +1,5 @@
-"""Schedule query detection and response helpers."""
+"""Schedule query detection and response helpers.
+"""
 
 from __future__ import annotations
 
@@ -6,8 +7,10 @@ from typing import Iterable
 
 from src.models.database import Schedule
 from src.services.timezone_utils import format_dt_in_timezone
-from src.services.trigger_matcher import get_trigger_matcher
+from src.triggers.trigger_matcher import get_trigger_matcher
 from src.config import settings
+
+
 async def detect_schedule_status_request(text: str) -> bool:
     """Detect whether `text` is a schedule-status query by delegating to
     the central TriggerMatcher. Returns True when the top schedule-query
