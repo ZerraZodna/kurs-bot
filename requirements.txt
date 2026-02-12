@@ -19,3 +19,7 @@ pydantic_core==2.41.5
 numpy
 pydantic-settings
  
+
+# Optional fast PDF extractor alternative
+pymupdf
+
