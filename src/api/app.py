@@ -45,15 +45,21 @@ async def lifespan(app: FastAPI):
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     apply_logging_redaction()
     verify_secrets_config()
-    ollama_url = "http://localhost:11434"
+    # Respect env/config: derive Ollama base from settings.OLLAMA_URL
+    # `settings.OLLAMA_URL` may include the API path (e.g. /api/generate), so strip
+    # anything after the first '/api' to obtain the base URL for health checks.
+    ollama_base = getattr(settings, "OLLAMA_URL", "http://localhost:11434")
+    if "/api" in ollama_base:
+        ollama_base = ollama_base.rsplit("/api", 1)[0]
+
     try:
-        response = httpx.get(f"{ollama_url}/api/tags", timeout=2.0)
+        response = httpx.get(f"{ollama_base}/api/tags", timeout=2.0)
         if response.status_code == 200:
-            logging.info(f"Ollama AI server is running at {ollama_url}")
+            logging.info(f"Ollama AI server is running at {ollama_base}")
         else:
-            logging.warning(f"Ollama AI server responded with status {response.status_code} at {ollama_url}")
+            logging.warning(f"Ollama AI server responded with status {response.status_code} at {ollama_base}")
     except Exception as e:
-        logging.error(f"Ollama AI server is NOT reachable at {ollama_url}: {e}")
+        logging.error(f"Ollama AI server is NOT reachable at {ollama_base}: {e}")
 
     yield
 
