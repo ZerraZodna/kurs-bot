@@ -27,6 +27,7 @@ class TelegramHandler:
             "channel": "telegram",
             "text": text,
             "external_message_id": str(msg.get("message_id")),
+            "chat_id": str(msg.get("chat", {}).get("id")),
             "timestamp": datetime.fromtimestamp(msg.get("date", 0), timezone.utc),
         }
 
