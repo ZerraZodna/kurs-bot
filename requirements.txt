@@ -23,3 +23,9 @@ pydantic-settings
 # Optional fast PDF extractor alternative
 pymupdf
 
+# Optional local embedding backend (kept in main requirements by request)
+# Install these if you plan to run the local sentence-transformers + hnswlib index builder
+sentence-transformers
+hnswlib
+
+

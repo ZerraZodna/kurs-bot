@@ -22,6 +22,7 @@ class EmbeddingService:
         self.embed_url = settings.OLLAMA_EMBED_URL
         self.embed_model = settings.OLLAMA_EMBED_MODEL
         self.embedding_dimension = settings.EMBEDDING_DIMENSION
+        self.backend = getattr(settings, "EMBEDDING_BACKEND", "ollama")
         # Client proxy exposes a `post` coroutine so tests can patch it.
         class _ClientProxy:
             async def post(self, *args, **kwargs):
@@ -29,6 +30,8 @@ class EmbeddingService:
                     return await client.post(*args, **kwargs)
 
         self.client = _ClientProxy()
+        # local model placeholder
+        self._local_model = None
     
     async def generate_embedding(self, text: str) -> Optional[List[float]]:
         """
@@ -45,8 +48,28 @@ class EmbeddingService:
             return None
         
         try:
-            # Use the client proxy (tests may patch `self.client.post`)
-            # Include Authorization header when OLLAMA_API_KEY is configured
+            if self.backend == 'local':
+                # lazy-load sentence-transformers model
+                if self._local_model is None:
+                    try:
+                        from sentence_transformers import SentenceTransformer
+                    except Exception as e:
+                        logger.error("Local embedding backend requested but 'sentence-transformers' is not installed")
+                        return None
+                    # load model in thread to avoid blocking
+                    self._local_model = await asyncio.to_thread(SentenceTransformer, "all-MiniLM-L6-v2")
+                # compute embedding in thread
+                vec = await asyncio.to_thread(self._local_model.encode, text.strip(), convert_to_numpy=True)
+                if isinstance(vec, np.ndarray):
+                    emb = vec.tolist()
+                else:
+                    emb = list(vec)
+                if len(emb) != self.embedding_dimension:
+                    logger.error(f"Embedding dimension mismatch: expected {self.embedding_dimension}, got {len(emb)}")
+                    return None
+                return emb
+
+            # Fallback to Ollama HTTP API
             headers = {}
             api_key = getattr(settings, "OLLAMA_API_KEY", None)
             if api_key:
@@ -60,18 +83,14 @@ class EmbeddingService:
                 },
                 headers=headers or None,
             )
-            # Some test mocks may make `raise_for_status` an async mock.
             _rs = response.raise_for_status()
             if asyncio.iscoroutine(_rs):
                 await _rs
-            
+
             data = response.json()
-            # In tests/mock contexts `response.json()` may be an async
-            # callable (AsyncMock) returning a coroutine. Await if needed.
             if asyncio.iscoroutine(data):
                 data = await data
-            
-            # Handle both single embedding and batch response
+
             if "embeddings" in data:
                 embeddings = data["embeddings"]
                 if isinstance(embeddings, list) and len(embeddings) > 0:
@@ -80,25 +99,22 @@ class EmbeddingService:
                     embedding = embeddings
             else:
                 embedding = data.get("embedding")
-            
+
             if embedding is None:
                 logger.error(f"No embedding in response: {data}")
                 return None
-            
-            # Convert to list if numpy array
+
             if isinstance(embedding, np.ndarray):
                 embedding = embedding.tolist()
-            
-            # Validate dimension
+
             if len(embedding) != self.embedding_dimension:
                 logger.error(
                     f"Embedding dimension mismatch: expected {self.embedding_dimension}, "
                     f"got {len(embedding)}"
                 )
                 return None
-            
+
             return embedding
-            
         except httpx.ConnectError as e:
             logger.error(f"Failed to connect to Ollama embed endpoint: {e}")
             return None
@@ -193,6 +209,33 @@ class EmbeddingService:
         """
         if not texts:
             return []
+        if self.backend == 'local' and self._local_model is None:
+            # ensure model loaded
+            try:
+                from sentence_transformers import SentenceTransformer
+                self._local_model = await asyncio.to_thread(SentenceTransformer, "all-MiniLM-L6-v2")
+            except Exception:
+                # fall back to concurrent HTTP calls
+                pass
+
+        if self.backend == 'local' and self._local_model is not None:
+            # run encoding in thread pool (batch if supported)
+            try:
+                vecs = await asyncio.to_thread(self._local_model.encode, texts, convert_to_numpy=True, show_progress_bar=False)
+                out = []
+                for vec in vecs:
+                    if isinstance(vec, np.ndarray):
+                        emb = vec.tolist()
+                    else:
+                        emb = list(vec)
+                    if len(emb) != self.embedding_dimension:
+                        out.append(None)
+                    else:
+                        out.append(emb)
+                return out
+            except Exception as e:
+                logger.warning(f"Local batch embedding failed, falling back to async calls: {e}")
+
         tasks = [self.generate_embedding(t) for t in texts]
         return await asyncio.gather(*tasks)
 

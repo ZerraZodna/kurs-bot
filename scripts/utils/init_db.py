@@ -82,7 +82,71 @@ def init_db(database_url: str, yes: bool = False, lessons: str | None = None) ->
         if database_url.startswith('sqlite:///'):
             db_path_info = Path(database_url.replace('sqlite:///', ''))
 
+    # If an existing sqlite DB is present, verify embeddings dimension to avoid
+    # accidental mismatches (e.g. switching embedding model dims).
+    expected_dim = None
+    try:
+        expected_dim = int(os.environ.get('EMBEDDING_DIMENSION') or 0)
+    except Exception:
+        expected_dim = 0
+
+    def _scan_db_for_mismatched_dims(path: Path, expected: int):
+        if expected <= 0:
+            return []
+        import sqlite3
+        import numpy as _np
+
+        mismatches = []
+        conn = sqlite3.connect(str(path))
+        c = conn.cursor()
+        c.execute("SELECT name, type FROM sqlite_master WHERE type IN ('table','view')")
+        for name, _typ in c.fetchall():
+            try:
+                cols_info = c.execute(f"PRAGMA table_info({name})").fetchall()
+            except Exception:
+                continue
+            blob_cols = [r[1] for r in cols_info if r[2] and r[2].upper().startswith('BLOB') or ('embed' in (r[1] or '').lower())]
+            for col in blob_cols:
+                try:
+                    row = c.execute(f"SELECT {col} FROM {name} WHERE {col} IS NOT NULL LIMIT 1").fetchone()
+                except Exception:
+                    row = None
+                if row and row[0]:
+                    try:
+                        arr = _np.frombuffer(row[0], dtype=_np.float32)
+                        if arr.shape[0] != expected:
+                            mismatches.append((name, col, int(arr.shape[0])))
+                    except Exception:
+                        # non-numeric blob or unexpected format
+                        mismatches.append((name, col, None))
+        conn.close()
+        return mismatches
+
     if db_path_info and db_path_info.exists():
+        # load .env if present to pick up EMBEDDING_DIMENSION when not in env
+        repo_root = Path(__file__).resolve().parents[2]
+        dotenv = repo_root / '.env'
+        data = load_dotenv(dotenv)
+        if not expected_dim and 'EMBEDDING_DIMENSION' in data:
+            try:
+                expected_dim = int(data['EMBEDDING_DIMENSION'])
+            except Exception:
+                expected_dim = expected_dim or 0
+
+        # allow caller to override check via environment flag
+        allow_mismatch = os.environ.get('ALLOW_EMBEDDING_DIM_MISMATCH', '').lower() in ('1','true','yes')
+        # If a user passed CLI flags, they will be handled by main() wrapper which
+        # may set ALLOW_EMBEDDING_DIM_MISMATCH in env before calling init_db.
+        if expected_dim and not allow_mismatch:
+            mism = _scan_db_for_mismatched_dims(db_path_info, expected_dim)
+            if mism:
+                msg_lines = [f"Found {len(mism)} embedding dimension mismatch(es):"]
+                for t, c, l in mism:
+                    msg_lines.append(f" - table {t}, column {c}: stored_dim={l} expected={expected_dim}")
+                msg_lines.append('')
+                msg_lines.append('To proceed and overwrite the DB anyway, re-run with the environment variable ALLOW_EMBEDDING_DIM_MISMATCH=1 or pass --allow-dim-mismatch to the CLI.')
+                raise SystemExit('\n'.join(msg_lines))
+
         if not yes:
             raise SystemExit(0)
         backup_path = db_path_info.with_suffix('.db.backup')
@@ -139,9 +203,31 @@ def main(argv: list | None = None) -> int:
     parser.add_argument('--db', help='Database to initialize. Accepts prod/dev, relative path, or full DATABASE_URL')
     parser.add_argument('--yes', '-y', action='store_true', help='Auto-confirm recreate without prompt')
     parser.add_argument('--lessons', help='Path to ACIM lessons PDF to import (optional)')
+    parser.add_argument('--build-index', action='store_true', help='If set and EMBEDDING_BACKEND=local, build hnswlib index from lessons')
     ns = parser.parse_args(argv)
     database_url = resolve_database_url(ns.db)
     init_db(database_url, yes=ns.yes, lessons=ns.lessons)
+    # optionally build a local hnswlib index
+    if ns.build_index:
+        # determine backend and index path from env or .env
+        env = os.environ.copy()
+        repo_root = Path(__file__).resolve().parents[2]
+        dotenv = repo_root / '.env'
+        data = load_dotenv(dotenv)
+        for k, v in data.items():
+            if k not in env:
+                env[k] = v
+        backend = env.get('EMBEDDING_BACKEND', 'local')
+        index_path = env.get('HNSWLIB_INDEX_PATH', 'src/data/emb_index.bin')
+        if backend != 'local':
+            print('⚠️  EMBEDDING_BACKEND is not set to "local" — skipping index build.')
+        else:
+            builder = repo_root / 'scripts' / 'utils' / 'embeddings_local.py'
+            if not builder.exists():
+                print('⚠️  embeddings_local.py not found under scripts/utils/ — cannot build index')
+            else:
+                print(f'🔨 Building local hnswlib index at {index_path} (this may take a while)')
+                subprocess.run([sys.executable, str(builder), '--out', str(index_path)], env=env)
     return 0
 
 

@@ -18,7 +18,10 @@ class Settings(BaseSettings):
     # Embedding settings for semantic search
     OLLAMA_EMBED_URL: str = "http://localhost:11434/api/embed"
     OLLAMA_EMBED_MODEL: str = "nomic-embed-text:latest"
-    EMBEDDING_DIMENSION: int = 768
+    # Embedding backend: 'ollama' or 'local'
+    EMBEDDING_BACKEND: str = "local"
+    # Default dimension for the local recommended model (all-MiniLM-L6-v2)
+    EMBEDDING_DIMENSION: int = 384
     SEMANTIC_SEARCH_THRESHOLD: float = 0.5
     SEMANTIC_SEARCH_MAX_RESULTS: int = 5
     # Trigger matcher defaults

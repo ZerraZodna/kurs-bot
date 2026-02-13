@@ -117,12 +117,16 @@ ngrok config add-authtoken <your-ngrok-token>
 
 5) Database migrations (alembic):
 
+See scripts/setup_new_host.ps1
+
 ```bash
 # Ensure .venv is active
 alembic upgrade head
 ```
 
 6) Start the app (development):
+
+See: Start_Linux.ps1 or Start_Windows.ps1
 
 ```bash
 # from the project root with the virtualenv active
@@ -135,6 +139,13 @@ ngrok http 8000 > ngrok.log 2>&1 &
 
 7) Example: set Telegram webhook using the ngrok URL returned from `ngrok http 8000`:
 
+Power Shell:
+$token = 'xxxxxxxxxxx'
+$telegramBot = 'tttttttt'
+$webhook = 'https://appeasable-pressuringly-chau.ngrok-free.dev/webhook/telegram/'
+Invoke-RestMethod -Uri "https://api.telegram.org/bot$token/setWebhook" -Method Post -Body @{ url = $webhook$telegramBot  }
+
+Does NOT WORK:
 ```bash
 # set TELEGRAM_BOT_TOKEN in .env first
 # then call Telegram setWebhook API (substitute <ngrok-url> and token)
@@ -205,6 +216,33 @@ See `DEPLOYMENT.md` for production deployment notes and recommended startup orde
 - `SLACK_BOT_TOKEN` - Slack bot token
 - `SENDGRID_API_KEY` - SendGrid API key
 - Note: vector-index configuration and runtime toggle have been removed in this branch; vector indexing is disabled by design.
+
+### Local embeddings (optional)
+
+This project supports two embedding backends:
+
+- **ollama**: uses a local Ollama HTTP API (`OLLAMA_EMBED_URL`) and models like `nomic-embed-text` (768-dim).
+- **local**: uses `sentence-transformers` (default `all-MiniLM-L6-v2`, 384-dim) and an optional `hnswlib` index for fast nearest-neighbor search.
+
+Toggle the backend in your `.env`:
+
+```
+EMBEDDING_BACKEND=local
+SENTENCE_TRANSFORMERS_MODEL=all-MiniLM-L6-v2
+EMBEDDING_DIMENSION=384
+HNSWLIB_INDEX_PATH=src/data/emb_index.bin
+```
+
+To build a local index from lessons in the DB, install the minimal extras and run the helper:
+
+```powershell
+# activate your venv first
+
+#  install from the project's requirements file
+pip install -r requirements.txt
+```
+
+The index builder will read lessons from the configured `DATABASE_URL`, encode them with the specified sentence-transformers model, and save an `hnswlib` index plus a small metadata file. Set `HNSWLIB_INDEX_PATH` in `.env` so runtime code can find it.
 
 ## Project Structure
 - `src/models/database.py` - SQLAlchemy ORM models
