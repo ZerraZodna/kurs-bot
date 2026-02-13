@@ -10,7 +10,7 @@ A chatbot/consultant with persistent memory that delivers daily lessons and inte
 - Alembic (migrations)
 - pytest (testing)
 
-## Setup
+## Setup for Windows:
 
 1. Clone the repo and create a virtual environment:
    ```powershell
@@ -44,11 +44,12 @@ A chatbot/consultant with persistent memory that delivers daily lessons and inte
    .\run_tests.ps1
    ```
 
+or:
 ## Ubuntu Preparation (clean install)
 
-Follow these steps on a fresh Ubuntu system (20.04+ / 22.04+). Commands are copy-paste ready.
+These concise steps target a developer machine or VM (Ubuntu 20.04+). They install Python, create the virtualenv, and explain ngrok options.
 
-1) Update packages and install system prerequisites:
+1) Update packages and install prerequisites
 
 ```bash
 sudo apt update && sudo apt upgrade -y
@@ -80,8 +81,25 @@ git clone git@github.com:ZerraZodna/kurs-bot.git
 cd kurs-bot
 python3 -m venv .venv
 source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
+python -m pip install --upgrade pip
+
+## CPU-only install (recommended for small/headless servers)
+
+If you want to avoid installing CUDA/GPU wheels (useful on small servers or CI), install CPU-only PyTorch first, then install the project requirements. Example (with your virtualenv active):
+
+```bash
+# Install CPU-only PyTorch wheel first (if your app uses torch). Do NOT install torchvision/torchaudio unless you need image/audio features.
+python -m pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch
+
+# If you need local sentence-transformers/hnswlib for building a local index, install them after torch:
+python -m pip install --no-cache-dir sentence-transformers hnswlib
+
+# Then install the project requirements (avoids pulling CUDA wheels as dependencies)
+python -m pip install --no-cache-dir -r requirements.txt
+```
+
+Notes:
+- If you do NOT need torch at all, skip the first step.
 ```
 
 4) Environment variables and ngrok auth:
@@ -94,16 +112,28 @@ cp .env.template .env
 nano .env
 ```
 
+EASY INSTALL Ngrok that FAILS:
+sudo snap install ngrok
+# authenticate (once)
+ngrok config add-authtoken <YOUR_NGROK_AUTHTOKEN>
+
+
 - Ngrok: install from https://ngrok.com/download or via snap/apt if available. Authenticate your ngrok client with your authtoken (replace <your-ngrok-token>):
 
 ```bash
 # example using the official install script
+# Add the ngrok signing key
 curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
-  | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null \
-  && echo "deb https://ngrok-agent.s3.amazonaws.com stable main" \
-  | sudo tee /etc/apt/sources.list.d/ngrok.list \
-  && sudo apt update \
-  && sudo apt install ngrok
+  | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+
+# Add the ngrok repository (adjust "bookworm" if your Ubuntu version differs; works for 22.04/24.04 as of 2026)
+echo "deb https://ngrok-agent.s3.amazonaws.com bookworm main" \
+  | sudo tee /etc/apt/sources.list.d/ngrok.list
+
+# Update packages and install ngrok
+sudo apt update
+sudo apt install ngrok -y
+
 
 or:
 curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
@@ -125,8 +155,20 @@ alembic upgrade head
 ```
 
 6) Start the app (development):
+Windows:
+Start-Windows.ps1
 
-See: Start-Linux.sh or Start-Windows.ps1
+Unix: 
+chmod +x Start-Linux.sh
+source .venv/bin/activate
+./Start-Linux.sh
+
+Or totally manual:
+pwsh
+./.venv/bin/Activate.ps1
+ngrok http 8000 > ngrok.log 2>&1 &
+uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
+
 
 ```bash
 # from the project root with the virtualenv active

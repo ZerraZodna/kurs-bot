@@ -19,13 +19,12 @@ pydantic_core==2.41.5
 numpy
 pydantic-settings
  
-
 # Optional fast PDF extractor alternative
 pymupdf
 
-# Optional local embedding backend (kept in main requirements by request)
-# Install these if you plan to run the local sentence-transformers + hnswlib index builder
-sentence-transformers
-hnswlib
+# Optional local embedding backend (moved out of main install for CPU-only setups)
+# If you plan to run the local sentence-transformers + hnswlib index builder,
+# install them separately as needed (see INSTALL_CPU.txt step 4):
+#   python -m pip install --no-cache-dir sentence-transformers hnswlib
 
 
