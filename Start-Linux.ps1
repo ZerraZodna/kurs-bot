@@ -43,6 +43,15 @@ function Start-WindowedProcess {
     $outLog = Join-Path $scriptRoot ("$Title.out.log")
     $errLog = Join-Path $scriptRoot ("$Title.err.log")
     try {
+        # Prefer a POSIX-style background launch so the current terminal isn't held.
+        $nohupCmd = "nohup pwsh -File '$wrapper' > '$outLog' 2> '$errLog' &"
+        if (Get-Command 'bash' -ErrorAction SilentlyContinue) {
+            Start-Process -FilePath 'bash' -ArgumentList '-c', $nohupCmd -WorkingDirectory $scriptRoot
+            Write-Output "Started $Title detached via nohup (stdout: $outLog, stderr: $errLog)"
+            return
+        }
+
+        # Fallback to Start-Process with redirected output
         Start-Process -FilePath 'pwsh' -ArgumentList '-NoExit', '-File', $wrapper -WorkingDirectory $scriptRoot -RedirectStandardOutput $outLog -RedirectStandardError $errLog
         Write-Output "Started $Title detached (stdout: $outLog, stderr: $errLog)"
     } catch {
