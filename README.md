@@ -126,7 +126,7 @@ alembic upgrade head
 
 6) Start the app (development):
 
-See: Start_Linux.ps1 or Start_Windows.ps1
+See: Start-Linux.sh or Start-Windows.ps1
 
 ```bash
 # from the project root with the virtualenv active
