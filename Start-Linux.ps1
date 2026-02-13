@@ -40,10 +40,11 @@ function Start-WindowedProcess {
     }
 
     # No graphical terminal: start pwsh detached and log output
-    $log = Join-Path $scriptRoot ("$Title.log")
+    $outLog = Join-Path $scriptRoot ("$Title.out.log")
+    $errLog = Join-Path $scriptRoot ("$Title.err.log")
     try {
-        Start-Process -FilePath 'pwsh' -ArgumentList '-NoExit', '-File', $wrapper -WorkingDirectory $scriptRoot -RedirectStandardOutput $log -RedirectStandardError $log
-        Write-Output "Started $Title detached (logs: $log)"
+        Start-Process -FilePath 'pwsh' -ArgumentList '-NoExit', '-File', $wrapper -WorkingDirectory $scriptRoot -RedirectStandardOutput $outLog -RedirectStandardError $errLog
+        Write-Output "Started $Title detached (stdout: $outLog, stderr: $errLog)"
     } catch {
         Write-Output "Failed to start detached; running $Title inline"
         & pwsh -NoExit -File $wrapper
