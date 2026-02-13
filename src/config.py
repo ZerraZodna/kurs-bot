@@ -14,9 +14,6 @@ class Settings(BaseSettings):
     NON_ENGLISH_OLLAMA_MODEL: str = "gpt-oss:20b"
     # Optional API key for Ollama Cloud / authenticated Ollama endpoints
     OLLAMA_API_KEY: str = ""
-    TEST_OLLAMA_MODEL="llama3.2:3b"
-    TEST_OLLAMA_CHAT_RAG_MODEL="llama3.2:3b"
-    TEST_NON_ENGLISH_OLLAMA_MODEL="llama3.2:3b"
 
     # Embedding settings for semantic search
     OLLAMA_EMBED_URL: str = "http://localhost:11434/api/embed"
