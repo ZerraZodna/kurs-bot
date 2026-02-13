@@ -7,18 +7,48 @@ import sys
 import argparse
 from pathlib import Path
 
+
+def load_dotenv(repo_root: str | Path) -> None:
+    """Load simple KEY=VALUE pairs from a .env file into os.environ if not set.
+
+    This avoids adding a dependency on python-dotenv while providing the
+    expected behavior: environment variables in `.env` are used when present.
+    """
+    env_path = Path(repo_root) / '.env'
+    if not env_path.exists():
+        return
+    for line in env_path.read_text(encoding='utf8').splitlines():
+        line = line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        k, v = line.split('=', 1)
+        k = k.strip()
+        v = v.strip().strip('"').strip("'")
+        if k and k not in os.environ:
+            os.environ[k] = v
+
 def main():
     parser = argparse.ArgumentParser(description='Run alembic migrations against dev or prod DB')
-    parser.add_argument('--db', choices=('dev','prod'), default='dev', help='Target database')
+    parser.add_argument('--db', choices=('dev','prod'), help='Target database (optional). If omitted, DATABASE_URL from environment/.env is used')
     parser.add_argument('--yes', '-y', action='store_true', help='Auto-confirm fallback stamping on failure')
     args = parser.parse_args()
+    # Ensure project root is importable and load .env if present
+    REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    load_dotenv(REPO_ROOT)
 
-    db_map = {
-        'dev': 'sqlite:///./src/data/dev.db',
-        'prod': 'sqlite:///./src/data/prod.db',
-    }
-    url = db_map[args.db]
-    os.environ['DATABASE_URL'] = url
+    if args.db:
+        db_map = {
+            'dev': 'sqlite:///./src/data/dev.db',
+            'prod': 'sqlite:///./src/data/prod.db',
+        }
+        url = db_map[args.db]
+        os.environ['DATABASE_URL'] = url
+    else:
+        url = os.environ.get('DATABASE_URL')
+        if not url:
+            # fall back to dev for safety
+            url = 'sqlite:///./src/data/dev.db'
+            os.environ['DATABASE_URL'] = url
 
     # Ensure project root is importable
     REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))

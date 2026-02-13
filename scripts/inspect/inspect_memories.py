@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Inspect user memories and list those related to lessons.
 
-Usage: python scripts/inspect_memories.py [USER_ID]
+Usage: python scripts/inspect/inspect_memories.py [USER_ID]
 If USER_ID is omitted, defaults to 7.
 """
 import sys

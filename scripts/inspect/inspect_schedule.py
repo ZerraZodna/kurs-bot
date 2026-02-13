@@ -1,8 +1,8 @@
 """Inspect a schedule row and print next_send_time details.
 
 Usage:
-    python scripts/inspect_schedule.py --schedule-id 1
-    python scripts/inspect_schedule.py --user-id 4
+    python scripts/inspect/inspect_schedule.py --schedule-id 1
+    python scripts/inspect/inspect_schedule.py --user-id 4
 
 This prints repr, isoformat, tzinfo and converts the stored value to the user's timezone for clarity.
 """

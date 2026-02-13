@@ -1,25 +1,20 @@
-"""Seed default prompt templates into DB.
+"""Seed default prompt templates into the database.
 
-Run: python scripts/seed_prompt_templates.py
+Exposes a `seed()` function for programmatic use and prints concise
+progress messages when run as a script.
 """
-import sys
-import os
-
-# Ensure repo root is on sys.path so `import src...` works when running this script directly
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-if REPO_ROOT not in sys.path:
-    sys.path.insert(0, REPO_ROOT)
+from typing import Optional
 
 from src.models.database import SessionLocal, PromptTemplate, init_db
 
 
-def seed():
+def seed() -> None:
     init_db()
     db = SessionLocal()
     try:
         existing = db.query(PromptTemplate).filter(PromptTemplate.key == 'concise_coach_v1').first()
         if existing:
-            print('Default template already present')
+            print('✅ Default template already present')
             return
         tmpl = PromptTemplate(
             key='concise_coach_v1',
@@ -31,10 +26,19 @@ def seed():
         )
         db.add(tmpl)
         db.commit()
-        print('Seeded concise_coach_v1')
+        print('✅ Seeded concise_coach_v1')
     finally:
         db.close()
 
 
+def main(argv: Optional[list] = None) -> int:
+    try:
+        seed()
+        return 0
+    except Exception as exc:
+        print('❌ Failed to seed prompt templates:', exc)
+        return 2
+
+
 if __name__ == '__main__':
-    seed()
+    raise SystemExit(main())

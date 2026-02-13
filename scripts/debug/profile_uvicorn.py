@@ -5,7 +5,7 @@ import uvicorn
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 
 def main() -> None:
@@ -30,7 +30,7 @@ def main() -> None:
     thread.join()
     profile.disable()
 
-    profile.dump_stats("d:/dev/kurs-bot/cprofile.out")
+    profile.dump_stats("cprofile.out")
 
 
 if __name__ == "__main__":
