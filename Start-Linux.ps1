@@ -18,10 +18,14 @@ Write-Output "Started ngrok detached (stdout: $ngrokOut, stderr: $ngrokErr)"
 # Run uvicorn in the foreground so logs appear directly in this terminal
 if (Get-Command 'bash' -ErrorAction SilentlyContinue) {
     Write-Output "Starting uvicorn in foreground (activate venv if needed)"
-    bash -lc "source '$scriptRoot/.venv/bin/activate' && $uvicornCmd"
+    # Use exec so the shell is replaced by the uvicorn process and SIGINT/Ctrl-C
+    # is delivered directly to uvicorn (not swallowed by an intermediate shell).
+    bash -lc "source '$scriptRoot/.venv/bin/activate' && exec $uvicornCmd"
 } else {
-    # Fallback to pwsh inline
+    # We're already running inside pwsh -> activate the venv in this session and
+    # run uvicorn directly so Ctrl-C is forwarded to the server process.
     $activate = Join-Path $scriptRoot ".venv/bin/Activate.ps1"
     Write-Output "Starting uvicorn in foreground via pwsh"
-    & pwsh -NoProfile -Command "& '$activate'; $uvicornCmd"
+    . $activate
+    & $uvicornCmd
 }
