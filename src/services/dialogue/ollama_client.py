@@ -10,6 +10,7 @@ clear logging and fallbacks.
 
 import asyncio
 import logging
+import os
 from typing import Any, Optional
 from urllib.parse import urlparse
 
@@ -38,6 +39,21 @@ def _is_cloud_url(url: Optional[str]) -> bool:
         return False
     hostname = urlparse(url).hostname or ""
     return "ollama.com" in hostname
+
+
+def _test_use_real_ollama_enabled() -> bool:
+    """Return True when tests explicitly request real Ollama calls.
+
+    Accepts common truthy values in env vars: 1, true, yes (case-insensitive).
+    """
+    v = os.getenv("TEST_USE_REAL_OLLAMA") or os.getenv("USE_REAL_OLLAMA")
+    if not v:
+        return False
+    return str(v).strip().lower() in ("1", "true", "yes", "y")
+
+
+# Cache the test-flag at import time to avoid repeated getenv() calls
+_TEST_USE_REAL_OLLAMA = _test_use_real_ollama_enabled()
 
 
 def _normalize_local_model_name(model: str) -> str:
@@ -162,6 +178,9 @@ async def call_ollama(prompt: str, model: str | None = None, language: str | Non
                 # If cloud reports model missing, try model + '-cloud' once
                 err = str(e)
                 logger.warning("Cloud client error: %s", err)
+                # During real-Ollama test runs we want to surface failures.
+                if _TEST_USE_REAL_OLLAMA:
+                    raise
                 if "not found" in err.lower() and not str(chosen_model).endswith("-cloud"):
                     alt = f"{chosen_model}-cloud"
                     try:
@@ -179,7 +198,11 @@ async def call_ollama(prompt: str, model: str | None = None, language: str | Non
 
     except httpx.HTTPStatusError as he:
         logger.exception("Ollama returned HTTP error: %s", he)
+        if _TEST_USE_REAL_OLLAMA:
+            raise
         return "[Sorry, I couldn't process your request right now.]"
     except Exception as e:
         logger.exception("[Ollama error] %s", e)
+        if _TEST_USE_REAL_OLLAMA:
+            raise
         return "[Sorry, I couldn't process your request right now.]"
