@@ -31,20 +31,25 @@ jobs:
           # Install project requirements
           pip install --no-cache-dir -r requirements.txt
       - name: Pre-download SentenceTransformer model
+        uses: actions/cache@v4
+        with:
+          path: src/data/models
+          key: model-cache-all-MiniLM-L6-v2-${{ runner.os }}
+          restore-keys: |
+            model-cache-all-MiniLM-L6-v2-
+
+      - name: Pre-download SentenceTransformer model
         run: |
           python - <<'PY'
           import os
-          from sentence_transformers import SentenceTransformer
+          from huggingface_hub import snapshot_download
           model_name = "all-MiniLM-L6-v2"
+          repo_id = f"sentence-transformers/{model_name}"
           out_dir = os.path.join('src', 'data', 'models', model_name.replace('/', '_'))
           os.makedirs(out_dir, exist_ok=True)
-          print(f"Downloading SentenceTransformer '{model_name}' into {out_dir}")
-          m = SentenceTransformer(model_name)
-          try:
-              m.save(out_dir)
-              print(f"Saved model to {out_dir}")
-          except Exception:
-              print("Failed to save model to local cache, but model will still be available in HF cache")
+          print(f"Downloading HF snapshot '{repo_id}' into {out_dir}")
+          snapshot_download(repo_id=repo_id, cache_dir=out_dir, local_dir=out_dir, allow_patterns=["*"], resume_download=True)
+          print("Saved model snapshot to local cache")
           PY
       - name: Prepare env
         run: |
