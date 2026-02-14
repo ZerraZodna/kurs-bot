@@ -4,6 +4,7 @@ from pydantic import ConfigDict
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./src/data/prod.db"
+    # Telegram bot token left empty by default; test CI should provide via .env_template
     TELEGRAM_BOT_TOKEN: str = ""
     ADMIN_TELEGRAM_USERNAME: str = ""
     SLACK_BOT_TOKEN: str = ""

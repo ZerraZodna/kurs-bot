@@ -18,17 +18,20 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Install dependencies (CPU-only PyTorch for sentence-transformers)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          # Install CPU-only PyTorch wheel first to avoid CUDA packages on runners with limited disk
+          pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu "torch==2.2.2+cpu"
+          # Then install the rest of the project requirements
+          pip install --no-cache-dir -r requirements.txt
       - name: Prepare env
         run: |
-          if [ -f .env_template ]; then
-            cp .env_template .env
-            echo "Copied .env_template to .env"
+          if [ -f .env.template ]; then
+            cp .env.template .env
+            echo "Copied .env.template to .env"
           else
-            echo ".env_template not found, skipping copy"
+            echo ".env.template not found, skipping copy"
           fi
 
       - name: Run tests

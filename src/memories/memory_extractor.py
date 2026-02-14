@@ -223,7 +223,13 @@ User message: "{user_message}"{context_str}"""
 
         # Detect learning goal phrases (English/Norwegian)
         import re
-        goal_patterns = [r"my goal is to (.+)", r"i want to (.+)", r"jeg ønsker(?: å| å)?(?: )?(?:lære|gjøre|bli) (.+)", r"lære (.+)"]
+        goal_patterns = [
+            r"my goal is to (.+)",
+            r"my goal is (.+)",
+            r"i want to (.+)",
+            r"jeg ønsker(?: å| å)?(?: )?(?:lære|gjøre|bli) (.+)",
+            r"lære (.+)",
+        ]
         for pat in goal_patterns:
             m = re.search(pat, lower)
             if m:
