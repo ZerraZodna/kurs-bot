@@ -8,7 +8,12 @@ class Settings(BaseSettings):
     ADMIN_TELEGRAM_USERNAME: str = ""
     SLACK_BOT_TOKEN: str = ""
     SENDGRID_API_KEY: str = ""
-    OLLAMA_URL: str = "http://localhost:11434/api/generate"
+    # Ollama endpoints: allow separate URLs for local and cloud deployments.
+    # - `LOCAL_OLLAMA_URL` should point at a local Ollama HTTP API (include /api/generate)
+    # - `CLOUD_OLLAMA_URL` should point at Ollama Cloud (include /api/generate)
+    # Explicit endpoints for local and cloud Ollama deployments.
+    LOCAL_OLLAMA_URL: str = "http://localhost:11434/api/generate"
+    CLOUD_OLLAMA_URL: str = "https://ollama.com/api/generate"
     OLLAMA_MODEL: str = "qwen3:latest"
     OLLAMA_CHAT_RAG_MODEL: str = "llama3.2:3b"
     NON_ENGLISH_OLLAMA_MODEL: str = "gpt-oss:20b"

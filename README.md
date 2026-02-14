@@ -90,16 +90,10 @@ If you want to avoid installing CUDA/GPU wheels (useful on small servers or CI),
 ```bash
 # Install CPU-only PyTorch wheel first (if your app uses torch). Do NOT install torchvision/torchaudio unless you need image/audio features.
 python -m pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch
-
-# If you need local sentence-transformers/hnswlib for building a local index, install them after torch:
-python -m pip install --no-cache-dir sentence-transformers hnswlib
+pip install --no-cache-dir sentence-transformers hnswlib
 
 # Then install the project requirements (avoids pulling CUDA wheels as dependencies)
 python -m pip install --no-cache-dir -r requirements.txt
-```
-
-Notes:
-- If you do NOT need torch at all, skip the first step.
 ```
 
 4) Environment variables and ngrok auth:
@@ -148,13 +142,16 @@ ngrok config add-authtoken <your-ngrok-token>
 5) Database migrations (alembic):
 
 See scripts/setup_new_host.ps1
+.\scripts\setup_new_host.ps1 -Yes -InstallDeps
 
-```bash
-# Ensure .venv is active
-alembic upgrade head
+For GPU edit .env to use:
+EMBEDDING_BACKEND=ollama
+Then init prod.db:
+```pwsh
+.\scripts\setup_new_host.ps1 -Yes
 ```
 
-6) Start the app (development):
+6) Start the app (development): (Do step 7 first once)
 Windows:
 Start-Windows.ps1
 
@@ -164,19 +161,30 @@ source .venv/bin/activate
 ./Start-Linux.sh
 
 Or totally manual:
+```bash
 pwsh
 ./.venv/bin/Activate.ps1
-ngrok http 8000 > ngrok.log 2>&1 &
-uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
-
-
-```bash
-# from the project root with the virtualenv active
-uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
 # in another terminal, expose with ngrok
 ngrok http 8000
 # or as process: see "jobs" & sudo kill 
 ngrok http 8000 > ngrok.log 2>&1 &
+
+#Forground
+uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
+
+#In background developer mode:
+nohup .venv/bin/python -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000 >uvicorn.log 2>&1 & disown
+
+#To follow log:
+tail -n 200 -F uvcorn.log
+```
+
+For Production server:
+```bash
+.venv/bin/pip install uvloop httptools
+# or install uvicorn with recommended extras
+.venv/bin/pip install "uvicorn[standard]"
+nohup python -m uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --workers 2 --loop uvloop --http httptools >/dev/null 2>&1 &
 ```
 
 7) Example: set Telegram webhook using the ngrok URL returned from `ngrok http 8000`:

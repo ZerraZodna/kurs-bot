@@ -30,7 +30,7 @@ async def test_birthdate_memory_stored_with_real_ollama(db_session):
     """
 
     # Quick health check to see if Ollama is reachable. Skip test if it's not.
-    ollama_url = getattr(settings, "OLLAMA_URL", "http://localhost:11434/api/generate")
+    ollama_url = getattr(settings, "LOCAL_OLLAMA_URL", "http://localhost:11434/api/generate")
     try:
         # Try GET first (some Ollama deployments respond to GET for health)
         resp = httpx.get(ollama_url, timeout=5.0)

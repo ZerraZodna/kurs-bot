@@ -7,17 +7,23 @@ import datetime
 # Use Settings from config.py for database URL
 from src.config import settings
 
-DATABASE_URL = settings.DATABASE_URL
+# Ensure an empty string from env doesn't override the intended default
+DEFAULT_DB = "sqlite:///./src/data/prod.db"
+DATABASE_URL = settings.DATABASE_URL or DEFAULT_DB
+if not isinstance(DATABASE_URL, str) or DATABASE_URL.strip() == "":
+    DATABASE_URL = DEFAULT_DB
+
+is_sqlite = isinstance(DATABASE_URL, str) and DATABASE_URL.startswith("sqlite")
 
 engine = create_engine(
     DATABASE_URL,
     pool_size=10, max_overflow=20,
-    connect_args={"check_same_thread": False, "timeout": 30} if DATABASE_URL.startswith("sqlite") else {},
+    connect_args={"check_same_thread": False, "timeout": 30} if is_sqlite else {},
     future=True,
 )
 
 # SQLite connection pragmas
-if DATABASE_URL.startswith("sqlite"):
+if is_sqlite:
     @event.listens_for(engine, "connect")
     def _set_sqlite_pragma(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()

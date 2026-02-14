@@ -14,6 +14,7 @@
 param(
     [switch]$Yes,
     [string]$Lessons
+    ,[switch]$InstallDeps
 )
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
@@ -34,6 +35,18 @@ Write-Host "`n==> Initializing production database and seeding defaults"
 
 $python = (Get-Command python -ErrorAction SilentlyContinue).Source
 if (-not $python) { Write-Host "python not found in PATH"; exit 3 }
+
+if ($InstallDeps) {
+    Write-Host "==> Installing dependencies: CPU-only PyTorch, sentence-transformers, hnswlib, and requirements"
+    & $python -m pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch
+    if ($LASTEXITCODE -ne 0) { Write-Host "Failed to install torch"; exit $LASTEXITCODE }
+
+    & $python -m pip install --no-cache-dir sentence-transformers hnswlib
+    if ($LASTEXITCODE -ne 0) { Write-Host "Failed to install sentence-transformers/hnswlib"; exit $LASTEXITCODE }
+
+    & $python -m pip install --no-cache-dir -r (Join-Path $RepoRoot 'requirements.txt')
+    if ($LASTEXITCODE -ne 0) { Write-Host "Failed to install requirements.txt"; exit $LASTEXITCODE }
+}
 
 $initArgs = @("--yes", "--db", "src/data/prod.db")
 if ($Lessons) { $initArgs += "--lessons"; $initArgs += $Lessons }

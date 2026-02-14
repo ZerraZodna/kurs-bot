@@ -19,14 +19,6 @@ User Message → Ollama LLM → JSON Decision → MemoryManager → Database
 5. **MemoryManager** stores the extracted memory with conflict resolution
 6. **Dialogue** continues and bot responds
 
-## Configuration
-
-In `.env`:
-```
-OLLAMA_URL=http://localhost:11434/api/generate
-OLLAMA_MODEL=llama3.1:8b
-```
-
 **Recommended Models for Memory Extraction:**
 - `qwen2.5-coder:7b` ⭐ (best balance, 4.7 GB)
 - `qwen2.5-coder:14b` (more powerful, 9.0 GB)

@@ -26,7 +26,13 @@ except Exception:
 logger = logging.getLogger(__name__)
 
 # Configurable defaults
-OLLAMA_URL = getattr(settings, "OLLAMA_URL", "http://localhost:11434/api/generate")
+# Prefer explicit LOCAL_OLLAMA_URL / CLOUD_OLLAMA_URL
+LOCAL_OLLAMA_DEFAULT = "http://localhost:11434/api/generate"
+CLOUD_OLLAMA_DEFAULT = "https://ollama.com/api/generate"
+
+LOCAL_OLLAMA_URL = getattr(settings, "LOCAL_OLLAMA_URL", LOCAL_OLLAMA_DEFAULT)
+CLOUD_OLLAMA_URL = getattr(settings, "CLOUD_OLLAMA_URL", CLOUD_OLLAMA_DEFAULT)
+
 OLLAMA_TIMEOUT = getattr(settings, "OLLAMA_TIMEOUT", 30.0)
 OLLAMA_RETRIES = getattr(settings, "OLLAMA_RETRIES", 2)
 OLLAMA_MODEL = getattr(settings, "OLLAMA_MODEL")
@@ -114,7 +120,7 @@ def _extract_chat_text(resp: Any) -> Optional[str]:
 
 
 async def _call_local_http(model: str, prompt: str) -> str:
-    url = getattr(settings, "LOCAL_OLLAMA_URL", OLLAMA_URL)
+    url = LOCAL_OLLAMA_URL
     payload = {"model": _normalize_local_model_name(model), "prompt": prompt, "stream": False}
     timeout = OLLAMA_LONG_TIMEOUT if "gpt-oss" in model.lower() else OLLAMA_TIMEOUT
     async with httpx.AsyncClient() as client:
@@ -150,7 +156,8 @@ async def call_ollama(prompt: str, model: str | None = None, language: str | Non
     if language and language.lower() != "en":
         chosen_model = getattr(settings, "NON_ENGLISH_OLLAMA_MODEL", chosen_model)
 
-    raw_url = getattr(settings, "OLLAMA_URL", None)
+    # Determine cloud vs local endpoint. Prefer explicit cloud setting.
+    raw_url = CLOUD_OLLAMA_URL
     is_cloud = _is_cloud_url(raw_url)
 
     # If targeting local but model name is cloud-specific, normalize it
@@ -163,7 +170,7 @@ async def call_ollama(prompt: str, model: str | None = None, language: str | Non
     try:
         if is_cloud and OllamaClient is not None:
             api_key = getattr(settings, "OLLAMA_API_KEY", None)
-            parsed = urlparse(raw_url or "https://ollama.com")
+            parsed = urlparse(raw_url or CLOUD_OLLAMA_DEFAULT)
             host_base = f"{parsed.scheme}://{parsed.hostname}"
 
             loop = asyncio.get_running_loop()
