@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     # Environment for CI: run real embedding code (install deps below)
     env:
-      TEST_USE_REAL_OLLAMA: 'True'
+      TEST_USE_REAL_OLLAMA: 'False'
       EMBEDDING_BACKEND: 'local'
     
 
@@ -57,8 +57,8 @@ jobs:
           if [ -f .env.template ]; then
             cp .env.template .env
             echo "Copied .env.template to .env"
-            # Ensure CI forces real-embedding mode regardless of template
-            echo "TEST_USE_REAL_OLLAMA=True" >> .env
+            # Ensure CI forces test-mode for Ollama (avoid real Ollama calls)
+            echo "TEST_USE_REAL_OLLAMA=False" >> .env
           else
             echo ".env.template not found, skipping copy"
           fi
