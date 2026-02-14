@@ -1,9 +1,14 @@
 import os
 from ollama import Client
 
+api_key = os.environ.get('OLLAMA_API_KEY')
+headers = {}
+if api_key:
+  headers['Authorization'] = 'Bearer ' + api_key
+
 client = Client(
-    host="https://ollama.com",
-    headers={'Authorization': 'Bearer ' + os.environ.get('OLLAMA_API_KEY')}
+  host="https://ollama.com",
+  headers=headers
 )
 
 messages = [
