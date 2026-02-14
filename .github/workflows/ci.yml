@@ -32,14 +32,6 @@ jobs:
           # Install project requirements
           pip install --no-cache-dir -r requirements.txt
       - name: Pre-download SentenceTransformer model
-        uses: actions/cache@v4
-        with:
-          path: src/data/models
-          key: model-cache-all-MiniLM-L6-v2-${{ runner.os }}
-          restore-keys: |
-            model-cache-all-MiniLM-L6-v2-
-
-      - name: Pre-download SentenceTransformer model
         run: |
           python - <<'PY'
           import os
