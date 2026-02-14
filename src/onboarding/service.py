@@ -20,8 +20,9 @@ from src.onboarding.prompts import (
     get_continuation_welcome_message,
     get_lesson_1_welcome_message,
     get_onboarding_complete_message_text,
-    get_onboarding_prompts,
+    get_onboarding_message,
 )
+from src.models.database import User
 from src.onboarding.status import get_onboarding_status_dict
 from src.onboarding.schedule_setup import create_auto_schedule
 from src.services.timezone_utils import ensure_user_timezone
@@ -102,8 +103,6 @@ class OnboardingService:
             name_memories = self.memory_manager.get_memory(user_id, "name")
         name = name_memories[0]["value"] if name_memories else "friend"
 
-        lang_prompts = get_onboarding_prompts(language, name)
-
         if next_step == "name":
             self.memory_manager.store_memory(
                 user_id=user_id,
@@ -114,7 +113,41 @@ class OnboardingService:
                 source="onboarding_service",
                 allow_duplicates=False,
             )
-            return lang_prompts["name"]
+            # If we have a first/last name in the DB (from Telegram), prefer
+            # asking permission to use that first name rather than asking for
+            # the full name again. Re-use the `name_prompt` template and
+            # format it with `first` and `full` placeholders. If no name is
+            # available at all, fall back to a simple, generic "What's your
+            # name?" question (don't return an unformatted template).
+            first_name_memories = self.memory_manager.get_memory(user_id, "first_name")
+            last_name_memories = self.memory_manager.get_memory(user_id, "last_name")
+
+            # Helper to format the template with available parts
+            def _format_with(first: str, last: str | None = None) -> str:
+                full = f"{first} {last}".strip() if last else first
+                return get_onboarding_message("name_prompt", language).format(first=first, full=full)
+
+            # Prefer memory-stored names
+            if first_name_memories:
+                first = first_name_memories[0].get("value")
+                # use last_name memory if present
+                last = last_name_memories[0].get("value") if last_name_memories else None
+                return _format_with(first, last)
+
+            # Try to fetch from the users table as a fallback
+            try:
+                db_user = self.db.query(User).filter(User.user_id == user_id).first()
+                if db_user and db_user.first_name:
+                    return _format_with(db_user.first_name, db_user.last_name)
+            except Exception:
+                # If DB lookup fails, fall back to the generic prompt
+                pass
+
+            # No name available — return a generic localized prompt asking
+            # for the user's name (do not attempt to format the template).
+            if language == "no":
+                return "Velkommen! Hva heter du? 👋"
+            return "Welcome! What's your name? 👋"
         elif next_step == "consent":
             self.memory_manager.store_memory(
                 user_id=user_id,
@@ -125,7 +158,7 @@ class OnboardingService:
                 source="onboarding_service",
                 allow_duplicates=False,
             )
-            return lang_prompts["consent"]
+            return get_onboarding_message("consent_prompt", language)
         elif next_step == "commitment":
             self.memory_manager.store_memory(
                 user_id=user_id,
@@ -136,7 +169,8 @@ class OnboardingService:
                 source="onboarding_service",
                 allow_duplicates=False,
             )
-            return lang_prompts["commitment"]
+            # commitment prompt includes the user's name
+            return get_onboarding_message("commitment_prompt", language).format(name=name)
         elif next_step == "lesson_status":
             self.memory_manager.store_memory(
                 user_id=user_id,
@@ -147,7 +181,7 @@ class OnboardingService:
                 source="onboarding_service",
                 allow_duplicates=False,
             )
-            return lang_prompts["lesson_status"]
+            return get_onboarding_message("ask_new_or_continuing", language).format(name=name)
 
         return None
     

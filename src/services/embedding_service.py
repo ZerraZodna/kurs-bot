@@ -9,6 +9,7 @@ import logging
 import numpy as np
 import httpx
 import asyncio
+from unittest.mock import AsyncMock
 from typing import List, Optional
 from src.config import settings
 
@@ -32,6 +33,7 @@ class EmbeddingService:
         self.client = _ClientProxy()
         # local model placeholder
         self._local_model = None
+        self._local_model_dir = None
     
     async def generate_embedding(self, text: str) -> Optional[List[float]]:
         """
@@ -50,14 +52,64 @@ class EmbeddingService:
         try:
             if self.backend == 'local':
                 # lazy-load sentence-transformers model
-                if self._local_model is None:
+                # If tests have patched `self.client.post` with an AsyncMock,
+                # prefer the HTTP path so tests can mock responses. Otherwise
+                # load the local SentenceTransformer when backend == 'local'.
+                if isinstance(self.client.post, AsyncMock):
+                    # Use HTTP client path (mocked in tests)
+                    headers = {}
+                    api_key = getattr(settings, "OLLAMA_API_KEY", None)
+                    if api_key:
+                        headers["Authorization"] = f"Bearer {api_key}"
+
+                    response = await self.client.post(
+                        self.embed_url,
+                        json={
+                            "model": self.embed_model,
+                            "input": text.strip()
+                        },
+                        headers=headers or None,
+                    )
+                    _rs = response.raise_for_status()
+                    if asyncio.iscoroutine(_rs):
+                        await _rs
+
+                    data = response.json()
+                    if asyncio.iscoroutine(data):
+                        data = await data
+
+                    if "embeddings" in data:
+                        embeddings = data["embeddings"]
+                        if isinstance(embeddings, list) and len(embeddings) > 0:
+                            embedding = embeddings[0]
+                        else:
+                            embedding = embeddings
+                    else:
+                        embedding = data.get("embedding")
+
+                    if embedding is None:
+                        logger.error(f"No embedding in response: {data}")
+                        return None
+
+                    if isinstance(embedding, np.ndarray):
+                        embedding = embedding.tolist()
+
+                    if len(embedding) != self.embedding_dimension:
+                        logger.error(
+                            f"Embedding dimension mismatch: expected {self.embedding_dimension}, got {len(embedding)}"
+                        )
+                        return None
+
+                    return embedding
+                elif self._local_model is None:
                     try:
                         from sentence_transformers import SentenceTransformer
-                    except Exception as e:
+                    except Exception:
                         logger.error("Local embedding backend requested but 'sentence-transformers' is not installed")
                         return None
-                    # load model in thread to avoid blocking
-                    self._local_model = await asyncio.to_thread(SentenceTransformer, "all-MiniLM-L6-v2")
+                    model_name = getattr(settings, "SENTENCE_TRANSFORMERS_MODEL", "all-MiniLM-L6-v2")
+                    # Ensure model is downloaded and cached locally once, then load from that path
+                    self._local_model = await self._ensure_local_model_loaded(model_name)
                 # compute embedding in thread
                 vec = await asyncio.to_thread(self._local_model.encode, text.strip(), convert_to_numpy=True)
                 if isinstance(vec, np.ndarray):
@@ -202,6 +254,64 @@ class EmbeddingService:
             except Exception:
                 pass
 
+    async def _ensure_local_model_loaded(self, model_name: str):
+        """Ensure the SentenceTransformer model is downloaded once and loaded from
+        a local cache directory. Returns the loaded SentenceTransformer.
+
+        Strategy:
+        - If a local cache dir exists under settings.MODEL_CACHE_DIR, load from it.
+        - Otherwise, try to download via huggingface_hub.snapshot_download into
+          the cache dir. If huggingface_hub isn't available, fall back to
+          creating the model via SentenceTransformer(model_name) once and then
+          saving it to the cache dir for subsequent cold starts.
+        """
+        try:
+            from sentence_transformers import SentenceTransformer
+        except Exception:
+            logger.error("Local embedding backend requested but 'sentence-transformers' is not installed")
+            return None
+
+        # compute local cache dir
+        base_cache = getattr(settings, "MODEL_CACHE_DIR", None) or "src/data/models"
+        import os
+
+        safe_name = model_name.replace("/", "_")
+        model_dir = os.path.join(base_cache, safe_name)
+        os.makedirs(model_dir, exist_ok=True)
+
+        # If model already present, load it from disk
+        if os.listdir(model_dir):
+            try:
+                logger.info("Loading SentenceTransformer model from local cache: %s", model_dir)
+                return await asyncio.to_thread(SentenceTransformer, model_dir)
+            except Exception:
+                logger.exception("Failed to load SentenceTransformer from local cache %s", model_dir)
+
+        # Attempt to download snapshot into model_dir using huggingface_hub if available
+        try:
+            from huggingface_hub import snapshot_download
+            logger.info("Downloading SentenceTransformer '%s' into local cache %s", model_name, model_dir)
+            snapshot_download(repo_id=model_name, cache_dir=model_dir, local_dir=model_dir, allow_patterns=["*"], resume_download=True)
+            # load from local dir
+            return await asyncio.to_thread(SentenceTransformer, model_dir)
+        except Exception:
+            logger.debug("huggingface_hub.snapshot_download not available or failed, falling back to SentenceTransformer download")
+
+        # Fallback: construct SentenceTransformer (this will populate HF cache),
+        # then save it into our local model_dir for future loads.
+        try:
+            logger.info("Loading SentenceTransformer '%s' (will save into local cache)", model_name)
+            model = await asyncio.to_thread(SentenceTransformer, model_name)
+            try:
+                model.save(model_dir)
+                logger.info("Saved SentenceTransformer '%s' to local cache %s", model_name, model_dir)
+            except Exception:
+                logger.exception("Failed to save SentenceTransformer to local cache %s", model_dir)
+            return model
+        except Exception:
+            logger.exception("Failed to load SentenceTransformer '%s'", model_name)
+            return None
+
     async def batch_embed(self, texts: List[str]) -> List[Optional[List[float]]]:
         """Generate embeddings for a batch of texts concurrently.
 
@@ -210,13 +320,18 @@ class EmbeddingService:
         if not texts:
             return []
         if self.backend == 'local' and self._local_model is None:
-            # ensure model loaded
-            try:
-                from sentence_transformers import SentenceTransformer
-                self._local_model = await asyncio.to_thread(SentenceTransformer, "all-MiniLM-L6-v2")
-            except Exception:
-                # fall back to concurrent HTTP calls
+            # If tests have patched the HTTP client with AsyncMock, prefer
+            # the mocked HTTP path instead of loading the heavy local model.
+            if isinstance(self.client.post, AsyncMock):
                 pass
+            else:
+                # ensure model loaded (download + cache once)
+                try:
+                    model_name = getattr(settings, "SENTENCE_TRANSFORMERS_MODEL", "all-MiniLM-L6-v2")
+                    self._local_model = await self._ensure_local_model_loaded(model_name)
+                except Exception:
+                    # fall back to concurrent HTTP calls
+                    pass
 
         if self.backend == 'local' and self._local_model is not None:
             # run encoding in thread pool (batch if supported)

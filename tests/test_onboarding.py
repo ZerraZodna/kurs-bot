@@ -23,7 +23,7 @@ from src.services.dialogue_engine import DialogueEngine
 from src.onboarding.service import OnboardingService
 from src.scheduler import SchedulerService
 from datetime import datetime, timezone
-from src.onboarding.prompts import get_onboarding_prompts
+from src.onboarding.prompts import get_onboarding_message
 from src.memories import MemoryManager
 from uuid import uuid4
 
@@ -250,12 +250,21 @@ async def test_onboarding_greeting_hei_detects_norwegian():
     name_mem = mm.get_memory(user_id, "first_name")
     assert not name_mem or name_mem[0].get("value") in (None, ""), "Expected no first_name memory yet"
 
-    # The bot's response should be the Norwegian name prompt
-    prompts = get_onboarding_prompts("no", "")
-    expected = prompts.get("name")
-    assert expected and expected in response, (
-        f"Expected Norwegian onboarding prompt in response, got: {response}"
-    )
+    # The bot's response should be the Norwegian name prompt.
+    # Onboarding now prefers fetching the name from Telegram when available,
+    # so accept either the original templated prompt or the Telegram-autofill phrasing.
+    from src.onboarding.prompts import get_onboarding_message
+    expected = get_onboarding_message("name_prompt", "no")
+    if not (expected and expected in response):
+        # Accept phrasing that references the Telegram name being present
+        telegram_phrase_ok = (
+            "navnet ditt i Telegram" in response
+            or "Jeg ser at navnet ditt i Telegram" in response
+            or "kaller deg" in response
+        )
+        assert telegram_phrase_ok, (
+            f"Expected Norwegian onboarding prompt (templated or Telegram-autofill) in response, got: {response}"
+        )
 
     db.close()
 

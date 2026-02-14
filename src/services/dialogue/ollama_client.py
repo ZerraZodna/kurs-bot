@@ -156,12 +156,15 @@ async def call_ollama(prompt: str, model: str | None = None, language: str | Non
     if language and language.lower() != "en":
         chosen_model = getattr(settings, "NON_ENGLISH_OLLAMA_MODEL", chosen_model)
 
-    # Determine cloud vs local endpoint. Prefer explicit cloud setting.
+    # Determine cloud vs local endpoint. Use cloud ONLY when the model
+    # explicitly ends with '-cloud' and a cloud URL is configured.
     raw_url = CLOUD_OLLAMA_URL
-    is_cloud = _is_cloud_url(raw_url)
+    is_cloud_url_configured = _is_cloud_url(raw_url)
+    is_cloud = isinstance(chosen_model, str) and str(chosen_model).endswith("-cloud") and is_cloud_url_configured
 
-    # If targeting local but model name is cloud-specific, normalize it
-    if not is_cloud and isinstance(chosen_model, str) and "-cloud" in chosen_model:
+    # If the model had '-cloud' but we are not using cloud (no cloud URL),
+    # normalize it for local usage by removing the suffix.
+    if not is_cloud and isinstance(chosen_model, str) and str(chosen_model).endswith("-cloud"):
         logger.debug("Mapping cloud model to local: %s", chosen_model)
         chosen_model = _normalize_local_model_name(chosen_model)
 
@@ -182,23 +185,13 @@ async def call_ollama(prompt: str, model: str | None = None, language: str | Non
                 # If no text extracted, return stringified response
                 return str(out)
             except Exception as e:
-                # If cloud reports model missing, try model + '-cloud' once
                 err = str(e)
                 logger.warning("Cloud client error: %s", err)
                 # During real-Ollama test runs we want to surface failures.
                 if _TEST_USE_REAL_OLLAMA:
                     raise
-                if "not found" in err.lower() and not str(chosen_model).endswith("-cloud"):
-                    alt = f"{chosen_model}-cloud"
-                    try:
-                        out = await loop.run_in_executor(None, _cloud_call_sync, host_base, api_key, alt, prompt)
-                        text = _extract_chat_text(out)
-                        if text:
-                            return text
-                        return str(out)
-                    except Exception:
-                        logger.exception("Retry with -cloud model failed")
-                # Fall through to local fallback below
+                logger.info("Cloud call failed; falling back to local HTTP API")
+                # Do NOT attempt to guess or append '-cloud' here; fall back to local.
 
         # Local HTTP path (or fallback if cloud failed)
         return await _call_local_http(chosen_model, prompt)

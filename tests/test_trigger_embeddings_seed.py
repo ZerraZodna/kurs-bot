@@ -44,11 +44,12 @@ async def test_seed_triggers_and_match(monkeypatch):
     # Point embedding service to dummy for seeding and matching
     monkeypatch.setattr("src.services.embedding_service.get_embedding_service", lambda: DummyEmbedSvc())
 
-    # Import seed_triggers after monkeypatching to ensure it uses the dummy service
-    from scripts import seed_triggers
+    # Import the async seeder after monkeypatching so it uses the dummy service
+    # and await the coroutine directly (avoids running asyncio.run() inside tests).
+    from src.triggers.trigger_matcher import seed_triggers
 
     # Run seeding (will populate the test DB via conftest DATABASE_URL)
-    await seed_triggers.main()
+    await seed_triggers()
 
     # Ensure triggers exist in DB
     db = SessionLocal()
