@@ -23,6 +23,8 @@ jobs:
           python -m pip install --upgrade pip
           # Install CPU-only PyTorch wheel first to avoid CUDA packages on runners with limited disk
           pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu "torch==2.2.2+cpu"
+          # Install sentence-transformers and hnswlib (CPU) so local embedding backend works in CI
+          pip install --no-cache-dir sentence-transformers hnswlib
           # Then install the rest of the project requirements
           pip install --no-cache-dir -r requirements.txt
       - name: Prepare env
