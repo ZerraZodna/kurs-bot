@@ -46,127 +46,129 @@ async def lifespan(app: FastAPI):
     apply_logging_redaction()
     verify_secrets_config()
     # Health-check Ollama endpoints. Try local first, then cloud.
-    candidates = []
+    # Health-check Ollama endpoints.
+    # Preference: if configured models are cloud (contain '-cloud'), check cloud first.
+    # Also: if embeddings use Ollama (`EMBEDDING_BACKEND == 'ollama'`), always verify local availability.
+    def _is_cloud_model(m: str | None) -> bool:
+        try:
+            return isinstance(m, str) and m.endswith("-cloud")
+        except Exception:
+            return False
+
+    model_main = getattr(settings, "OLLAMA_MODEL", "")
+    model_non_english = getattr(settings, "NON_ENGLISH_OLLAMA_MODEL", "")
+    model_rag = getattr(settings, "OLLAMA_CHAT_RAG_MODEL", "")
+    model_is_cloud = any(_is_cloud_model(x) for x in (model_main, model_non_english, model_rag))
+
     local = getattr(settings, "LOCAL_OLLAMA_URL", None)
     cloud = getattr(settings, "CLOUD_OLLAMA_URL", None)
-    if local:
-        candidates.append(local)
-    if cloud:
-        candidates.append(cloud)
+
+    # Build candidate order: prefer cloud if models are cloud; otherwise prefer local.
+    candidates = []
+    if model_is_cloud:
+        if cloud:
+            candidates.append(cloud)
+        if local:
+            candidates.append(local)
+    else:
+        if local:
+            candidates.append(local)
+        if cloud:
+            candidates.append(cloud)
 
     checked = False
     for base in candidates:
+        if not base:
+            continue
         b = base
         if "/api" in b:
             b = b.rsplit("/api", 1)[0]
-        # Health-check Ollama endpoints.
-        # Preference: if configured models are cloud (contain '-cloud'), check cloud first.
-        # Also: if embeddings use Ollama (`EMBEDDING_BACKEND == 'ollama'`), always verify local availability.
-        def _is_cloud_model(m: str | None) -> bool:
+
+        try:
+            logging.info(f"Checking Ollama endpoint at {b}")
+            response = httpx.get(f"{b}/api/tags", timeout=2.0)
+        except Exception as e:
+            logging.warning(f"Ollama AI server not reachable at {b}: {e}")
+            continue
+
+        if response.status_code != 200:
+            logging.warning(f"Ollama AI server responded with status {response.status_code} at {b}")
+            continue
+
+        logging.info(f"Ollama AI server is running at {b}")
+
+        # Check that RAG model is present (when configured)
+        rag_model = getattr(settings, "OLLAMA_CHAT_RAG_MODEL", None)
+        if rag_model:
+            embedding_backend = getattr(settings, "EMBEDDING_BACKEND", "local")
             try:
-                return isinstance(m, str) and m.endswith("-cloud")
+                is_cloud_rag = isinstance(rag_model, str) and rag_model.endswith("-cloud")
             except Exception:
-                return False
+                is_cloud_rag = False
 
-        model_main = getattr(settings, "OLLAMA_MODEL", "")
-        model_non_english = getattr(settings, "NON_ENGLISH_OLLAMA_MODEL", "")
-        model_rag = getattr(settings, "OLLAMA_CHAT_RAG_MODEL", "")
-        model_is_cloud = any(_is_cloud_model(x) for x in (model_main, model_non_english, model_rag))
+            if str(embedding_backend).lower() == "local" and not is_cloud_rag:
+                logging.info(
+                    f"Skipping remote RAG model check for local embedding backend and local RAG model '{rag_model}'"
+                )
+            else:
+                has_model = False
+                try:
+                    models_resp = httpx.get(f"{b}/api/models", timeout=2.0)
+                    if models_resp.status_code == 200:
+                        try:
+                            data = models_resp.json()
+                            if isinstance(data, list):
+                                for item in data:
+                                    name = item.get("name") if isinstance(item, dict) else item
+                                    if name and str(name).lower() == str(rag_model).lower():
+                                        has_model = True
+                                        break
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
 
-        local = getattr(settings, "LOCAL_OLLAMA_URL", None)
-        cloud = getattr(settings, "CLOUD_OLLAMA_URL", None)
+                if not has_model:
+                    try:
+                        ping = httpx.post(
+                            f"{b}/api/generate",
+                            json={"model": rag_model, "prompt": "ping", "stream": False},
+                            timeout=3.0,
+                        )
+                        if ping.status_code == 200:
+                            has_model = True
+                    except Exception:
+                        pass
 
-        # Build candidate order: prefer cloud if models are cloud; otherwise prefer local.
-        candidates = []
-        if model_is_cloud:
-            if cloud:
-                candidates.append(cloud)
-            if local:
-                candidates.append(local)
-        else:
-            if local:
-                candidates.append(local)
-            if cloud:
-                candidates.append(cloud)
+                if has_model:
+                    logging.info(f"RAG model '{rag_model}' is available at {b}")
+                else:
+                    logging.warning(f"RAG model '{rag_model}' not found at {b}; RAG functionality may fail")
 
-        checked = False
-        for base in candidates:
-            if not base:
-                continue
-            b = base
+        checked = True
+        break
+
+    if not checked:
+        logging.error("Ollama AI server is NOT reachable at configured endpoints (checked preferred endpoints)")
+
+    # If embedding backend uses Ollama, explicitly confirm local Ollama is present
+    embedding_backend = getattr(settings, "EMBEDDING_BACKEND", "local")
+    if str(embedding_backend).lower() == "ollama":
+        if local:
+            b = local
             if "/api" in b:
                 b = b.rsplit("/api", 1)[0]
             try:
-                logging.info(f"Checking Ollama endpoint at {b}")
-                response = httpx.get(f"{b}/api/tags", timeout=2.0)
-                if response.status_code == 200:
-                    logging.info(f"Ollama AI server is running at {b}")
-                    # Check that RAG model is present (when configured)
-                    rag_model = getattr(settings, "OLLAMA_CHAT_RAG_MODEL", None)
-                    if rag_model:
-                        try:
-                            # Prefer the models listing endpoint when available
-                            models_resp = httpx.get(f"{b}/api/models", timeout=2.0)
-                            has_model = False
-                            if models_resp.status_code == 200:
-                                try:
-                                    data = models_resp.json()
-                                    # data might be a list of model dicts or names
-                                    if isinstance(data, list):
-                                        for item in data:
-                                            name = item.get("name") if isinstance(item, dict) else item
-                                            if name and str(name).lower() == str(rag_model).lower():
-                                                has_model = True
-                                                break
-                                except Exception:
-                                    pass
-                            if not has_model:
-                                # Fallback: attempt a lightweight POST to /api/generate to see if model is accepted
-                                try:
-                                    ping = httpx.post(f"{b}/api/generate", json={"model": rag_model, "prompt": "ping", "stream": False}, timeout=3.0)
-                                    if ping.status_code == 200:
-                                        has_model = True
-                                except Exception:
-                                    pass
-
-                            if has_model:
-                                logging.info(f"RAG model '{rag_model}' is available at {b}")
-                            else:
-                                logging.warning(f"RAG model '{rag_model}' not found at {b}; RAG functionality may fail")
-                        except Exception as e:
-                            logging.warning(f"Could not verify RAG model at {b}: {e}")
-
-                    checked = True
-                    break
+                logging.info(f"Checking local Ollama for embeddings at {b}")
+                resp = httpx.get(f"{b}/api/tags", timeout=2.0)
+                if resp.status_code == 200:
+                    logging.info(f"Local Ollama available for embeddings at {b}")
                 else:
-                    logging.warning(f"Ollama AI server responded with status {response.status_code} at {b}")
+                    logging.error(f"Local Ollama responded {resp.status_code} at {b}; embeddings may fail")
             except Exception as e:
-                logging.warning(f"Ollama AI server not reachable at {b}: {e}")
-
-        if not checked:
-            logging.error("Ollama AI server is NOT reachable at configured endpoints (checked preferred endpoints)")
-
-        # If embedding backend uses Ollama, explicitly confirm local Ollama is present
-        embedding_backend = getattr(settings, "EMBEDDING_BACKEND", "local")
-        if str(embedding_backend).lower() == "ollama":
-            if local:
-                b = local
-                if "/api" in b:
-                    b = b.rsplit("/api", 1)[0]
-                try:
-                    logging.info(f"Checking local Ollama for embeddings at {b}")
-                    resp = httpx.get(f"{b}/api/tags", timeout=2.0)
-                    if resp.status_code == 200:
-                        logging.info(f"Local Ollama available for embeddings at {b}")
-                    else:
-                        logging.error(f"Local Ollama responded {resp.status_code} at {b}; embeddings may fail")
-                except Exception as e:
-                    logging.error(f"Local Ollama for embeddings not reachable at {b}: {e}")
-            else:
-                logging.error("Embedding backend is set to 'ollama' but LOCAL_OLLAMA_URL is not configured")
-
-    if not checked:
-        logging.error("Ollama AI server is NOT reachable at configured endpoints")
+                logging.error(f"Local Ollama for embeddings not reachable at {b}: {e}")
+        else:
+            logging.error("Embedding backend is set to 'ollama' but LOCAL_OLLAMA_URL is not configured")
 
     yield
 
