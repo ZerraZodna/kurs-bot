@@ -90,7 +90,11 @@ If you want to avoid installing CUDA/GPU wheels (useful on small servers or CI),
 ```bash
 # Install CPU-only PyTorch wheel first (if your app uses torch). Do NOT install torchvision/torchaudio unless you need image/audio features.
 python -m pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch
-pip install --no-cache-dir sentence-transformers hnswlib
+python -m pip install --no-cache-dir sentence-transformers hnswlib
+
+## AI suggest this torch version (not tested)
+python -m pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.4.1+cpu
+python -m pip install --no-cache-dir sentence-transformers hnswlib
 
 # Then install the project requirements (avoids pulling CUDA wheels as dependencies)
 python -m pip install --no-cache-dir -r requirements.txt
