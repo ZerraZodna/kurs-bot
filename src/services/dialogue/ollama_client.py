@@ -38,6 +38,7 @@ OLLAMA_RETRIES = getattr(settings, "OLLAMA_RETRIES", 2)
 OLLAMA_MODEL = getattr(settings, "OLLAMA_MODEL")
 OLLAMA_LONG_TIMEOUT = getattr(settings, "OLLAMA_LONG_TIMEOUT", 180.0)
 OLLAMA_LONG_RETRIES = getattr(settings, "OLLAMA_LONG_RETRIES", 0)
+OLLAMA_TEMPERATURE = getattr(settings, "OLLAMA_TEMPERATURE", 0.2)
 
 
 def _is_cloud_url(url: Optional[str]) -> bool:
@@ -119,9 +120,10 @@ def _extract_chat_text(resp: Any) -> Optional[str]:
     return None
 
 
-async def _call_local_http(model: str, prompt: str) -> str:
+async def _call_local_http(model: str, prompt: str, temperature: float | None = None) -> str:
     url = LOCAL_OLLAMA_URL
-    payload = {"model": _normalize_local_model_name(model), "prompt": prompt, "stream": False}
+    temp = OLLAMA_TEMPERATURE if temperature is None else temperature
+    payload = {"model": _normalize_local_model_name(model), "prompt": prompt, "stream": False, "temperature": float(temp)}
     timeout = OLLAMA_LONG_TIMEOUT if "gpt-oss" in model.lower() else OLLAMA_TIMEOUT
     async with httpx.AsyncClient() as client:
         r = await client.post(url, json=payload, timeout=timeout)
@@ -135,15 +137,19 @@ async def _call_local_http(model: str, prompt: str) -> str:
         return str(data)
 
 
-def _cloud_call_sync(host_base: str, api_key: Optional[str], model: str, prompt: str) -> Any:
+def _cloud_call_sync(host_base: str, api_key: Optional[str], model: str, prompt: str, temperature: float = 0.2) -> Any:
     """Sync wrapper executed in a thread: use official `OllamaClient` to call cloud."""
-    client = OllamaClient(host=host_base, headers={"Authorization": f"Bearer {api_key}"} if api_key else None)
+    client = OllamaClient(host=host_base, headers={"Authorization": f"Bearer {api_key}" } if api_key else None)
     messages = [{"role": "user", "content": prompt}]
-    # Use non-streaming chat for simplicity
-    return client.chat(str(model), messages=messages, stream=False)
+    # Use non-streaming chat for simplicity, forward temperature
+    try:
+        return client.chat(str(model), messages=messages, stream=False, temperature=float(temperature))
+    except TypeError:
+        # Older clients may not accept temperature kwarg; fallback
+        return client.chat(str(model), messages=messages, stream=False)
 
 
-async def call_ollama(prompt: str, model: str | None = None, language: str | None = None) -> str:
+async def call_ollama(prompt: str, model: str | None = None, language: str | None = None, temperature: float | None = None) -> str:
     """Top-level async method to call Ollama (cloud or local) and return text.
 
     Behavior summary:
@@ -178,7 +184,8 @@ async def call_ollama(prompt: str, model: str | None = None, language: str | Non
 
             loop = asyncio.get_running_loop()
             try:
-                out = await loop.run_in_executor(None, _cloud_call_sync, host_base, api_key, chosen_model, prompt)
+                temp = OLLAMA_TEMPERATURE if temperature is None else temperature
+                out = await loop.run_in_executor(None, _cloud_call_sync, host_base, api_key, chosen_model, prompt, float(temp))
                 text = _extract_chat_text(out)
                 if text:
                     return text
@@ -194,7 +201,8 @@ async def call_ollama(prompt: str, model: str | None = None, language: str | Non
                 # Do NOT attempt to guess or append '-cloud' here; fall back to local.
 
         # Local HTTP path (or fallback if cloud failed)
-        return await _call_local_http(chosen_model, prompt)
+        temp = OLLAMA_TEMPERATURE if temperature is None else temperature
+        return await _call_local_http(chosen_model, prompt, temperature=float(temp))
 
     except httpx.HTTPStatusError as he:
         logger.exception("Ollama returned HTTP error: %s", he)
