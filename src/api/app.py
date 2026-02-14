@@ -121,6 +121,8 @@ async def lifespan(app: FastAPI):
         rag_is_cloud = isinstance(rag_model, str) and rag_model.endswith("-cloud")
     except Exception:
         rag_is_cloud = False
+    # Track whether we've successfully checked any preferred endpoints
+    checked = False
 
     if rag_model and not rag_is_cloud and local:
         # RAG model is local; verify local server first to avoid checking cloud.
