@@ -23,8 +23,7 @@ jobs:
           python -m pip install --upgrade pip
           # Install CPU-only PyTorch wheel first to avoid CUDA packages on runners with limited disk
           pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu "torch==2.2.2+cpu"
-          # Install sentence-transformers and hnswlib (CPU) so local embedding backend works in CI
-          pip install --no-cache-dir sentence-transformers hnswlib
+          # Do not install heavy local embedding deps in CI; use test-mode embeddings
           # Then install the rest of the project requirements
           pip install --no-cache-dir -r requirements.txt
       - name: Prepare env
@@ -32,6 +31,8 @@ jobs:
           if [ -f .env.template ]; then
             cp .env.template .env
             echo "Copied .env.template to .env"
+            # Ensure CI forces test-mode embedding regardless of template
+            echo "TEST_USE_REAL_OLLAMA=False" >> .env
           else
             echo ".env.template not found, skipping copy"
           fi

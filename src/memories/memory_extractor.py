@@ -199,6 +199,19 @@ User message: "{user_message}"{context_str}"""
 
         # Heuristic: common name introduction patterns (e.g., "my name is Alex", "I'm Alex", "jeg heter Alex")
         import re
+        # If the message refers to lessons or contains digits, treat as lesson-related
+        if "lesson" in lower or re.search(r"\d+", message):
+            # Try to extract explicit lesson number patterns first
+            lesson_patterns = [r"i am on lesson (\d+)", r"i'm on lesson (\d+)", r"i am on (\d+)", r"i'm on (\d+)", r"on lesson (\d+)"]
+            for pat in lesson_patterns:
+                m = re.search(pat, lower)
+                if m:
+                    val = m.group(1).strip()
+                    out.append({"store": True, "key": "current_lesson", "value": val, "confidence": 0.9, "ttl_hours": None})
+                    return out
+            # If no explicit lesson number found, avoid extracting names from this message
+            logger.debug("Heuristic skipping name extraction due to lesson/digit context")
+            return out
         name_patterns = [r"my name is ([A-Z][a-zA-Z\-']+)", r"i'm ([A-Z][a-zA-Z\-']+)", r"i am ([A-Z][a-zA-Z\-']+)", r"jeg heter ([A-ZØÆÅøæå][a-zA-Z\-']+)"]
         for pat in name_patterns:
             m = re.search(pat, message, re.IGNORECASE)

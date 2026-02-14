@@ -47,6 +47,27 @@ async def lifespan(app: FastAPI):
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     apply_logging_redaction()
     verify_secrets_config()
+    # Ensure embedding backend requirements in production: fail-fast if
+    # EMBEDDING_BACKEND=local is expected to use real embeddings but the
+    # sentence-transformers package is not installed. CI/test runs should set
+    # TEST_USE_REAL_OLLAMA=False so this check is skipped there.
+    try:
+        embedding_backend = getattr(settings, "EMBEDDING_BACKEND", "local")
+        test_real = getattr(settings, "TEST_USE_REAL_OLLAMA", True)
+        if str(embedding_backend).lower() == "local" and bool(test_real):
+            try:
+                import sentence_transformers  # type: ignore
+            except Exception:
+                logging.error(
+                    "EMBEDDING_BACKEND=local requires 'sentence-transformers' installed in production."
+                )
+                logging.error(
+                    "Install sentence-transformers or set EMBEDDING_BACKEND=ollama/CLOUD and configure OLLAMA_EMBED_URL."
+                )
+                raise RuntimeError("Missing 'sentence-transformers' for local embeddings in production")
+    except Exception:
+        # Re-raise to stop startup; caller/lifespan will log the exception.
+        raise
     # Helper functions for Ollama health checks and model discovery
     def _strip_api(path: str) -> str:
         try:

@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     EMBEDDING_DIMENSION: int = 384
     SEMANTIC_SEARCH_THRESHOLD: float = 0.5
     SEMANTIC_SEARCH_MAX_RESULTS: int = 5
+    # When True (default), production expects real embedding infra (Ollama or sentence-transformers).
+    # Set to False in CI/.env.template to enable lightweight test-mode embeddings.
+    TEST_USE_REAL_OLLAMA: bool = True
     # Trigger matcher defaults
     TRIGGER_SIMILARITY_THRESHOLD: float = 0.75
     TRIGGER_MATCHER_REFRESH_SECS: int = 300
