@@ -33,3 +33,8 @@ Notes:
 - To target a non-default DB, set `DATABASE_URL` in `.env` or the environment and use `migrate_db.py` (or `init_prod_db.py` where appropriate).
 - `init_prod_db.py` can import ACIM lessons with `--lessons /path/to.pdf`.
 - See `docs/` for full operational details.
+
+# New prompts
+$env:PYTHONPATH='.'; python .\scripts\utils\seed_prompt_templates.py
+# Reset triggers after changing from Local to Ollama for Embeddings
+$env:PYTHONPATH='.'; python .\scripts\utils\reset_trigger_embeddings.py
