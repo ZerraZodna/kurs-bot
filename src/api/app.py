@@ -25,6 +25,7 @@ import asyncio
 import logging
 import httpx
 from sqlalchemy.exc import OperationalError
+from src.services.ollama_online_test import run_ollama_checks
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -93,112 +94,18 @@ async def lifespan(app: FastAPI):
         except Exception:
             logging.exception("/api/generate ping failed at %s", base)
             return False
-    # Health-check Ollama endpoints. Try local first, then cloud.
-    # Health-check Ollama endpoints.
-    # Preference: if configured models are cloud (contain '-cloud'), check cloud first.
-    # Also: if embeddings use Ollama (`EMBEDDING_BACKEND == 'ollama'`), always verify local availability.
-    def _is_cloud_model(m: str | None) -> bool:
-        try:
-            return isinstance(m, str) and m.endswith("-cloud")
-        except Exception:
-            return False
-
-    model_main = getattr(settings, "OLLAMA_MODEL", "")
-    model_non_english = getattr(settings, "NON_ENGLISH_OLLAMA_MODEL", "")
-    model_rag = getattr(settings, "OLLAMA_CHAT_RAG_MODEL", "")
-    model_is_cloud = any(_is_cloud_model(x) for x in (model_main, model_non_english, model_rag))
-
-    local = getattr(settings, "LOCAL_OLLAMA_URL", None)
-    cloud = getattr(settings, "CLOUD_OLLAMA_URL", None)
-
-    # Build candidate order. Rules:
-    # - If RAG model explicitly ends with '-cloud', prefer cloud endpoints.
-    # - If RAG model is local (no '-cloud') and a local URL is configured, prefer local.
-    # - Otherwise, prefer cloud only if a cloud URL is explicitly needed by models.
-    candidates = []
-    rag_model = getattr(settings, "OLLAMA_CHAT_RAG_MODEL", None)
+    # Consolidated Ollama availability and model checks (refactored).
     try:
-        rag_is_cloud = isinstance(rag_model, str) and rag_model.endswith("-cloud")
+        any_ok, diagnostics = run_ollama_checks(settings)
+        if not any_ok:
+            logging.error("Ollama AI server is NOT reachable at configured endpoints (checked preferred endpoints)")
+            for e in diagnostics:
+                logging.error("Diag: %s", str(e))
+        else:
+            logging.info("Ollama checks passed")
+            logging.debug("Ollama diagnostics: %s", diagnostics)
     except Exception:
-        rag_is_cloud = False
-    # Track whether we've successfully checked any preferred endpoints
-    checked = False
-
-    if rag_model and not rag_is_cloud and local:
-        # RAG model is local; verify local server first to avoid checking cloud.
-        candidates.append(local)
-        # Optionally allow cloud as a secondary only if models are cloud-marked.
-        if model_is_cloud and cloud:
-            checked = False
-            for base in candidates:
-                if not base:
-                    continue
-                b = _strip_api(base)
-
-                logging.info(f"Checking Ollama endpoint at {b}")
-                tags_resp = _probe_tags(b)
-                if not tags_resp:
-                    continue
-                if tags_resp.status_code != 200:
-                    logging.warning(f"Ollama AI server responded with status {tags_resp.status_code} at {b}")
-                    continue
-
-                logging.info(f"Ollama AI server is running at {b}")
-
-                # Check that RAG model is present (when configured)
-                rag_model = getattr(settings, "OLLAMA_CHAT_RAG_MODEL", None)
-                if rag_model:
-                    embedding_backend = getattr(settings, "EMBEDDING_BACKEND", "local")
-                    try:
-                        is_cloud_rag = isinstance(rag_model, str) and rag_model.endswith("-cloud")
-                    except Exception:
-                        is_cloud_rag = False
-
-                    host_is_cloud = _is_cloud_host_url(b)
-
-                    # If the model is local and this host is cloud, skip checking here.
-                    if host_is_cloud and not is_cloud_rag:
-                        logging.info(
-                            "Skipping RAG model '%s' check on cloud host %s because model is local",
-                            rag_model,
-                            b,
-                        )
-                        checked = True
-                        continue
-
-                    # If the model is cloud-only and this is a local host, skip checking.
-                    if not host_is_cloud and is_cloud_rag:
-                        logging.info(
-                            "Skipping RAG model '%s' check on local host %s because model is cloud-only",
-                            rag_model,
-                            b,
-                        )
-                        checked = True
-                        continue
-
-                    # Inspect tags for model
-                    logging.info("Inspecting /api/tags response for models at %s", b)
-                    has_model = _tags_contain_model(tags_resp, rag_model)
-
-                    if not has_model and not host_is_cloud:
-                        logging.info("Model '%s' not found in tags at %s; attempting /api/generate ping", rag_model, b)
-                        if _attempt_generate_ping(b, rag_model):
-                            has_model = True
-
-                    if has_model:
-                        logging.info(f"RAG model '{rag_model}' is available at {b}")
-                    else:
-                        logging.warning(f"RAG model '{rag_model}' not found at {b}; RAG functionality may fail")
-
-                checked = True
-
-            if not checked:
-                logging.error("Ollama AI server is NOT reachable at configured endpoints (checked preferred endpoints)")
-
-        checked = True
-
-    if not checked:
-        logging.error("Ollama AI server is NOT reachable at configured endpoints (checked preferred endpoints)")
+        logging.exception("Error while running Ollama checks")
 
     # If embedding backend uses Ollama, explicitly confirm local Ollama is present
     embedding_backend = getattr(settings, "EMBEDDING_BACKEND", "local")
