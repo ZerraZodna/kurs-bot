@@ -36,6 +36,16 @@ def setup_test_environment():
         init_db()
     except Exception as e:
         print(f"⚠️  Could not initialize test DB schema: {e}")
+    # Ensure starter trigger embeddings exist in the fresh test DB so tests that
+    # rely on trigger matching behave deterministically even without real
+    # embedding infra (sentence-transformers or Ollama).
+    try:
+        import asyncio
+        from src.triggers.trigger_matcher import seed_triggers
+        asyncio.run(seed_triggers())
+        print("🧪 Seeded trigger embeddings for tests")
+    except Exception as _ex:
+        print(f"⚠️ Could not seed trigger embeddings for tests: {_ex}")
     
     yield
     

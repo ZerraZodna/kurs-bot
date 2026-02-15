@@ -199,14 +199,9 @@ class MemoryManager:
 
     def set_next_lesson(self, user_id: int, lesson_id: int) -> None:
         """Helper: set the last sent / next lesson id for a user (used by trigger dispatcher)."""
-        self.store_memory(
-            user_id=user_id,
-            key="last_sent_lesson_id",
-            value=str(lesson_id),
-            category="progress",
-            source="trigger_dispatcher",
-        )
-
+        # Use consolidated lesson_state helper so state stays consistent.
+        from src.scheduler.lesson_state import set_last_sent_lesson_id
+        set_last_sent_lesson_id(self, user_id, lesson_id, write_legacy=True)
 
 if __name__ == '__main__':
     # quick manual test

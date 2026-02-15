@@ -12,6 +12,7 @@ from src.services.gdpr_service import record_consent
 from src.services.dialogue.lesson_handler import format_lesson_message
 from src.services.dialogue.memory_helpers import delete_user_and_data, get_user_language
 from src.onboarding import prompts as prompts_module
+from src.scheduler.lesson_state import set_current_lesson
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class OnboardingStep(Enum):
     CONSENT = "consent"
     COMMITMENT = "commitment"
     LESSON_STATUS = "lesson_status"
+    NAME = "name"
 
 
 
@@ -178,7 +180,15 @@ class OnboardingFlow:
             thank_you = self._get_message("consent_granted", language)
             next_prompt = self.onboarding.get_onboarding_prompt(user_id)
             if next_prompt:
-                return f"{thank_you}\n\n{next_prompt}"
+                # Insert the thank-you after the initial greeting line of the
+                # next prompt (e.g., "Beautiful, {name}!") so the flow reads:
+                # "Beautiful, {name}!\nThank you...\nAre you interested..."
+                parts = next_prompt.split("\n", 1)
+                if len(parts) == 2:
+                    head, tail = parts[0], parts[1]
+                    return f"{head}\n{thank_you}\n{tail}"
+                # Fallback: append thank-you if no newline present
+                return f"{next_prompt}\n\n{thank_you}"
             return thank_you
         elif consent is False:
             self._store_memory(user_id, "data_consent", "declined", category="profile")
@@ -198,14 +208,61 @@ class OnboardingFlow:
         return None
 
     async def _handle_lesson_status_pending(self, user_id: int, text: str, session: Session) -> Optional[str]:
+        # If the user replied with just a number (e.g., "7"), treat that as
+        # an explicit lesson number and persist it immediately to avoid the
+        # LLM picking up lesson context and returning lesson content.
+        t = (text or "").strip()
+        import re as _re
+        m = _re.match(r"^(\d{1,3})$", t)
+        if m:
+            try:
+                lesson_id = int(m.group(1))
+                if 1 <= lesson_id <= 365:
+                    # Persist lesson (onboarding context) but DO NOT deliver the
+                    # lesson now. Instead, mark onboarding progressed, create
+                    # the default schedule, and return the onboarding-complete
+                    # message so the user receives the welcome + summary.
+                    set_current_lesson(self.memory_manager, user_id, str(lesson_id))
+                    self._resolve_pending_step(user_id)
+                    self._set_pending_lesson_delivery(user_id)
+                    try:
+                        # OnboardingService.get_onboarding_complete_message will
+                        # auto-create the default schedule and return the text.
+                        return self.onboarding.get_onboarding_complete_message(user_id)
+                    except Exception:
+                        # Fallback: continue onboarding prompt if creation fails
+                        return self.onboarding.get_onboarding_prompt(user_id)
+            except Exception:
+                pass
+
         response = self.onboarding.handle_lesson_status_response(user_id, text)
         action = response.get("action")
 
+        # If user explicitly asks to start with Lesson 1, deliver it now
         if action == "send_lesson_1":
             return await self._deliver_lesson(user_id, 1, session, is_first=True)
+
+        # If user indicates a specific lesson number, persist the lesson
+        # but do NOT automatically deliver the lesson during onboarding.
+        # Instead, advance onboarding to the next logical prompt (schedule).
         elif action == "send_specific_lesson":
-            lesson_id = response["lesson_id"]
-            return await self._deliver_lesson(user_id, lesson_id, session, is_first=False)
+            lesson_id = response.get("lesson_id")
+            # `handle_lesson_status_response` already stored `current_lesson`.
+            # If onboarding is now complete (name, consent, commitment), ask
+            # for preferred lesson time so we can set up daily reminders.
+            status = self.onboarding.get_onboarding_status(user_id)
+            if status.get("onboarding_complete") or (
+                status.get("has_name") and status.get("has_consent") and status.get("has_commitment")
+            ):
+                # Onboarding satisfied: persist lesson, create default
+                # schedule and return the onboarding completion message
+                try:
+                    return self.onboarding.get_onboarding_complete_message(user_id)
+                except Exception:
+                    return self.onboarding.get_onboarding_prompt(user_id)
+            # Otherwise, continue onboarding flow normally
+            return self.onboarding.get_onboarding_prompt(user_id)
+
         elif action == "ask_lesson_number":
             language = get_user_language(self.memory_manager, user_id)
             self._store_memory(user_id, "onboarding_step_pending", OnboardingStep.LESSON_STATUS.value, ttl_hours=2)
@@ -216,7 +273,8 @@ class OnboardingFlow:
         return self._get_message("ask_new_or_continuing", language).format(name=self._get_user_name(user_id))
 
     async def _deliver_lesson(self, user_id: int, lesson_id: int, session: Session, is_first: bool) -> str:
-        self._store_memory(user_id, "current_lesson", str(lesson_id), category="progress")
+        # Record user progress using consolidated lesson_state helper
+        set_current_lesson(self.memory_manager, user_id, str(lesson_id))
 
         completion_msg = self._check_and_send_completion_message(user_id)
 

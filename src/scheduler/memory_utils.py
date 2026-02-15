@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone
 from src.services.timezone_utils import to_utc
 from typing import Optional
+from src.scheduler.lesson_state import get_last_sent_lesson_id as _get_last_sent_lesson_id, set_last_sent_lesson_id as _set_last_sent_lesson_id
 
 from src.memories import MemoryManager
 
@@ -24,23 +25,12 @@ def get_user_language(memory_manager: MemoryManager, user_id: int) -> str:
     #return memories[0].get("value", "en") if memories else "en"
 
 def get_last_sent_lesson_id(memory_manager: MemoryManager, user_id: int) -> Optional[int]:
-    memories = memory_manager.get_memory(user_id, "last_sent_lesson_id")
-    if not memories:
-        return None
-    value = str(memories[0].get("value", "")).strip()
-    try:
-        return int(value)
-    except ValueError:
-        return None
+    """Wrapper: use consolidated lesson_state getter."""
+    return _get_last_sent_lesson_id(memory_manager, user_id)
 
 def set_last_sent_lesson_id(memory_manager: MemoryManager, user_id: int, lesson_id: int) -> None:
-    memory_manager.store_memory(
-        user_id=user_id,
-        key="last_sent_lesson_id",
-        value=str(lesson_id),
-        category="progress",
-        source="scheduler",
-    )
+    """Wrapper: use consolidated lesson_state setter."""
+    _set_last_sent_lesson_id(memory_manager, user_id, lesson_id, write_legacy=True)
 
 def get_pending_confirmation(memory_manager: MemoryManager, user_id: int) -> Optional[dict]:
     memories = memory_manager.get_memory(user_id, "lesson_confirmation_pending")

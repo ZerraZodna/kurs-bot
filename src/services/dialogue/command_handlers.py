@@ -8,7 +8,7 @@ import threading
 
 from sqlalchemy.orm import Session
 from apscheduler.triggers.date import DateTrigger
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from src.services.semantic_search import get_semantic_search_service
 from src.scheduler import SchedulerService
@@ -337,19 +337,16 @@ def handle_debug_next_day(
             .all()
         )
     if schedules:
-        scheduler = SchedulerService.get_scheduler()
-        now = datetime.now(timezone.utc)
+        # Directly invoke scheduler execution in simulation mode so we
+        # send the messages as if the job ran, but avoid mutating the
+        # stored schedule times (no DB updates).
         for schedule in schedules:
-            job_id = f"debug_next_day_{schedule.schedule_id}_{int(now.timestamp())}"
-            scheduler.add_job(
-                func=SchedulerService.execute_scheduled_task,
-                trigger=DateTrigger(run_date=now, timezone="UTC"),
-                args=[schedule.schedule_id],
-                id=job_id,
-                replace_existing=True,
-            )
-        return "OK — simulating next day for 1 hour and triggering the scheduled morning message now."
-    return "OK — simulating next day for 1 hour. No active daily schedule found."
+            try:
+                SchedulerService.execute_scheduled_task(schedule.schedule_id, simulate=True)
+            except Exception as e:
+                logger.exception("Failed to simulate schedule %s: %s", schedule.schedule_id, e)
+        return "OK"
+    return "OK"
 
 
 def handle_list_memories(text: str, memory_manager, session: Session, user_id: int) -> Optional[str]:

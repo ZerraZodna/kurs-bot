@@ -43,6 +43,9 @@ def detect_lesson_request(text: str) -> Optional[Dict[str, Any]]:
                 return {"lesson_id": lesson_num}
             if 361 <= lesson_num <= 365:
                 return {"lesson_id": 361}
+    # Detect requests for "today's lesson" or similar phrasing
+    if re.search(r"\btoday('?s)?\s+lesson\b", text_lower) or "todays lesson" in text_lower:
+        return {"today": True}
 
     return None
 

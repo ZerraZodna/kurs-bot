@@ -71,12 +71,15 @@ class SchedulerService:
         if not last_sent:
             lesson = db.query(Lesson).filter(Lesson.lesson_id == 1).first()
             if lesson:
-                set_last_sent_lesson_id(memory_manager, schedule.user_id, 1)
+                # Do not mutate state when simply building the outbound
+                # message for previewing; return the formatted lesson text
+                # but avoid calling `set_last_sent_lesson_id` here.
                 return format_lesson_message(lesson, language)
             return None
 
         next_id = (last_sent % 365) + 1
-        set_pending_confirmation(memory_manager, schedule.user_id, last_sent, next_id)
+        # Do not persist pending confirmation when only building a
+        # preview message; return the confirmation prompt text only.
         return build_confirmation_prompt(last_sent, next_id, language)
 
     @staticmethod
@@ -424,7 +427,7 @@ class SchedulerService:
                 session.close()
 
     @staticmethod
-    def execute_scheduled_task(schedule_id: int):
+    def execute_scheduled_task(schedule_id: int, simulate: bool = False):
         """
         Execute a scheduled task (send lesson or reminder).
 
@@ -453,22 +456,25 @@ class SchedulerService:
                 if not message:
                     message = "Reminder"
                 send_outbound_message(db, user, message)
+                if not simulate:
+                    schedule.last_sent_at = datetime.now(timezone.utc)
+                    schedule.next_send_time = None
+                    schedule.is_active = False
+                    db.commit()
 
-                schedule.last_sent_at = datetime.now(timezone.utc)
-                schedule.next_send_time = None
-                schedule.is_active = False
-                db.commit()
+                    # Remove job from scheduler (use jobs helper)
+                    try:
+                        from . import jobs as schedule_jobs
 
-                # Remove job from scheduler (use jobs helper)
-                try:
-                    from . import jobs as schedule_jobs
+                        schedule_jobs.remove_job_for_schedule(schedule.schedule_id)
+                    except Exception as e:
+                        logger.warning(f"Could not remove job schedule_{schedule.schedule_id}: {e}")
 
-                    schedule_jobs.remove_job_for_schedule(schedule.schedule_id)
-                except Exception as e:
-                    logger.warning(f"Could not remove job schedule_{schedule.schedule_id}: {e}")
-
-                logger.info(f"✓ Executed one-time reminder {schedule_id}")
-                return
+                    logger.info(f"✓ Executed one-time reminder {schedule_id}")
+                    return
+                else:
+                    logger.info(f"Simulated one-time reminder {schedule_id} (no DB changes)")
+                    return
 
             # Determine user's language (default English)
             language = get_user_language(memory_manager, schedule.user_id)
@@ -488,24 +494,32 @@ class SchedulerService:
                     if lesson:
                         message = format_lesson_message(lesson, language)
                         send_outbound_message(db, user, message)
+                        # Always update lesson_state memories so follow-up
+                        # confirmations and progression work even during
+                        # simulated runs; avoid modifying Schedule rows.
                         set_last_sent_lesson_id(memory_manager, schedule.user_id, 1)
                 else:
                     # Ask if yesterday's lesson was completed before proceeding
                     next_id = (last_sent % 365) + 1
+                        # Persist pending confirmation so the dialogue layer
+                        # can ask the user and handle their reply.
                     set_pending_confirmation(memory_manager, schedule.user_id, last_sent, next_id)
                     prompt = build_confirmation_prompt(last_sent, next_id, language)
                     send_outbound_message(db, user, prompt)
 
-            # Update schedule
-            schedule.last_sent_at = datetime.now(timezone.utc)
+            if not simulate:
+                # Update schedule
+                schedule.last_sent_at = datetime.now(timezone.utc)
 
-            # Calculate next send time
-            now = datetime.now(timezone.utc)
-            schedule.next_send_time = now + timedelta(days=1)
+                # Calculate next send time
+                now = datetime.now(timezone.utc)
+                schedule.next_send_time = now + timedelta(days=1)
 
-            db.commit()
+                db.commit()
 
-            logger.info(f"✓ Executed schedule {schedule_id}, next send at {schedule.next_send_time}")
+                logger.info(f"✓ Executed schedule {schedule_id}, next send at {schedule.next_send_time}")
+            else:
+                logger.info(f"Simulated execution of schedule {schedule_id} (no DB changes)")
 
         except Exception as e:
             logger.error(f"Error executing schedule {schedule_id}: {e}")

@@ -165,12 +165,23 @@ class DialogueEngine:
         )
         if debug_response:
             return debug_response
-
         # FIRST: Extract memories from user message (this might store commitment, name, time, etc.)
-        if self.onboarding.should_show_onboarding(user_id):
-            await extract_and_store_memories(
-                self.memory_manager, self.memory_extractor, user_id, text, rag_mode=use_rag_for_this_message
-            )
+        # Run extraction early so simple factual replies during onboarding (e.g., "My name is Johannes")
+        # are captured and persisted before onboarding flow generates follow-ups.
+        await extract_and_store_memories(
+            self.memory_manager, self.memory_extractor, user_id, text, rag_mode=use_rag_for_this_message
+        )
+
+        # If user needs onboarding, handle onboarding now to prioritise pending
+        # onboarding prompts (e.g., consent, lesson-status) after extraction.
+        if (
+            self.onboarding_flow
+            and self.onboarding.should_show_onboarding(user_id)
+            and not use_rag_for_this_message
+        ):
+            onboarding_response = await self.onboarding_flow.handle_onboarding(user_id, text, session)
+            if onboarding_response:
+                return onboarding_response
  
 
         # Handle lesson confirmation replies (before onboarding/schedule logic)
@@ -190,11 +201,25 @@ class DialogueEngine:
         # Check if user is asking about a specific lesson (run regardless of onboarding)
         lesson_request = detect_lesson_request(text)
         if lesson_request:
-            lesson_response = await handle_lesson_request(
-                lesson_request["lesson_id"], text, session, user_language=user_lang
-            )
-            if lesson_response:
-                return lesson_response
+            # Support 'today' requests which need resolution to an actual lesson id
+            if lesson_request.get("today") and self.prompt_builder:
+                today_ctx = self.prompt_builder.get_today_lesson_context(user_id)
+                state = today_ctx.get("state", {})
+                lesson_id = state.get("lesson_id")
+                if lesson_id:
+                    lesson_response = await handle_lesson_request(lesson_id, text, session, user_language=user_lang)
+                    if lesson_response:
+                        return lesson_response
+                else:
+                    # No lesson known for today — fall back to LLM explaining how to get lessons
+                    return "I couldn't determine your current lesson. Tell me which lesson number you'd like, e.g. 'Lesson 7'."
+
+            if lesson_request.get("lesson_id"):
+                lesson_response = await handle_lesson_request(
+                    lesson_request["lesson_id"], text, session, user_language=user_lang
+                )
+                if lesson_response:
+                    return lesson_response
 
         # Handle schedule follow-ups (e.g., user clarifying a previous deferred schedule request)
         schedule_response = await handle_schedule_messages(
@@ -211,18 +236,6 @@ class DialogueEngine:
             return schedule_response
 
         # Schedule handled after LLM response via trigger matching; skip pre-LLM scheduling
-        
-        # Check if user needs onboarding (new users). Do NOT run onboarding
-        # prompts when the current message explicitly requests RAG — RAG should
-        # not trigger onboarding or other profile prompts.
-        if (
-            self.onboarding_flow
-            and self.onboarding.should_show_onboarding(user_id)
-            and not use_rag_for_this_message
-        ):
-            onboarding_response = await self.onboarding_flow.handle_onboarding(user_id, text, session)
-            if onboarding_response:
-                return onboarding_response
 
         # Auto-send next lesson on a new day when user makes contact
         if include_lesson and self.prompt_builder and not use_rag_for_this_message:

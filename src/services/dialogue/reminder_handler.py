@@ -10,6 +10,7 @@ from src.services.timezone_utils import to_utc
 from sqlalchemy.orm import Session
 from src.models.database import Lesson
 from src.memories import MemoryManager
+from src.scheduler.lesson_state import set_last_sent_lesson_id
 
 logger = logging.getLogger(__name__)
 
@@ -156,14 +157,8 @@ async def handle_lesson_confirmation(
     language = get_language_fn(user_id)
     message = await format_lesson_fn(lesson, language)
 
-    memory_manager.store_memory(
-        user_id=user_id,
-        key="last_sent_lesson_id",
-        value=str(lesson.lesson_id),
-        category="progress",
-        confidence=1.0,
-        source="dialogue_engine_lesson_confirmation",
-    )
+    # Persist the last lesson we sent using consolidated lesson_state helper
+    set_last_sent_lesson_id(memory_manager, user_id, lesson.lesson_id)
 
     resolve_pending_confirmation(memory_manager, user_id)
     return message

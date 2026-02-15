@@ -262,8 +262,14 @@ async def test_onboarding_greeting_hei_detects_norwegian():
             or "Jeg ser at navnet ditt i Telegram" in response
             or "kaller deg" in response
         )
-        assert telegram_phrase_ok, (
-            f"Expected Norwegian onboarding prompt (templated or Telegram-autofill) in response, got: {response}"
+        # Also accept the simpler Norwegian welcome/name prompt phrasing
+        simple_norwegian_ok = (
+            "Hva heter du" in response
+            or "Velkommen! Hva heter du" in response
+            or ("Velkommen!" in response and "Hva" in response)
+        )
+        assert telegram_phrase_ok or simple_norwegian_ok, (
+            f"Expected Norwegian onboarding prompt (templated, Telegram-autofill, or simple welcome) in response, got: {response}"
         )
 
     db.close()

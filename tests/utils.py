@@ -2,7 +2,7 @@ from src.models.database import User
 from src.memories import MemoryManager
 
 
-def create_test_user(db, external_id: str, first_name: str = "Test") -> int:
+def create_test_user(db, external_id: str, first_name: str | None = None) -> int:
     """Create a fresh user row for tests (does NOT add onboarding memories).
 
     Removes any existing user with the same external_id, creates a new
@@ -22,12 +22,21 @@ def create_test_user(db, external_id: str, first_name: str = "Test") -> int:
         channel="test",
         phone_number=None,
         email=f"{external_id}@example.com",
-        first_name=first_name,
+        first_name=first_name if first_name and str(first_name).strip() else None,
         last_name="User",
         opted_in=True,
     )
     db.add(user)
     db.commit()
+    # Also add a profile memory for first_name so tests that expect
+    # onboarding prompts to consider the name don't need to rely on
+    # DB-only fields. This keeps onboarding logic pure and test helpers
+    # responsible for seeding memories.
+    # Only store a first_name memory when a non-empty name is provided
+    if first_name and str(first_name).strip():
+        mm = MemoryManager(db)
+        mm.store_memory(user.user_id, "first_name", first_name, category="profile", source="test")
+
     return user.user_id
 
 

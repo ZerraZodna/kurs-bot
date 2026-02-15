@@ -27,6 +27,7 @@ from src.onboarding.status import get_onboarding_status_dict
 from src.onboarding.schedule_setup import create_auto_schedule
 from src.services.timezone_utils import ensure_user_timezone
 from src.onboarding.user_management import delete_user_and_data, is_user_new
+from src.scheduler.lesson_state import set_current_lesson
 
 logger = logging.getLogger(__name__)
 
@@ -187,8 +188,8 @@ class OnboardingService:
     
     def get_onboarding_complete_message(self, user_id: int) -> str:
         """
-        Get the completion message after onboarding is done.
-        Also automatically creates a daily schedule at 07:30 AM.
+        Finalize onboarding side-effects (timezone, schedule) and return
+        the onboarding completion message text for the user.
         """
         name_memories = self.memory_manager.get_memory(user_id, "first_name")
         if not name_memories:
@@ -200,7 +201,7 @@ class OnboardingService:
 
         ensure_user_timezone(self.memory_manager, user_id, language)
 
-        # Auto-create schedule
+        # Auto-create schedule when onboarding is completed
         create_auto_schedule(self.db, user_id)
 
         return get_onboarding_complete_message_text(language, name)
@@ -261,11 +262,41 @@ class OnboardingService:
     def handle_lesson_status_response(self, user_id: int, text: str) -> Dict[str, Any]:
         """
         Handle user's response about whether they're new or continuing.
-        
-        Returns:
-            Dict with action: "send_lesson_1" or "ask_lesson_number" and appropriate message
+
+        Uses the detectors' structured facts to store a `current_lesson` memory when
+        an explicit lesson number is provided, and to avoid re-asking the 'new/continue'
+        question when facts indicate the user is continuing or has completed the course.
+
+        Returns the detector response dict for downstream handling.
         """
-        return handle_lesson_status_response(text)
+        result = handle_lesson_status_response(text)
+
+        # Persist explicit lesson number so onboarding flow won't ask again
+        try:
+            action = result.get("action")
+            facts = result.get("facts") or {}
+        except Exception:
+            action = None
+            facts = {}
+
+        if action == "send_specific_lesson":
+            lesson_id = result.get("lesson_id")
+            if lesson_id:
+                # store as a progress memory so get_onboarding_status sees it
+                # Use consolidated lesson_state helper to keep state consistent
+                set_current_lesson(self.memory_manager, user_id, str(lesson_id))
+        elif facts.get("is_continuing") or facts.get("completed_before"):
+            # mark that user is continuing (no specific lesson known)
+            self.memory_manager.store_memory(
+                user_id=user_id,
+                key="current_lesson",
+                value="continuing",
+                confidence=1.0,
+                source="onboarding_service",
+                category="progress",
+            )
+
+        return result
 
     def get_lesson_1_welcome_message(self, user_id: int) -> str:
         """Welcome message for brand new users starting with Lesson 1."""

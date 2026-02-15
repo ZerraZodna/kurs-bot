@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from src.models.database import Base, User, Memory
 from src.services.dialogue_engine import DialogueEngine
 from src.config import settings
+from tests.utils import make_ready_user
 
 
 @pytest.fixture(scope="function")
@@ -67,7 +68,9 @@ async def test_birthdate_memory_stored_with_real_ollama(db_session):
     # Create engine and dialogue engine bound to our test session
     engine = DialogueEngine(db=db_session)
 
-    user = db_session.query(User).first()
+    # Ensure user has completed onboarding so extraction runs (avoid name prompt)
+    make_ready_user(db_session, "99997")
+    user = db_session.query(User).filter_by(external_id="99997").first()
 
     # Send the message via the full production code path
     await engine.process_message(user.user_id, "I am born 23.05.1966", session=db_session)

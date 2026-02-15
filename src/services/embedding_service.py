@@ -22,8 +22,18 @@ class EmbeddingService:
     def __init__(self):
         self.embed_url = settings.OLLAMA_EMBED_URL
         self.embed_model = settings.OLLAMA_EMBED_MODEL
-        self.embedding_dimension = settings.EMBEDDING_DIMENSION
-        self.backend = getattr(settings, "EMBEDDING_BACKEND", "ollama")
+        # Embedding backend must be explicitly configured via EMBEDDING_BACKEND
+        self.backend = getattr(settings, "EMBEDDING_BACKEND", "local")
+        # Determine expected embedding dimension per backend. Allow override
+        # from settings.EMBEDDING_DIMENSION but prefer a sensible default.
+        if self.backend == "local":
+            default_dim = 384
+        elif self.backend == "ollama":
+            default_dim = 768
+        else:
+            default_dim = settings.EMBEDDING_DIMENSION
+
+        self.embedding_dimension = getattr(settings, "EMBEDDING_DIMENSION", default_dim) or default_dim
         # Client proxy exposes a `post` coroutine so tests can patch it.
         class _ClientProxy:
             async def post(self, *args, **kwargs):
@@ -50,10 +60,13 @@ class EmbeddingService:
             return None
         
         try:
+            # Backend-specific handling: be strict and do NOT silently fall back
             if self.backend == 'local':
                 # If tests have patched the HTTP client with AsyncMock, prefer
-                # the HTTP (mocked) path so tests can assert payload/response.
-                if isinstance(self.client.post, AsyncMock):
+                # the mocked HTTP path instead of loading the heavy local model.
+                if isinstance(getattr(self.client, 'post', None), AsyncMock):
+                    # Use the same HTTP embed call as the 'ollama' backend so tests
+                    # that patch `client.post` receive the mocked response.
                     headers = {}
                     api_key = getattr(settings, "OLLAMA_API_KEY", None)
                     if api_key:
@@ -75,30 +88,9 @@ class EmbeddingService:
                     if asyncio.iscoroutine(data):
                         data = await data
 
-                    if "embeddings" in data:
-                        embeddings = data["embeddings"]
-                        if isinstance(embeddings, list) and len(embeddings) > 0:
-                            embedding = embeddings[0]
-                        else:
-                            embedding = embeddings
-                    else:
-                        embedding = data.get("embedding")
+                    return self._extract_embedding_from_data(data)
 
-                    if embedding is None:
-                        logger.error(f"No embedding in response: {data}")
-                        return None
-
-                    if isinstance(embedding, np.ndarray):
-                        embedding = embedding.tolist()
-
-                    if len(embedding) != self.embedding_dimension:
-                        logger.error(
-                            f"Embedding dimension mismatch: expected {self.embedding_dimension}, got {len(embedding)}"
-                        )
-                        return None
-
-                    return embedding
-                # lazy-load sentence-transformers model
+                # Require sentence-transformers local model; do not call HTTP
                 if self._local_model is None:
                     try:
                         from sentence_transformers import SentenceTransformer
@@ -106,65 +98,54 @@ class EmbeddingService:
                         logger.error("Local embedding backend requested but 'sentence-transformers' is not installed")
                         return None
                     model_name = getattr(settings, "SENTENCE_TRANSFORMERS_MODEL", "all-MiniLM-L6-v2")
-                    # Ensure model is downloaded and cached locally once, then load from that path
                     self._local_model = await self._ensure_local_model_loaded(model_name)
-                # compute embedding in thread
+                    if self._local_model is None:
+                        logger.error("Failed to load local sentence-transformers model for local backend")
+                        return None
+
                 vec = await asyncio.to_thread(self._local_model.encode, text.strip(), convert_to_numpy=True)
                 if isinstance(vec, np.ndarray):
                     emb = vec.tolist()
                 else:
                     emb = list(vec)
+
                 if len(emb) != self.embedding_dimension:
-                    logger.error(f"Embedding dimension mismatch: expected {self.embedding_dimension}, got {len(emb)}")
+                    logger.error(
+                        "Embedding dimension mismatch for local backend: expected %s, got %s",
+                        self.embedding_dimension,
+                        len(emb),
+                    )
                     return None
                 return emb
 
-            # Fallback to Ollama HTTP API
-            headers = {}
-            api_key = getattr(settings, "OLLAMA_API_KEY", None)
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
+            elif self.backend == 'ollama':
+                # Use Ollama HTTP API exclusively for the 'ollama' backend
+                headers = {}
+                api_key = getattr(settings, "OLLAMA_API_KEY", None)
+                if api_key:
+                    headers["Authorization"] = f"Bearer {api_key}"
 
-            response = await self.client.post(
-                self.embed_url,
-                json={
-                    "model": self.embed_model,
-                    "input": text.strip()
-                },
-                headers=headers or None,
-            )
-            _rs = response.raise_for_status()
-            if asyncio.iscoroutine(_rs):
-                await _rs
-
-            data = response.json()
-            if asyncio.iscoroutine(data):
-                data = await data
-
-            if "embeddings" in data:
-                embeddings = data["embeddings"]
-                if isinstance(embeddings, list) and len(embeddings) > 0:
-                    embedding = embeddings[0]
-                else:
-                    embedding = embeddings
-            else:
-                embedding = data.get("embedding")
-
-            if embedding is None:
-                logger.error(f"No embedding in response: {data}")
-                return None
-
-            if isinstance(embedding, np.ndarray):
-                embedding = embedding.tolist()
-
-            if len(embedding) != self.embedding_dimension:
-                logger.error(
-                    f"Embedding dimension mismatch: expected {self.embedding_dimension}, "
-                    f"got {len(embedding)}"
+                response = await self.client.post(
+                    self.embed_url,
+                    json={
+                        "model": self.embed_model,
+                        "input": text.strip()
+                    },
+                    headers=headers or None,
                 )
-                return None
+                _rs = response.raise_for_status()
+                if asyncio.iscoroutine(_rs):
+                    await _rs
 
-            return embedding
+                data = response.json()
+                if asyncio.iscoroutine(data):
+                    data = await data
+
+                return self._extract_embedding_from_data(data)
+
+            else:
+                logger.error("Unknown EMBEDDING_BACKEND '%s'", self.backend)
+                return None
         except httpx.ConnectError as e:
             logger.error(f"Failed to connect to Ollama embed endpoint: {e}")
             return None
@@ -320,16 +301,12 @@ class EmbeddingService:
         if self.backend == 'local' and self._local_model is None:
             # If tests have patched the HTTP client with AsyncMock, prefer
             # the mocked HTTP path instead of loading the heavy local model.
-            if isinstance(self.client.post, AsyncMock):
-                pass
-            else:
-                # ensure model loaded (download + cache once)
-                try:
-                    model_name = getattr(settings, "SENTENCE_TRANSFORMERS_MODEL", "all-MiniLM-L6-v2")
-                    self._local_model = await self._ensure_local_model_loaded(model_name)
-                except Exception:
-                    # fall back to concurrent HTTP calls
-                    pass
+            # For batch embedding: attempt to load local model if backend is local
+            try:
+                model_name = getattr(settings, "SENTENCE_TRANSFORMERS_MODEL", "all-MiniLM-L6-v2")
+                self._local_model = await self._ensure_local_model_loaded(model_name)
+            except Exception:
+                logger.exception("Failed to load local model for batch embedding")
 
         if self.backend == 'local' and self._local_model is not None:
             # run encoding in thread pool (batch if supported)
@@ -342,6 +319,7 @@ class EmbeddingService:
                     else:
                         emb = list(vec)
                     if len(emb) != self.embedding_dimension:
+                        logger.error("Batch embedding produced wrong dimension: expected %s got %s", self.embedding_dimension, len(emb))
                         out.append(None)
                     else:
                         out.append(emb)
@@ -351,6 +329,49 @@ class EmbeddingService:
 
         tasks = [self.generate_embedding(t) for t in texts]
         return await asyncio.gather(*tasks)
+
+    def _extract_embedding_from_data(self, data) -> Optional[List[float]]:
+        """Parse embedding data returned by HTTP embed endpoints.
+
+        Accepts the parsed JSON `data` and returns a list of floats when a
+        valid embedding is found and matches `self.embedding_dimension`.
+        Returns None on parse errors or dimension mismatches.
+        """
+        try:
+            if isinstance(data, dict) and "embeddings" in data:
+                embeddings = data["embeddings"]
+                if isinstance(embeddings, list) and len(embeddings) > 0:
+                    embedding = embeddings[0]
+                else:
+                    embedding = embeddings
+            elif isinstance(data, dict):
+                embedding = data.get("embedding")
+            else:
+                embedding = None
+
+            if embedding is None:
+                logger.error("No embedding in response: %s", data)
+                return None
+
+            if isinstance(embedding, np.ndarray):
+                embedding = embedding.tolist()
+
+            if not isinstance(embedding, (list, tuple)):
+                logger.error("Embedding response has unexpected type: %s", type(embedding))
+                return None
+
+            if len(embedding) != self.embedding_dimension:
+                logger.error(
+                    "Embedding dimension mismatch: expected %s, got %s",
+                    self.embedding_dimension,
+                    len(embedding),
+                )
+                return None
+
+            return list(embedding)
+        except Exception:
+            logger.exception("Failed to parse embedding response")
+            return None
 
 
 # Global instance
