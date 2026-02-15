@@ -78,8 +78,17 @@ async def test_memory_driven_schedule_creation():
         active = [s for s in schedules if s.is_active]
         assert len(active) == 1
         sched = active[0]
-        hour, minute = SchedulerService.parse_time_string("10:15")
-        assert sched.next_send_time is None or (sched.next_send_time.hour == hour and sched.next_send_time.minute == minute)
+        # Compute expected next_send using user's timezone and compare stored UTC value
+        from src.scheduler.time_utils import compute_next_send_and_cron
+        from src.models.database import User
+
+        user = db.query(User).filter_by(user_id=user_id).first()
+        tz_name = getattr(user, "timezone", "UTC") if user else "UTC"
+        expected_next_send, expected_cron = compute_next_send_and_cron("10:15", tz_name)
+
+        assert sched.next_send_time is None or (
+            sched.next_send_time.hour == expected_next_send.hour and sched.next_send_time.minute == expected_next_send.minute
+        )
 
     finally:
         db.close()
