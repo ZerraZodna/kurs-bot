@@ -63,9 +63,8 @@ def _test_use_real_ollama_enabled() -> bool:
 _TEST_USE_REAL_OLLAMA = _test_use_real_ollama_enabled()
 
 
-def _normalize_local_model_name(model: str) -> str:
-    # Cloud models typically have '-cloud' suffix; remove it for local servers
-    return model.replace("-cloud", "")
+# Note: cloud-model name normalization removed. Cloud-only models must run in cloud
+# and will not be attempted locally.
 
 
 def _extract_chat_text(resp: Any) -> Optional[str]:
@@ -123,7 +122,7 @@ def _extract_chat_text(resp: Any) -> Optional[str]:
 async def _call_local_http(model: str, prompt: str, temperature: float | None = None) -> str:
     url = LOCAL_OLLAMA_URL
     temp = OLLAMA_TEMPERATURE if temperature is None else temperature
-    payload = {"model": _normalize_local_model_name(model), "prompt": prompt, "stream": False, "temperature": float(temp)}
+    payload = {"model": model, "prompt": prompt, "stream": False, "temperature": float(temp)}
     timeout = OLLAMA_LONG_TIMEOUT if "gpt-oss" in model.lower() else OLLAMA_TIMEOUT
     async with httpx.AsyncClient() as client:
         r = await client.post(url, json=payload, timeout=timeout)
@@ -166,18 +165,26 @@ async def call_ollama(prompt: str, model: str | None = None, language: str | Non
     # explicitly ends with '-cloud' and a cloud URL is configured.
     raw_url = CLOUD_OLLAMA_URL
     is_cloud_url_configured = _is_cloud_url(raw_url)
-    is_cloud = isinstance(chosen_model, str) and str(chosen_model).endswith("-cloud") and is_cloud_url_configured
+    is_cloud = isinstance(chosen_model, str) and str(chosen_model).lower().endswith("cloud") and is_cloud_url_configured
 
-    # If the model had '-cloud' but we are not using cloud (no cloud URL),
-    # normalize it for local usage by removing the suffix.
-    if not is_cloud and isinstance(chosen_model, str) and str(chosen_model).endswith("-cloud"):
-        logger.debug("Mapping cloud model to local: %s", chosen_model)
-        chosen_model = _normalize_local_model_name(chosen_model)
+    # If the model explicitly indicates a cloud variant but CLOUD_OLLAMA_URL is
+    # not configured, DO NOT attempt to call local Ollama — treat as unavailable.
+    if isinstance(chosen_model, str) and str(chosen_model).lower().endswith("cloud") and not is_cloud_url_configured:
+        logger.error("Cloud model requested but CLOUD_OLLAMA_URL not configured: %s", chosen_model)
+        if _TEST_USE_REAL_OLLAMA:
+            raise RuntimeError("Cloud Ollama requested but CLOUD_OLLAMA_URL not configured")
+        return "[Ollama cloud model requested but cloud endpoint is not configured.]"
 
     logger.info("AI PROMPT (model=%s): %s", chosen_model, (prompt[:100] + "...") if len(prompt) > 100 else prompt)
 
     try:
-        if is_cloud and OllamaClient is not None:
+        if is_cloud:
+            if OllamaClient is None:
+                logger.error("Ollama cloud client library not installed; cannot call cloud models")
+                if _TEST_USE_REAL_OLLAMA:
+                    raise RuntimeError("Ollama client library not available for cloud calls")
+                return "[Ollama cloud client not available on this host]"
+            # proceed with cloud call
             api_key = getattr(settings, "OLLAMA_API_KEY", None)
             parsed = urlparse(raw_url or CLOUD_OLLAMA_DEFAULT)
             host_base = f"{parsed.scheme}://{parsed.hostname}"
@@ -189,16 +196,13 @@ async def call_ollama(prompt: str, model: str | None = None, language: str | Non
                 text = _extract_chat_text(out)
                 if text:
                     return text
-                # If no text extracted, return stringified response
                 return str(out)
             except Exception as e:
                 err = str(e)
                 logger.warning("Cloud client error: %s", err)
-                # During real-Ollama test runs we want to surface failures.
                 if _TEST_USE_REAL_OLLAMA:
                     raise
-                logger.info("Cloud call failed; falling back to local HTTP API")
-                # Do NOT attempt to guess or append '-cloud' here; fall back to local.
+                return "[Sorry, I couldn't process your request right now.]"
 
         # Local HTTP path (or fallback if cloud failed)
         temp = OLLAMA_TEMPERATURE if temperature is None else temperature

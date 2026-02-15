@@ -6,12 +6,13 @@ the health-check logic organized and testable.
 from typing import Dict, List, Tuple
 from urllib.parse import urlparse
 import logging
+import re
 import httpx
 
 
 def _is_cloud_model(model: str | None) -> bool:
     try:
-        return isinstance(model, str) and model.endswith("-cloud")
+        return isinstance(model, str) and str(model).lower().endswith("cloud")
     except Exception:
         return False
 
@@ -132,11 +133,11 @@ def run_ollama_checks(settings) -> Tuple[bool, List[Dict]]:
                 # may include the '-cloud' suffix while the /api/tags list the
                 # canonical model name without that suffix. Match both variants.
                 for k, m in cloud_models.items():
-                    model_name = str(m).lower()
-                    if model_name.endswith("-cloud"):
-                        stripped = model_name[: -len("-cloud")]
-                    else:
-                        stripped = model_name
+                    model_name = str(m)
+                    try:
+                        stripped = re.sub(r"[:\-]?\d*-?cloud$", "", model_name, flags=re.IGNORECASE).lower()
+                    except Exception:
+                        stripped = model_name.lower()
                     found = (model_name in names) or (stripped in names)
                     # DEBUG: log the comparison for easier troubleshooting
                     logging.debug(
