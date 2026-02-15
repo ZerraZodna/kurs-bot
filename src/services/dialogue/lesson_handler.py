@@ -26,26 +26,37 @@ def detect_lesson_request(text: str) -> Optional[Dict[str, Any]]:
     Returns:
         Dict with lesson_id if detected, None otherwise
     """
-    text_lower = text.lower()
+    text_lower = (text or "").lower()
 
-    lesson_patterns = [
-        r"lesson\s+(\d+)",
-        r"leksjon\s+(\d+)",
-        r"day\s+(\d+)",
-        r"lesson\s+#(\d+)",
-    ]
+    def _extract_number(s: str) -> Optional[int]:
+        m = re.search(r"\b(?:lesson|leksjon|day)\s*#?\s*(\d+)\b", s)
+        if m:
+            try:
+                n = int(m.group(1))
+            except Exception:
+                return None
+            if 1 <= n <= 360:
+                return n
+            if 361 <= n <= 365:
+                return 361
+        return None
 
-    for pattern in lesson_patterns:
-        match = re.search(pattern, text_lower)
-        if match:
-            lesson_num = int(match.group(1))
-            if 1 <= lesson_num <= 360:
-                return {"lesson_id": lesson_num}
-            if 361 <= lesson_num <= 365:
-                return {"lesson_id": 361}
-    # Detect requests for "today's lesson" or similar phrasing
+    # Direct command forms: "show lesson 6", "send me lesson 6", "give lesson 6"
+    def _is_command_like(s: str) -> bool:
+        return bool(re.search(r"^\s*(?:show|send|give|read|display)(?: me)?(?: the)?\b", s)) and "lesson" in s
+
+    # 1) explicit numbered lesson
+    num = _extract_number(text_lower)
+    if num:
+        return {"lesson_id": num}
+
+    # 2) today's lesson
     if re.search(r"\btoday('?s)?\s+lesson\b", text_lower) or "todays lesson" in text_lower:
         return {"today": True}
+
+    # 3) command-like without a number (e.g., "show lesson")
+    if _is_command_like(text_lower):
+        return {"raw_command": True}
 
     return None
 
@@ -88,9 +99,13 @@ async def handle_lesson_request(
             "exactly what",
         ]
 
+        # Also treat direct 'show/send/give/read/display lesson' commands as raw requests
+        def _is_command_like(s: str) -> bool:
+            return bool(re.search(r"^\s*(?:show|send|give|read|display)(?: me)?(?: the)?\b", s)) and "lesson" in s
+
         is_raw_request = any(t in user_lower for t in raw_triggers) or bool(
             re.search(r"\bwhat exactly is\b.*\blesson\b", user_lower)
-        )
+        ) or _is_command_like(user_lower)
 
         if is_raw_request:
             # Return raw lesson text directly (translate if needed)

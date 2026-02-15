@@ -5,7 +5,9 @@ set -euo pipefail
 # Lowercase copy moved into scripts/ per repository convention.
 
 script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$script_root"
+# repo_root is the workspace root (parent of scripts/)
+repo_root="$(cd "$script_root/.." && pwd)"
+cd "$repo_root"
 
 ngrok_cmd="ngrok http 8000"
 
@@ -25,15 +27,15 @@ else
 fi
 
 # Activate virtualenv if present. Prefer an explicit $VENV, then common names.
-if [ -n "${VENV:-}" ] && [ -f "$script_root/$VENV/bin/activate" ]; then
+if [ -n "${VENV:-}" ] && [ -f "$repo_root/$VENV/bin/activate" ]; then
   # shellcheck source=/dev/null
-  . "$script_root/$VENV/bin/activate"
+  . "$repo_root/$VENV/bin/activate"
   echo "Activated virtualenv: $VENV"
 else
   for candidate in .venv .ven venv; do
-    if [ -f "$script_root/$candidate/bin/activate" ]; then
+    if [ -f "$repo_root/$candidate/bin/activate" ]; then
       # shellcheck source=/dev/null
-      . "$script_root/$candidate/bin/activate"
+      . "$repo_root/$candidate/bin/activate"
       echo "Activated virtualenv: $candidate"
       break
     fi
