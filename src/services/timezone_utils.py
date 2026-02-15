@@ -60,7 +60,7 @@ def get_user_timezone_name(
     # otherwise infer from language or return UTC.
     if fallback_language:
         return infer_timezone_from_language(fallback_language)
-    return "UTC"
+    return "Europe/Oslo"
 
 
 def ensure_user_timezone(
