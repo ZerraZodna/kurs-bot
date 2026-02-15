@@ -142,6 +142,6 @@ cython_debug/
 .DS_Store
 Thumbs.db
 clean_lessons.txt
-start-ngrok.ps1
-start-uvicorn.ps1
+scripts/start-ngrok.ps1
+scripts/start-uvicorn.ps1
 src/data/models/

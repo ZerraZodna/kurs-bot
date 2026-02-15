@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     SYSTEM_PROMPT_RAG: str = "You are a helpful personal assistant. Use the provided memories and context to give clear, concise answers. Be conversational and practical. Avoid spiritual lectures unless asked."
     # Ollama temperature (0.0 = deterministic, 1.0 = creative). Lower reduces hallucination.
     OLLAMA_TEMPERATURE: float = 0.2
+    # Enable the developer web UI when True (set in .env during local dev)
+    DEV_WEB_CLIENT: bool = False
     # Add more config as needed
 
     model_config: ConfigDict = ConfigDict(

@@ -157,12 +157,12 @@ Then init prod.db:
 
 6) Start the app (development): (Do step 7 first once)
 Windows:
-Start-Windows.ps1
+\.\scripts\start-windows.ps1
 
-Unix: 
-chmod +x Start-Linux.sh
+Unix:
+chmod +x ./scripts/start-linux.sh
 source .venv/bin/activate
-./Start-Linux.sh
+./scripts/start-linux.sh
 
 Or totally manual:
 ```bash

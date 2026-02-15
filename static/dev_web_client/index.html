@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Kurs-bot — Dev Web UI</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <div id="app">
+      <h1>Kurs-bot — Dev Web UI</h1>
+      <div id="chat" class="chat"></div>
+      <div class="controls">
+        <input id="user_id" placeholder="User ID (e.g. 1)" value="1" />
+        <input id="text" placeholder="Type a message..." />
+        <button id="send">Send</button>
+      </div>
+    </div>
+    <script src="config.js"></script>
+    <script src="https://unpkg.com/dompurify@2.4.0/dist/purify.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

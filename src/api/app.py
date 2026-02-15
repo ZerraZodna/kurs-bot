@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from src.memories import MemoryManager
 from src.services.maintenance import nightly_memory_purge
@@ -21,6 +22,7 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
+from pathlib import Path
 import asyncio
 import logging
 import httpx
@@ -152,6 +154,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# Allow CORS for the development web UI so browser preflight (OPTIONS)
+# requests succeed when the frontend hits the API directly.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
+
 app.add_middleware(ConsentMiddleware)
 app.add_middleware(ApiKeyAuthMiddleware)
 
@@ -159,6 +171,23 @@ app.add_middleware(ApiKeyAuthMiddleware)
 app.include_router(dialogue_router)
 app.include_router(gdpr_router)
 
+# Dev Web UI (serve static client and proxy to DialogueEngine) when enabled
+DEV_WEB = getattr(settings, "DEV_WEB_CLIENT", False)
+
+# Compute project-relative static path for visibility in logs/debugging
+static_path = Path(__file__).resolve().parents[2] / "static" / "dev_web_client"
+print(f"DEBUG: settings.DEV_WEB_CLIENT={getattr(settings, 'DEV_WEB_CLIENT', None)}")
+print(f"DEBUG: computed static_path={static_path} exists={static_path.exists()}")
+
+if DEV_WEB:
+    print("DEBUG: DEV_WEB is True — mounting dev static and router")
+    from fastapi.staticfiles import StaticFiles
+    from src.api.dev_web_client import router as dev_router
+
+    # Mount static files under /dev/static using project-relative path
+    static_dir = str(static_path)
+    app.mount("/dev/static", StaticFiles(directory=static_dir), name="dev_static")
+    app.include_router(dev_router)
 
 @app.get("/")
 async def root():

@@ -1,0 +1,26 @@
+body { font-family: Arial, Helvetica, sans-serif; margin: 20px; background: #000; color: #e6e6e6 }
+#app { max-width: 720px; margin: 0 auto; }
+.chat { border: 1px solid #222; height: 400px; overflow:auto; padding: 10px; background: #0b0b0b }
+.msg { padding: 6px 8px; margin: 6px 0; border-radius: 6px; color: #e6e6e6 }
+.msg.user { background: linear-gradient(90deg,#0f2740,#09203a); text-align: left }
+.msg.bot { background: linear-gradient(90deg,#3a2a09,#241805); text-align: left }
+.controls { margin-top: 8px; display:flex; gap:8px }
+.controls input { padding:8px; flex:1; background:#111; color:#e6e6e6; border:1px solid #333 }
+.controls #user_id { width: 120px; flex: none }
+button { padding:8px 12px; background:#222; color:#e6e6e6; border:1px solid #444 }
+
+/* Make links and small accents visible */
+a { color: #66b2ff }
+small { color: #999 }
+
+/* Improve HTML rendering inside the chat (headings, tables, code, lists) */
+.chat { color: #e6e6e6 }
+.chat h1, .chat h2, .chat h3, .chat h4 { color: #ffffff; margin: 8px 0 }
+.chat p { margin: 6px 0 }
+.chat ul, .chat ol { margin: 6px 0 6px 18px }
+.chat a { color: #66b2ff }
+.chat table { width: 100%; border-collapse: collapse; margin: 8px 0; background: transparent }
+.chat th, .chat td { border: 1px solid #222; padding: 6px 8px; vertical-align: top }
+.chat th { background: #111; font-weight: 600 }
+.chat pre, .chat code { background: #0d0d0d; color: #f0f0f0; padding: 6px 8px; border-radius: 6px; font-family: monospace; overflow: auto }
+.msg { word-break: break-word; white-space: pre-wrap; overflow-wrap: anywhere }
