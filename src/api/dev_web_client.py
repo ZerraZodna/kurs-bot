@@ -1,5 +1,10 @@
 from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
+from typing import Optional
+import os
+import socket
+import getpass
+
 from src.models.database import SessionLocal, User
 from src.services.dialogue_engine import DialogueEngine
 from src.memories import MemoryManager
@@ -9,22 +14,38 @@ router = APIRouter(prefix="/dev")
 
 
 class MessagePayload(BaseModel):
-    user_id: int
+    # Keep `user_id` optional for compatibility but it will be ignored by the server.
+    user_id: Optional[int] = None
     text: str
+
+
+def _get_server_user_identifier() -> str:
+    """Return a stable identifier derived from the server OS environment.
+
+    Uses username@hostname (Windows: USERNAME/COMPUTERNAME; *nix: USER/HOSTNAME).
+    This ensures the dev web UI cannot impersonate other users by sending user_id.
+    """
+    user = os.environ.get("USERNAME") or os.environ.get("USER") or getpass.getuser()
+    host = os.environ.get("COMPUTERNAME") or os.environ.get("HOSTNAME") or socket.gethostname()
+    return f"{user}@{host}"
 
 
 @router.post("/message")
 async def dev_message(payload: MessagePayload):
-    # Create or ensure a user exists for the given user_id
+    # Ignore any client-supplied user_id and derive a server-side identifier
+    server_identifier = _get_server_user_identifier()
+
     db = SessionLocal()
     try:
-        user = db.query(User).filter_by(user_id=payload.user_id).first()
+        # Find a lightweight user record tied to this server/process
+        user = db.query(User).filter_by(external_id=str(server_identifier), channel="web").first()
         if not user:
-            # Create lightweight user record for dev channel
-            user = User(external_id=str(payload.user_id), channel="web", first_name="Dev", opted_in=True)
+            # Create lightweight user record for dev channel using server identifier
+            user = User(external_id=str(server_identifier), channel="web", first_name="Dev", opted_in=True)
             db.add(user)
             db.commit()
             db.refresh(user)
+
         # Use DialogueEngine to process message
         dialogue = DialogueEngine(db)
         response = await dialogue.process_message(user_id=user.user_id, text=payload.text, session=db)

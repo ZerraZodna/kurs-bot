@@ -5,7 +5,8 @@
 param(
     [int]$StaticPort = 3000,
     [int]$ApiPort = 8000,
-    [switch]$DirectApi
+    [switch]$DirectApi,
+    [switch]$Reload
 )
 
 $repoRoot = Resolve-Path "$PSScriptRoot\.."
@@ -28,10 +29,56 @@ if ($DirectApi) {
 }
 Set-Content -Path $configPath -Value $configContent -Encoding UTF8
 
-if (Test-Path $venvPython) {
-    Write-Host "Using venv python:" $venvPython
-    & $venvPython (Join-Path $repoRoot 'scripts\dev_static_server.py') --port $port --directory $staticDir --api-port $ApiPort
+function Start-DevServer {
+    param($pythonExe)
+    Write-Host "Starting dev static server using" $pythonExe
+    & $pythonExe (Join-Path $repoRoot 'scripts\dev_static_server.py') --port $port --directory $staticDir --api-port $ApiPort
+}
+
+if (-not $Reload) {
+    if (Test-Path $venvPython) {
+        Write-Host "Using venv python:" $venvPython
+        Start-DevServer -pythonExe $venvPython
+    } else {
+        Write-Host "Using system python"
+        Start-DevServer -pythonExe python
+    }
 } else {
-    Write-Host "Using system python"
-    python (Join-Path $repoRoot 'scripts\dev_static_server.py') --port $port --directory $staticDir --api-port $ApiPort
+    Write-Host "Reload enabled: watching" $staticDir "for changes..."
+
+    function Get-LatestWriteTime {
+        param($dir)
+        try {
+            $items = Get-ChildItem -Path $dir -Recurse -File -ErrorAction Stop
+            if (-not $items) { return $null }
+            return ($items | Measure-Object -Property LastWriteTime -Maximum).Maximum
+        } catch {
+            return $null
+        }
+    }
+
+    $lastWrite = Get-LatestWriteTime -dir $staticDir
+
+    while ($true) {
+        if (Test-Path $venvPython) {
+            $proc = Start-Process -FilePath $venvPython -ArgumentList @( (Join-Path $repoRoot 'scripts\dev_static_server.py'), '--port', $port, '--directory', $staticDir, '--api-port', $ApiPort ) -NoNewWindow -PassThru
+        } else {
+            $proc = Start-Process -FilePath 'python' -ArgumentList @( (Join-Path $repoRoot 'scripts\dev_static_server.py'), '--port', $port, '--directory', $staticDir, '--api-port', $ApiPort ) -NoNewWindow -PassThru
+        }
+
+        # Poll for file changes or process exit
+        while (-not $proc.HasExited) {
+            Start-Sleep -Seconds 1
+            $newWrite = Get-LatestWriteTime -dir $staticDir
+            if ($newWrite -ne $null -and $lastWrite -ne $null -and $newWrite -gt $lastWrite) {
+                Write-Host "Change detected in $staticDir; restarting dev server..."
+                try { Stop-Process -Id $proc.Id -Force } catch { }
+                break
+            }
+        }
+
+        # Update lastWrite and loop to restart
+        $lastWrite = Get-LatestWriteTime -dir $staticDir
+        Start-Sleep -Seconds 1
+    }
 }
