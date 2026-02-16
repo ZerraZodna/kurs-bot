@@ -8,7 +8,7 @@ from typing import Optional
 from src.models.database import SessionLocal, PromptTemplate, init_db
 
 
-def seed() -> None:
+def seed(delete_existing_system: bool = False) -> None:
     init_db()
     db = SessionLocal()
     try:
@@ -56,6 +56,15 @@ def seed() -> None:
         ]
 
         seeded = 0
+        # If requested, delete all existing system-owned prompt templates
+        if delete_existing_system:
+            existing_count = db.query(PromptTemplate).filter(PromptTemplate.owner == 'system').count()
+            if existing_count:
+                db.query(PromptTemplate).filter(PromptTemplate.owner == 'system').delete(synchronize_session=False)
+                db.commit()
+                print(f"🗑️ Deleted {existing_count} system prompt template(s)")
+            else:
+                print("ℹ️ No system prompt templates to delete")
         for t in templates:
             existing = db.query(PromptTemplate).filter(PromptTemplate.key == t["key"]).first()
             if existing:
@@ -83,7 +92,17 @@ def seed() -> None:
 
 def main(argv: Optional[list] = None) -> int:
     try:
-        seed()
+        delete_flag = False
+        # When run as a script interactively, ask the user whether to delete existing system prompts
+        if argv is None:
+            try:
+                ans = input("Delete existing system prompt templates? [y/N]: ").strip().lower()
+                delete_flag = ans in ("y", "yes")
+            except Exception:
+                # In non-interactive environments, default to not deleting
+                delete_flag = False
+
+        seed(delete_existing_system=delete_flag)
         return 0
     except Exception as exc:
         print('❌ Failed to seed prompt templates:', exc)
