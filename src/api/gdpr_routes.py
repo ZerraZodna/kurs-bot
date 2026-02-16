@@ -69,6 +69,12 @@ class GdprEraseRequest(BaseModel):
     actor: str = "user"
 
 
+class GdprCleanRequest(BaseModel):
+    user_id: int
+    reason: Optional[str] = None
+    actor: str = "user"
+
+
 class GdprObjectRequest(BaseModel):
     user_id: int
     reason: Optional[str] = None
@@ -189,6 +195,22 @@ async def gdpr_erase(
         raise HTTPException(status_code=404, detail=str(exc))
 
     return {"status": "erased", "user_id": request.user_id}
+
+
+@router.post("/clean")
+async def gdpr_clean(
+    request: GdprCleanRequest,
+    db: Session = Depends(get_db),
+    _admin: None = Depends(require_gdpr_admin),
+) -> Dict[str, Any]:
+    try:
+        from src.services.gdpr_service import clean_user_data
+
+        clean_user_data(db, request.user_id, request.reason, request.actor)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    return {"status": "cleaned", "user_id": request.user_id}
 
 
 @router.post("/withdraw-consent")

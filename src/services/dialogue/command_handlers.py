@@ -228,6 +228,13 @@ def _execute_verified_request(session: Session, user_id: int, verification) -> s
     if request_type == "erase":
         erase_user_data(session, user_id, payload.get("reason"), actor="user")
         return "Your data has been erased."
+    if request_type == "clean":
+        # Clean behaves like erase but leaves the User row active so the
+        # same user_id can be reused by tests / WebUI.
+        from src.services.gdpr_service import clean_user_data
+
+        clean_user_data(session, user_id, payload.get("reason"), actor="user")
+        return "Your data has been erased (clean). User record left active."
     if request_type == "restrict":
         restrict_processing(session, user_id, payload.get("reason"), actor="user")
         return "Your data processing has been restricted."
@@ -276,6 +283,7 @@ async def handle_gdpr_commands(
             "GDPR options:\n"
             "- gdpr export: receive a JSON copy of your data\n"
             "- gdpr erase: delete your data (you can onboard again later)\n"
+            "- gdpr clean: delete/anonymize PII but keep the user id active for reuse\n"
             "- gdpr restrict <reason>: limit processing (onboarding is blocked)\n"
             "- gdpr object <reason>: object to processing and restrict it (onboarding is blocked)\n"
             "- gdpr withdraw <scope>: withdraw consent (onboarding is blocked; default scope: data_storage)"
@@ -284,11 +292,11 @@ async def handle_gdpr_commands(
     action = parts[1]
     reason = " ".join(parts[2:]).strip() if len(parts) > 2 else None
 
-    if action not in {"export", "erase", "restrict", "object", "withdraw"}:
-        return "Unsupported GDPR action. Try: export, erase, restrict, object, withdraw."
+    if action not in {"export", "erase", "clean", "restrict", "object", "withdraw"}:
+        return "Unsupported GDPR action. Try: export, erase, clean, restrict, object, withdraw."
 
     payload = {}
-    if action in {"restrict", "object", "erase"} and reason:
+    if action in {"restrict", "object", "erase", "clean"} and reason:
         payload["reason"] = reason
     if action == "withdraw":
         payload["scope"] = reason or "data_storage"

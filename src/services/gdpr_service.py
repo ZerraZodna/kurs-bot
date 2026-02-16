@@ -431,3 +431,58 @@ def erase_user_data(
         actor=actor,
         details={"reason": reason},
     )
+
+
+def clean_user_data(
+    session: Session,
+    user_id: int,
+    reason: Optional[str],
+    actor: str,
+) -> None:
+    """Erase user PII and records like `erase_user_data` but keep the
+    user account record active so the same `user_id` can be reused by tests
+    or the WebUI. Performs the same deletion/anonymization steps and then
+    re-activates the DB `User` row.
+
+    IMPORTANT: This intentionally differs from `erase_user_data` by leaving
+    the `User` row active (is_deleted=False) so onboarding and reuse are
+    possible for the same id.
+    """
+    # Reuse erase_user_data to perform removes and anonymization first
+    erase_user_data(session, user_id, reason, actor)
+
+    # Re-activate the user row so the id can be reused
+    user = session.query(User).filter_by(user_id=user_id).first()
+    if not user:
+        raise ValueError("User not found")
+    user = cast(Any, user)
+
+    # Restore active flags and clear deletion markers while keeping contact
+    # information removed. Use a predictable external_id so the id can be
+    # referenced from tests/UI.
+    user.is_deleted = False
+    user.deleted_at = None
+    user.processing_restricted = False
+    user.opted_in = False
+    user.restriction_reason = None
+    user.external_id = f"cleaned-{user_id}"
+    user.channel = "web"
+
+    session.add(user)
+    session.commit()
+
+    record_gdpr_request(
+        session=session,
+        user_id=user_id,
+        request_type="clean",
+        status="completed",
+        actor=actor,
+        reason=reason,
+    )
+    record_gdpr_audit(
+        session=session,
+        user_id=user_id,
+        action="clean",
+        actor=actor,
+        details={"reason": reason},
+    )
