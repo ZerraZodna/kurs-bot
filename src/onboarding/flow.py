@@ -12,7 +12,7 @@ from src.services.gdpr_service import record_consent
 from src.services.dialogue.lesson_handler import format_lesson_message
 from src.services.dialogue.memory_helpers import delete_user_and_data, get_user_language
 from src.onboarding import prompts as prompts_module
-from src.scheduler.lesson_state import set_current_lesson
+from src.scheduler.lesson_state import set_current_lesson, get_current_lesson
 
 logger = logging.getLogger(__name__)
 
@@ -180,15 +180,10 @@ class OnboardingFlow:
             thank_you = self._get_message("consent_granted", language)
             next_prompt = self.onboarding.get_onboarding_prompt(user_id)
             if next_prompt:
-                # Insert the thank-you after the initial greeting line of the
-                # next prompt (e.g., "Beautiful, {name}!") so the flow reads:
-                # "Beautiful, {name}!\nThank you...\nAre you interested..."
-                parts = next_prompt.split("\n", 1)
-                if len(parts) == 2:
-                    head, tail = parts[0], parts[1]
-                    return f"{head}\n{thank_you}\n{tail}"
-                # Fallback: append thank-you if no newline present
-                return f"{next_prompt}\n\n{thank_you}"
+                # Show the thank-you immediately after consent, then present
+                # the next onboarding prompt. This keeps the thank-you as the
+                # immediate acknowledgement of consent.
+                return f"{thank_you}\n\n{next_prompt}"
             return thank_you
         elif consent is False:
             self._store_memory(user_id, "data_consent", "declined", category="profile")
@@ -208,6 +203,21 @@ class OnboardingFlow:
         return None
 
     async def _handle_lesson_status_pending(self, user_id: int, text: str, session: Session) -> Optional[str]:
+        # If a memory extractor or earlier step already recorded a current
+        # lesson (e.g. user said "I'm on lesson 8" and the extractor stored
+        # `current_lesson`), honor that and complete onboarding: set the
+        # consolidated lesson state, create the default schedule, resolve the
+        # pending step and return the onboarding-complete message.
+        existing = get_current_lesson(self.memory_manager, user_id)
+        if existing and str(existing).lower() != "continuing":
+            # Attempt to interpret and persist an explicit lesson number
+            lid = int(str(existing))
+            if 1 <= lid <= 365:
+                set_current_lesson(self.memory_manager, user_id, str(lid))
+                self._resolve_pending_step(user_id)
+                self._set_pending_lesson_delivery(user_id)
+                return self.onboarding.get_onboarding_complete_message(user_id)
+
         # If the user replied with just a number (e.g., "7"), treat that as
         # an explicit lesson number and persist it immediately to avoid the
         # LLM picking up lesson context and returning lesson content.

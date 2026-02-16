@@ -99,16 +99,16 @@ ONBOARD_MESSAGES = {
         "no": "Før vi fortsetter: Er det greit at jeg lagrer samtalen og relevant informasjon for å gi deg oppfølging? Du kan når som helst slette alle dataene dine med kommandoen 'GDPR erase'. 🗑️ (ja/nei)",
     },
     "consent_granted": {
-        "en": "Thank you for consenting to store your conversation data. This helps me provide better support. 🙏",
-        "no": "Takk for at du samtykker til å lagre samtalen. Dette hjelper meg å gi deg bedre støtte. 🙏",
+        "en": "Thank you for consenting to store your conversation data. This helps me provide better support. 🙏\nIf you have any concerns type: gdpr",
+        "no": "Takk for at du samtykker til å lagre samtalen. Dette hjelper meg å gi deg bedre støtte. 🙏\nHvis du har bekymringer, skriv: gdpr",
     },
     "commitment_prompt": {
         "en": "Beautiful, {name}!\nAre you interested in exploring these lessons together? I'm here to guide and support you on this journey. Will you commit to doing the ACIM lessons each day? 🌿",
         "no": "Herlig, {name}!\nEr du interessert i å utforske disse leksjonene sammen med meg? Jeg er her for å veilede og støtte deg på denne reisen. Er du bestemt for å gjøre ACIM leksjonene hver dag så godt som? 🌿",
     },
     "ask_new_or_continuing": {
-        "en": "Wonderful, {name}! Are you new to ACIM, or have you already begun working with the lessons? 🌱",
-        "no": "Flott, {name}! Er du ny til ACIM, eller har du allerede begynt med leksjonene? 🌱",
+        "en": "Now, {name}, are you new to ACIM, or have you already begun working with the lessons? 🌱",
+        "no": "Nå, {name}, er du ny til ACIM, eller har du allerede begynt med leksjonene? 🌱",
     },
 }
 

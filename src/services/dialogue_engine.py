@@ -201,6 +201,20 @@ class DialogueEngine:
         # Check if user is asking about a specific lesson (run regardless of onboarding)
         lesson_request = detect_lesson_request(text)
         if lesson_request:
+            # If the user is currently in the onboarding 'lesson_status' step,
+            # let the onboarding flow handle this message so we persist the
+            # lesson and create the default schedule instead of sending the
+            # lesson content immediately.
+            pending = None
+            if self.memory_manager:
+                pending = self.memory_manager.get_memory(user_id, "onboarding_step_pending")
+            if pending:
+                val = (pending[0].get("value") or "").lower()
+                if val == "lesson_status" and self.onboarding_flow:
+                    onboarding_resp = await self.onboarding_flow.handle_onboarding(user_id, text, session)
+                    if onboarding_resp:
+                        return onboarding_resp
+                    
             # Support 'today' requests which need resolution to an actual lesson id
             if lesson_request.get("today") and self.prompt_builder:
                 today_ctx = self.prompt_builder.get_today_lesson_context(user_id)
