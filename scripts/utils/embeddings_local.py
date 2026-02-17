@@ -51,6 +51,7 @@ def main(argv=None):
         raise
 
     model = SentenceTransformer('all-MiniLM-L6-v2')
+    print(f"DEBUG: embeddings_local building embeddings for {len(texts)} texts using model 'all-MiniLM-L6-v2' (show_progress_bar=True)")
     emb = model.encode(texts, convert_to_numpy=True, show_progress_bar=True)
     dim = emb.shape[1]
 

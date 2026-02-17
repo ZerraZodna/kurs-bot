@@ -132,7 +132,7 @@ class TriggerMatcher:
         except Exception as e:
             logger.warning(f"Could not seed trigger embeddings: {e}")
 
-    async def match_triggers(self, user_text: str, top_k: int = 3) -> List[Dict]:
+    async def match_triggers(self, user_text: str, top_k: int = 3, precomputed_embedding: Optional[List[float]] = None) -> List[Dict]:
         """Match triggers for the provided text and return top_k matches.
 
         Returns list of dicts: {trigger_id, name, action_type, score, threshold}
@@ -150,7 +150,10 @@ class TriggerMatcher:
         if not self._triggers:
             return []
 
-        embedding = await self.embedding_service.generate_embedding(user_text)
+        if precomputed_embedding is not None:
+            embedding = precomputed_embedding
+        else:
+            embedding = await self.embedding_service.generate_embedding(user_text)
         if not embedding:
             return []
 

@@ -325,6 +325,13 @@ class DialogueEngine:
                     relevant_memories=relevant_memories,
                 )
         
+        # Precompute user text embedding so trigger matching can reuse it
+        try:
+            from src.services.embedding_service import get_embedding_service
+            user_text_embedding = await get_embedding_service().generate_embedding(original_text)
+        except Exception:
+            user_text_embedding = None
+
         response = await self.call_ollama(
             prompt, model=settings.OLLAMA_CHAT_RAG_MODEL if use_rag_for_this_message else None, language=user_lang
         )
@@ -334,7 +341,14 @@ class DialogueEngine:
         # Trigger matching and dispatch (always enabled)
         from src.triggers.triggering import handle_triggers
 
-        await handle_triggers(response=response, original_text=original_text, session=session, memory_manager=self.memory_manager, user_id=user_id)
+        await handle_triggers(
+            response=response,
+            original_text=original_text,
+            session=session,
+            memory_manager=self.memory_manager,
+            user_id=user_id,
+            original_text_embedding=user_text_embedding,
+        )
 
         return response
 

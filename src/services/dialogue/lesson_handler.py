@@ -171,10 +171,10 @@ async def translate_text(text: str, language: str, call_ollama_fn) -> str:
     try:
         prompt = (
             f"Translate the following text to {language}. "
-            "Preserve paragraph breaks and meaning. Return only the translation.\n\n"
+            "Preserve paragraph breaks and meaning. Return only the translation. Be as close to original text as possible. Text:\n\n"
             f"{text}"
         )
-        result = await call_ollama_fn(prompt)
+        result = await call_ollama_fn(prompt, None, language)
         return result or text
     except Exception as e:
         logger.warning(f"Translation failed, sending original text: {e}")

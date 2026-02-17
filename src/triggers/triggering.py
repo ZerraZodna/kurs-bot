@@ -15,6 +15,7 @@ async def handle_triggers(
     session,
     memory_manager,
     user_id: int,
+    original_text_embedding=None,
 ) -> None:
     """Run trigger dispatching for a dialogue turn.
 
@@ -64,7 +65,7 @@ async def handle_triggers(
         matcher = get_trigger_matcher()
         try:
             # Match on original user text
-            matches = await matcher.match_triggers(original_text)
+            matches = await matcher.match_triggers(original_text, precomputed_embedding=original_text_embedding)
             for m in matches:
                 if m.get("score", 0.0) >= m.get("threshold", settings.TRIGGER_SIMILARITY_THRESHOLD):
                     action = m.get("action_type")
@@ -77,6 +78,11 @@ async def handle_triggers(
                     res = dispatcher.dispatch(m, {"user_id": user_id, "original_text": original_text})
                     if res and res.get("ok"):
                         dispatched_actions.add(action)
+            # If any actions were dispatched from the original text, skip matching
+            # on the assistant response to avoid computing an extra embedding.
+            if dispatched_actions:
+                logger.info(f"Skipping assistant-response trigger matching; actions already dispatched for user={user_id}: {dispatched_actions}")
+                return
 
             # Also attempt matching on the assistant response text
             try:
