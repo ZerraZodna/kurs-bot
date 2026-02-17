@@ -30,7 +30,8 @@ class SemanticSearchService:
         session: Session,
         limit: Optional[int] = None,
         threshold: Optional[float] = None,
-        categories: Optional[List[str]] = None
+        categories: Optional[List[str]] = None,
+        query_embedding: Optional[List[float]] = None,
     ) -> List[Tuple[Memory, float]]:
         """
         Search for memories similar to query text
@@ -80,7 +81,7 @@ class SemanticSearchService:
         memories = candidates
         # Rerank will generate embeddings and return scores; keep neutral scores on failure
         try:
-            ranked = await self.rerank_memories(memories, query_text)
+            ranked = await self.rerank_memories(memories, query_text, query_embedding=query_embedding)
         except Exception as ex:
             logger.warning(f"Rerank failed: {ex}")
             ranked = [(m, 0.5) for m in memories]
@@ -98,7 +99,8 @@ class SemanticSearchService:
     async def rerank_memories(
         self,
         memories: List[Memory],
-        query_text: str
+        query_text: str,
+        query_embedding: Optional[List[float]] = None,
     ) -> List[Tuple[Memory, float]]:
         """
         Rerank a list of memories by relevance to query text
@@ -114,10 +116,11 @@ class SemanticSearchService:
             # Return in original order with equal scores
             return [(m, 0.5) for m in memories]
         
-        # Generate query embedding
-        query_embedding = await self.embedding_service.generate_embedding(query_text)
+        # Use provided embedding when available, otherwise generate one now
         if query_embedding is None:
-            return [(m, 0.5) for m in memories]
+            query_embedding = await self.embedding_service.generate_embedding(query_text)
+            if query_embedding is None:
+                return [(m, 0.5) for m in memories]
 
         # Use persisted embedding bytes if available (tests/mocks may provide this).
         mem_embeddings: List[Optional[List[float]]] = []

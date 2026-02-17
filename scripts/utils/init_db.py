@@ -11,6 +11,7 @@ import os
 import sys
 import argparse
 import subprocess
+import asyncio
 from pathlib import Path
 
 
@@ -62,6 +63,57 @@ def resolve_database_url(db_arg: str | None) -> str:
     if 'DATABASE_URL' in data and data['DATABASE_URL']:
         return data['DATABASE_URL']
     raise SystemExit('No DATABASE_URL provided via --db, environment, or .env')
+
+
+def _ensure_repo_root_on_path() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
+
+def seed_triggers() -> None:
+    """Seed the default triggers using the core seeder coroutine.
+
+    This mirrors the previous `scripts/utils/seed_triggers.py` behavior but
+    is now available directly from this script.
+    """
+    _ensure_repo_root_on_path()
+    from src.triggers.trigger_matcher import seed_triggers as _seed_coroutine
+
+    asyncio.run(_seed_coroutine())
+
+
+def reset_trigger_embeddings() -> int:
+    """Delete all rows in `trigger_embeddings` and re-seed STARTER.
+
+    Returns 0 on success, non-zero on failure. Mirrors
+    `scripts/utils/reset_trigger_embeddings.py` behavior.
+    """
+    _ensure_repo_root_on_path()
+    try:
+        from src.models.database import SessionLocal, TriggerEmbedding
+        from src.triggers.trigger_matcher import seed_triggers as _seed_coroutine
+
+        db = SessionLocal()
+        try:
+            num = db.query(TriggerEmbedding).count()
+            if num > 0:
+                print(f"Deleting {num} existing trigger_embeddings rows...")
+                db.query(TriggerEmbedding).delete()
+                db.commit()
+                print("Deleted existing trigger embeddings.")
+            else:
+                print("No existing trigger embeddings found; seeding starter set.")
+        finally:
+            db.close()
+
+        print("Seeding STARTER trigger embeddings using current embedding backend...")
+        asyncio.run(_seed_coroutine())
+        print("✅ Re-seeded trigger embeddings from STARTER")
+        return 0
+    except Exception as e:
+        print(f"❌ Failed to reset triggers: {e}")
+        return 1
 
 
 def init_db(database_url: str, yes: bool = False, lessons: str | None = None) -> None:
@@ -165,8 +217,7 @@ def init_db(database_url: str, yes: bool = False, lessons: str | None = None) ->
     # Seed trigger embeddings
     try:
         print('\n✨ Seeding default trigger embeddings...')
-        from scripts.utils.seed_triggers import seed as _seed_triggers
-        _seed_triggers()
+        seed_triggers()
         print('✅ Trigger embeddings seeded')
     except Exception as e:
         print(f'⚠️  Failed to seed trigger embeddings: {e}')
@@ -204,7 +255,14 @@ def main(argv: list | None = None) -> int:
     parser.add_argument('--yes', '-y', action='store_true', help='Auto-confirm recreate without prompt')
     parser.add_argument('--lessons', help='Path to ACIM lessons PDF to import (optional)')
     parser.add_argument('--build-index', action='store_true', help='If set and EMBEDDING_BACKEND=local, build hnswlib index from lessons')
+    parser.add_argument('--seed-triggers', action='store_true', help='Seed trigger embeddings and exit')
+    parser.add_argument('--reset-trigger-embeddings', action='store_true', help='Delete trigger embeddings and re-seed STARTER then exit')
     ns = parser.parse_args(argv)
+    if ns.seed_triggers:
+        seed_triggers()
+        return 0
+    if ns.reset_trigger_embeddings:
+        return reset_trigger_embeddings()
     database_url = resolve_database_url(ns.db)
     init_db(database_url, yes=ns.yes, lessons=ns.lessons)
     # optionally build a local hnswlib index

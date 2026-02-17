@@ -26,10 +26,9 @@ if (Test-Path $ProdDb) {
     exit 1
 }
 
-if (-not $Yes) {
-    Write-Host "This script performs a full initialization intended for a CLEAN new host.`nRe-run with -Yes to proceed." -ForegroundColor Cyan
-    exit 2
-}
+# If a prod DB is present we abort above. When there is no prod DB we allow
+# running the initializer without forcing the user to pass `-Yes` so first-time
+# setup is smoother for new hosts.
 
 Write-Host "`n==> Initializing production database and seeding defaults"
 

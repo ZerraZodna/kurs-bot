@@ -26,6 +26,22 @@ STARTER = [
     {"name": "exit_rag", "action_type": "exit_rag", "utterance": "Stop using RAG", "threshold": 0.75},
 ]
 
+# Add common phrasings for requesting today's/next lesson, including Norwegian
+lesson_phrases = [
+    "What's today's lesson?",
+    "What is todays lesson",
+    "What is today's lesson",
+    "Show me today's lesson",
+    "Which lesson is it today",
+    "Send me today's lesson",
+    "Hva er dagens leksjon",
+    "Hva er dagens leksjon?",
+    "Vis meg dagens leksjon",
+    "Hvilken leksjon er det i dag",
+]
+for p in lesson_phrases:
+    STARTER.append({"name": "next_lesson", "action_type": "next_lesson", "utterance": p, "threshold": 0.75})
+
 # Examples for users asking about their current reminders/schedules
 SCHEDULE_STATUS_EXAMPLES = [
     "do i have any reminders",

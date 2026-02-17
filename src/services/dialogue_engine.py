@@ -30,7 +30,7 @@ from src.services.dialogue import (
     handle_list_memories,
 )
 from src.config import settings
-from src.models.database import User, Memory
+from src.models.database import User, Memory, Lesson
 from src.services.timezone_utils import ensure_user_timezone, format_dt_in_timezone
 from src.services.prompt_registry import get_prompt_registry
 
@@ -51,11 +51,6 @@ class DialogueEngine:
         )
     
     def get_trigger_dispatcher(self, db=None, memory_manager: MemoryManager = None) -> object:
-        from src.triggers import get_trigger_dispatcher as _get
-        return _get(db=db, memory_manager=memory_manager)
-
-
-    def get_trigger_dispatcher(db=None, memory_manager: MemoryManager = None) -> object:
         from src.triggers import get_trigger_dispatcher as _get
         return _get(db=db, memory_manager=memory_manager)
 
@@ -93,7 +88,6 @@ class DialogueEngine:
             return "User not found."
 
         # Keep original user text for trigger matching
-        original_text = text
         gdpr_response = await handle_gdpr_commands(
             text=text,
             session=session,
@@ -124,9 +118,9 @@ class DialogueEngine:
 
         # If user is in RAG mode and asked to list memories, return full list
         if use_rag_for_this_message:
-            listMemories = handle_list_memories(text, self.memory_manager, session, user_id)
-            if listMemories:
-                return listMemories;
+            list_memories = handle_list_memories(text, self.memory_manager, session, user_id)
+            if list_memories:
+                return list_memories
 
             # Handle RAG prompt management commands: rag_prompt list|select|custom|show
             prompt_cmd_response = handle_rag_prompt_command(text, self.memory_manager, user_id)
@@ -272,6 +266,14 @@ class DialogueEngine:
         else:
             # Build context-aware prompt
             relevant_memories = []
+            # Compute the user's query embedding once for this turn so it can
+            # be reused by semantic search and later trigger matching.
+            from src.services.embedding_service import get_embedding_service
+            user_text_embedding = await get_embedding_service().generate_embedding(text)
+
+            # Guard semantic search: failures in the search backend or embedding
+            # generation should not crash the whole message turn. Also ensure
+            # the search_session is closed in all cases.
             try:
                 search_service = get_semantic_search_service()
                 # Use a fresh session for semantic search to avoid lock conflicts
@@ -281,6 +283,7 @@ class DialogueEngine:
                         user_id=user_id,
                         query_text=text,
                         session=search_session,
+                        query_embedding=user_text_embedding,
                     )
                     relevant_memories = [
                         {
@@ -296,11 +299,14 @@ class DialogueEngine:
                 finally:
                     search_session.close()
             except Exception as ex:
+                # Log and continue — semantic search is optional context.
                 logger.warning(f"Semantic search failed: {ex}")
 
             # Use RAG prompt if RAG mode is active for this message
             if use_rag_for_this_message:
                 # Resolve per-user prompt via PromptRegistry (falls back to SYSTEM_PROMPT_RAG)
+                # Prompt registry may fail (database/unexpected errors). Fall
+                # back to the default RAG system prompt rather than raising.
                 try:
                     system_prompt = self.prompt_registry.get_prompt_for_user(self.memory_manager, user_id)
                 except Exception:
@@ -325,12 +331,20 @@ class DialogueEngine:
                     relevant_memories=relevant_memories,
                 )
         
-        # Precompute user text embedding so trigger matching can reuse it
-        try:
-            from src.services.embedding_service import get_embedding_service
-            user_text_embedding = await get_embedding_service().generate_embedding(original_text)
-        except Exception:
-            user_text_embedding = None
+        # Run trigger matching on original user text before calling the LLM.
+        from src.services.dialogue.lesson_handler import pre_llm_lesson_short_circuit
+
+        pre = await pre_llm_lesson_short_circuit(
+            original_text=text,
+            precomputed_embedding=user_text_embedding,
+            user_id=user_id,
+            session=session,
+            prompt_builder=self.prompt_builder,
+            user_lang=user_lang,
+            call_ollama_fn=self.call_ollama,
+        )
+        if pre:
+            return pre
 
         response = await self.call_ollama(
             prompt, model=settings.OLLAMA_CHAT_RAG_MODEL if use_rag_for_this_message else None, language=user_lang
@@ -343,7 +357,7 @@ class DialogueEngine:
 
         await handle_triggers(
             response=response,
-            original_text=original_text,
+            original_text=text,
             session=session,
             memory_manager=self.memory_manager,
             user_id=user_id,
@@ -422,6 +436,9 @@ When would you like to receive them? (e.g., "9:00 AM", "morning", "evening", "8:
         # They have a time preference - create the schedule
         time_str = time_memories[0]["value"]
 
+        # Wrap schedule creation in a try/except so transient errors in the
+        # scheduler or timezone resolution return a helpful message to the
+        # user instead of raising an uncaught exception.
         try:
             schedule = SchedulerService.create_daily_schedule(
                 user_id=user_id,
