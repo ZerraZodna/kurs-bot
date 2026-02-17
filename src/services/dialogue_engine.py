@@ -168,7 +168,7 @@ class DialogueEngine:
         # FIRST: Extract memories from user message (this might store commitment, name, time, etc.)
         # Run extraction early so simple factual replies during onboarding (e.g., "My name is Johannes")
         # are captured and persisted before onboarding flow generates follow-ups.
-        if (self.onboarding_flow)
+        if self.onboarding_flow:
             await extract_and_store_memories(
                 self.memory_manager, self.memory_extractor, user_id, text, rag_mode=use_rag_for_this_message
             )
