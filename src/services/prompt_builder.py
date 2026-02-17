@@ -255,128 +255,18 @@ class PromptBuilder:
         return {"lesson_text": lesson_text, "state": state}
 
     def _get_current_lesson_state(self, user_id: int) -> Dict[str, Any]:
-        """Return current lesson state and progress note for prompt guidance."""
+        """Return current lesson state and progress note for prompt guidance.
+
+        This implementation uses the centralized `lesson_state` helpers for
+        consistent reads of `current_lesson` and `last_sent_lesson_id`.
+        """
+        from src.scheduler.lesson_state import compute_current_lesson_state
+
         now = datetime.now(timezone.utc)
         day_offset = self._get_debug_day_offset(user_id)
         today = (now + timedelta(days=day_offset)).date()
 
-        def _normalize_dt(value: Any) -> datetime:
-            if isinstance(value, datetime):
-                return to_utc(value)
-            return to_utc(datetime.min)
-
-        signals: List[Dict[str, Any]] = []
-
-        current_lesson_memories = self.memory_manager.get_memory(user_id, "current_lesson")
-        # Prefer an explicit `current_lesson` memory regardless of other signals.
-        if current_lesson_memories:
-            most_recent = max(current_lesson_memories, key=lambda x: _normalize_dt(x.get("created_at")))
-            parsed = self._parse_lesson_id(str(most_recent.get("value", "")).strip())
-            if parsed:
-                return {
-                    "lesson_id": parsed,
-                    "progress_note": None,
-                    "advanced_by_day": False,
-                    "previous_lesson_id": None,
-                }
-            # If parsing failed, fall through to other signals
-
-        lessons_completed = self.memory_manager.get_memory(user_id, "lesson_completed")
-        if lessons_completed:
-            most_recent = max(lessons_completed, key=lambda x: _normalize_dt(x.get("created_at")))
-            signals.append({
-                "type": "lesson_completed",
-                "value": str(most_recent.get("value", "")).strip(),
-                "created_at": _normalize_dt(most_recent.get("created_at")),
-            })
-
-        last_sent_memories = self.memory_manager.get_memory(user_id, "last_sent_lesson_id")
-        if last_sent_memories:
-            most_recent = max(last_sent_memories, key=lambda x: _normalize_dt(x.get("created_at")))
-            signals.append({
-                "type": "last_sent_lesson_id",
-                "value": str(most_recent.get("value", "")).strip(),
-                "created_at": _normalize_dt(most_recent.get("created_at")),
-            })
-        else:
-            log_value = self._get_last_lesson_from_logs(user_id)
-            if log_value:
-                signals.append({
-                    "type": "last_sent_lesson_id",
-                    "value": str(log_value.get("lesson_id", "")).strip(),
-                    "created_at": _normalize_dt(log_value.get("created_at")),
-                })
-
-        if not signals:
-            return {
-                "lesson_id": 1,
-                "progress_note": None,
-                "advanced_by_day": False,
-                "previous_lesson_id": None,
-            }
-
-        latest = max(signals, key=lambda s: s.get("created_at", to_utc(datetime.min)))
-        signal_type = latest.get("type")
-        parsed = self._parse_lesson_id(str(latest.get("value", "")).strip())
-        if not parsed:
-            return {
-                "lesson_id": 1,
-                "progress_note": None,
-                "advanced_by_day": False,
-                "previous_lesson_id": None,
-            }
-
-        if signal_type == "current_lesson":
-            return {
-                "lesson_id": parsed,
-                "progress_note": None,
-                "advanced_by_day": False,
-                "previous_lesson_id": None,
-            }
-
-        if signal_type == "lesson_completed":
-            if parsed < 365:
-                return {
-                    "lesson_id": parsed + 1,
-                    "progress_note": None,
-                    "advanced_by_day": False,
-                    "previous_lesson_id": parsed,
-                }
-            return {
-                "lesson_id": 365,
-                "progress_note": None,
-                "advanced_by_day": False,
-                "previous_lesson_id": parsed,
-            }
-
-        if signal_type == "last_sent_lesson_id":
-            last_date = latest.get("created_at", now).date()
-            if last_date < today:
-                next_id = parsed + 1 if parsed < 365 else 365
-                note = (
-                    f"The user received Lesson {parsed} on a previous day. "
-                    f"Assume today's lesson is Lesson {next_id}. "
-                    "You may offer to repeat yesterday's lesson if they want, but proceed with the new lesson by default."
-                )
-                return {
-                    "lesson_id": next_id,
-                    "progress_note": note,
-                    "advanced_by_day": True,
-                    "previous_lesson_id": parsed,
-                }
-            return {
-                "lesson_id": parsed,
-                "progress_note": None,
-                "advanced_by_day": False,
-                "previous_lesson_id": None,
-            }
-
-        return {
-            "lesson_id": 1,
-            "progress_note": None,
-            "advanced_by_day": False,
-            "previous_lesson_id": None,
-        }
+        return compute_current_lesson_state(self.memory_manager, user_id, today=today)
 
     def _get_user_local_time_str(self, user: Any) -> Optional[str]:
         """Return a compact local time string for the user, or None if unavailable.

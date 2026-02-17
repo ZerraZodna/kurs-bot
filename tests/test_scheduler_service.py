@@ -71,9 +71,13 @@ def test_execute_scheduled_task_sends_lesson_one(db_session, scheduler_session_f
     assert sent, "Expected lesson message to be sent"
     assert "Lesson 1" in sent[0][1]
 
-    memory = db_session.query(Memory).filter_by(key="last_sent_lesson_id").first()
-    assert memory is not None
-    assert memory.value == "1"
+    # Use canonical lesson_state getter to verify last-sent was persisted
+    from src.memories import MemoryManager
+    from src.scheduler.lesson_state import get_last_sent_lesson_id
+
+    mm = MemoryManager(db_session)
+    last_sent = get_last_sent_lesson_id(mm, user.user_id)
+    assert last_sent == 1
 
     log = db_session.query(MessageLog).filter_by(direction="outbound").first()
     assert log is not None
@@ -102,20 +106,12 @@ def test_execute_scheduled_task_prompts_confirmation(db_session, scheduler_sessi
     db_session.add(schedule)
     db_session.commit()
 
-    # Simulate last sent lesson
-    memory = Memory(
-        user_id=user.user_id,
-        category="progress",
-        key="last_sent_lesson_id",
-        value="1",
-        value_hash="",
-        confidence=1.0,
-        is_active=True,
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
-    )
-    db_session.add(memory)
-    db_session.commit()
+    # Simulate last sent lesson via canonical helper
+    from src.memories import MemoryManager
+    from src.scheduler.lesson_state import set_last_sent_lesson_id
+
+    mm = MemoryManager(db_session)
+    set_last_sent_lesson_id(mm, user.user_id, 1)
 
     scheduler_module.SchedulerService.execute_scheduled_task(schedule.schedule_id)
 

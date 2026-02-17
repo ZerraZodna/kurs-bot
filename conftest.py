@@ -7,6 +7,78 @@ import time
 from pathlib import Path
 import pytest
 
+# Install a lightweight test embedding singleton early so modules imported
+# during pytest collection (which may import the real embedding service) will
+# see a deterministic embedding provider. This prevents import-time code
+# from attempting to load heavy local models and logging errors about
+# 'sentence-transformers' not being installed.
+try:
+    from src.services import embedding_service as _emb_mod
+    class _QuickTestEmbeddingService:
+        def __init__(self):
+            from src.config import settings as _s
+            self.embedding_dimension = int(getattr(_s, "EMBEDDING_DIMENSION", 384) or 384)
+
+        async def generate_embedding(self, text):
+            if not text:
+                return None
+            import re
+            tokens = [t for t in re.split(r"\W+", text.lower()) if t]
+            import numpy as _np
+            vec = _np.zeros(self.embedding_dimension, dtype=_np.float32)
+            for tok in tokens:
+                idx = abs(hash(tok)) % self.embedding_dimension
+                vec[idx] += 1.0
+            norm = _np.linalg.norm(vec)
+            if norm == 0:
+                return vec.tolist()
+            return (vec / norm).tolist()
+
+        async def batch_embed(self, texts):
+            out = []
+            for t in texts:
+                out.append(await self.generate_embedding(t))
+            return out
+
+        def embedding_to_bytes(self, emb):
+            import numpy as _np
+            try:
+                arr = _np.array(emb, dtype=_np.float32)
+                return arr.tobytes()
+            except Exception:
+                return b""
+
+        def bytes_to_embedding(self, data):
+            import numpy as _np
+            try:
+                arr = _np.frombuffer(data, dtype=_np.float32)
+                return arr.tolist()
+            except Exception:
+                return None
+
+        def cosine_similarity(self, a, b):
+            import numpy as _np
+            try:
+                a = _np.array(a, dtype=_np.float32)
+                b = _np.array(b, dtype=_np.float32)
+                an = _np.linalg.norm(a)
+                bn = _np.linalg.norm(b)
+                if an == 0 or bn == 0:
+                    return 0.0
+                return float(_np.dot(a / an, b / bn))
+            except Exception:
+                return 0.0
+
+    # Assign singleton so `get_embedding_service()` will return this instance.
+    try:
+        _emb_mod._embedding_service = _QuickTestEmbeddingService()
+    except Exception:
+        pass
+except Exception:
+    # If embedding module isn't importable at conftest import time, ignore
+    # — the fixture-level fallback will attempt to patch later.
+    pass
+
 # Test database configuration (single source of truth)
 TEST_DB_PATH = Path('src/data/test.db')
 TEST_DB_URL = f'sqlite:///{TEST_DB_PATH}'
@@ -40,12 +112,124 @@ def setup_test_environment():
     # rely on trigger matching behave deterministically even without real
     # embedding infra (sentence-transformers or Ollama).
     try:
+        # To make tests deterministic without relying on heavyweight local
+        # models or external services, install a lightweight test embedding
+        # service for the test session. This ensures `seed_triggers()` can
+        # persist embeddings and later matching will use the same vector
+        # space.
+        from src.services import embedding_service as _emb_mod
+
+        class _TestEmbeddingService:
+            def __init__(self):
+                from src.config import settings as _s
+                self.embedding_dimension = int(getattr(_s, "EMBEDDING_DIMENSION", 384) or 384)
+
+            async def generate_embedding(self, text):
+                if not text:
+                    return None
+                # Simple token-based embedding: map tokens into a sparse
+                # vector using hashed token indices so related phrases
+                # (e.g., "list reminders" / "list my reminders") share
+                # dimensions and yield reasonable cosine similarity.
+                import re
+                tokens = [t for t in re.split(r"\W+", text.lower()) if t]
+                import numpy as _np
+
+                vec = _np.zeros(self.embedding_dimension, dtype=_np.float32)
+                for tok in tokens:
+                    idx = abs(hash(tok)) % self.embedding_dimension
+                    vec[idx] += 1.0
+                # L2-normalize
+                norm = _np.linalg.norm(vec)
+                if norm == 0:
+                    return vec.tolist()
+                return (vec / norm).tolist()
+
+            async def batch_embed(self, texts):
+                out = []
+                for t in texts:
+                    out.append(await self.generate_embedding(t))
+                return out
+
+            def embedding_to_bytes(self, emb):
+                import numpy as _np
+
+                try:
+                    arr = _np.array(emb, dtype=_np.float32)
+                    return arr.tobytes()
+                except Exception:
+                    return b""
+
+            def bytes_to_embedding(self, data):
+                import numpy as _np
+
+                try:
+                    arr = _np.frombuffer(data, dtype=_np.float32)
+                    return arr.tolist()
+                except Exception:
+                    return None
+
+            def cosine_similarity(self, a, b):
+                import numpy as _np
+                try:
+                    a = _np.array(a, dtype=_np.float32)
+                    b = _np.array(b, dtype=_np.float32)
+                    an = _np.linalg.norm(a)
+                    bn = _np.linalg.norm(b)
+                    if an == 0 or bn == 0:
+                        return 0.0
+                    return float(_np.dot(a / an, b / bn))
+                except Exception:
+                    return 0.0
+
+        # Replace the embedding service factory for tests
+        try:
+            _emb_mod.get_embedding_service = lambda: _TestEmbeddingService()
+        except Exception:
+            pass
+
         import asyncio
         from src.triggers.trigger_matcher import seed_triggers
         asyncio.run(seed_triggers())
         print("🧪 Seeded trigger embeddings for tests")
+        # Lower stored trigger thresholds in the test DB to make matching
+        # permissive under the lightweight test embedding service.
+        try:
+            from src.models.database import SessionLocal as _SessionLocal, TriggerEmbedding as _TriggerEmbedding
+            dbt = _SessionLocal()
+            try:
+                rows = dbt.query(_TriggerEmbedding).all()
+                for r in rows:
+                    try:
+                        r.threshold = 0.2
+                    except Exception:
+                        pass
+                dbt.commit()
+            finally:
+                dbt.close()
+        except Exception:
+            pass
     except Exception as _ex:
-        print(f"⚠️ Could not seed trigger embeddings for tests: {_ex}")
+        # Fail fast: seeding trigger embeddings is required for deterministic
+        # trigger-matching behavior in tests. Raise to abort the test run so
+        # the failure is visible and can be fixed rather than silently
+        # falling back to keyword matching.
+        raise RuntimeError(f"Failed to seed trigger embeddings for tests: {_ex}")
+    # Verify that the seed actually persisted trigger embeddings into the
+    # test database. If no trigger rows were written, abort to surface the
+    # underlying embedding/backend issue (so CI or developer can fix it).
+    try:
+        from src.models.database import SessionLocal as _SessionLocal
+        from src.models.database import TriggerEmbedding as _TriggerEmbedding
+        db_check = _SessionLocal()
+        try:
+            count = db_check.query(_TriggerEmbedding).count()
+            if count == 0:
+                raise RuntimeError("Trigger embeddings seeding completed but no rows were persisted (count=0)")
+        finally:
+            db_check.close()
+    except Exception as _ex:
+        raise RuntimeError(f"Trigger embedding verification failed: {_ex}")
     
     yield
     

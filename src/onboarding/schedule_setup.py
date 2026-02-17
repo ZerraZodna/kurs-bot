@@ -40,9 +40,27 @@ def create_auto_schedule(db: Session, user_id: int) -> bool:
             logger.info(f"Schedule already exists for user {user_id}")
             return False
 
+        # Pick the user's current lesson (if known) so the first automated
+        # delivery does not always default to Lesson 1 for continuing users.
+        try:
+            from src.memories import MemoryManager
+            from src.scheduler.lesson_state import get_current_lesson
+
+            memory_manager = MemoryManager(db)
+            cur = get_current_lesson(memory_manager, user_id)
+            # Accept numeric or numeric-string lesson ids
+            lesson_id = None
+            if cur is not None:
+                try:
+                    lesson_id = int(str(cur))
+                except Exception:
+                    lesson_id = None
+        except Exception:
+            lesson_id = None
+
         SchedulerService.create_daily_schedule(
             user_id=user_id,
-            lesson_id=None,
+            lesson_id=lesson_id,
             time_str="07:30",
             schedule_type="daily",
             session=db,

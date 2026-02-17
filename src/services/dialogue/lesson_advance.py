@@ -9,6 +9,9 @@ from src.models.database import Lesson
 
 from .lesson_handler import format_lesson_message, translate_text
 from .memory_helpers import get_user_language
+from src.onboarding.prompts import get_lesson_confirmation_prompt
+from src.scheduler.lesson_state import set_last_sent_lesson_id
+from src.scheduler.memory_utils import set_pending_confirmation
 
 
 def is_simple_greeting(text: str) -> bool:
@@ -45,43 +48,57 @@ async def maybe_send_next_lesson(
     memory_manager,
     call_ollama,
 ) -> Optional[str]:
+    """Possibly return today's lesson message when user sends a simple greeting.
+
+    Behavior:
+    - If the computed state signals `need_confirmation`, return the
+      localized confirmation prompt and do not send the lesson.
+    - Only load and format the lesson when we're going to deliver it.
+    - Persist `last_sent_lesson_id` after preparing the message.
+    """
     context = prompt_builder.get_today_lesson_context(user_id)
-    lesson_text = context.get("lesson_text", "")
     state = context.get("state", {})
-    if not lesson_text or not state.get("advanced_by_day"):
-        return None
+    language = get_user_language(memory_manager, user_id)
 
-    if not is_simple_greeting(text):
-        return None
-
+    # Read lesson identifiers early so confirmation logic can reference them
     lesson_id = state.get("lesson_id")
     previous_lesson_id = state.get("previous_lesson_id")
+
+    # If the computed state signals we need confirmation (user reported a
+    # current lesson but we have no last_sent record), ask for confirmation
+    # regardless of `advanced_by_day` so onboarding 'continuing' users are
+    # prompted on first contact.
+    if state.get("need_confirmation") and lesson_id and is_simple_greeting(text):
+        # Persist a pending confirmation so dialogue handlers can resolve it
+        next_id = (int(lesson_id) % 365) + 1
+        set_pending_confirmation(memory_manager, user_id, int(lesson_id), next_id)
+        return get_lesson_confirmation_prompt(language, lesson_id)
+
+    # Only proceed to auto-send when today's lesson was advanced by the
+    # scheduler and the assistant was greeted with a short/simple greeting.
+    if not state.get("advanced_by_day") or not is_simple_greeting(text):
+        return None
+
     if not lesson_id:
         return None
 
+    # Load the lesson and format the message for the user's language.
     lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
     if not lesson:
         return None
 
-    language = get_user_language(memory_manager, user_id)
-    message = await format_lesson_message(lesson, language, call_ollama)
+    # Get  lesson in English, translate only once
+    message = await format_lesson_message(lesson, "en", call_ollama)
 
-    repeat_note = None
+    # Optionally offer to repeat the previous lesson.
+    previous_lesson_id = state.get("previous_lesson_id")
     if previous_lesson_id:
         repeat_note = f"If you'd like to repeat Lesson {previous_lesson_id} instead, just let me know."
-        if language.lower() not in ["en"]:
-            repeat_note = await translate_text(repeat_note, language, call_ollama)
-
-    if repeat_note:
         message = f"{message}\n\n{repeat_note}"
+    if (language or "").lower() not in ["en"]:
+        message = await translate_text(message, language, call_ollama)
 
-    memory_manager.store_memory(
-        user_id=user_id,
-        key="last_sent_lesson_id",
-        value=str(lesson.lesson_id),
-        category="progress",
-        confidence=1.0,
-        source="dialogue_engine_auto_lesson",
-    )
+    # Persist via consolidated lesson_state helper
+    set_last_sent_lesson_id(memory_manager, user_id, lesson.lesson_id)
 
     return message

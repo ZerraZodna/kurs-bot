@@ -31,7 +31,9 @@ Common memory keys to use:
 - "learning_goal": What they want to learn/achieve
 - "preferred_lesson_time": When they want lessons/reminders (e.g., "morning", "9:00 AM", "evening", "daily")
 - "acim_commitment": If they commit to ACIM lessons (store "committed to 365 ACIM lessons" or similar commitment phrase)
-- "current_lesson": The lesson number they're currently on (e.g., "2", "15", "100")
+- "current_lesson": The lesson number they're currently on (prefer numeric values, e.g. 2, 15, 100).
+    The system will normalize numeric lesson values to integers when persisting canonical
+    lesson state; textual values like "continuing" are preserved as strings.
 - "lesson_completed": When they finish/complete a lesson (store just the lesson number)
 - "study_preference": How they prefer to study
 - "email": Email address
@@ -44,10 +46,10 @@ Common memory keys to use:
 IMPORTANT: If a date is present in the message, prefer storing it under the `birth_date` key rather than `name` or `first_name`.
 
 LESSON PROGRESS EXAMPLES:
-- "I am currently on lesson 2" -> {"store": true, "key": "current_lesson", "value": "2", "confidence": 0.95}
-- "I just finished lesson 5" -> {"store": true, "key": "lesson_completed", "value": "5", "confidence": 0.95}
-- "jeg er på leksjon 10" -> {"store": true, "key": "current_lesson", "value": "10", "confidence": 0.95}
-- "I'm working on lesson 23" -> {"store": true, "key": "current_lesson", "value": "23", "confidence": 0.95}
+- "I am currently on lesson 2" -> {"store": true, "key": "current_lesson", "value": 2, "confidence": 0.95}
+- "I just finished lesson 5" -> {"store": true, "key": "lesson_completed", "value": 5, "confidence": 0.95}
+- "jeg er på leksjon 10" -> {"store": true, "key": "current_lesson", "value": 10, "confidence": 0.95}
+- "I'm working on lesson 23" -> {"store": true, "key": "current_lesson", "value": 23, "confidence": 0.95}
 
 COMMITMENT EXAMPLES (extract as "acim_commitment"):
 - English: "Yes, I'm ready to commit to this journey!" -> store "committed to ACIM lessons"
@@ -207,7 +209,11 @@ User message: "{user_message}"{context_str}"""
                 m = re.search(pat, lower)
                 if m:
                     val = m.group(1).strip()
-                    out.append({"store": True, "key": "current_lesson", "value": val, "confidence": 0.9, "ttl_hours": None})
+                    try:
+                        ival = int(val)
+                    except Exception:
+                        ival = val
+                    out.append({"store": True, "key": "current_lesson", "value": ival, "confidence": 0.9, "ttl_hours": None})
                     return out
             # If no explicit lesson number found, avoid extracting names from this message
             logger.debug("Heuristic skipping name extraction due to lesson/digit context")

@@ -228,13 +228,13 @@ def _execute_verified_request(session: Session, user_id: int, verification) -> s
     if request_type == "erase":
         erase_user_data(session, user_id, payload.get("reason"), actor="user")
         return "Your data has been erased."
-    if request_type == "clean":
-        # Clean behaves like erase but leaves the User row active so the
+    if request_type == "clear":
+        # Clear behaves like erase but leaves the User row active so the
         # same user_id can be reused by tests / WebUI.
         from src.services.gdpr_service import clean_user_data
 
         clean_user_data(session, user_id, payload.get("reason"), actor="user")
-        return "Your data has been erased (clean). User record left active."
+        return "Your data has been erased (clear). User record left active."
     if request_type == "restrict":
         restrict_processing(session, user_id, payload.get("reason"), actor="user")
         return "Your data processing has been restricted."
@@ -283,7 +283,7 @@ async def handle_gdpr_commands(
             "GDPR options:\n"
             "- gdpr export: receive a JSON copy of your data\n"
             "- gdpr erase: delete your data (you can onboard again later)\n"
-            "- gdpr clean: delete/anonymize PII but keep the user id active for reuse\n"
+            "- gdpr clear: delete/anonymize PII but keep the user id active for reuse\n"
             "- gdpr restrict <reason>: limit processing (onboarding is blocked)\n"
             "- gdpr object <reason>: object to processing and restrict it (onboarding is blocked)\n"
             "- gdpr withdraw <scope>: withdraw consent (onboarding is blocked; default scope: data_storage)"
@@ -292,11 +292,11 @@ async def handle_gdpr_commands(
     action = parts[1]
     reason = " ".join(parts[2:]).strip() if len(parts) > 2 else None
 
-    if action not in {"export", "erase", "clean", "restrict", "object", "withdraw"}:
-        return "Unsupported GDPR action. Try: export, erase, clean, restrict, object, withdraw."
+    if action not in {"export", "erase", "clear", "restrict", "object", "withdraw"}:
+        return "Unsupported GDPR action. Try: export, erase, clear, restrict, object, withdraw."
 
     payload = {}
-    if action in {"restrict", "object", "erase", "clean"} and reason:
+    if action in {"restrict", "object", "erase", "clear"} and reason:
         payload["reason"] = reason
     if action == "withdraw":
         payload["scope"] = reason or "data_storage"
@@ -324,15 +324,39 @@ def handle_debug_next_day(
         return None
 
     if memory_manager:
-        memory_manager.store_memory(
-            user_id=user_id,
-            key="debug_day_offset",
-            value="1",
-            confidence=1.0,
-            source="debug_command",
-            ttl_hours=1,
-            category="conversation",
-        )
+        # Increment existing debug offset if present so repeated `next_day`
+        # calls advance the simulated day consecutively.
+        try:
+            offsets = memory_manager.get_memory(user_id, "debug_day_offset")
+            current = 0
+            if offsets:
+                latest = max(offsets, key=lambda x: x.get("created_at") or datetime(1970, 1, 1, tzinfo=timezone.utc))
+                raw = str(latest.get("value", "")).strip()
+                try:
+                    current = int(raw)
+                except Exception:
+                    current = 0
+            new_value = str(current + 1)
+            memory_manager.store_memory(
+                user_id=user_id,
+                key="debug_day_offset",
+                value=new_value,
+                confidence=1.0,
+                source="debug_command",
+                ttl_hours=1,
+                category="conversation",
+            )
+        except Exception:
+            # Fall back to writing '1' if anything goes wrong
+            memory_manager.store_memory(
+                user_id=user_id,
+                key="debug_day_offset",
+                value="1",
+                confidence=1.0,
+                source="debug_command",
+                ttl_hours=1,
+                category="conversation",
+            )
     schedules = []
     if session:
         schedules = (
@@ -345,14 +369,24 @@ def handle_debug_next_day(
             .all()
         )
     if schedules:
-        # Directly invoke scheduler execution in simulation mode so we
-        # send the messages as if the job ran, but avoid mutating the
-        # stored schedule times (no DB updates).
+        # Use the production scheduler simulation path so we exercise
+        # the same code paths used in production. Collect returned
+        # simulated messages (if any) and return them to the caller.
+        messages = []
         for schedule in schedules:
             try:
-                SchedulerService.execute_scheduled_task(schedule.schedule_id, simulate=True)
+                result = SchedulerService.execute_scheduled_task(schedule.schedule_id, simulate=True, session=session)
+                if result:
+                    # result is expected to be a list of messages when simulate=True
+                    if isinstance(result, list):
+                        messages.extend(result)
+                    elif isinstance(result, str):
+                        messages.append(result)
             except Exception as e:
-                logger.exception("Failed to simulate schedule %s: %s", schedule.schedule_id, e)
+                logger.exception("Failed to simulate schedule %s: %s", getattr(schedule, "schedule_id", "?"), e)
+
+        if messages:
+            return "\n\n".join(messages)
         return "OK"
     return "OK"
 

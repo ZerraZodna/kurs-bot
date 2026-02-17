@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from src.memories import MemoryManager, MemoryExtractor
 from src.config import settings
+from src.scheduler.lesson_state import set_current_lesson
 
 logger = logging.getLogger(__name__)
 
@@ -62,20 +63,31 @@ async def extract_and_store_memories(
 
         for memory in extracted_memories:
             try:
-                memory_manager.store_memory(
-                    user_id=user_id,
-                    key=memory.get("key"),
-                    value=memory.get("value"),
-                    confidence=memory.get("confidence", 1.0),
-                    ttl_hours=memory.get("ttl_hours"),
-                    source="dialogue_engine_extractor",
-                    generate_embedding=False,  # Disable embedding to avoid lock contention
-                )
+                key = memory.get("key")
+                val = memory.get("value")
+                # Route lesson state writes through the centralized helper
+                if key == "current_lesson":
+                    # Normalize numeric lesson values to int, keep strings like 'continuing'
+                    parsed = None
+                    try:
+                        parsed = int(val)
+                    except Exception:
+                        parsed = val
+                    set_current_lesson(memory_manager, user_id, parsed)
+                else:
+                    memory_manager.store_memory(
+                        user_id=user_id,
+                        key=key,
+                        value=val,
+                        confidence=memory.get("confidence", 1.0),
+                        ttl_hours=memory.get("ttl_hours"),
+                        source="dialogue_engine_extractor",
+                        generate_embedding=False,  # Disable embedding to avoid lock contention
+                    )
                 print(f"[EXTRACT DEBUG] stored memory for user {user_id}: {memory.get('key')}={memory.get('value')}")
-                logger.info(
-                    f"Stored memory for user {user_id}: {memory.get('key')}="
-                    f"{memory.get('value')[:50]}"
-                )
+                val = memory.get('value')
+                sval = str(val) if val is not None else ''
+                logger.info(f"Stored memory for user {user_id}: {memory.get('key')}={sval[:50]}")
             except Exception as e:
                 logger.error(f"Error storing memory: {e}")
 

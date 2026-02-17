@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
 from src.memories import MemoryManager
+from datetime import date
 
 
 def _latest_memory(memories: list) -> Optional[Dict[str, Any]]:
@@ -102,29 +103,6 @@ def set_lesson_state(
         allow_duplicates=False,
     )
 
-    # Mirror to legacy keys during migration window for compatibility
-    if write_legacy:
-        if state.get("current_lesson") is not None:
-            val = state.get("current_lesson")
-            memory_manager.store_memory(
-                user_id=user_id,
-                key="current_lesson",
-                value=str(val),
-                category="progress",
-                source="lesson_state_manager",
-                allow_duplicates=False,
-            )
-        if state.get("last_sent_lesson_id") is not None:
-            memory_manager.store_memory(
-                user_id=user_id,
-                key="last_sent_lesson_id",
-                value=str(state.get("last_sent_lesson_id")),
-                category="progress",
-                source="lesson_state_manager",
-                allow_duplicates=False,
-            )
-
-
 def get_current_lesson(memory_manager: MemoryManager, user_id: int) -> Optional[Any]:
     return get_lesson_state(memory_manager, user_id).get("current_lesson")
 
@@ -139,3 +117,65 @@ def get_last_sent_lesson_id(memory_manager: MemoryManager, user_id: int) -> Opti
 
 def set_last_sent_lesson_id(memory_manager: MemoryManager, user_id: int, lesson_id: int, write_legacy: bool = True) -> None:
     set_lesson_state(memory_manager, user_id, last_sent_lesson_id=lesson_id, write_legacy=write_legacy)
+
+
+def has_lesson_status(memory_manager: MemoryManager, user_id: int) -> bool:
+    """Return True when the user has any lesson-related progress info.
+
+    This central helper makes onboarding and other callers clearer and
+    keeps the logic in one place for future changes.
+    """
+    state = get_lesson_state(memory_manager, user_id)
+    return state.get("current_lesson") is not None or state.get("last_sent_lesson_id") is not None
+
+
+def compute_current_lesson_state(memory_manager: MemoryManager, user_id: int, today: Optional[date] = None) -> Dict[str, Any]:
+    """Compute the lesson state used for determining "today's" lesson.
+
+    Returns same shape as PromptBuilder._get_current_lesson_state expects:
+    {"lesson_id": int, "progress_note": Optional[str], "advanced_by_day": bool, "previous_lesson_id": Optional[int], "need_confirmation": bool}
+
+    `today` may be provided (date) to allow deterministic testing; if None,
+    uses UTC today.
+    """
+    if today is None:
+        today = datetime.now(timezone.utc).date()
+
+    state = get_lesson_state(memory_manager, user_id)
+    cur = state.get("current_lesson")
+    last_sent = state.get("last_sent_lesson_id")
+    updated_at = state.get("updated_at")
+
+    # If user explicitly set a current_lesson (numeric), honor it.
+    try:
+        if cur is not None and str(cur).isdigit():
+            # If we have a numeric current_lesson but no recorded last_sent
+            # lesson, surface that we need a confirmation before delivering
+            # the lesson (e.g., user onboarding reported "I'm on lesson 8").
+            if last_sent is None:
+                return {"lesson_id": int(cur), "progress_note": None, "advanced_by_day": False, "previous_lesson_id": None, "need_confirmation": True}
+            return {"lesson_id": int(cur), "progress_note": None, "advanced_by_day": False, "previous_lesson_id": None, "need_confirmation": False}
+    except Exception:
+        pass
+
+    # If we have a last_sent value, decide whether to advance by day.
+    if last_sent is not None:
+        try:
+            if updated_at:
+                updated_dt = datetime.fromisoformat(updated_at) if isinstance(updated_at, str) else updated_at
+            else:
+                updated_dt = datetime.now(timezone.utc)
+            last_date = updated_dt.date()
+            if last_date < today:
+                next_id = last_sent + 1 if last_sent < 365 else 365
+                note = (
+                    f"The user received Lesson {last_sent} on a previous day. "
+                    f"Assume today's lesson is Lesson {next_id}."
+                )
+                return {"lesson_id": next_id, "progress_note": note, "advanced_by_day": True, "previous_lesson_id": last_sent, "need_confirmation": False}
+            return {"lesson_id": last_sent, "progress_note": None, "advanced_by_day": False, "previous_lesson_id": None, "need_confirmation": False}
+        except Exception:
+            pass
+
+    # Fallback to Lesson 1 when nothing else is known
+    return {"lesson_id": 1, "progress_note": None, "advanced_by_day": False, "previous_lesson_id": None, "need_confirmation": False}

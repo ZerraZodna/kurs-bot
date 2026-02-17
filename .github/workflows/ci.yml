@@ -12,7 +12,11 @@ jobs:
     # Environment for CI: run real embedding code (install deps below)
     env:
       TEST_USE_REAL_OLLAMA: 'False'
-      EMBEDDING_BACKEND: 'local'
+      # Use the lightweight test embedding backend in CI to avoid
+      # downloading heavy local models during workflow runs.
+      EMBEDDING_BACKEND: 'test'
+      # Set to 'true' to skip pre-downloading large SentenceTransformer model
+      SKIP_MODEL_PRECACHE: 'true'
     
 
     steps:
@@ -25,13 +29,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Install CPU-only PyTorch wheel first (pin to avoid accidental CUDA wheels)
-          # Use torch 2.4.x+cpu which is compatible with recent sentence-transformers
-          pip install --no-cache-dir torch==2.4.1+cpu --index-url https://download.pytorch.org/whl/cpu
-          pip install --no-cache-dir sentence-transformers hnswlib
-          # Install project requirements
+          # Install only the project requirements for CI; avoid heavy ML packages
+          # unless explicitly enabled via SKIP_MODEL_PRECACHE=false and other
+          # opt-in flags.
           pip install --no-cache-dir -r requirements.txt
-      - name: Pre-download SentenceTransformer model
+      - name: Pre-download SentenceTransformer model (optional)
+        if: ${{ env.SKIP_MODEL_PRECACHE != 'true' }}
         run: |
           python - <<'PY'
           import os

@@ -178,13 +178,22 @@ class OnboardingFlow:
             language = get_user_language(self.memory_manager, user_id)
             print(f"[ONBOARD DEBUG] consent granted - user_id={user_id} language={language}")
             thank_you = self._get_message("consent_granted", language)
-            next_prompt = self.onboarding.get_onboarding_prompt(user_id)
-            if next_prompt:
-                # Show the thank-you immediately after consent, then present
-                # the next onboarding prompt. This keeps the thank-you as the
-                # immediate acknowledgement of consent.
-                return f"{thank_you}\n\n{next_prompt}"
-            return thank_you
+            # If the user already satisfies the remaining onboarding steps
+            # (e.g., name, commitment, lesson status), finalize onboarding
+            # immediately so side-effects like schedule creation run now.
+            try:
+                next_prompt = self.onboarding.get_onboarding_prompt(user_id)
+                if next_prompt:
+                    # Show the thank-you immediately after consent, then present
+                    # the next onboarding prompt.
+                    return f"{thank_you}\n\n{next_prompt}"
+                # No next prompt -> onboarding is complete. Trigger completion
+                # routine which also creates the default schedule.
+                completion = self.onboarding.get_onboarding_complete_message(user_id)
+                return f"{thank_you}\n\n{completion}"
+            except Exception:
+                # Fallback to thank-you only if any helper fails
+                return thank_you
         elif consent is False:
             self._store_memory(user_id, "data_consent", "declined", category="profile")
             record_consent(session, user_id, "data_storage", False, "dialogue_engine_consent")
@@ -213,7 +222,7 @@ class OnboardingFlow:
             # Attempt to interpret and persist an explicit lesson number
             lid = int(str(existing))
             if 1 <= lid <= 365:
-                set_current_lesson(self.memory_manager, user_id, str(lid))
+                set_current_lesson(self.memory_manager, user_id, lid)
                 self._resolve_pending_step(user_id)
                 self._set_pending_lesson_delivery(user_id)
                 return self.onboarding.get_onboarding_complete_message(user_id)
@@ -232,7 +241,7 @@ class OnboardingFlow:
                     # lesson now. Instead, mark onboarding progressed, create
                     # the default schedule, and return the onboarding-complete
                     # message so the user receives the welcome + summary.
-                    set_current_lesson(self.memory_manager, user_id, str(lesson_id))
+                    set_current_lesson(self.memory_manager, user_id, lesson_id)
                     self._resolve_pending_step(user_id)
                     self._set_pending_lesson_delivery(user_id)
                     try:
@@ -284,7 +293,7 @@ class OnboardingFlow:
 
     async def _deliver_lesson(self, user_id: int, lesson_id: int, session: Session, is_first: bool) -> str:
         # Record user progress using consolidated lesson_state helper
-        set_current_lesson(self.memory_manager, user_id, str(lesson_id))
+        set_current_lesson(self.memory_manager, user_id, lesson_id)
 
         completion_msg = self._check_and_send_completion_message(user_id)
 

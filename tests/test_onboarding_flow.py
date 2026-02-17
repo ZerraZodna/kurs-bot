@@ -9,6 +9,7 @@ from src.models.database import SessionLocal, User, Memory, Schedule, init_db
 from tests.utils import create_test_user
 from src.services.dialogue_engine import DialogueEngine
 from src.memories import MemoryManager
+from src.scheduler.lesson_state import get_current_lesson
 
 
 # Use shared `create_test_user` from tests.utils
@@ -54,32 +55,31 @@ async def test_onboarding_new_user_creates_daily_schedule():
 async def test_onboarding_continuing_user_lesson10_sets_memory_and_schedule():
     """A returning user who says 'I am on lesson 10' should have current_lesson stored and receive a daily schedule."""
     db = SessionLocal()
-    try:
-        user_id = create_test_user(db, "test_onboarding_flow_continuing_user", first_name="Bob")
+    user_id = create_test_user(db, "test_onboarding_flow_continuing_user", first_name="Bob")
 
-        # Pre-store consent and commitment so onboarding asks about lesson status
-        mm = MemoryManager(db)
-        mm.store_memory(user_id, "data_consent", "granted", category="profile", source="test")
-        mm.store_memory(user_id, "acim_commitment", "committed to ACIM lessons", category="goals", source="test")
+    # Pre-store consent and commitment so onboarding asks about lesson status
+    mm = MemoryManager(db)
+    mm.store_memory(user_id, "data_consent", "granted", category="profile", source="test")
+    mm.store_memory(user_id, "acim_commitment", "committed to ACIM lessons", category="goals", source="test")
 
-        dialogue = DialogueEngine(db)
+    dialogue = DialogueEngine(db)
 
-        # Begin onboarding which should ask lesson status
-        resp = await dialogue.process_message(user_id, "Hi", db)
-        assert resp is not None
+    # Begin onboarding which should ask lesson status
+    resp = await dialogue.process_message(user_id, "Hi", db)
+    assert resp is not None
 
-        # User states they are on lesson 10
-        resp2 = await dialogue.process_message(user_id, "I am on lesson 10", db)
-        assert resp2 is not None
+    # User states they are on lesson 10
+    resp2 = await dialogue.process_message(user_id, "I am on lesson 10", db)
+    assert resp2 is not None
 
-        # Memory should have recorded current_lesson=10
-        mems = db.query(Memory).filter_by(user_id=user_id, key="current_lesson").all()
-        assert any(m.value == "10" for m in mems), f"Expected current_lesson=10 in memories, got {[m.value for m in mems]}"
+    # Memory should have recorded current_lesson=10
+    mm = MemoryManager(db)
+    cur = get_current_lesson(mm, user_id)
+    assert cur == 10, f"Expected current_lesson=10, got {cur}"
 
-        # Simulate final onboarding completion to create auto schedule
-        _ = dialogue.onboarding.get_onboarding_complete_message(user_id)
-        schedules = db.query(Schedule).filter_by(user_id=user_id).all()
-        assert any(s.schedule_type.startswith("daily") and s.is_active for s in schedules), f"Expected active daily schedule, got {schedules}"
+    # Simulate final onboarding completion to create auto schedule
+    _ = dialogue.onboarding.get_onboarding_complete_message(user_id)
+    schedules = db.query(Schedule).filter_by(user_id=user_id).all()
+    assert any(s.schedule_type.startswith("daily") and s.is_active for s in schedules), f"Expected active daily schedule, got {schedules}"
 
-    finally:
-        db.close()
+    db.close()

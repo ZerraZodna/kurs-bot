@@ -16,7 +16,7 @@ from src.onboarding.detectors import (
     detect_schedule_request,
     handle_lesson_status_response,
 )
-from src.onboarding.prompts import (
+from src.onboarding.language.prompts import (
     get_continuation_welcome_message,
     get_lesson_1_welcome_message,
     get_onboarding_complete_message_text,
@@ -27,7 +27,7 @@ from src.onboarding.status import get_onboarding_status_dict
 from src.onboarding.schedule_setup import create_auto_schedule
 from src.services.timezone_utils import ensure_user_timezone
 from src.onboarding.user_management import delete_user_and_data, is_user_new
-from src.scheduler.lesson_state import set_current_lesson
+from src.scheduler.lesson_state import set_current_lesson, get_lesson_state, has_lesson_status
 
 logger = logging.getLogger(__name__)
 
@@ -75,14 +75,14 @@ class OnboardingService:
             for m in consent_memories
         )
 
-        lesson_status_memories = self.memory_manager.get_memory(user_id, "current_lesson")
-        has_lesson_status = bool(lesson_status_memories)
+        # Use consolidated lesson_state helper for onboarding status
+        lesson_status_present = has_lesson_status(self.memory_manager, user_id)
 
         return get_onboarding_status_dict(
             has_name=has_name,
             has_consent=has_consent,
             has_commitment=has_commitment,
-            has_lesson_status=has_lesson_status,
+            has_lesson_status=lesson_status_present,
             declined_commitment=declined_commitment,
             declined_consent=declined_consent,
         )
@@ -284,17 +284,10 @@ class OnboardingService:
             if lesson_id:
                 # store as a progress memory so get_onboarding_status sees it
                 # Use consolidated lesson_state helper to keep state consistent
-                set_current_lesson(self.memory_manager, user_id, str(lesson_id))
+                set_current_lesson(self.memory_manager, user_id, int(lesson_id))
         elif facts.get("is_continuing") or facts.get("completed_before"):
             # mark that user is continuing (no specific lesson known)
-            self.memory_manager.store_memory(
-                user_id=user_id,
-                key="current_lesson",
-                value="continuing",
-                confidence=1.0,
-                source="onboarding_service",
-                category="progress",
-            )
+            set_current_lesson(self.memory_manager, user_id, "continuing")
 
         return result
 

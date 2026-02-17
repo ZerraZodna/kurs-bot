@@ -10,7 +10,7 @@ from src.services.timezone_utils import to_utc
 from sqlalchemy.orm import Session
 from src.models.database import Lesson
 from src.memories import MemoryManager
-from src.scheduler.lesson_state import set_last_sent_lesson_id
+from src.scheduler.lesson_state import set_last_sent_lesson_id, set_current_lesson
 
 logger = logging.getLogger(__name__)
 
@@ -136,14 +136,7 @@ async def handle_lesson_confirmation(
     # Update explicit current_lesson state to the next lesson (if known).
     if lesson_id:
         next_id = lesson_id + 1 if lesson_id < 365 else 365
-        memory_manager.store_memory(
-            user_id=user_id,
-            key="current_lesson",
-            value=str(next_id),
-            category="progress",
-            confidence=1.0,
-            source="dialogue_engine_lesson_confirmation",
-        )
+        set_current_lesson(memory_manager, user_id, next_id)
 
     lesson = (
         session.query(Lesson).filter(Lesson.lesson_id == next_id).first()

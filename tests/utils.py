@@ -1,5 +1,6 @@
 from src.models.database import User
 from src.memories import MemoryManager
+from src.scheduler.lesson_state import set_current_lesson
 
 
 def create_test_user(db, external_id: str, first_name: str | None = None) -> int:
@@ -52,5 +53,5 @@ def make_ready_user(db, external_id: str, first_name: str = "Test") -> int:
     mm.store_memory(user_id, "acim_commitment", "yes", category="profile", source="test")
     mm.store_memory(user_id, "data_consent", "yes", category="profile", source="test")
     mm.store_memory(user_id, "first_name", first_name, category="profile", source="test")
-    mm.store_memory(user_id, "current_lesson", "1", category="progress", source="test")
+    set_current_lesson(mm, user_id, 1)
     return user_id

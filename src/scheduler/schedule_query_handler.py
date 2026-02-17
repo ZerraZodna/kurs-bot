@@ -26,6 +26,11 @@ async def detect_schedule_status_request(text: str) -> bool:
 
     matcher = trigger_matcher.get_trigger_matcher()
     matches = await matcher.match_triggers(message, top_k=3)
+    # If the matcher returned no results, do not fall back to simple
+    # keyword scanning here — tests should seed the trigger matcher via
+    # `conftest.setup_test_environment` and we want failures in that
+    # seeding to surface (fail-fast). Returning False when no matches
+    # were produced preserves the matcher-driven behavior.
     if not matches:
         return False
 
