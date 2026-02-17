@@ -82,7 +82,30 @@ async def handle_lesson_request(
         lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
 
         if not lesson:
-            return f"I couldn't find lesson {lesson_id} in my database. ACIM has 365 lessons - please ask for a lesson between 1 and 365."
+            # If the lessons table is empty, attempt to import lessons from the
+            # bundled PDF automatically to reduce friction on new hosts.
+            session_count = session.query(Lesson).count()
+            if session_count == 0:
+                from pathlib import Path
+                import importlib.util
+                repo_root = Path(__file__).resolve().parents[3]
+                script_path = repo_root / 'scripts' / 'utils' / 'import_acim_lessons.py'
+                if script_path.exists():
+                    try:
+                        spec = importlib.util.spec_from_file_location("import_acim_lessons", str(script_path))
+                        mod = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(mod)
+                        # Call main() to perform import; it returns an exit code
+                        rc = mod.main([])
+                        if rc == 0:
+                            # re-query for the lesson after successful import
+                            lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
+                    except Exception:
+                        # If importing fails, continue to return the not-found message
+                        lesson = None
+
+            if not lesson:
+                return f"I couldn't find lesson {lesson_id} in my database. ACIM has 365 lessons - please ask for a lesson between 1 and 365."
 
         # Detect if the user explicitly asks for the exact/raw lesson text
         user_lower = user_input.lower()
@@ -136,6 +159,41 @@ async def handle_lesson_request(
     except Exception as e:
         logger.error(f"[Lesson request error] Failed to handle lesson {lesson_id}: {e}")
         return f"I encountered an error retrieving lesson {lesson_id}. Please try again."
+
+
+async def pre_llm_lesson_short_circuit(
+    original_text: str,
+    precomputed_embedding,
+    user_id: int,
+    session: Session,
+    prompt_builder,
+    user_lang: str,
+    call_ollama_fn,
+) -> Optional[str]:
+    """
+    Check triggers on the original user text before calling the LLM and
+    return a verbatim/formatted lesson message when a lesson-related trigger
+    (next_lesson/raw_lesson) matches.
+
+    This function intentionally avoids try/except so failures surface to the
+    caller for observability.
+    """
+    from src.triggers.trigger_matcher import get_trigger_matcher
+
+    matcher = get_trigger_matcher()
+    matches = await matcher.match_triggers(original_text, precomputed_embedding=precomputed_embedding)
+    for m in matches:
+        if m.get("score", 0.0) >= m.get("threshold", settings.TRIGGER_SIMILARITY_THRESHOLD):
+            action = m.get("action_type")
+            if action in ("next_lesson", "raw_lesson") and prompt_builder:
+                today_ctx = prompt_builder.get_today_lesson_context(user_id)
+                state = today_ctx.get("state", {})
+                lesson_id = state.get("lesson_id")
+                if lesson_id:
+                    lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
+                    if lesson:
+                        return await format_lesson_message(lesson, user_lang, call_ollama_fn)
+
 
 
 async def format_lesson_message(lesson: Lesson, language: str, call_ollama_fn) -> str:
