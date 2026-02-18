@@ -9,6 +9,14 @@ without requiring heavy ML dependencies or an Ollama server.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Ensure the repository root is on sys.path so `import src...` works when
+# running this script directly (e.g., in CI or locally as `python scripts/...`).
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+
 import hashlib
 import numpy as np
 from src.triggers.trigger_matcher import STARTER
