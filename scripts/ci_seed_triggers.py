@@ -21,6 +21,8 @@ import hashlib
 import numpy as np
 from src.triggers.trigger_matcher import STARTER
 from src.models.database import TriggerEmbedding, SessionLocal, init_db
+from pathlib import Path
+import importlib
 from src.config import settings
 
 
@@ -53,6 +55,34 @@ def hash_embedding(text: str, dim: int):
 
 def main():
     dim = getattr(settings, "EMBEDDING_DIMENSION", 384) or 384
+    # If a precomputed trigger data file exists, load and insert those values
+    repo_root = Path(__file__).resolve().parents[1]
+    precomputed = repo_root / 'scripts' / 'ci_trigger_data.py'
+    if precomputed.exists():
+        try:
+            spec = importlib.import_module('scripts.ci_trigger_data')
+            triggers = getattr(spec, 'TRIGGERS', None)
+            if isinstance(triggers, list):
+                init_db()
+                db = SessionLocal()
+                try:
+                    for t in triggers:
+                        emb = t.get('embedding') or []
+                        try:
+                            arr = np.array(emb, dtype=np.float32)
+                            b = arr.tobytes()
+                        except Exception:
+                            b = b''
+                        te = TriggerEmbedding(name=t.get('name') or '', action_type=t.get('action_type') or '', embedding=b, threshold=float(t.get('threshold', 0.75)))
+                        db.add(te)
+                    db.commit()
+                    print(f"Seeded {len(triggers)} precomputed trigger embeddings from {precomputed}")
+                    return
+                finally:
+                    db.close()
+        except Exception as e:
+            print(f"Failed to load precomputed triggers: {e}; falling back to deterministic seeding")
+
     # Ensure database tables exist before inserting (CI DB is ephemeral)
     init_db()
     db = SessionLocal()
