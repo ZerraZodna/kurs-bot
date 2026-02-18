@@ -65,10 +65,31 @@ Content can be rendered at presentation layer:
 
 ## Usage
 
-Run the import script:
+Run the import script (script moved to `scripts/utils`):
 ```bash
-python scripts/import_acim_lessons.py --pdf src/data/Sparkly\ ACIM\ lessons-extracted.pdf
+# from repo root, with virtualenv activated
+python3 scripts/utils/import_acim_lessons.py --pdf "src/data/Sparkly ACIM lessons-extracted.pdf"
 ```
+
+Example run (Linux bash):
+```bash
+(.venv) ubuntu@ip-172-31-25-219:~/kurs-bot$ python3 scripts/utils/import_acim_lessons.py
+🧪 Using database: sqlite:///./src/data/prod.db
+📖 Reading ACIM lessons from: src/data/Sparkly ACIM lessons-extracted.pdf
+🔍 Extracting lessons from PDF...
+Found 362 candidate lessons in PDF
+/home/ubuntu/kurs-bot/scripts/utils/import_acim_lessons.py:213: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    created_at=datetime.datetime.utcnow()
+```
+
+Note: the script currently emits a DeprecationWarning because it uses `datetime.datetime.utcnow()` (see the path above). To make datetimes timezone-aware, replace with, for example:
+
+```py
+from datetime import datetime, timezone
+created_at = datetime.now(timezone.utc)
+```
+
+This keeps behavior equivalent while avoiding the deprecation warning.
 
 The script extracts 365 lessons and stores them in the database with clean, complete content ready for flexible styling on the frontend.
 

@@ -56,4 +56,16 @@ else
   exit 1
 fi
 
-exec $uvicorn_cmd
+# Start uvicorn detached with nohup; keep it simple and write logs to script dir
+nohup $uvicorn_cmd >"$script_root/uvicorn.out.log" 2>"$script_root/uvicorn.err.log" &
+echo "Started uvicorn detached (logs: $script_root/uvicorn.out.log, $script_root/uvicorn.err.log)"
+
+echo
+echo "To list running processes (ngrok/uvicorn):"
+echo "  pgrep -a ngrok || ps aux | grep ngrok | grep -v grep"
+echo "  pgrep -a -f 'uvicorn|python.*uvicorn' || ps aux | grep uvicorn | grep -v grep"
+echo
+echo "To follow uvicorn logs in real time:"
+echo "  tail -f $script_root/uvicorn.err.log $script_root/uvicorn.out.log"
+
+exit 0

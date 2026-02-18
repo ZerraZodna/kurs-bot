@@ -18,8 +18,6 @@ ollama
 pydantic_core==2.41.5
 numpy
 pydantic-settings
- 
-# Optional fast PDF extractor alternative
 pymupdf
 
 # Optional local embedding backend (moved out of main install for CPU-only setups)
