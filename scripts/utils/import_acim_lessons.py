@@ -10,7 +10,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, List, Optional
 import datetime
 import fitz
 
@@ -381,15 +381,30 @@ def parse_lessons_from_text(full_text: str) -> list[tuple[int, str, str]]:
     return out
 
 
-def import_to_db(lessons, clear=False, limit=None, full_html=None):
+def import_to_db(
+    lessons: List[tuple[int, str, str]],
+    clear: bool = False,
+    limit: Optional[int] = None,
+    full_html: Optional[str] = None,
+) -> int:
+    """Import parsed lessons into the database.
+
+    Args:
+        lessons: List of (lesson_id, title, content) tuples.
+        clear: If True, delete existing lessons before import.
+        limit: Optional limit on number of lessons to import.
+        full_html: Unused placeholder for future HTML content.
+
+    Returns:
+        Number of lessons added.
+    """
     if limit is not None:
         lessons = lessons[:limit]
-    session = SessionLocal()
-    try:
+    added = 0
+    with SessionLocal() as session:
         if clear:
             session.query(Lesson).delete()
             session.commit()
-        added = 0
         for lid, title, content in lessons:
             exists = session.query(Lesson).filter(Lesson.lesson_id == lid).first()
             if exists:
@@ -412,19 +427,115 @@ def import_to_db(lessons, clear=False, limit=None, full_html=None):
             if added % 50 == 0:
                 session.commit()
         session.commit()
-        return added
-    finally:
-        session.close()
+    return added
 
 
 def verify_db_count(expected: int) -> bool:
-    session = SessionLocal()
-    try:
+    with SessionLocal() as session:
         cnt = session.query(Lesson).count()
         print(f"Database contains {cnt} lessons (expected {expected})")
         return cnt >= expected
-    finally:
-        session.close()
+
+
+def _normalize_extracted_text_for_dump(text: str) -> str:
+    """Normalize extracted text into paragraph blocks for parsing.
+
+    This preserves the original dump-processing heuristics and targeted
+    fixes while returning the normalized text so parsing is consistent
+    whether or not the user requests a dump file.
+    """
+    try:
+        t = text.replace('\r\n', '\n')
+        t = re.sub(r'\n{3,}', '\n\n', t)
+        parts = [p.strip() for p in t.split('\n\n') if p.strip()]
+        normalized_parts = []
+        for p in parts:
+            pclean = re.sub(r'\r?\n(?=[ \t\*\"\u201c\u2018])', '\n', p)
+            pclean = re.sub(r'\r?\n+', ' ', pclean)
+            pclean = re.sub(r'\s+', ' ', pclean).strip()
+            normalized_parts.append(pclean)
+
+        merged_parts = []
+        i = 0
+        while i < len(normalized_parts):
+            cur = normalized_parts[i]
+            if i + 1 < len(normalized_parts):
+                nxt = normalized_parts[i + 1]
+                nxt_strip = nxt.lstrip()
+                is_header = bool(re.match(r'(?i)^(lesson\b|lesson\s+\d|intro|introduction|part\b|workbook\b)', nxt_strip))
+                last_tok = re.sub(r'[\W_]+$', '', (cur.split()[-1] if cur.split() else ''))
+                last_tok_len = len(last_tok)
+                cur_ends_sentence = bool(re.search(r'[\.\!\?\:\;"\)\]]$', cur.strip()))
+                if (not cur_ends_sentence and last_tok_len > 0 and last_tok_len <= 4
+                        and nxt_strip and nxt_strip[0].islower() and not is_header):
+                    cur = cur.rstrip() + ' ' + nxt_strip
+                    merged_parts.append(cur)
+                    i += 2
+                    continue
+            merged_parts.append(cur)
+            i += 1
+
+        out_text = '\n\n'.join(merged_parts) + '\n'
+
+        short_join_re = re.compile(r'(?<![\.\!\?])\b(\w{1,4})\n\n(lesson\b)', flags=re.I)
+        out_text = short_join_re.sub(r'\1 \2', out_text)
+
+        try:
+            low = out_text.lower().find('lesson 1')
+            if low != -1:
+                hi = out_text.lower().find('\n\nlesson 2', low+1)
+                if hi == -1:
+                    hi = out_text.lower().find('lesson 2', low+1)
+                block = out_text[low:hi] if hi != -1 else out_text[low:]
+                b = block
+                b = re.sub(r'(”\*\*\*|"\*\*\*)\s*Now', r'\1\n\nNow', b)
+                b = b.replace(': *"', ':\n\n*"')
+                b = b.replace(': *“', ':\n\n*“')
+                b = b.replace('*Then look farther away', '\n\nThen look farther away')
+                if b != block:
+                    out_text = out_text[:low] + b + (out_text[hi:] if hi != -1 else '')
+        except Exception:
+            pass
+
+        try:
+            out_text = re.sub(r'(\*\u201c[^\u201d]+\u201d\*)\s+(?=\*\u201c)', r"\1\n", out_text)
+        except Exception:
+            out_text = re.sub(r'("\*[^\"]+"\*)\s+(?=")', r"\1\n", out_text)
+
+        try:
+            bold_italic_re = re.compile(r'(\*\*\*.*?\*\*\*)\s*(?=\*\*\*)', flags=re.DOTALL)
+            out_text = bold_italic_re.sub(r'\1\n', out_text)
+        except Exception:
+            pass
+
+        try:
+            out_text = re.sub(
+                r"(?mi)(?<!\n\n)\n*\s*(lesson\s+\d{1,3}\b[^\n]*)",
+                r"\n\n\1\n\n",
+                out_text,
+            )
+            out_text = re.sub(r'\n{3,}', '\n\n', out_text)
+            out_text = re.sub(r"(?mi)^(lesson\s+\d{1,3}\b)\s+([^\n\r]+)", r"\1\n\n\2", out_text)
+        except Exception:
+            pass
+
+        try:
+            out_text = re.sub(r'(?m)(\*\*\*.*?\*\*\*)\r?\n\s*\r?\n\s*(\*\*\*.*?\*\*\*)', r'\1\n\2', out_text, flags=re.DOTALL)
+        except Exception:
+            pass
+
+        try:
+            out_text = re.sub(
+                r'(?mi)(lesson\s+361)\s*\n\s*\n\s*t\s*o\s*3\s*6\s*5',
+                r'\1 to 365\n\n',
+                out_text,
+            )
+        except Exception:
+            pass
+
+        return out_text
+    except Exception:
+        return text
 
 
 def main(argv=None):
