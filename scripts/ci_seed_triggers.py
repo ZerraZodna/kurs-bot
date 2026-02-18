@@ -20,7 +20,7 @@ sys.path.insert(0, str(REPO_ROOT))
 import hashlib
 import numpy as np
 from src.triggers.trigger_matcher import STARTER
-from src.models.database import TriggerEmbedding, SessionLocal
+from src.models.database import TriggerEmbedding, SessionLocal, init_db
 from src.config import settings
 
 
@@ -53,6 +53,8 @@ def hash_embedding(text: str, dim: int):
 
 def main():
     dim = getattr(settings, "EMBEDDING_DIMENSION", 384) or 384
+    # Ensure database tables exist before inserting (CI DB is ephemeral)
+    init_db()
     db = SessionLocal()
     try:
         # Clear existing starter entries with same names to avoid duplicates
