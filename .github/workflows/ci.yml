@@ -12,9 +12,10 @@ jobs:
     # Environment for CI: run real embedding code (install deps below)
     env:
       TEST_USE_REAL_OLLAMA: 'False'
-      # Use the lightweight test embedding backend in CI to avoid
-      # downloading heavy local models during workflow runs.
-      EMBEDDING_BACKEND: 'test'
+      # Use the local embedding backend in CI so behavior matches local dev.
+      # This avoids using a non-standard 'test' value which can bypass
+      # the normal HTTP/mock embedding path and cause surprising failures.
+      EMBEDDING_BACKEND: 'local'
       # Set to 'true' to skip pre-downloading large SentenceTransformer model
       SKIP_MODEL_PRECACHE: 'true'
     
