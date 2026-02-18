@@ -59,5 +59,8 @@ jobs:
             echo ".env.template not found, skipping copy"
           fi
 
+      - name: Seed deterministic trigger embeddings
+        run: python scripts/ci_seed_triggers.py
+
       - name: Run tests
         run: pytest -q
