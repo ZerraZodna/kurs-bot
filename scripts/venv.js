@@ -18,10 +18,24 @@ function venvPython() {
   return null;
 }
 
+function findSystemPython() {
+  const candidates = [
+    process.env.PYTHON,
+    process.env.PYTHON3,
+    'python3',
+    'python'
+  ].filter(Boolean);
+  for (const cmd of candidates) {
+    const res = spawnSync(cmd, ['-V'], { stdio: 'ignore' });
+    if (!res.error) return cmd;
+  }
+  return null;
+}
+
 function whichPython() {
   const p = venvPython();
   if (p) return p;
-  return process.env.PYTHON || process.env.PYTHON3 || 'python';
+  return findSystemPython();
 }
 
 function runCommand(cmd, args, opts = {}) {
@@ -32,7 +46,11 @@ function runCommand(cmd, args, opts = {}) {
 
 function ensureVenv() {
   if (fs.existsSync(venvDir)) return true;
-  const python = process.env.PYTHON || process.env.PYTHON3 || 'python';
+  const python = findSystemPython();
+  if (!python) {
+    console.error('No Python found. Install Python 3 or set PYTHON/PYTHON3 env var.');
+    return false;
+  }
   console.log('Creating venv using:', python);
   const res = spawnSync(python, ['-m', 'venv', '.venv'], { cwd: repoRoot, stdio: 'inherit' });
   return res.status === 0;
@@ -41,7 +59,7 @@ function ensureVenv() {
 function installDeps() {
   const py = whichPython();
   if (!py) {
-    console.error('No Python found to install dependencies. Set PYTHON env or create .venv first.');
+    console.error('No Python found to install dependencies. Install Python 3 or set PYTHON/PYTHON3 env var.');
     return false;
   }
 
