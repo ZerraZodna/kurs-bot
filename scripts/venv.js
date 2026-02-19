@@ -174,6 +174,7 @@ switch (cmd) {
       '  npm stop             # stop ngrok and uvicorn processes started by `npm start`',
       '  npm restart          # stop then start services (equivalent to stop + start)',
       '  npm run start:ui     # serve the dev frontend (equivalent to serve_dev_ui.ps1) — opens browser by default; use `--no-open` or set BROWSER=none to disable',
+      '  npm run init_db     # initialize database (defaults to prod.db)',
       '  npm run config       # create .env from .env.template (if missing) and open it in your editor',
       "  npm run update       # run 'git pull' and, if changes were pulled, restart services (stop then start)",
       '  npm run ping         # check Telegram API and Ollama endpoints based on .env',

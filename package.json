@@ -11,6 +11,7 @@
     "help": "node ./scripts/venv.js help",
     "install:py": "node ./scripts/venv.js install",
     "postinstall": "node ./scripts/venv.js ensure-venv && node ./scripts/venv.js install",
+    "init_db": "node ./scripts/venv.js run scripts/utils/init_db.py --yes --db prod",
     "config": "node ./scripts/venv.js config",
     "update": "node ./scripts/venv.js update",
     "test": "node ./scripts/venv.js test",
