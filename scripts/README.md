@@ -21,6 +21,12 @@ Commands (for a CLEAN new host):
 # If you prefer to run only the production DB initializer directly (Python)
 python scripts/utils/init_prod_db.py --yes
 
+# Currently bug in PDF import done above, so must do this too:
+Windows:
+. .\.venv\Scripts\Activate.ps1; python .\scripts\utils\import_acim_lessons.py --pdf "src/data/Sparkly ACIM lessons-extracted.pdf" --dump-text src/data/Sparkly_ACIM_extracted.txt
+Bash:
+source ./.venv/bin/activate && python ./scripts/utils/import_acim_lessons.py --pdf "src/data/Sparkly ACIM lessons-extracted.pdf" --dump-text src/data/Sparkly_ACIM_extracted.txt
+
 # Import ACIM lessons from PDF (Python)
 python scripts/utils/import_acim_lessons.py --pdf src/data/"Sparkly ACIM lessons-extracted.pdf"
 

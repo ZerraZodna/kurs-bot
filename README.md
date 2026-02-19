@@ -155,6 +155,9 @@ Then init prod.db:
 .\scripts\setup_new_host.ps1 -Yes
 ```
 
+source ./.venv/bin/activate && python ./scripts/utils/import_acim_lessons.py --pdf "src/data/Sparkly ACIM lessons-extracted.pdf" --dump-text src/data/Sparkly_ACIM_extracted.txt
+
+
 6) Start the app (development): (Do step 7 first once)
 Windows:
 \.\scripts\start-windows.ps1

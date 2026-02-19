@@ -1,0 +1,33 @@
+{
+  "name": "kurs-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Add npm package support for kurs-bot (frontend/tooling)",
+  "engines": {
+    "node": ">=14"
+  },
+  "scripts": {
+    "venv": "node ./scripts/venv.js",
+    "help": "node ./scripts/venv.js help",
+    "install:py": "node ./scripts/venv.js install",
+    "postinstall": "node ./scripts/venv.js ensure-venv && node ./scripts/venv.js install",
+    "config": "node ./scripts/venv.js config",
+    "update": "node ./scripts/venv.js update",
+    "test": "node ./scripts/venv.js test",
+    "tests": "npm test",
+    "ping": "node ./scripts/venv.js ping",
+    "start": "node ./scripts/venv.js start",
+    "start:ui": "node ./scripts/venv.js start-ui",
+    "start:py": "node ./scripts/venv.js run src\\main.py",
+    "stop": "node ./scripts/venv.js stop",
+    "restart": "npm run stop && npm run start",
+    "tail": "node ./scripts/venv.js tail",
+    "list": "node ./scripts/venv.js list",
+    "lint": "echo \"No linter configured\" && exit 0"
+  }
+  ,
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.0.0"
+  }
+}

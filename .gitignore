@@ -146,3 +146,8 @@ scripts/start-ngrok.ps1
 scripts/start-uvicorn.ps1
 src/data/models/
 src/data/Sparkly_ACIM_extracted.txt
+
+# Node / JavaScript
+node_modules/
+package-lock.json
+yarn.lock
