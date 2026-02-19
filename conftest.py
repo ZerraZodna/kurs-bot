@@ -6,82 +6,15 @@ import os
 import time
 from pathlib import Path
 import pytest
-
-# Install a lightweight test embedding singleton early so modules imported
-# during pytest collection (which may import the real embedding service) will
-# see a deterministic embedding provider. This prevents import-time code
-# from attempting to load heavy local models and logging errors about
-# 'sentence-transformers' not being installed.
-try:
-    from src.services import embedding_service as _emb_mod
-    class _QuickTestEmbeddingService:
-        def __init__(self):
-            from src.config import settings as _s
-            self.embedding_dimension = int(getattr(_s, "EMBEDDING_DIMENSION", 384) or 384)
-
-        async def generate_embedding(self, text):
-            if not text:
-                return None
-            import re
-            tokens = [t for t in re.split(r"\W+", text.lower()) if t]
-            import numpy as _np
-            vec = _np.zeros(self.embedding_dimension, dtype=_np.float32)
-            for tok in tokens:
-                idx = abs(hash(tok)) % self.embedding_dimension
-                vec[idx] += 1.0
-            norm = _np.linalg.norm(vec)
-            if norm == 0:
-                return vec.tolist()
-            return (vec / norm).tolist()
-
-        async def batch_embed(self, texts):
-            out = []
-            for t in texts:
-                out.append(await self.generate_embedding(t))
-            return out
-
-        def embedding_to_bytes(self, emb):
-            import numpy as _np
-            try:
-                arr = _np.array(emb, dtype=_np.float32)
-                return arr.tobytes()
-            except Exception:
-                return b""
-
-        def bytes_to_embedding(self, data):
-            import numpy as _np
-            try:
-                arr = _np.frombuffer(data, dtype=_np.float32)
-                return arr.tolist()
-            except Exception:
-                return None
-
-        def cosine_similarity(self, a, b):
-            import numpy as _np
-            try:
-                a = _np.array(a, dtype=_np.float32)
-                b = _np.array(b, dtype=_np.float32)
-                an = _np.linalg.norm(a)
-                bn = _np.linalg.norm(b)
-                if an == 0 or bn == 0:
-                    return 0.0
-                return float(_np.dot(a / an, b / bn))
-            except Exception:
-                return 0.0
-
-    # Assign singleton so `get_embedding_service()` will return this instance.
-    try:
-        _emb_mod._embedding_service = _QuickTestEmbeddingService()
-    except Exception:
-        pass
-except Exception:
-    # If embedding module isn't importable at conftest import time, ignore
-    # — the fixture-level fallback will attempt to patch later.
-    pass
+# Ensure test DB is used for the test session
+# (override early so modules importing settings pick up test DB URL)
 
 # Test database configuration (single source of truth)
 TEST_DB_PATH = Path('src/data/test.db')
 TEST_DB_URL = f'sqlite:///{TEST_DB_PATH}'
+
+# Export DATABASE_URL so code using settings picks up the test DB
+os.environ['DATABASE_URL'] = TEST_DB_URL
 
 # Set test database environment variable for all tests
 os.environ['DATABASE_URL'] = TEST_DB_URL

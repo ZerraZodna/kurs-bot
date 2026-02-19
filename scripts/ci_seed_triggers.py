@@ -81,29 +81,12 @@ def main():
                 finally:
                     db.close()
         except Exception as e:
-            print(f"Failed to load precomputed triggers: {e}; falling back to deterministic seeding")
-
-    # Ensure database tables exist before inserting (CI DB is ephemeral)
-    init_db()
-    db = SessionLocal()
-    try:
-        # Clear existing starter entries with same names to avoid duplicates
-        # (safe in CI ephemeral DBs)
-        for spec in STARTER:
-            utterance = spec["utterance"]
-            emb = hash_embedding(utterance, dim)
-            b = emb.tobytes()
-            te = TriggerEmbedding(
-                name=spec.get("name") or utterance,
-                action_type=spec["action_type"],
-                embedding=b,
-                threshold=spec.get("threshold", 0.75),
-            )
-            db.add(te)
-        db.commit()
-        print("Seeded trigger_embeddings (deterministic hashes).")
-    finally:
-        db.close()
+            print(f"Failed to load precomputed triggers: {e}")
+            sys.exit(1)
+    # If we reach here, precomputed file was not present.
+    print(f"Error: precomputed trigger data not found at {precomputed}; refusing to seed deterministically.")
+    print("Please generate scripts/ci_trigger_data.py using scripts/export_trigger_embeddings.py and retry.")
+    sys.exit(1)
 
 
 if __name__ == "__main__":

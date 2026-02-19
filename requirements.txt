@@ -20,9 +20,9 @@ numpy
 pydantic-settings
 pymupdf
 
-# Optional local embedding backend (moved out of main install for CPU-only setups)
+#  local embedding backend (moved out of main install for CPU-only setups)
 # If you plan to run the local sentence-transformers + hnswlib index builder,
 # install them separately as needed (see INSTALL_CPU.txt step 4):
-#   python -m pip install --no-cache-dir sentence-transformers hnswlib
-
+#   python -m pip install --no-cache-dir sentence-transformers hnswlib 
+#   python -m pip install faiss-cpu
 

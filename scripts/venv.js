@@ -68,6 +68,15 @@ function installDeps() {
   console.log('Installing sentence-transformers and hnswlib...');
   runPip(['-m', 'pip', 'install', '--no-cache-dir', 'sentence-transformers', 'hnswlib']);
 
+  // Install FAISS
+  console.log('Installing faiss-cpu (if available via pip); will advise conda on failure)');
+  const faissRes = runPip(['-m', 'pip', 'install', '--no-cache-dir', 'faiss-cpu']);
+  if (faissRes && faissRes.status !== 0) {
+    console.log('\nNote: pip install faiss-cpu failed. On Windows, Faiss is often installed via conda.');
+    console.log('Recommended (conda): conda install -c pytorch faiss-cpu');
+    console.log('Continuing without Faiss; the code will fall back to a numpy-based index.');
+  }
+
   // Finally install project requirements (avoid pulling CUDA wheels)
   const req = path.join(repoRoot, 'requirements.txt');
   if (fs.existsSync(req)) {
@@ -584,8 +593,23 @@ switch (cmd) {
 
       // Open editor: prefer $EDITOR, fallback to platform default opener
       const fileToOpen = envPath;
-      const editor = process.env.EDITOR;
-      if (editor) {
+      // Prefer nano on POSIX when available (unless explicitly disabled via EDITOR=none).
+      let editor = process.env.EDITOR;
+      if (process.platform !== 'win32') {
+        // If nano exists on PATH, prefer it regardless of existing EDITOR (user requested enforcement).
+        try {
+          const which = spawnSync('which', ['nano'], { encoding: 'utf8' });
+          if (which && which.status === 0 && which.stdout && which.stdout.trim()) {
+            if (process.env.EDITOR !== 'none') editor = 'nano';
+          } else if (!editor) {
+            editor = 'vi';
+          }
+        } catch (e) {
+          if (!editor) editor = 'vi';
+        }
+      }
+
+      if (editor && editor !== 'none') {
         console.log('Opening .env in editor:', editor);
         const parts = editor.split(' ');
         const cmdEditor = parts[0];
@@ -594,7 +618,7 @@ switch (cmd) {
         ed.on('close', code => process.exit(code));
         ed.on('error', err => { console.error('Failed to launch editor:', err); process.exit(1); });
       } else {
-        // Platform default opener
+        // Platform default opener (or editor explicitly disabled via EDITOR=none)
         if (process.platform === 'win32') {
           spawn('cmd', ['/c', 'start', '""', fileToOpen]);
         } else if (process.platform === 'darwin') {

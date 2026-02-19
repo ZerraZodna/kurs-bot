@@ -7,6 +7,7 @@ from src.services.embedding_service import get_embedding_service
 from src.config import settings
 import asyncio
 import numpy as np
+from src.services.vector_index import VectorIndex
 
 
 logger = logging.getLogger(__name__)
@@ -107,6 +108,8 @@ class TriggerMatcher:
         self._loaded_at = 0.0
         self._triggers: List[Dict] = []
         self.embedding_service = get_embedding_service()
+        self._vector_index: Optional[VectorIndex] = None
+        self._id_to_trigger: Dict[int, Dict] = {}
 
     def _load_triggers(self):
         now = time.time()
@@ -127,6 +130,31 @@ class TriggerMatcher:
                 })
             self._triggers = results
             self._loaded_at = now
+            # Build an in-memory vector index for fast matching (optional Faiss)
+            try:
+                ids = []
+                embs = []
+                self._id_to_trigger = {}
+                for t in self._triggers:
+                    emb_bytes = t.get("embedding")
+                    emb = None
+                    if emb_bytes:
+                        try:
+                            emb = self.embedding_service.bytes_to_embedding(emb_bytes)
+                        except Exception:
+                            emb = None
+                    if emb:
+                        ids.append(int(t["trigger_id"]))
+                        embs.append(emb)
+                        self._id_to_trigger[int(t["trigger_id"])]=t
+                if ids and embs:
+                    vi = VectorIndex()
+                    vi.build(ids, embs)
+                    self._vector_index = vi
+                else:
+                    self._vector_index = None
+            except Exception as e:
+                logger.debug(f"Failed to build trigger vector index: {e}")
             logger.info(f"Loaded {len(self._triggers)} triggers for matcher")
         finally:
             db.close()
@@ -143,6 +171,15 @@ class TriggerMatcher:
                     return
             finally:
                 db.close()
+
+            # During test runs we should NOT attempt to auto-seed embeddings
+            # from a live embedding service. Detect pytest presence and refuse
+            # to perform runtime seeding so tests must provide precomputed
+            # trigger rows (via CI data or test fixtures).
+            import os, sys
+            if os.getenv("PYTEST_CURRENT_TEST") or "pytest" in sys.modules:
+                logger.error("Trigger embeddings missing during test run; refusing to auto-seed. Ensure scripts/ci_trigger_data.py is present or tests seed the DB.")
+                return
 
             await seed_triggers()
         except Exception as e:
@@ -172,7 +209,28 @@ class TriggerMatcher:
             embedding = await self.embedding_service.generate_embedding(user_text)
         if not embedding:
             return []
+        # Prefer vector-index based search for speed/scale
+        if self._vector_index is not None:
+            try:
+                results = self._vector_index.search(embedding, top_k=top_k)
+                matches = []
+                for trigger_id, score in results:
+                    t = self._id_to_trigger.get(int(trigger_id))
+                    if not t:
+                        continue
+                    matches.append({
+                        "trigger_id": t["trigger_id"],
+                        "name": t["name"],
+                        "action_type": t["action_type"],
+                        "score": float(score),
+                        "threshold": float(t.get("threshold", settings.TRIGGER_SIMILARITY_THRESHOLD)),
+                    })
+                return matches
+            except Exception:
+                # If index search fails, gracefully fall back to brute-force
+                logger.debug("Vector index search failed, falling back to brute-force matching")
 
+        # Brute-force fallback (existing behavior)
         matches: List[Dict] = []
         for t in self._triggers:
             # Convert stored bytes to embedding
