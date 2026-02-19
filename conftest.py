@@ -16,6 +16,16 @@ TEST_DB_URL = f'sqlite:///{TEST_DB_PATH}'
 # Export DATABASE_URL so code using settings picks up the test DB
 os.environ['DATABASE_URL'] = TEST_DB_URL
 
+# Prevent tests from attempting real Ollama calls in CI: ensure test flag
+# is explicit and disable real Ollama usage unless the environment requests it.
+os.environ.setdefault('TEST_USE_REAL_OLLAMA', '0')
+os.environ.setdefault('USE_REAL_OLLAMA', '0')
+
+# Prefer a non-local embedding backend during collection so import-time
+# code does not attempt to load heavyweight local models. The session
+# fixture will install a lightweight test embedding service.
+os.environ.setdefault('EMBEDDING_BACKEND', 'none')
+
 # Set test database environment variable for all tests
 os.environ['DATABASE_URL'] = TEST_DB_URL
 

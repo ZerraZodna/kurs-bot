@@ -216,17 +216,32 @@ switch (cmd) {
       const uiUrl = `http://localhost:${port}/`;
       console.log('\nDev UI available at:', uiUrl);
       if (!noOpen && process.env.BROWSER !== 'none') {
-        try {
+        // Attempt to open the browser but handle errors gracefully so a
+        // missing opener (e.g. xdg-open on headless WSL) does not crash the
+        // runner. Print a friendly tip to the user instead.
+        function tryOpen(url) {
+          let cmd, args;
           if (process.platform === 'win32') {
-            spawn('cmd', ['/c', 'start', '""', uiUrl]);
+            cmd = 'cmd'; args = ['/c', 'start', '""', url];
           } else if (process.platform === 'darwin') {
-            spawn('open', [uiUrl]);
+            cmd = 'open'; args = [url];
           } else {
-            spawn('xdg-open', [uiUrl]);
+            cmd = 'xdg-open'; args = [url];
           }
-        } catch (e) {
-          // ignore opener errors
+          try {
+            const child = spawn(cmd, args);
+            child.on('error', (err) => {
+              console.log(`\nCould not open browser: ${err.message}`);
+              console.log('You are running in a headless environment or the system opener is missing.');
+              console.log('Options: 1) Start the UI with `--no-open`; 2) set `BROWSER=none` to disable auto-open; 3) install a system opener (e.g. `xdg-utils` on Linux/WSL).');
+            });
+          } catch (e) {
+            console.log(`\nCould not open browser: ${e && e.message}`);
+            console.log('You are running in a headless environment or the system opener is missing.');
+            console.log('Options: 1) Start the UI with `--no-open`; 2) set `BROWSER=none` to disable auto-open; 3) install a system opener (e.g. `xdg-utils` on Linux/WSL).');
+          }
         }
+        tryOpen(uiUrl);
       }
 
       runScript(argsForScript[0], argsForScript.slice(1));
@@ -302,12 +317,10 @@ switch (cmd) {
       console.log('\nWaiting 10 seconds, then printing last 50 lines from logs to confirm startup...');
       setTimeout(() => {
         try {
-          const node = process.execPath || 'node';
-          const tailScript = path.join(__dirname, 'tail_logs.js');
-          console.log('Running tail script to show recent logs:', tailScript);
-          spawnSync(node, [tailScript], { stdio: 'inherit', cwd: repoRoot });
+          // Use the internal tailLogs function defined above instead of an external script
+          tailLogs();
         } catch (e) {
-          console.error('Failed to run tail script:', e && e.message);
+          console.error('Failed to show tail logs:', e && e.message);
         }
         process.exit(0);
       }, 10000);
