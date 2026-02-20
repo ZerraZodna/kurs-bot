@@ -124,7 +124,7 @@ class OnboardingService:
             last_name_memories = self.memory_manager.get_memory(user_id, "last_name")
 
             # Helper to format the template with available parts
-            def _format_with(first: str, last: str | None = None) -> str:
+            def _format_with(first: str, last: Optional[str] = None) -> str:
                 full = f"{first} {last}".strip() if last else first
                 return get_onboarding_message("name_prompt", language).format(first=first, full=full)
 

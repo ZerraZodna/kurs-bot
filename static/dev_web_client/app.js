@@ -88,17 +88,25 @@ async function send() {
   textInput.value = ''
 
   try {
-    const apiBase = window.__DEV_API_BASE || ''
+    const apiBaseRaw = (window.__DEV_API_BASE || '').trim()
+    const apiBase = apiBaseRaw.endsWith('/') ? apiBaseRaw.slice(0, -1) : apiBaseRaw
     const url = apiBase ? `${apiBase}/dev/message` : '/dev/message'
+    console.log('DEV UI fetch url:', url)
     const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id, text }),
     })
-    const data = await resp.json()
-    appendMessage('bot', data.response || JSON.stringify(data))
+    const raw = await resp.text()
+    let data
+    try { data = JSON.parse(raw) } catch (_) { data = null }
+    const body = data && typeof data === 'object'
+      ? (data.response || raw)
+      : raw
+    appendMessage('bot', body || '(empty response)')
   } catch (e) {
-    appendMessage('bot', 'Request failed: ' + e.message)
+    appendMessage('bot', `Request failed: ${e.message} (url=${window.__DEV_API_BASE || '/'}dev/message)`)
+    console.error('DEV UI fetch error', e)
   }
 }
 

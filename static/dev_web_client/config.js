@@ -1,1 +1,1 @@
-﻿window.__DEV_API_BASE = '';
+window.__DEV_API_BASE = '';
