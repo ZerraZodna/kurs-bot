@@ -274,6 +274,10 @@ switch (cmd) {
       const ngrokErr = path.join(scriptsDir, 'ngrok.err.log');
       const uvicornOut = path.join(scriptsDir, 'uvicorn.out.log');
       const uvicornErr = path.join(scriptsDir, 'uvicorn.err.log');
+      // Clean previous logs to avoid stale noise
+      [ngrokOut, ngrokErr, uvicornOut, uvicornErr].forEach(p => {
+        try { fs.unlinkSync(p); } catch (_) {}
+      });
 
       // Helper to start detached process with logs
       function startDetached(bin, args, outPath, errPath) {
@@ -310,15 +314,15 @@ switch (cmd) {
         const uvCheck = spawnSync('uvicorn', ['--version']);
         if (uvCheck.status === 0) {
           uvBin = 'uvicorn';
-          uvArgs = ['src.api.app:app', '--reload', '--host', '0.0.0.0', '--port', '8000'];
+          uvArgs = ['src.api.app:app', '--host', '127.0.0.1', '--port', '8000'];
         } else {
           // fall back to python -m uvicorn
           uvBin = py;
-          uvArgs = ['-m', 'uvicorn', 'src.api.app:app', '--reload', '--host', '0.0.0.0', '--port', '8000'];
+          uvArgs = ['-m', 'uvicorn', 'src.api.app:app', '--host', '127.0.0.1', '--port', '8000'];
         }
       } catch (e) {
         uvBin = py;
-        uvArgs = ['-m', 'uvicorn', 'src.api.app:app', '--reload', '--host', '0.0.0.0', '--port', '8000'];
+        uvArgs = ['-m', 'uvicorn', 'src.api.app:app', '--host', '127.0.0.1', '--port', '8000'];
       }
 
       // Start uvicorn detached
