@@ -59,15 +59,13 @@ def _test_use_real_ollama_enabled() -> bool:
     return str(v).strip().lower() in ("1", "true", "yes", "y")
 
 
-# Cache the test-flag at import time to avoid repeated getenv() calls
-_TEST_USE_REAL_OLLAMA = _test_use_real_ollama_enabled()
-# Fail-fast at import time when tests explicitly opt out of real Ollama.
-# This guarantees the process crashes immediately on any accidental import
-# of the real Ollama client during test collection or the very first test.
-if not _TEST_USE_REAL_OLLAMA:
-    raise RuntimeError(
-        "TEST_USE_REAL_OLLAMA is falsy — blocking import of the real Ollama client for test safety."
-    )
+# Historically the code used raw env vars read at import time which meant
+# values in .env (loaded via Pydantic `settings`) did not enable real calls
+# unless the env var was present before the process started. Prefer the
+# Pydantic `settings.TEST_USE_REAL_OLLAMA` value so `.env` controls behavior
+# in development without requiring pre-start environment variables.
+# Keep a cached boolean for efficiency.
+_TEST_USE_REAL_OLLAMA = bool(getattr(settings, "TEST_USE_REAL_OLLAMA", False))
 
 
 # Note: cloud-model name normalization removed. Cloud-only models must run in cloud

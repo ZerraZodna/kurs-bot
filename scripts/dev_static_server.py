@@ -20,7 +20,8 @@ class ProxyingHandler(http.server.SimpleHTTPRequestHandler):
             body = self.rfile.read(length) if length else b''
 
             # Use loopback explicitly and allow a generous timeout for model calls
-            conn = http.client.HTTPConnection('127.0.0.1', self.api_port, timeout=25)
+            # Increase timeout to accommodate slow local model inference
+            conn = http.client.HTTPConnection('127.0.0.1', self.api_port, timeout=60)
             # Forward minimal headers
             headers = {'Content-Type': self.headers.get('Content-Type', 'application/json')}
             try:

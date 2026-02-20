@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Kurs Bot is a spiritual coaching chatbot that delivers daily ACIM (A Course in Miracles) lessons via Telegram, Slack, SMS, and email. It features persistent user memory, AI-powered dialogue (via Ollama), and GDPR-compliant data handling.
 
 ## Development Commands
+As first command, ensure that ./.venv/ is activated.
 
 ```bash
 # Setup

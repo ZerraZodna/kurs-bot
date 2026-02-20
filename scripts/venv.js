@@ -283,16 +283,30 @@ switch (cmd) {
       });
 
       // Helper to start detached process with logs
-      function startDetached(bin, args, outPath, errPath) {
+      function startDetached(bin, args, outPath, errPath, pidFile) {
         try {
           const out = fs.openSync(outPath, 'a');
           const err = fs.openSync(errPath, 'a');
           const child = spawn(bin, args, { cwd: repoRoot, detached: true, stdio: ['ignore', out, err] });
           child.unref();
-          return true;
+          try {
+            if (pidFile) fs.writeFileSync(pidFile, String(child.pid));
+          } catch (e) {
+            // non-fatal if pid file cannot be written
+          }
+          return child.pid || null;
         } catch (err) {
-          return false;
+          return null;
         }
+      }
+
+      // Ensure virtualenv exists and prefer venv Python for uvicorn
+      ensureVenv();
+      const venvPy = venvPython();
+      let py = venvPy || whichPython();
+      if (!py) {
+        console.error('No Python available to start uvicorn. Install Python or create .venv');
+        process.exit(1);
       }
 
       // Start ngrok if available
@@ -310,7 +324,7 @@ switch (cmd) {
       }
 
       // Determine uvicorn command
-      const py = whichPython();
+      py = whichPython();
       let uvBin = null;
       let uvArgs = null;
       try {
@@ -318,22 +332,22 @@ switch (cmd) {
         if (uvCheck.status === 0) {
           uvBin = 'uvicorn';
           uvArgs = ['src.api.app:app', '--host', '127.0.0.1', '--port', '8000'];
-        } else {
+          } else {
           // fall back to python -m uvicorn
           uvBin = py;
           uvArgs = ['-m', 'uvicorn', 'src.api.app:app', '--host', '127.0.0.1', '--port', '8000'];
-        }
-      } catch (e) {
+          }
+        } catch (e) {
         uvBin = py;
         uvArgs = ['-m', 'uvicorn', 'src.api.app:app', '--host', '127.0.0.1', '--port', '8000'];
-      }
+        }
 
       // Start uvicorn detached
       const uvStarted = startDetached(uvBin, uvArgs, uvicornOut, uvicornErr);
       if (uvStarted) console.log('Started uvicorn detached (logs:', uvicornOut, uvicornErr + ')');
-      else {
-        console.error('Failed to start uvicorn; check that uvicorn is installed in the venv');
-        process.exit(1);
+        else {
+          console.error('Failed to start uvicorn; check that uvicorn is installed in the venv');
+          process.exit(1);
       }
 
       console.log('\nTo view logs:');
@@ -405,73 +419,258 @@ switch (cmd) {
         try { return spawnSync(cmd, args || [], { cwd: repoRoot }); } catch (e) { return { status: 1 }; }
       }
 
-      if (process.platform === 'win32') {
-        console.log('Stopping services on Windows...');
-        // Try to kill ngrok by image name
-        safeRun('taskkill', ['/IM', 'ngrok.exe', '/F']);
+      // Attempt to find processes listening on port 8000 and terminate them first.
+      const targetPort = process.env.PORT || '8000';
+      const killedPids = new Set();
 
-        // Try to kill uvicorn.exe
-        safeRun('taskkill', ['/IM', 'uvicorn.exe', '/F']);
-
-        // Kill python processes whose commandline contains 'uvicorn'
+      function killPid(pid, reason) {
         try {
-          const ps = spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine -match 'uvicorn' } | Select-Object -ExpandProperty ProcessId"], { encoding: 'utf8' });
-          if (ps && ps.stdout) {
-            const pids = ps.stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-            for (const pid of pids) {
-              spawnSync('taskkill', ['/PID', pid, '/F']);
-              console.log('Killed PID', pid);
+          if (process.platform === 'win32') {
+            // Try taskkill first
+            let res = spawnSync('taskkill', ['/PID', pid, '/F']);
+            if (res && res.status === 0) {
+              console.log(`Killed PID ${pid}${reason ? ' (' + reason + ')' : ''}`);
+              killedPids.add(pid);
+              return;
+            }
+
+            // Try PowerShell Stop-Process
+            try {
+              const psRes = spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', `Stop-Process -Id ${pid} -Force -ErrorAction SilentlyContinue`], { encoding: 'utf8' });
+              if (psRes && psRes.status === 0) {
+                console.log(`Killed PID ${pid}${reason ? ' (' + reason + ')' : ''} via PowerShell`);
+                killedPids.add(pid);
+                return;
+              }
+            } catch (_) {}
+
+            // Try taskkill with process tree
+            res = spawnSync('taskkill', ['/PID', pid, '/F', '/T']);
+            if (res && res.status === 0) {
+              console.log(`Killed PID ${pid}${reason ? ' (' + reason + ')' : ''} (tree)`);
+              killedPids.add(pid);
+              return;
+            }
+
+            console.log('Failed to kill PID', pid, '(taskkill/powershell attempts returned non-zero). You may need elevated privileges.');
+          } else {
+            // POSIX: try graceful TERM then SIGKILL
+            let res = spawnSync('kill', ['-TERM', pid]);
+            if (res && res.status === 0) {
+              console.log(`Killed PID ${pid}${reason ? ' (' + reason + ')' : ''}`);
+              killedPids.add(pid);
+              return;
+            }
+            res = spawnSync('kill', ['-9', pid]);
+            if (res && res.status === 0) {
+              console.log(`Killed PID ${pid}${reason ? ' (' + reason + ')' : ''} (SIGKILL)`);
+              killedPids.add(pid);
+              return;
+            }
+            console.log('Failed to kill PID', pid, '(kill attempts returned non-zero)');
+          }
+        } catch (e) {
+          console.log('Failed to kill PID', pid, e && e.message);
+        }
+      }
+
+      if (process.platform === 'win32') {
+        // On Windows we only stop ngrok. Uvicorn runs in its own terminal
+        // window and should not be killed by this command.
+        console.log('Stopping ngrok only (Windows). Uvicorn is not touched.');
+        const scriptsDir = path.join(repoRoot, 'scripts');
+        const pidFile = path.join(scriptsDir, 'ngrok.pid');
+        let stopped = false;
+
+        try {
+          if (fs.existsSync(pidFile)) {
+            const pid = fs.readFileSync(pidFile, 'utf8').trim();
+            if (pid) {
+              const res = spawnSync('taskkill', ['/PID', pid, '/F']);
+              if (res && res.status === 0) {
+                console.log('Stopped ngrok (pid ' + pid + ') via pid file.');
+                stopped = true;
+                try { fs.unlinkSync(pidFile); } catch (_) {}
+              } else {
+                console.log('taskkill by pid failed; will try by image name.');
+              }
             }
           }
         } catch (e) {
-          console.log('Failed to query processes via PowerShell:', e && e.message);
+          // non-fatal; continue to image-name fallback
         }
-      } else {
-        console.log('Stopping services on POSIX...');
 
-        // On POSIX: discover matching processes first, show them, then attempt to kill.
-        const patterns = ['ngrok.*8000', 'ngrok', 'uvicorn', 'python.*uvicorn'];
-        let anyFound = false;
-        for (const pat of patterns) {
+        if (!stopped) {
           try {
-            const list = spawnSync('pgrep', ['-a', '-f', pat], { encoding: 'utf8' });
-            if (list && list.stdout && list.stdout.trim()) {
-              anyFound = true;
-              console.log(`\nProcesses matching /${pat}/:`);
-              console.log(list.stdout.trim());
-              // extract PIDs
-              const pids = list.stdout.split(/\r?\n/).map(l => (l || '').trim().split(/\s+/)[0]).filter(Boolean);
-              for (const pid of pids) {
-                try {
-                  const killed = spawnSync('kill', ['-TERM', pid]);
-                  if (killed.status === 0) console.log('Killed PID', pid);
-                  else console.log('Failed to kill PID', pid, '(status', killed.status, ')');
-                } catch (e) {
-                  console.log('Error killing PID', pid, e && e.message);
+            const res2 = spawnSync('taskkill', ['/IM', 'ngrok.exe', '/F']);
+            if (res2 && res2.status === 0) {
+              console.log('Stopped ngrok by image name (ngrok.exe).');
+              stopped = true;
+            } else {
+              console.log('No ngrok process found via taskkill, or taskkill failed. It may not be running.');
+            }
+          } catch (e) {
+            console.log('Failed to run taskkill to stop ngrok:', e && e.message);
+          }
+        }
+
+        process.exit(0);
+      } else {
+        console.log('Stopping services on POSIX (attempting port-based detection first)...');
+
+        // Prefer lsof if available
+        try {
+          const lsof = spawnSync('lsof', ['-ti', `:${targetPort}`], { encoding: 'utf8' });
+          if (lsof && lsof.stdout && lsof.stdout.trim()) {
+            const pids = lsof.stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+            for (const pid of pids) if (!killedPids.has(pid)) killPid(pid, `listening on port ${targetPort}`);
+          }
+        } catch (e) {
+          // lsof not available; try ss
+        }
+
+        if (killedPids.size === 0) {
+          try {
+            const ss = spawnSync('ss', ['-ltnp'], { encoding: 'utf8' });
+            if (ss && ss.stdout) {
+              const lines = ss.stdout.split(/\r?\n/);
+              for (const l of lines) {
+                if (l.indexOf(':' + targetPort) >= 0) {
+                  // try to extract pid=1234
+                  const m = l.match(/pid=(\d+),/);
+                  if (m && m[1]) {
+                    const pid = m[1];
+                    if (!killedPids.has(pid)) killPid(pid, `listening on port ${targetPort}`);
+                  }
                 }
               }
             }
           } catch (e) {
-            // pgrep might not be available; fall back to silent pkill attempts below
+            // ss not available; try netstat
           }
         }
 
-        if (!anyFound) {
-          // Try pkill as a last resort and report exit status
-          console.log('No matching processes found via pgrep; attempting pkill patterns (may require privileges)...');
-          for (const p of ['ngrok.*8000', 'ngrok', 'uvicorn', 'python.*uvicorn']) {
+        if (killedPids.size === 0) {
+          try {
+            const net = spawnSync('netstat', ['-ltnp'], { encoding: 'utf8' });
+            if (net && net.stdout) {
+              const lines = net.stdout.split(/\r?\n/);
+              for (const l of lines) {
+                if (l.indexOf(':' + targetPort) >= 0) {
+                  const m = l.match(/\b(\d+)\/(?:[^\s]+)/);
+                  if (m && m[1]) {
+                    const pid = m[1];
+                    if (!killedPids.has(pid)) killPid(pid, `listening on port ${targetPort}`);
+                  } else {
+                    // Older netstat formats may put PID at end
+                    const parts = l.trim().split(/\s+/);
+                    const pid = parts[parts.length - 1];
+                    if (pid && !isNaN(Number(pid)) && !killedPids.has(pid)) killPid(pid, `listening on port ${targetPort}`);
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+
+        // If we still haven't found processes by port, fall back to pattern-based pkill/pgrep
+        if (killedPids.size === 0) {
+          console.log('No processes found by port; falling back to pattern matching (pgrep/pkill)...');
+          const patterns = ['ngrok.*8000', 'ngrok', 'uvicorn', 'python.*uvicorn'];
+          let anyFound = false;
+          for (const pat of patterns) {
             try {
-              const r = spawnSync('pkill', ['-f', p], { encoding: 'utf8' });
-              if (r && (r.status === 0)) console.log(`pkill matched pattern /${p}/ and exited 0`);
-              else if (r && r.status !== 0 && r.stderr) console.log(`pkill pattern /${p}/ exited ${r.status}: ${r.stderr.trim()}`);
+              const list = spawnSync('pgrep', ['-a', '-f', pat], { encoding: 'utf8' });
+              if (list && list.stdout && list.stdout.trim()) {
+                anyFound = true;
+                console.log(`\nProcesses matching /${pat}/:`);
+                console.log(list.stdout.trim());
+                const pids = list.stdout.split(/\r?\n/).map(l => (l || '').trim().split(/\s+/)[0]).filter(Boolean);
+                for (const pid of pids) if (!killedPids.has(pid)) killPid(pid, `matched /${pat}/`);
+              }
             } catch (e) {
-              // ignore
+              // pgrep might not be available; continue
+            }
+          }
+
+          if (!anyFound) {
+            console.log('Attempting pkill as a last resort...');
+            for (const p of ['ngrok.*8000', 'ngrok', 'uvicorn', 'python.*uvicorn']) {
+              try {
+                const r = spawnSync('pkill', ['-f', p], { encoding: 'utf8' });
+                if (r && (r.status === 0)) console.log(`pkill matched pattern /${p}/ and exited 0`);
+                else if (r && r.status !== 0 && r.stderr) console.log(`pkill pattern /${p}/ exited ${r.status}: ${r.stderr.trim()}`);
+              } catch (e) {
+                // ignore
+              }
             }
           }
         }
       }
 
-      console.log('Stop command completed. Verify processes are stopped with `ps`/`tasklist`.');
+      // Verify whether any processes are still listening on the target port
+      try {
+        const remaining = [];
+        if (process.platform === 'win32') {
+          const net2 = spawnSync('netstat', ['-ano'], { encoding: 'utf8' });
+          if (net2 && net2.stdout) {
+            const lines2 = net2.stdout.split(/\r?\n/);
+            for (const l of lines2) {
+              if (l && l.indexOf(':' + targetPort) >= 0 && /LISTENING/i.test(l)) {
+                const parts = l.trim().split(/\s+/);
+                const pid = parts[parts.length - 1];
+                if (pid && !killedPids.has(pid)) remaining.push(pid);
+              }
+            }
+          }
+        } else {
+          try {
+            const lsof2 = spawnSync('lsof', ['-ti', `:${targetPort}`], { encoding: 'utf8' });
+            if (lsof2 && lsof2.stdout && lsof2.stdout.trim()) {
+              const pids = lsof2.stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+              for (const pid of pids) if (!killedPids.has(pid)) remaining.push(pid);
+            }
+          } catch (e) {}
+          try {
+            const net2 = spawnSync('netstat', ['-ltnp'], { encoding: 'utf8' });
+            if (net2 && net2.stdout) {
+              const lines2 = net2.stdout.split(/\r?\n/);
+              for (const l of lines2) {
+                if (l && l.indexOf(':' + targetPort) >= 0) {
+                  const m = l.match(/\b(\d+)\/(?:[^\s]+)/);
+                  if (m && m[1] && !killedPids.has(m[1])) remaining.push(m[1]);
+                }
+              }
+            }
+          } catch (e) {}
+        }
+
+        if (remaining.length) {
+          console.warn('Warning: some processes are still listening on port', targetPort, ':', Array.from(new Set(remaining)).join(', '));
+          console.warn('You may need to run the stop command with elevated privileges or inspect the processes with `tasklist`/`ps -ef`.');
+        } else {
+          console.log('Stop command completed. No remaining listeners detected on port', targetPort + '.');
+        }
+      } catch (e) {
+        console.log('Stop command completed. Verify processes are stopped with `ps`/`tasklist`.');
+      }
+      // List matching processes after stop so user can verify
+      if (process.platform === 'win32') {
+        console.log('\nListing processes matching ngrok or uvicorn (Windows) after stop...');
+        try {
+          // Exclude the listing PowerShell process itself by filtering by ProcessId -ne $PID
+          const psListPost = spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', "Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -and ($_.CommandLine -match 'ngrok' -or $_.CommandLine -match 'uvicorn') } | Select-Object ProcessId, CommandLine | Format-List"], { encoding: 'utf8' });
+          if (psListPost && psListPost.stdout && psListPost.stdout.trim()) {
+            console.log(psListPost.stdout);
+          } else {
+            console.log('No matching processes found.');
+          }
+        } catch (e) {
+          console.error('Failed to list processes via PowerShell after stop:', e && e.message);
+        }
+      }
       process.exit(0);
     }
     break;
@@ -481,7 +680,14 @@ switch (cmd) {
         if (process.platform === 'win32') {
           console.log('Listing processes matching ngrok or uvicorn (Windows)...');
           try {
-            const ps = spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and ($_.CommandLine -match 'ngrok' -or $_.CommandLine -match 'uvicorn') } | Select-Object ProcessId, CommandLine | Format-List"], { encoding: 'utf8' });
+            // Exclude the listing helper itself by ensuring ProcessId -ne $PID
+            // Use same detection as the 'stop' pre-scan: include net TCP owners
+            // and commandline matches, and exclude the listing helper itself.
+            // Use an explicit array collection and concatenation in PowerShell
+            // to avoid runtime errors when the + operator isn't defined for
+            // the returned object types (op_Addition errors).
+            const psCommand = "& { $p1 = @(Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess); $p2 = @(Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -and ($_.CommandLine -match 'ngrok' -or $_.CommandLine -match 'uvicorn') } | Select-Object -ExpandProperty ProcessId); $all = ($p1 + $p2) | Sort-Object -Unique; if ($all -and $all.Count -gt 0) { foreach ($procId in $all) { Get-CimInstance Win32_Process -Filter \"ProcessId=$procId\" | Select-Object ProcessId, CommandLine } } else { Write-Output 'No matching processes found.' } }";
+            const ps = spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', psCommand], { encoding: 'utf8' });
             if (ps.stdout && ps.stdout.trim()) console.log(ps.stdout);
             else if (ps.stderr && ps.stderr.trim()) console.error(ps.stderr);
             else console.log('No matching processes found.');
