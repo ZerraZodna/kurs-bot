@@ -45,6 +45,19 @@ Notes:
 - The runner prefers `.venv` python if present. If `.venv` is missing, `npm install` will run the `postinstall` script which invokes the runner to create `.venv` (if `python` is on PATH) and install Python dependencies. You can still run `npm run install:py` explicitly when needed.
 - You can call the runner directly with subcommands: `node ./scripts/venv.js help`.
 
+Quick note: `npm test -- -s`
+
+ - **What it does:** passes arguments after `--` through to the underlying test runner. In our setup the Node runner runs `python -m pytest`, so `npm test -- -s` becomes `python -m pytest -s` which runs pytest with "capture disabled" (prints test stdout/stderr live).
+ - **When to use:** useful when you want to see printed debug output from tests (for example temporary debug prints in `src/services/*`), or to preserve test output ordering for debugging flaky tests.
+ - **Common variants:**
+	 - `npm test -- -k <expr>` run only tests matching `<expr>`
+	 - `npm test -- -q` quieter pytest output
+	 - `npm test -- -x` stop after first failure
+
+Recommendation:
+
+ - For fastest local iteration prefer `npm run test:fast` (if available) which invokes pytest directly and avoids the Node wrapper overhead. Use `npm test -- <pytest-args>` when you need the runner's environment setup or to capture live test output (`-s`).
+
 - To run the local binary directly (prefers node_modules/.bin):
 
 ```powershell

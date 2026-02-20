@@ -16,6 +16,7 @@
     "config": "node ./scripts/venv.js config",
     "update": "node ./scripts/venv.js update",
     "test": "node ./scripts/venv.js test",
+    "test:fast": "python -m pytest --maxfail=3 -q",
     "tests": "npm test",
     "ping": "node ./scripts/venv.js ping",
     "start": "node ./scripts/venv.js start",

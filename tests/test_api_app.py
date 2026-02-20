@@ -26,26 +26,3 @@ def test_webhook_invalid_payload(client):
     assert response.status_code == 200
     assert response.json()["ok"] is False
 
-def test_webhook_valid_message(monkeypatch, client):
-    # Simplified test: just verify the webhook accepts the payload
-    # Full integration testing is covered in test_integration_memory.py
-    from src.config import settings
-    token_suffix = settings.TELEGRAM_BOT_TOKEN.split(":")[1]
-    payload = {
-        "message": {
-            "message_id": 123,
-            "from": {"id": 42, "first_name": "John", "last_name": "Doe"},
-            "text": "Hello!",
-            "date": 1700000000
-        }
-    }
-    # Mock the dialogue processing to avoid database mocking complexity
-    import src.api.app as app_module
-    async def mock_process_message(*args, **kwargs):
-        return "Test response"
-    
-    monkeypatch.setattr(app_module.DialogueEngine, "process_message", mock_process_message)
-    
-    response = client.post(f"/webhook/telegram/{token_suffix}", json=payload)
-    assert response.status_code == 200
-    assert response.json()["ok"] is True
