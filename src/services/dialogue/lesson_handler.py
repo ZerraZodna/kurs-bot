@@ -196,6 +196,62 @@ async def pre_llm_lesson_short_circuit(
 
 
 
+async def process_lesson_query(
+    user_id: int,
+    text: str,
+    session: Session,
+    prompt_builder: Optional[object],
+    memory_manager: Optional[object],
+    onboarding_flow: Optional[object],
+    onboarding_service: Optional[object],
+    user_language: Optional[str],
+) -> Optional[str]:
+    """
+    Handle incoming lesson-related queries (e.g. "What's today's lesson?", "Lesson 3").
+
+    Extracted from `DialogueEngine.process_message` to allow tests to call
+    the logic directly without invoking the full message pipeline.
+    """
+    lesson_request = detect_lesson_request(text)
+    if not lesson_request:
+        return None
+
+    # If the user is in the onboarding 'lesson_status' step, let onboarding
+    # handle the message so we persist the lesson and create the default
+    # schedule instead of sending the lesson content immediately.
+    pending = None
+    if memory_manager:
+        pending = memory_manager.get_memory(user_id, "onboarding_step_pending")
+    if pending:
+        val = (pending[0].get("value") or "").lower()
+        if val == "lesson_status" and onboarding_flow:
+            onboarding_resp = await onboarding_flow.handle_onboarding(user_id, text, session)
+            if onboarding_resp:
+                return onboarding_resp
+
+    # Support 'today' requests which need resolution to an actual lesson id
+    if lesson_request.get("today") and prompt_builder:
+        today_ctx = prompt_builder.get_today_lesson_context(user_id)
+        state = today_ctx.get("state", {})
+        lesson_id = state.get("lesson_id")
+        if lesson_id:
+            lesson_response = await handle_lesson_request(lesson_id, text, session, user_language=user_language)
+            if lesson_response:
+                return lesson_response
+        else:
+            return "I couldn't determine your current lesson. Tell me which lesson number you'd like, e.g. 'Lesson 7'."
+
+    if lesson_request.get("lesson_id"):
+        lesson_response = await handle_lesson_request(
+            lesson_request["lesson_id"], text, session, user_language=user_language
+        )
+        if lesson_response:
+            return lesson_response
+
+    return None
+
+
+
 async def format_lesson_message(lesson: Lesson, language: str, call_ollama_fn) -> str:
     """
     Format lesson for display with optional translation.

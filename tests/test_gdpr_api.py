@@ -20,7 +20,13 @@ from src.models.database import (
 from src.services.gdpr_service import record_consent
 
 
-client = TestClient(app)
+import pytest
+
+
+@pytest.fixture
+def client():
+    with TestClient(app) as c:
+        yield c
 
 
 def _reset_db():
@@ -112,7 +118,7 @@ def _seed_user() -> int:
         db.close()
 
 
-def test_gdpr_endpoints_require_token():
+def test_gdpr_endpoints_require_token(client):
     _reset_db()
     user_id = _seed_user()
     settings.GDPR_ADMIN_TOKEN = "test-token"
@@ -128,7 +134,7 @@ def test_gdpr_endpoints_require_token():
     assert response.status_code == 403
 
 
-def test_gdpr_export_restrict_rectify_erase_api():
+def test_gdpr_export_restrict_rectify_erase_api(client):
     _reset_db()
     user_id = _seed_user()
     settings.GDPR_ADMIN_TOKEN = "test-token"
@@ -201,7 +207,7 @@ def test_gdpr_export_restrict_rectify_erase_api():
         db.close()
 
 
-def test_gdpr_object_and_withdraw_consent_api():
+def test_gdpr_object_and_withdraw_consent_api(client):
     _reset_db()
     user_id = _seed_user()
     settings.GDPR_ADMIN_TOKEN = "test-token"
@@ -232,7 +238,7 @@ def test_gdpr_object_and_withdraw_consent_api():
     assert withdraw.json()["status"] == "withdrawn"
 
 
-def test_gdpr_privacy_notice_public():
+def test_gdpr_privacy_notice_public(client):
     response = client.get("/gdpr/privacy-notice")
     assert response.status_code == 200
     assert "Privacy Notice" in response.json().get("content", "")

@@ -2,19 +2,23 @@ import pytest
 from fastapi.testclient import TestClient
 from src.api.app import app
 
-client = TestClient(app)
 
-def test_root_endpoint():
+@pytest.fixture
+def client():
+    with TestClient(app) as c:
+        yield c
+
+def test_root_endpoint(client):
     response = client.get("/")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
 
-def test_webhook_forbidden():
+def test_webhook_forbidden(client):
     # Wrong token should return 403
     response = client.post("/webhook/telegram/wrongtoken", json={})
     assert response.status_code == 403
 
-def test_webhook_invalid_payload():
+def test_webhook_invalid_payload(client):
     # Correct token, but invalid payload (no message)
     from src.config import settings
     token_suffix = settings.TELEGRAM_BOT_TOKEN.split(":")[1]
@@ -23,7 +27,7 @@ def test_webhook_invalid_payload():
     assert response.json()["ok"] is False
 
 @pytest.mark.skip(reason="Full integration test - covered by test_integration_memory.py")
-def test_webhook_valid_message(monkeypatch):
+def test_webhook_valid_message(monkeypatch, client):
     # Simplified test: just verify the webhook accepts the payload
     # Full integration testing is covered in test_integration_memory.py
     from src.config import settings

@@ -50,7 +50,7 @@ async def test_memory_driven_schedule_creation():
 
         # Trigger the schedule creation via dialogue flow
         # Mock the LLM to return a structured intent that will create the schedule
-        async def _fake_ollama(prompt, model=None):
+        async def _fake_ollama(prompt, model=None, language=None):
             import json
             return json.dumps({
                 "intent": {
@@ -60,7 +60,10 @@ async def test_memory_driven_schedule_creation():
                 }
             })
 
-        dialogue.call_ollama = _fake_ollama
+        # Patch module-level ollama client so any code path uses the fake implementation
+        import importlib
+        mod = importlib.import_module("src.services.dialogue.ollama_client")
+        setattr(mod, "call_ollama", _fake_ollama)
 
         resp = await dialogue.process_message(user_id, "Set up reminders", db)
         assert resp is not None

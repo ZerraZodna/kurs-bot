@@ -8,11 +8,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 import asyncio
+import pytest
 from src.models.database import SessionLocal, User, init_db
 from src.memories import MemoryManager
 from src.services.embedding_service import get_embedding_service
 from src.services.semantic_search import get_semantic_search_service
 
+@pytest.mark.skip(reason="Manual test - run manually; disables external calls during automated test runs")
 async def test_embeddings():
     """Test embedding generation and semantic search"""
     

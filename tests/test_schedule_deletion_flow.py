@@ -1,4 +1,5 @@
 import pytest
+from src.config import settings
 
 from src.models.database import SessionLocal
 from src.memories import MemoryManager
@@ -8,6 +9,8 @@ from tests.utils import make_ready_user
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(getattr(settings, "EMBEDDING_BACKEND", "local") == "none",
+                    reason="requires embedding backend (local or ollama) to run")
 async def test_list_and_delete_reminders_flow():
     db = SessionLocal()
     try:

@@ -206,7 +206,8 @@ switch (cmd) {
   case 'test':
     // ensure venv exists but don't fail if creation isn't possible
     if (!venvPython()) ensureVenv();
-    runPyModule('pytest', cmdArgs.length ? cmdArgs : ['--maxfail=3', '-v']);
+    // Treat Python warnings as errors by default to catch resource leaks.
+    runPyModule('pytest', cmdArgs.length ? cmdArgs : ['--maxfail=3', '-v', '-W', 'error']);
     break;
   case 'run':
     if (!cmdArgs[0]) {

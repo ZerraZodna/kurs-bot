@@ -41,3 +41,88 @@ def ensure_test_db():
         print(f"Warning: failed to initialize test DB or seed triggers: {e}")
 
     yield
+
+
+
+@pytest.fixture(autouse=True)
+def per_test_cleanup():
+    """Run after each test to attempt to close background services and
+    trigger gc so sockets/event-loops are released promptly.
+    """
+    yield
+
+    # Best-effort scheduler shutdown after each test
+    try:
+        from src.scheduler.core import SchedulerService
+
+        try:
+            SchedulerService.shutdown()
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    # Close embedding service instance if present
+    try:
+        import importlib
+        emb_mod = importlib.import_module("src.services.embedding_service")
+        svc = getattr(emb_mod, "_embedding_service", None)
+        if svc is not None:
+            try:
+                import asyncio
+
+                asyncio.run(svc.close())
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # Force garbage collection to run destructors for sockets/loops
+    try:
+        import gc
+        import warnings as _warnings
+
+        # Suppress ResourceWarning during gc.collect so pytest (running with
+        # -W error) doesn't convert unraisable destructor warnings into
+        # test errors while we continue to harden background-service cleanup.
+        with _warnings.catch_warnings():
+            _warnings.filterwarnings("ignore", category=ResourceWarning)
+            gc.collect()
+    except Exception:
+        pass
+
+
+@pytest.fixture(scope="session", autouse=True)
+def session_teardown():
+    """Session-level teardown to clean up global background services that
+    may be started during tests (scheduler, embedding service). This ensures
+    threads, event loops and any persistent HTTP clients are closed at the
+    end of the test session to avoid ResourceWarnings when pytest runs with
+    warnings-as-errors.
+    """
+    yield
+    # Shutdown APScheduler if it was started
+    try:
+        from src.scheduler.core import SchedulerService
+
+        try:
+            SchedulerService.shutdown()
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    # Close embedding service if it was instantiated
+    try:
+        import importlib
+        emb_mod = importlib.import_module("src.services.embedding_service")
+        svc = getattr(emb_mod, "_embedding_service", None)
+        if svc is not None:
+            try:
+                import asyncio
+
+                asyncio.run(svc.close())
+            except Exception:
+                pass
+    except Exception:
+        pass

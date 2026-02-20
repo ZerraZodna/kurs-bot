@@ -1,4 +1,5 @@
 import pytest
+from src.config import settings
 from datetime import datetime, timezone, timedelta
 
 from src.models.database import SessionLocal, init_db, Schedule
@@ -8,6 +9,8 @@ from src.scheduler.core import SchedulerService
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(getattr(settings, "EMBEDDING_BACKEND", "local") == "none",
+                    reason="requires embedding backend (local or ollama) to run")
 async def test_rag_mode_one_time_reminder_preserves_daily(monkeypatch):
     """RAG-mode flow: listing reminders, creating a one-time reminder should not overwrite daily lesson reminder."""
     db = SessionLocal()
