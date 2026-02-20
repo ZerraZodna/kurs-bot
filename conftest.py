@@ -2,7 +2,72 @@
 Pytest configuration for kurs-bot tests.
 Central location for all test database setup and configuration.
 """
+
+# Load .env early so its variables (e.g. TEST_USE_REAL_OLLAMA) are available
+# to pytest and any imported project modules during collection. We implement a
+# small, dependency-free loader so tests do not need `python-dotenv` installed.
 import os
+from pathlib import Path
+
+def _load_dotenv_if_present():
+    repo_root = Path(__file__).resolve().parent
+    env_path = repo_root / '.env'
+    if not env_path.exists():
+        return
+    try:
+        with env_path.open('r', encoding='utf8') as f:
+            for raw in f:
+                line = raw.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if '=' not in line:
+                    continue
+                k, v = line.split('=', 1)
+                k = k.strip()
+                v = v.strip().strip('"')
+                # Do not overwrite environment variables explicitly set
+                if k and os.getenv(k) is None:
+                    os.environ[k] = v
+    except Exception:
+        # Best-effort: do not fail pytest startup if .env can't be read
+        pass
+
+
+_load_dotenv_if_present()
+import sys
+import types
+# Insert an import-time stub for the Ollama client so early imports during
+# pytest collection cannot trigger real Ollama/model initialization when
+# `TEST_USE_REAL_OLLAMA` is not enabled. This prevents import-order races
+# where other modules bind `call_ollama` before test fixtures run.
+_test_use_real = os.getenv("TEST_USE_REAL_OLLAMA") or os.getenv("USE_REAL_OLLAMA")
+if not _test_use_real or str(_test_use_real).strip().lower() not in ("1", "true", "yes", "y"):
+    mod_name = "src.services.dialogue.ollama_client"
+    if mod_name not in sys.modules:
+        _fake = types.ModuleType(mod_name)
+
+        async def _fake_call_ollama(prompt: str, model: str | None = None, language: str | None = None) -> str:
+            short = (prompt[:160] + "...") if prompt and len(prompt) > 160 else (prompt or "")
+            return f"[MOCK_OLLAMA_REPLY] model={model or 'default'} lang={language or 'en'} text={short}"
+
+        setattr(_fake, "call_ollama", _fake_call_ollama)
+        sys.modules[mod_name] = _fake
+        # Ensure the package exposes attributes that tests may monkeypatch
+        try:
+            import importlib
+
+            pkg = importlib.import_module("src.services.dialogue")
+            try:
+                setattr(pkg, "ollama_client", _fake)
+                setattr(pkg, "call_ollama", _fake.call_ollama)
+            except Exception:
+                pass
+        except Exception:
+            # If the package cannot be imported now, leave the fake submodule
+            # in sys.modules so a later import will resolve to it.
+            pass
+
+import time
 import time
 from pathlib import Path
 import pytest

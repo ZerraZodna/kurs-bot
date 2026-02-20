@@ -10,6 +10,37 @@ import pytest
 # other project modules are imported.
 _test_use_real = os.getenv("TEST_USE_REAL_OLLAMA") or os.getenv("USE_REAL_OLLAMA")
 if not _test_use_real or str(_test_use_real).strip().lower() not in ("1", "true", "yes", "y"):
+    # Also block the top-level `ollama` package import entirely so any
+    # attempt to `from ollama import Client` or similar fails fast during
+    # test collection. This prevents the official client package from
+    # initializing or opening sockets before our guards run.
+    if "ollama" not in sys.modules:
+        class _BlockedOllama(types.ModuleType):
+            # Allow harmless introspection attributes to be read so that
+            # third-party libraries (inspect, torch, transformers, etc.) can
+            # perform module inspection without triggering our protective
+            # RuntimeError. Only raise when production code actually tries to
+            # access client objects like `Client`/`chat`.
+            _allowed_attrs = {"__file__", "__spec__", "__path__", "__name__"}
+
+            def __getattr__(self, attr):
+                if attr in self._allowed_attrs:
+                    # Provide a benign value for introspection
+                    if attr == "__file__":
+                        return "<blocked-ollama>"
+                    return None
+                # Only raise when test-run protection is triggered by real use
+                raise RuntimeError(
+                    "Access to the 'ollama' package is blocked in test runs (TEST_USE_REAL_OLLAMA is falsy)."
+                )
+
+        blk = _BlockedOllama("ollama")
+        # Ensure basic module metadata exists for importlib/inspect
+        try:
+            blk.__file__ = "<blocked-ollama>"
+        except Exception:
+            pass
+        sys.modules["ollama"] = blk
     _mod = "src.services.dialogue.ollama_client"
     if _mod not in sys.modules:
         _fake = types.ModuleType(_mod)
@@ -48,6 +79,69 @@ if not _test_use_real or str(_test_use_real).strip().lower() not in ("1", "true"
 # must include a committed `scripts/ci_trigger_data.py` so seeding does not
 # require heavy ML dependencies.
 from src.models.database import engine, Base
+
+
+# Prevent accidental outbound HTTP requests to Ollama during tests when
+# TEST_USE_REAL_OLLAMA is not enabled. This guard raises if any code
+# attempts to contact the local or cloud Ollama endpoints.
+@pytest.fixture(scope="session", autouse=True)
+def _block_ollama_http_requests():
+    v = os.getenv("TEST_USE_REAL_OLLAMA") or os.getenv("USE_REAL_OLLAMA")
+    if v and str(v).strip().lower() in ("1", "true", "yes", "y"):
+        yield
+        return
+
+    try:
+        import httpx
+
+        LOCAL = os.getenv("LOCAL_OLLAMA_URL", "http://localhost:11434")
+        CLOUD = os.getenv("CLOUD_OLLAMA_URL", "https://ollama.com")
+
+        def _is_ollama_url(u: object) -> bool:
+            try:
+                s = str(u)
+            except Exception:
+                return False
+            return LOCAL in s or CLOUD in s or "ollama.com" in s or "localhost:11434" in s
+
+        _orig_async_request = getattr(httpx.AsyncClient, "request", None)
+        _orig_sync_request = getattr(httpx.Client, "request", None)
+        _orig_module_request = getattr(httpx, "request", None)
+
+        async def _async_request(self, method, url, *args, **kwargs):
+            if _is_ollama_url(url):
+                raise RuntimeError("Blocked outgoing HTTP request to Ollama in tests (TEST_USE_REAL_OLLAMA is falsy)")
+            return await _orig_async_request(self, method, url, *args, **kwargs)
+
+        def _sync_request(self, method, url, *args, **kwargs):
+            if _is_ollama_url(url):
+                raise RuntimeError("Blocked outgoing HTTP request to Ollama in tests (TEST_USE_REAL_OLLAMA is falsy)")
+            return _orig_sync_request(self, method, url, *args, **kwargs)
+
+        def _module_request(method, url, *args, **kwargs):
+            if _is_ollama_url(url):
+                raise RuntimeError("Blocked outgoing HTTP request to Ollama in tests (TEST_USE_REAL_OLLAMA is falsy)")
+            return _orig_module_request(method, url, *args, **kwargs)
+
+        httpx.AsyncClient.request = _async_request
+        httpx.Client.request = _sync_request
+        httpx.request = _module_request
+    except Exception:
+        _orig_async_request = _orig_sync_request = _orig_module_request = None
+
+    yield
+
+    # Restore originals at session end
+    try:
+        import httpx as _httpx
+        if _orig_async_request is not None:
+            _httpx.AsyncClient.request = _orig_async_request
+        if _orig_sync_request is not None:
+            _httpx.Client.request = _orig_sync_request
+        if _orig_module_request is not None:
+            _httpx.request = _orig_module_request
+    except Exception:
+        pass
 
 
 @pytest.fixture(autouse=True)

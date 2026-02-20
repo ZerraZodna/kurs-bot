@@ -92,13 +92,13 @@ class EmbeddingService:
                     try:
                         from sentence_transformers import SentenceTransformer
                     except Exception:
-                        logger.error("Local embedding backend requested but 'sentence-transformers' is not installed")
-                        return None
+                        raise RuntimeError(
+                            "EMBEDDING_BACKEND=local requires the 'sentence-transformers' package. Install it with: pip install sentence-transformers"
+                        )
                     model_name = getattr(settings, "SENTENCE_TRANSFORMERS_MODEL", "all-MiniLM-L6-v2")
                     self._local_model = await self._ensure_local_model_loaded(model_name)
                     if self._local_model is None:
-                        logger.error("Failed to load local sentence-transformers model for local backend")
-                        return None
+                        raise RuntimeError("Failed to load local sentence-transformers model for local backend")
 
                 logger.info("DEBUG: generate_embedding calling local encode for single text (chars=%d)", len(normalized))
                 vec = await asyncio.to_thread(self._local_model.encode, normalized, convert_to_numpy=True)
@@ -255,11 +255,13 @@ class EmbeddingService:
           creating the model via SentenceTransformer(model_name) once and then
           saving it to the cache dir for subsequent cold starts.
         """
+        print(f"[DEBUG] _ensure_local_model_loaded called for model: {model_name}")
         try:
             from sentence_transformers import SentenceTransformer
         except Exception:
-            logger.warning("Local embedding backend requested but 'sentence-transformers' is not installed; deferred to HTTP embed fallback")
-            return None
+            raise RuntimeError(
+                "EMBEDDING_BACKEND=local requires the 'sentence-transformers' package. Install it with: pip install sentence-transformers"
+            )
 
         # compute local cache dir
         base_cache = getattr(settings, "MODEL_CACHE_DIR", None) or "src/data/models"

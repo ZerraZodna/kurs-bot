@@ -170,6 +170,7 @@ def _patch_embedding_service(monkeypatch):
 def _patch_httpx_client(monkeypatch):
     try:
         import httpx as _httpx
+        import os as _os
 
         class _DummyResponse:
             def __init__(self, json_data=None, status_code=200):
@@ -195,6 +196,22 @@ def _patch_httpx_client(monkeypatch):
                 return False
 
             async def post(self, *args, **kwargs):
+                # Fail fast on any attempt to call configured Ollama endpoints
+                try:
+                    url = args[0] if args else kwargs.get('url')
+                except Exception:
+                    url = None
+                if url:
+                    local = _os.getenv('LOCAL_OLLAMA_URL') or ''
+                    cloud = _os.getenv('CLOUD_OLLAMA_URL') or ''
+                    u = str(url)
+                    if local and local in u:
+                        raise RuntimeError(f"Blocked outbound call to LOCAL_OLLAMA_URL during tests: {u}")
+                    if cloud and cloud in u:
+                        raise RuntimeError(f"Blocked outbound call to CLOUD_OLLAMA_URL during tests: {u}")
+                    # Also block common Ollama path fragments as a safety net
+                    if 'ollama' in u and 'embed' in u or 'generate' in u:
+                        raise RuntimeError(f"Blocked outbound Ollama-related HTTP call during tests: {u}")
                 return _DummyResponse()
 
             async def get(self, *args, **kwargs):

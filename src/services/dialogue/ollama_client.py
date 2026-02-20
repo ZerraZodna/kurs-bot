@@ -61,6 +61,13 @@ def _test_use_real_ollama_enabled() -> bool:
 
 # Cache the test-flag at import time to avoid repeated getenv() calls
 _TEST_USE_REAL_OLLAMA = _test_use_real_ollama_enabled()
+# Fail-fast at import time when tests explicitly opt out of real Ollama.
+# This guarantees the process crashes immediately on any accidental import
+# of the real Ollama client during test collection or the very first test.
+if not _TEST_USE_REAL_OLLAMA:
+    raise RuntimeError(
+        "TEST_USE_REAL_OLLAMA is falsy — blocking import of the real Ollama client for test safety."
+    )
 
 
 # Note: cloud-model name normalization removed. Cloud-only models must run in cloud
@@ -160,6 +167,17 @@ async def call_ollama(prompt: str, model: str | None = None, language: str | Non
     chosen_model = model or OLLAMA_MODEL
     if language and language.lower() != "en":
         chosen_model = getattr(settings, "NON_ENGLISH_OLLAMA_MODEL", chosen_model)
+
+    # Safety short-circuit: respect TEST_USE_REAL_OLLAMA env var strictly.
+    # When falsy, do NOT make any real network/client calls. Raise an
+    # explicit error so accidental real Ollama usage is obvious during
+    # test runs rather than silently returning mock data.
+    if not _TEST_USE_REAL_OLLAMA:
+        short = (prompt[:160] + "...") if prompt and len(prompt) > 160 else (prompt or "")
+        raise RuntimeError(
+            "Real Ollama calls are disabled in this process (TEST_USE_REAL_OLLAMA is falsy). "
+            f"Attempted model={chosen_model or 'none'} lang={language or 'en'} prompt_snippet={short[:200]}"
+        )
 
     # Determine cloud vs local endpoint. Use cloud ONLY when the model
     # explicitly ends with '-cloud' and a cloud URL is configured.
