@@ -7,6 +7,7 @@ Provides utilities for storing and comparing embeddings.
 
 import logging
 import numpy as np
+import re
 import httpx
 import asyncio
 from unittest.mock import AsyncMock
@@ -66,6 +67,17 @@ class EmbeddingService:
         if not text or not text.strip():
             logger.warning("Cannot generate embedding for empty text")
             return None
+
+        # Normalize text for embedding generation to ensure consistent
+        # embeddings for semantically equivalent inputs (e.g. "What's" vs "what is").
+        # We lowercase, remove punctuation (keeping alphanumerics and whitespace),
+        # and collapse multiple whitespace characters.
+        try:
+            normalized = text.lower()
+            normalized = re.sub(r"[^\w\s]", " ", normalized)
+            normalized = re.sub(r"\s+", " ", normalized).strip()
+        except Exception:
+            normalized = text.strip()
         
         try:
             # Backend-specific handling: be strict and do NOT silently fall back
@@ -73,7 +85,7 @@ class EmbeddingService:
                 # If tests have patched the HTTP client with AsyncMock, prefer
                 # the mocked HTTP path instead of loading the heavy local model.
                 if isinstance(getattr(self.client, 'post', None), AsyncMock):
-                    return await self._handle_mocked_post(text)
+                    return await self._handle_mocked_post(normalized)
 
                 # Require sentence-transformers local model; do not call HTTP
                 if self._local_model is None:
@@ -88,8 +100,8 @@ class EmbeddingService:
                         logger.error("Failed to load local sentence-transformers model for local backend")
                         return None
 
-                logger.info("DEBUG: generate_embedding calling local encode for single text (chars=%d)", len(text.strip()))
-                vec = await asyncio.to_thread(self._local_model.encode, text.strip(), convert_to_numpy=True)
+                logger.info("DEBUG: generate_embedding calling local encode for single text (chars=%d)", len(normalized))
+                vec = await asyncio.to_thread(self._local_model.encode, normalized, convert_to_numpy=True)
                 if isinstance(vec, np.ndarray):
                     emb = vec.tolist()
                 else:
@@ -115,7 +127,7 @@ class EmbeddingService:
                     self.embed_url,
                     json={
                         "model": self.embed_model,
-                        "input": text.strip()
+                        "input": normalized
                     },
                     headers=headers or None,
                 )
@@ -136,7 +148,7 @@ class EmbeddingService:
                 # HTTP client has been patched by tests. This keeps the
                 # .env-driven setting but permits tests to patch `client.post`.
                 if isinstance(getattr(self.client, 'post', None), AsyncMock):
-                    return await self._handle_mocked_post(text)
+                    return await self._handle_mocked_post(normalized)
 
                 # No mock present and not a supported backend — raise so tests
                 # must explicitly provide a mocked client or choose a supported

@@ -26,7 +26,6 @@ def test_webhook_invalid_payload(client):
     assert response.status_code == 200
     assert response.json()["ok"] is False
 
-@pytest.mark.skip(reason="Full integration test - covered by test_integration_memory.py")
 def test_webhook_valid_message(monkeypatch, client):
     # Simplified test: just verify the webhook accepts the payload
     # Full integration testing is covered in test_integration_memory.py

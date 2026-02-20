@@ -175,6 +175,7 @@ switch (cmd) {
       '  npm restart          # stop then start services (equivalent to stop + start)',
       '  npm run start:ui     # serve the dev frontend (equivalent to serve_dev_ui.ps1) — opens browser by default; use `--no-open` or set BROWSER=none to disable',
       '  npm run init_db     # initialize database (defaults to prod.db)',
+      '  npm run seed        # regenerate ci_trigger_data.py and seed trigger_embeddings',
       '  npm run config       # create .env from .env.template (if missing) and open it in your editor',
       "  npm run update       # run 'git pull' and, if changes were pulled, restart services (stop then start)",
       '  npm run ping         # check Telegram API and Ollama endpoints based on .env',
@@ -195,6 +196,7 @@ switch (cmd) {
     console.log('  test [pytest-args]  Run pytest');
     console.log('  run <script> [args] Run a Python script');
     console.log('  exec <python-args>  Run arbitrary python with args');
+    console.log('  seed              Regenerate ci_trigger_data.py and seed trigger_embeddings');
     process.exit(0);
     break;
   case 'ensure-venv':
@@ -511,6 +513,14 @@ switch (cmd) {
         }
         process.exit(0);
       }
+      break;
+    case 'seed':
+      // Regenerate ci_trigger_data.py from STARTER and seed trigger_embeddings
+      if (!venvPython()) ensureVenv();
+      // Generate ci_trigger_data.py using local model
+      runScript(path.join(repoRoot, 'scripts', 'export_trigger_embeddings.py'), ['--from-starter', '--out', 'scripts/ci_trigger_data.py']);
+      // Seed the DB with the generated ci_trigger_data.py
+      runScript(path.join(repoRoot, 'scripts', 'ci_seed_triggers.py'));
       break;
   case 'tail':
     // Print last N lines of service logs (non-follow)

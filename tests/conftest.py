@@ -1,6 +1,46 @@
+import os
 from pathlib import Path
 import sys
+import types
 import pytest
+
+# Insert an import-time stub for the Ollama client to avoid any real
+# initialization (model/DB/HTTP) during test collection. Conftest is
+# imported by pytest early, so placing the stub here ensures it runs before
+# other project modules are imported.
+_test_use_real = os.getenv("TEST_USE_REAL_OLLAMA") or os.getenv("USE_REAL_OLLAMA")
+if not _test_use_real or str(_test_use_real).strip().lower() not in ("1", "true", "yes", "y"):
+    _mod = "src.services.dialogue.ollama_client"
+    if _mod not in sys.modules:
+        _fake = types.ModuleType(_mod)
+
+        async def _fake_call_ollama(prompt: str, model: str | None = None, language: str | None = None) -> str:
+            short = (prompt[:160] + "...") if prompt and len(prompt) > 160 else (prompt or "")
+            return f"[MOCK_OLLAMA_REPLY] model={model or 'default'} lang={language or 'en'} text={short}"
+
+        setattr(_fake, "call_ollama", _fake_call_ollama)
+        sys.modules[_mod] = _fake
+        # Force-import the parent package so its __init__ executes while our
+        # fake submodule is present in sys.modules. The package's import will
+        # bind `call_ollama` into the package namespace (via
+        # `from .ollama_client import call_ollama`) without triggering real
+        # initialization of the real submodule.
+        try:
+            import importlib
+
+            importlib.import_module("src.services.dialogue")
+            pkg_mod = sys.modules.get("src.services.dialogue")
+            if pkg_mod is not None:
+                try:
+                    setattr(pkg_mod, "ollama_client", _fake)
+                    setattr(pkg_mod, "call_ollama", _fake_call_ollama)
+                except Exception:
+                    pass
+        except Exception:
+            # If import fails, leave the fake submodule in sys.modules; tests
+            # will either import the package later (and find our fake) or
+            # monkeypatch with raising=False.
+            pass
 
 # Ensure test database is initialized for every test to guarantee isolation.
 # This autouse fixture recreates the schema and seeds trigger embeddings from

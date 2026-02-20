@@ -4,22 +4,33 @@ import types
 import importlib
 import pytest
 
+# NOTE: import-time prevention for the real Ollama client lives in
+# `tests/conftest.py`. That conftest stub runs before test collection and
+# prevents import-time model/HTTP initialization. `tests/helpers.py` should
+# only contain per-test fixtures/monkeypatch helpers.
+
 
 def _env_is_truthy(name: str) -> bool:
+    """Return True for common truthy env values (1/true/yes/y)."""
     v = os.getenv(name)
     if not v:
         return False
     return str(v).strip().lower() in ("1", "true", "yes", "y")
 
 
-@pytest.fixture(autouse=True)
-def install_test_mocks(monkeypatch):
-    """Consolidated test helpers: fake Ollama, embedding service, httpx client, and faiss stub.
+def _get_embedding_dim() -> int:
+    try:
+        return int(os.getenv("EMBEDDING_DIMENSION", "384") or 384)
+    except Exception:
+        return 384
 
-    This centralizes test-only patches so individual test files stay small.
+
+def _register_fake_faiss() -> None:
+    """Install a lightweight pure-Python faiss stub into sys.modules.
+
+    This avoids depending on native faiss in tests while preserving a
+    minimal feature set used by the matcher/test utilities.
     """
-
-    # Provide a pure-Python faiss stub when TEST_USE_REAL_FAISS is not set
     try:
         if not _env_is_truthy("TEST_USE_REAL_FAISS"):
             import numpy as _np
@@ -86,24 +97,31 @@ def install_test_mocks(monkeypatch):
     except Exception:
         pass
 
-    # Fake Ollama reply
+
+def _make_fake_call_ollama():
     async def _fake_call_ollama(prompt: str, model: str | None = None, language: str | None = None) -> str:
         short = (prompt[:160] + "...") if prompt and len(prompt) > 160 else (prompt or "")
         return f"[MOCK_OLLAMA_REPLY] model={model or 'default'} lang={language or 'en'} text={short}"
 
-    # Patch canonical client module if present
+    return _fake_call_ollama
+
+
+def _patch_ollama_client(monkeypatch):
+    fake = _make_fake_call_ollama()
     try:
         client_mod = importlib.import_module("src.services.dialogue.ollama_client")
     except Exception:
         client_mod = None
 
-    if client_mod is not None:
-        try:
-            monkeypatch.setattr(client_mod, "call_ollama", _fake_call_ollama)
-        except Exception:
-            pass
+    if not _env_is_truthy("TEST_USE_REAL_OLLAMA"):
+        if client_mod is not None:
+            try:
+                monkeypatch.setattr(client_mod, "call_ollama", fake)
+            except Exception:
+                pass
 
-    # Stub FastAPI startup health checks to avoid probes
+
+def _patch_ollama_online(monkeypatch):
     try:
         _online = importlib.import_module("src.services.ollama_online_test")
         try:
@@ -113,12 +131,13 @@ def install_test_mocks(monkeypatch):
     except Exception:
         pass
 
-    # Fake embedding service
+
+def _patch_embedding_service(monkeypatch):
     try:
         emb_mod = importlib.import_module("src.services.embedding_service")
 
         class _FakeEmbeddingService:
-            def __init__(self, dim: int = int(getattr(os.getenv('EMBEDDING_DIMENSION', 384), 384) or 384)):
+            def __init__(self, dim: int = _get_embedding_dim()):
                 self.embedding_dimension = dim
 
             async def generate_embedding(self, text: str):
@@ -147,13 +166,14 @@ def install_test_mocks(monkeypatch):
     except Exception:
         pass
 
-    # Dummy httpx.AsyncClient to prevent outbound network during tests
+
+def _patch_httpx_client(monkeypatch):
     try:
         import httpx as _httpx
 
         class _DummyResponse:
             def __init__(self, json_data=None, status_code=200):
-                self._json = json_data if json_data is not None else {"embeddings": [[0.0] * 384]}
+                self._json = json_data if json_data is not None else {"embeddings": [[0.0] * _get_embedding_dim()]}
                 self.status_code = status_code
 
             def raise_for_status(self):
@@ -186,5 +206,20 @@ def install_test_mocks(monkeypatch):
             pass
     except Exception:
         pass
+
+
+@pytest.fixture(autouse=True)
+def install_test_mocks(monkeypatch):
+    """Consolidated test helpers: fake Ollama, embedding service, httpx client, and faiss stub.
+
+    This centralizes test-only patches so individual test files stay small.
+    """
+
+    # Register lightweight stubs/mocks used by tests
+    _register_fake_faiss()
+    _patch_ollama_client(monkeypatch)
+    _patch_ollama_online(monkeypatch)
+    _patch_embedding_service(monkeypatch)
+    _patch_httpx_client(monkeypatch)
 
     yield

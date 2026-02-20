@@ -319,7 +319,6 @@ class DialogueEngine:
             session=session,
             prompt_builder=self.prompt_builder,
             user_lang=user_lang,
-            call_ollama_fn=self.call_ollama,
         )
         if pre:
             return pre

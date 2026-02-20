@@ -14,7 +14,10 @@ from src.memories import MemoryManager
 from src.services.embedding_service import get_embedding_service
 from src.services.semantic_search import get_semantic_search_service
 
-@pytest.mark.skip(reason="Manual test - run manually; disables external calls during automated test runs")
+import pytest
+
+
+@pytest.mark.asyncio
 async def test_embeddings():
     """Test embedding generation and semantic search"""
     

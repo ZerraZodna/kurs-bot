@@ -12,7 +12,7 @@ async def test_pre_llm_lesson_short_circuit(monkeypatch):
     from tests.utils import make_ready_user
 
     user_id = make_ready_user(session, external_id="u1", first_name="Test")
-    lesson = Lesson(lesson_id=1, title="L1", content="Full lesson text")
+    lesson = Lesson(lesson_id=1, title="Lesson 1", content="Lesson 1\nFull lesson text")
     session.add(lesson)
     session.commit()
 
@@ -49,7 +49,7 @@ async def test_pre_llm_lesson_short_circuit(monkeypatch):
     # The short-circuit should return the lesson content (not an LLM reply).
     # Accept either the older "Lesson 1" header or the text-based lesson
     # formatting returned by the dialogue engine.
-    assert "Lesson" in resp
+    assert "Lesson 1" in resp
 
     resp = await process_lesson_query(
         user_id=user_id,
