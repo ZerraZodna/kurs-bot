@@ -119,7 +119,7 @@ def _extract_chat_text(resp: Any) -> Optional[str]:
     return None
 
 
-async def _call_local_http(model: str, prompt: str, temperature: float | None = None) -> str:
+async def _call_local_http(model: str, prompt: str, temperature: Optional[float] = None) -> str:
     url = LOCAL_OLLAMA_URL
     temp = OLLAMA_TEMPERATURE if temperature is None else temperature
     payload = {"model": model, "prompt": prompt, "stream": False, "temperature": float(temp)}
@@ -148,7 +148,7 @@ def _cloud_call_sync(host_base: str, api_key: Optional[str], model: str, prompt:
         return client.chat(str(model), messages=messages, stream=False)
 
 
-async def call_ollama(prompt: str, model: str | None = None, language: str | None = None, temperature: float | None = None) -> str:
+async def call_ollama(prompt: str, model: Optional[str] = None, language: Optional[str] = None, temperature: Optional[float] = None) -> str:
     """Top-level async method to call Ollama (cloud or local) and return text.
 
     Behavior summary:

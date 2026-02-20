@@ -148,7 +148,8 @@ class TriggerMatcher:
                         embs.append(emb)
                         self._id_to_trigger[int(t["trigger_id"])]=t
                 if ids and embs:
-                    vi = VectorIndex()
+                    # Faiss on macOS + Python 3.9/libomp can segfault; use numpy fallback.
+                    vi = VectorIndex(use_faiss=False)
                     vi.build(ids, embs)
                     self._vector_index = vi
                 else:

@@ -19,22 +19,37 @@ class ProxyingHandler(http.server.SimpleHTTPRequestHandler):
             length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(length) if length else b''
 
-            conn = http.client.HTTPConnection('localhost', self.api_port)
+            # Use loopback explicitly and allow a generous timeout for model calls
+            conn = http.client.HTTPConnection('127.0.0.1', self.api_port, timeout=25)
             # Forward minimal headers
             headers = {'Content-Type': self.headers.get('Content-Type', 'application/json')}
-            conn.request('POST', self.path, body, headers)
-            resp = conn.getresponse()
-            resp_body = resp.read()
+            try:
+                conn.request('POST', self.path, body, headers)
+                resp = conn.getresponse()
+                resp_body = resp.read()
 
-            self.send_response(resp.status)
-            # Copy Content-Type if present
-            if resp.getheader('Content-Type'):
-                self.send_header('Content-Type', resp.getheader('Content-Type'))
-            self.send_header('Content-Length', str(len(resp_body)))
-            self.end_headers()
-            if resp_body:
-                self.wfile.write(resp_body)
-            conn.close()
+                self.send_response(resp.status)
+                # Copy Content-Type if present
+                if resp.getheader('Content-Type'):
+                    self.send_header('Content-Type', resp.getheader('Content-Type'))
+                self.send_header('Content-Length', str(len(resp_body)))
+                self.end_headers()
+                if resp_body:
+                    self.wfile.write(resp_body)
+            except Exception as e:
+                # Surface backend connectivity issues as 502 for the browser
+                msg = f"Backend at http://localhost:{self.api_port} unavailable: {e}"
+                payload = msg.encode('utf-8')
+                self.send_response(502)
+                self.send_header('Content-Type', 'text/plain; charset=utf-8')
+                self.send_header('Content-Length', str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+            finally:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
         else:
             self.send_error(501, "Unsupported method ('POST')")
 
