@@ -26,7 +26,14 @@ def detect_lesson_request(text: str) -> Optional[Dict[str, Any]]:
     Returns:
         Dict with lesson_id if detected, None otherwise
     """
-    text_lower = (text or "").lower()
+    # Normalize input for robust matching: lowercase, replace punctuation
+    # (except apostrophes which are handled explicitly) with spaces and
+    # collapse multiple whitespace. This helps match variants like
+    # "What's today's lesson?" or "what is todays lesson".
+    raw = (text or "")
+    text_lower = raw.lower()
+    text_normalized = re.sub(r"[^\w\s']", ' ', text_lower)
+    text_normalized = re.sub(r"\s+", ' ', text_normalized).strip()
 
     def _extract_number(s: str) -> Optional[int]:
         m = re.search(r"\b(?:lesson|leksjon|day)\s*#?\s*(\d+)\b", s)
@@ -46,18 +53,14 @@ def detect_lesson_request(text: str) -> Optional[Dict[str, Any]]:
         return bool(re.search(r"^\s*(?:show|send|give|read|display)(?: me)?(?: the)?\b", s)) and "lesson" in s
 
     # 1) explicit numbered lesson
-    num = _extract_number(text_lower)
+    num = _extract_number(text_normalized)
     if num:
         return {"lesson_id": num}
 
-    # 2) today's lesson
-    if re.search(r"\btoday('?s)?\s+lesson\b", text_lower) or "todays lesson" in text_lower:
-        return {"today": True}
-
-    # 3) command-like without a number (e.g., "show lesson")
-    if _is_command_like(text_lower):
-        return {"raw_command": True}
-
+    # Only detect explicit numbered lesson requests here. Other user
+    # phrasing (e.g., "What's today's lesson?", "what is todays lesson")
+    # should be handled by semantic trigger matching in
+    # `pre_llm_lesson_short_circuit` so we keep this detector minimal.
     return None
 
 
@@ -82,57 +85,32 @@ async def handle_lesson_request(
         lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
 
         if not lesson:
-            # If the lessons table is empty, attempt to import lessons from the
-            # bundled PDF automatically to reduce friction on new hosts.
-            session_count = session.query(Lesson).count()
-            if session_count == 0:
-                from pathlib import Path
-                import importlib.util
+            # Try to ensure lessons are present (import bundled lessons if DB empty)
+            from src.services.lesson_importer import ensure_lessons_available
 
-                repo_root = Path(__file__).resolve().parents[3]
-                script_path = repo_root / 'scripts' / 'utils' / 'import_acim_lessons.py'
-                if script_path.exists():
-                    try:
-                        spec = importlib.util.spec_from_file_location("import_acim_lessons", str(script_path))
-                        mod = importlib.util.module_from_spec(spec)
-                        spec.loader.exec_module(mod)
-                        # Call main() to perform import; it returns an exit code
-                        rc = mod.main([])
-                        if rc == 0:
-                            # re-query for the lesson after successful import
-                            lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
-                    except Exception:
-                        # If importing fails, continue to return the not-found message
-                        lesson = None
+            ok = ensure_lessons_available(session)
+            if ok:
+                lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
 
             if not lesson:
                 return f"I couldn't find lesson {lesson_id} in my database. ACIM has 365 lessons - please ask for a lesson between 1 and 365."
 
-        # Detect if the user explicitly asks for the exact/raw lesson text
+        # Detect if the user explicitly asks for the exact/raw lesson text.
+        # Prefer semantic trigger matching (raw_lesson) seeded in the triggers
+        # table so phrase variants are handled consistently. Fall back to a
+        # conservative regex if trigger matching isn't available.
         user_lower = user_input.lower()
-        raw_triggers = [
-            "text of lesson",
-            "text for lesson",
-            "the text of lesson",
-            "what is the text of",
-            "exact words",
-            "exact text",
-            "what exactly is",
-            "give me the exact words",
-            "give me the exact text",
-            "exactly what",
-        ]
+        from src.triggers.trigger_matcher import get_trigger_matcher
 
-        # Also treat direct 'show/send/give/read/display lesson' commands as raw requests
-        def _is_command_like(s: str) -> bool:
-            return bool(re.search(r"^\s*(?:show|send|give|read|display)(?: me)?(?: the)?\b", s)) and "lesson" in s
+        matcher = get_trigger_matcher()
+        matches = await matcher.match_triggers(user_input)
+        for m in matches:
+            if m.get("action_type") == "raw_lesson" and m.get("score", 0.0) >= m.get("threshold", settings.TRIGGER_SIMILARITY_THRESHOLD):
+                return await format_lesson_message(lesson, user_language or "en")
 
-        is_raw_request = any(t in user_lower for t in raw_triggers) or bool(
-            re.search(r"\bwhat exactly is\b.*\blesson\b", user_lower)
-        ) or _is_command_like(user_lower)
-
-        if is_raw_request:
-            # Return raw lesson text directly (translate if needed)
+        # Conservative regex fallback for explicit requests asking for the
+        # exact text/words of the lesson.
+        if re.search(r"\bwhat exactly is\b.*\blesson\b", user_lower) or re.search(r"\b(exact|exactly|the text of|exact text|exact words)\b", user_lower):
             return await format_lesson_message(lesson, user_language or "en")
 
         # Otherwise (including plain "Give me lesson N"), use RAG/LLM to discuss the lesson

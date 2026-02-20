@@ -147,6 +147,9 @@ def get_lesson_confirmation_prompt(language: str, lesson_id: int) -> str:
 
 # Confirmation prompt template for when a user reports a current lesson
 ONBOARD_MESSAGES["confirm_lesson"] = {
-	"en": "Yesterday you told me you were on Lesson {lesson_id}. From a gentle, loving place: did you complete that lesson yesterday? Reply 'yes' to receive today's lesson, or 'no' if you'd like to continue where you left off.",
-	"no": "I går sa du at du var på Leksjon {lesson_id}. Fra et mildt, kjærlig sted: fullførte du den leksjonen i går? Svar 'ja' for å motta dagens leksjon, eller 'nei' hvis du vil fortsette der du slapp.",
+    # use wording that doesn't assume a day boundary; the prompt may be shown
+    # multiple times if the session is restarted, and talking about "yesterday"
+    # can be confusing if it's still the same day.
+    "en": "The last time we spoke you told me you were on Lesson {lesson_id}. From a gentle, loving place: did you complete that lesson? Reply 'yes' to receive next lesson, or 'no' if you'd like to continue where you left off.",
+    "no": "Sist vi snakket sa du at du var på Leksjon {lesson_id}. Fra et mildt, kjærlig sted: fullførte du den leksjonen? Svar 'ja' for å motta neste leksjon, eller 'nei' hvis du vil fortsette der du slapp.",
 }

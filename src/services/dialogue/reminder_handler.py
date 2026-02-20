@@ -144,6 +144,17 @@ async def handle_lesson_confirmation(
         else None
     )
     if not lesson:
+        # Try centralized helper to import bundled lessons if DB is empty
+        try:
+            from src.services.lesson_importer import ensure_lessons_available
+
+            ok = ensure_lessons_available(session)
+            if ok:
+                lesson = session.query(Lesson).filter(Lesson.lesson_id == next_id).first()
+        except Exception:
+            lesson = None
+
+    if not lesson:
         resolve_pending_confirmation(memory_manager, user_id)
         return "Thanks! I couldn't find the next lesson right now."
 

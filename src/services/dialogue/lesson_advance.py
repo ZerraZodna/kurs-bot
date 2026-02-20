@@ -67,8 +67,16 @@ async def maybe_send_next_lesson(
     # If the computed state signals we need confirmation (user reported a
     # current lesson but we have no last_sent record), ask for confirmation
     # regardless of `advanced_by_day` so onboarding 'continuing' users are
-    # prompted on first contact.
+    # prompted on first contact.  However we don't want to repeat the same
+    # prompt multiple times in a single day/session; once a pending
+    # confirmation exists we simply return None until it's resolved.
     if state.get("need_confirmation") and lesson_id and is_simple_greeting(text):
+        # avoid re-sending the question if already pending
+        from src.scheduler.memory_utils import get_pending_confirmation
+
+        if get_pending_confirmation(memory_manager, user_id):
+            return None
+
         # Persist a pending confirmation so dialogue handlers can resolve it
         next_id = (int(lesson_id) % 365) + 1
         set_pending_confirmation(memory_manager, user_id, int(lesson_id), next_id)

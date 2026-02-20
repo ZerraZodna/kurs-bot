@@ -48,4 +48,36 @@ async def test_next_day_triggers_confirmation_prompt():
     assert pending is not None, "Expected a pending confirmation to be stored"
     assert int(pending.get("lesson_id")) == 8
 
+    # If we greet again in the same session/day we should NOT re-send the
+    # confirmation prompt; the pending entry protects against repeated
+    # messages which confused users.
+    result2 = await maybe_send_next_lesson(
+        user_id=user_id,
+        text="Hi again",
+        session=db,
+        prompt_builder=prompt_builder,
+        memory_manager=mm,
+        call_ollama=lambda p, m=None, language=None: asyncio.sleep(0) or "",
+    )
+    assert result2 is None, "Second greeting should not trigger another prompt"
+
+    # Also verify that the original prompt no longer contains the word
+    # 'yesterday' since we updated the wording to avoid day-boundary
+    # assumptions.
+    assert "yesterday" not in result.lower()
+
     db.close()
+
+
+def test_confirmation_prompt_wording():
+    # direct check of the template helper to ensure updated language
+    from src.onboarding.prompts import get_lesson_confirmation_prompt
+
+    prompt_en = get_lesson_confirmation_prompt("en", 9)
+    assert "yesterday" not in prompt_en.lower()
+    assert "last time" in prompt_en.lower() or "spoke" in prompt_en.lower()
+
+    prompt_no = get_lesson_confirmation_prompt("no", 12)
+    # norwegian text should also avoid the literal word for "yesterday"
+    assert "i går" not in prompt_no.lower()
+    assert "sist" in prompt_no.lower() or "snakket" in prompt_no.lower()
