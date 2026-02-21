@@ -10,6 +10,24 @@ A chatbot/consultant with persistent memory that delivers daily lessons and inte
 - Alembic (migrations)
 - pytest (testing)
 
+## macOS (Apple Silicon) quick start + Faiss note
+- The PyPI `faiss-cpu` wheel can segfault on macOS/arm64 (libomp/Accelerate issue). Use the conda-forge build instead.
+- Install Miniforge (conda-forge) first:
+  ```bash
+  /bin/bash -c "$(curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh)"
+  exec $SHELL
+  ```
+- Create a fresh env with Faiss:
+  ```bash
+  conda create -n kurs-bot python=3.10 faiss-cpu -c conda-forge
+  conda activate kurs-bot
+  pip install --upgrade pip
+  pip install --no-cache-dir sentence-transformers hnswlib
+  pip install --no-cache-dir -r requirements.txt
+  ```
+- Enable Faiss at runtime: `USE_REAL_FAISS=1 npm run start:api` (macOS default is off to avoid crashes).
+- If you already installed the PyPI Faiss wheel, remove it first: `pip uninstall -y faiss-cpu faiss`.
+
 ## Setup for Windows:
 
 1. Clone the repo and create a virtual environment:
@@ -159,13 +177,7 @@ source ./.venv/bin/activate && python ./scripts/utils/import_acim_lessons.py --p
 
 
 6) Start the app (development): (Do step 7 first once)
-Windows:
-\.\scripts\start-windows.ps1
-
-Unix:
-chmod +x ./scripts/start-linux.sh
-source .venv/bin/activate
-./scripts/start-linux.sh
+npm start
 
 Or totally manual:
 ```bash

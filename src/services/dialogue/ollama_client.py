@@ -48,6 +48,7 @@ def _is_cloud_url(url: Optional[str]) -> bool:
 
 
 _TEST_USE_REAL_OLLAMA = bool(getattr(settings, "TEST_USE_REAL_OLLAMA", False))
+_IS_TEST_ENV = bool(getattr(settings, "IS_TEST_ENV", False))
 
 
 # Note: cloud-model name normalization removed. Cloud-only models must run in cloud
@@ -148,14 +149,13 @@ async def call_ollama(prompt: str, model: Optional[str] = None, language: Option
     if language and language.lower() != "en":
         chosen_model = getattr(settings, "NON_ENGLISH_OLLAMA_MODEL", chosen_model)
 
-    # Safety short-circuit: respect TEST_USE_REAL_OLLAMA env var strictly.
-    # When falsy, do NOT make any real network/client calls. Raise an
-    # explicit error so accidental real Ollama usage is obvious during
-    # test runs rather than silently returning mock data.
-    if not _TEST_USE_REAL_OLLAMA:
+    # Safety short-circuit: only block real calls in explicit test context.
+    # In production (IS_TEST_ENV=False), always allow real Ollama regardless
+    # of TEST_USE_REAL_OLLAMA.
+    if _IS_TEST_ENV and not _TEST_USE_REAL_OLLAMA:
         short = (prompt[:160] + "...") if prompt and len(prompt) > 160 else (prompt or "")
         raise RuntimeError(
-            "Real Ollama calls are disabled in this process (TEST_USE_REAL_OLLAMA is falsy). "
+            "Real Ollama calls are disabled in this test process (TEST_USE_REAL_OLLAMA is falsy). "
             f"Attempted model={chosen_model or 'none'} lang={language or 'en'} prompt_snippet={short[:200]}"
         )
 

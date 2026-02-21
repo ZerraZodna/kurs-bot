@@ -62,6 +62,8 @@ function installDeps() {
     console.error('No Python found to install dependencies. Install Python 3 or set PYTHON/PYTHON3 env var.');
     return false;
   }
+  const isMac = process.platform === 'darwin';
+  const isArm64 = process.arch === 'arm64';
 
   // Helper to run pip commands
   function runPip(args) {
@@ -87,12 +89,18 @@ function installDeps() {
   runPip(['-m', 'pip', 'install', '--no-cache-dir', 'sentence-transformers', 'hnswlib']);
 
   // Install faiss-cpu only here (not in requirements.txt) so CI does not install it.
-  console.log('Installing faiss-cpu (if available via pip); will advise conda on failure)');
-  const faissRes = runPip(['-m', 'pip', 'install', '--no-cache-dir', 'faiss-cpu']);
-  if (faissRes && faissRes.status !== 0) {
-    console.log('\nNote: pip install faiss-cpu failed. On Windows, Faiss is often installed via conda.');
-    console.log('Recommended (conda): conda install -c pytorch faiss-cpu');
-    console.log('Continuing without Faiss; the code will fall back to a numpy-based index.');
+  if (isMac && isArm64) {
+    console.log('Skipping pip install of faiss-cpu on macOS arm64 (PyPI wheel often segfaults with libomp).');
+    console.log('Recommended: use conda-forge build instead: mamba/conda install -c conda-forge faiss-cpu');
+    console.log('Proceeding without Faiss; the app will fall back to the numpy index unless USE_REAL_FAISS=1 with a conda Faiss.');
+  } else {
+    console.log('Installing faiss-cpu (if available via pip); will advise conda on failure)');
+    const faissRes = runPip(['-m', 'pip', 'install', '--no-cache-dir', 'faiss-cpu']);
+    if (faissRes && faissRes.status !== 0) {
+      console.log('\nNote: pip install faiss-cpu failed. On some platforms Faiss is best installed via conda.');
+      console.log('Recommended (conda): conda install -c pytorch faiss-cpu');
+      console.log('Continuing without Faiss; the code will fall back to a numpy-based index.');
+    }
   }
 
   // Finally install project requirements (avoid pulling CUDA wheels)
