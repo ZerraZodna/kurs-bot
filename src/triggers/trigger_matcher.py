@@ -43,6 +43,45 @@ lesson_phrases = [
 for p in lesson_phrases:
     STARTER.append({"name": "next_lesson", "action_type": "next_lesson", "utterance": p, "threshold": 0.75})
 
+# Greetings (used for lightweight auto-send/confirmation gating)
+greeting_phrases = [
+    "hi",
+    "hello",
+    "hey",
+    "good morning",
+    "good evening",
+    "good afternoon",
+    "hei",
+    "hallo",
+    "god morgen",
+    "god kveld",
+    "god ettermiddag",
+]
+for p in greeting_phrases:
+    STARTER.append({"name": "greeting", "action_type": "greeting", "utterance": p, "threshold": 0.55})
+
+# Confirmation intents for lesson completion prompts
+confirm_yes_phrases = [
+    "yes I completed it",
+    "yes finished the lesson",
+    "finished the lesson",
+    "done with that lesson",
+    "jeg er ferdig",
+    "ja ferdig",
+]
+for p in confirm_yes_phrases:
+    STARTER.append({"name": "confirm_yes", "action_type": "confirm_yes", "utterance": p, "threshold": 0.55})
+
+confirm_no_phrases = [
+    "not yet, still working on it",
+    "no I haven't finished",
+    "I need more time",
+    "nei ikke ferdig",
+    "jeg er ikke ferdig ennå",
+]
+for p in confirm_no_phrases:
+    STARTER.append({"name": "confirm_no", "action_type": "confirm_no", "utterance": p, "threshold": 0.55})
+
 # Examples for users asking about their current reminders/schedules
 SCHEDULE_STATUS_EXAMPLES = [
     "do i have any reminders",

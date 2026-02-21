@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import re
 from typing import Optional
+from datetime import datetime, timezone, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -9,33 +9,22 @@ from src.models.database import Lesson
 
 from .lesson_handler import format_lesson_message, translate_text
 from .memory_helpers import get_user_language
-from src.onboarding.prompts import get_lesson_confirmation_prompt
+from src.onboarding.language.prompts import get_lesson_confirmation_prompt
 from src.scheduler.lesson_state import set_last_sent_lesson_id
 from src.scheduler.memory_utils import set_pending_confirmation
+from src.scheduler.lesson_state_flow import determine_lesson_action
+from src.triggers.trigger_matcher import get_trigger_matcher
 
 
-def is_simple_greeting(text: str) -> bool:
-    cleaned = re.sub(r"[^a-zA-Z\s]", "", text or "").strip().lower()
-    if not cleaned:
+async def is_trigger_greeting(text: str) -> bool:
+    """Use trigger matcher embeddings to detect greetings."""
+    if not text or not text.strip():
         return True
-    if len(cleaned.split()) <= 3:
-        greetings = {
-            "hi",
-            "hello",
-            "hey",
-            "good morning",
-            "good evening",
-            "good afternoon",
-            "morning",
-            "evening",
-            "afternoon",
-            "hei",
-            "hallo",
-            "god morgen",
-            "god kveld",
-            "god ettermiddag",
-        }
-        return cleaned in greetings
+    matcher = get_trigger_matcher()
+    matches = await matcher.match_triggers(text, top_k=3)
+    for m in matches:
+        if m.get("action_type") == "greeting" and m.get("score", 0) >= m.get("threshold", 0.55):
+            return True
     return False
 
 
@@ -56,28 +45,31 @@ async def maybe_send_next_lesson(
     - Only load and format the lesson when we're going to deliver it.
     - Persist `last_sent_lesson_id` after preparing the message.
     """
-    context = prompt_builder.get_today_lesson_context(user_id)
-    state = context.get("state", {})
+    # Derive 'today' with any debug day offset used in tests/debug flows
+    try:
+        day_offset = prompt_builder._get_debug_day_offset(user_id)
+    except Exception:
+        day_offset = 0
+    today = (datetime.now(timezone.utc) + timedelta(days=day_offset)).date()
+
+    decision = determine_lesson_action(memory_manager, user_id, today=today)
     language = get_user_language(memory_manager, user_id)
 
-    # Read lesson identifiers early so confirmation logic can reference them
-    lesson_id = state.get("lesson_id")
-    previous_lesson_id = state.get("previous_lesson_id")
-
-    # If the computed state signals we need confirmation (user reported a
-    # current lesson but we have no last_sent record), ask for confirmation
-    # regardless of `advanced_by_day` so onboarding 'continuing' users are
-    # prompted on first contact.
-    if state.get("need_confirmation") and lesson_id and is_simple_greeting(text):
-        # Persist a pending confirmation so dialogue handlers can resolve it
-        next_id = (int(lesson_id) % 365) + 1
-        set_pending_confirmation(memory_manager, user_id, int(lesson_id), next_id)
-        return get_lesson_confirmation_prompt(language, lesson_id)
-
-    # Only proceed to auto-send when today's lesson was advanced by the
-    # scheduler and the assistant was greeted with a short/simple greeting.
-    if not state.get("advanced_by_day") or not is_simple_greeting(text):
+    # Confirmation path
+    if decision.get("action") == "confirm" and await is_trigger_greeting(text):
+        confirm_id = decision.get("confirmation_lesson_id") or decision.get("lesson_id")
+        next_id = decision.get("next_lesson_id") or ((int(confirm_id) % 365) + 1 if confirm_id else None)
+        if confirm_id and next_id:
+            set_pending_confirmation(memory_manager, user_id, int(confirm_id), int(next_id))
+            return get_lesson_confirmation_prompt(language, int(confirm_id))
         return None
+
+    # Auto-send path only on simple greetings and when decision says send
+    if decision.get("action") != "send" or not await is_trigger_greeting(text):
+        return None
+
+    lesson_id = decision.get("lesson_id")
+    previous_lesson_id = decision.get("previous_lesson_id")
 
     if not lesson_id:
         return None

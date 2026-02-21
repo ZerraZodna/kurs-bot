@@ -33,7 +33,6 @@ from .memory_utils import (
     set_pending_confirmation,
 )
 from .message_utils import (
-    build_confirmation_prompt,
     format_lesson_message,
     send_outbound_message,
 )
@@ -48,6 +47,12 @@ _scheduler: Optional[BackgroundScheduler] = None
 
 class SchedulerService:
     """Manages background scheduling for lessons and reminders."""
+
+    @staticmethod
+    def _confirmation_prompt(language: str, lesson_id: int) -> str:
+        # Local import to avoid module import cycles
+        from src.onboarding.language.prompts import get_lesson_confirmation_prompt
+        return get_lesson_confirmation_prompt(language, lesson_id)
 
     @staticmethod
     def _parse_lesson_int(value) -> Optional[int]:
@@ -75,7 +80,7 @@ class SchedulerService:
         lesson_id = SchedulerService._parse_lesson_int(cur)
         if lesson_id is not None:
             next_id = (lesson_id % 365) + 1
-            return build_confirmation_prompt(lesson_id, next_id, language)
+            return SchedulerService._confirmation_prompt(language, lesson_id)
 
         lesson = db.query(Lesson).filter(Lesson.lesson_id == 1).first()
         if lesson:
@@ -111,7 +116,7 @@ class SchedulerService:
             if lesson_id is not None:
                 next_id = (lesson_id % 365) + 1
                 set_pending_confirmation(memory_manager, schedule.user_id, lesson_id, next_id)
-                prompt = build_confirmation_prompt(lesson_id, next_id, language)
+                prompt = SchedulerService._confirmation_prompt(language, lesson_id)
                 send_outbound_message(db, user, prompt)
                 if simulate:
                     messages.append(prompt)
@@ -144,7 +149,7 @@ class SchedulerService:
         if pending:
             lesson_id = pending.get("lesson_id")
             next_id = pending.get("next_lesson_id")
-            return build_confirmation_prompt(lesson_id, next_id, language)
+            return SchedulerService._confirmation_prompt(language, lesson_id)
 
         last_sent = get_last_sent_lesson_id(memory_manager, schedule.user_id)
         if not last_sent:
@@ -153,7 +158,7 @@ class SchedulerService:
         next_id = (last_sent % 365) + 1
         # Do not persist pending confirmation when only building a
         # preview message; return the confirmation prompt text only.
-        return build_confirmation_prompt(last_sent, next_id, language)
+        return SchedulerService._confirmation_prompt(language, last_sent)
 
     @staticmethod
     def run_recovery_check() -> int:
@@ -604,7 +609,7 @@ class SchedulerService:
         if pending:
             lesson_id = pending.get("lesson_id")
             next_id = pending.get("next_lesson_id")
-            prompt = build_confirmation_prompt(lesson_id, next_id, language)
+            prompt = SchedulerService._confirmation_prompt(language, lesson_id)
             send_outbound_message(db, user, prompt)
             if simulate:
                 messages.append(prompt)
@@ -618,7 +623,7 @@ class SchedulerService:
         # Ask if yesterday's lesson was completed before proceeding
         next_id = (last_sent % 365) + 1
         set_pending_confirmation(memory_manager, schedule.user_id, last_sent, next_id)
-        prompt = build_confirmation_prompt(last_sent, next_id, language)
+        prompt = SchedulerService._confirmation_prompt(language, last_sent)
         send_outbound_message(db, user, prompt)
         if simulate:
             messages.append(prompt)

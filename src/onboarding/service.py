@@ -4,6 +4,8 @@ Provides the `OnboardingService` implementation that coordinates
 detectors, prompt generation, schedule setup, and user management.
 """
 
+from __future__ import annotations
+
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from src.memories import MemoryManager

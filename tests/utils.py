@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from src.models.database import User
 from src.memories import MemoryManager
 from src.scheduler.lesson_state import set_current_lesson

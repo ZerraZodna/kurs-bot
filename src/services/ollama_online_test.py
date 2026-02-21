@@ -3,6 +3,8 @@
 Small, synchronous helpers used by the FastAPI startup lifespan to keep
 the health-check logic organized and testable.
 """
+
+from __future__ import annotations
 from typing import Dict, List, Tuple
 from urllib.parse import urlparse
 import logging

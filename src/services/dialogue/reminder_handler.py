@@ -4,15 +4,42 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 from src.services.timezone_utils import to_utc
 from sqlalchemy.orm import Session
 from src.models.database import Lesson
 from src.memories import MemoryManager
-from src.scheduler.lesson_state import set_last_sent_lesson_id, set_current_lesson
+from src.scheduler.lesson_state import set_last_sent_lesson_id
+from src.scheduler.lesson_state_flow import apply_reported_progress
+from src.triggers.trigger_matcher import get_trigger_matcher
 
 logger = logging.getLogger(__name__)
+
+async def _semantic_yes_no(text: str, onboarding_service) -> (bool, bool):
+    """Classify yes/no using trigger embeddings; no keyword fallback."""
+    matcher = get_trigger_matcher()
+    matches = await matcher.match_triggers(text, top_k=3)
+    yes_score = max(
+        (m.get("score", 0) for m in matches if m.get("action_type") == "confirm_yes"),
+        default=0.0,
+    )
+    yes_thresh = max(
+        (m.get("threshold", 0.55) for m in matches if m.get("action_type") == "confirm_yes"),
+        default=0.55,
+    )
+    no_score = max(
+        (m.get("score", 0) for m in matches if m.get("action_type") == "confirm_no"),
+        default=0.0,
+    )
+    no_thresh = max(
+        (m.get("threshold", 0.55) for m in matches if m.get("action_type") == "confirm_no"),
+        default=0.55,
+    )
+    is_yes = yes_score >= yes_thresh and yes_score > no_score
+    is_no = no_score >= no_thresh and no_score > yes_score
+    return is_yes, is_no
 
 
 def get_pending_confirmation(
@@ -90,23 +117,39 @@ async def handle_lesson_confirmation(
 
     message_lower = text.lower().strip()
 
-    is_yes = (
-        onboarding_service.detect_commitment_keywords(message_lower)
-        if onboarding_service
-        else False
-    )
-    no_keywords = [
-        "no",
-        "not yet",
-        "nope",
-        "nei",
-        "ikke ennå",
-        "ikke enda",
-        "ikke",
-        "ikke ferdig",
-        "senere",
+    # First, look for explicit lesson numbers in the reply (e.g., "on lesson 8").
+    # When present we treat the highest lesson number as the user's current lesson
+    # and infer the last completed lesson as `current - 1`. This lets us recover
+    # after outages or gaps without relying solely on a yes/no response.
+    lesson_numbers = [
+        int(m)
+        for m in re.findall(r"lesson\s*(\d{1,3})", message_lower)
+        if 1 <= int(m) <= 365
     ]
-    is_no = any(k in message_lower for k in no_keywords)
+    if pending and lesson_numbers:
+        current_lesson = max(lesson_numbers)
+        progress = apply_reported_progress(memory_manager, user_id, current_lesson)
+
+        lesson = (
+            session.query(Lesson).filter(Lesson.lesson_id == current_lesson).first()
+            if current_lesson
+            else None
+        )
+
+        resolve_pending_confirmation(memory_manager, user_id)
+
+        if not lesson:
+            return "Thanks for the update! I couldn't find that lesson right now."
+
+        language = get_language_fn(user_id)
+        message = await format_lesson_fn(lesson, language)
+
+        # Track last delivered lesson for scheduling/advancement logic
+        set_last_sent_lesson_id(memory_manager, user_id, lesson.lesson_id)
+
+        return message
+
+    is_yes, is_no = await _semantic_yes_no(message_lower, onboarding_service)
 
     if not is_yes and not is_no:
         return None
