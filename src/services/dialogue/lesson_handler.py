@@ -173,14 +173,14 @@ async def pre_llm_lesson_short_circuit(
                         return await format_lesson_message(lesson, user_lang)
 
 
-async def format_lesson_message(lesson: Lesson, language: Optional[str]) -> str:
+async def format_lesson_message(lesson: Lesson, language: Optional[str], call_ollama_fn=None) -> str:
     """
     Format lesson for display with optional translation.
 
     Args:
         lesson: Lesson object from database
         language: Target language
-        call_ollama_fn: Function to call Ollama (for translation)
+        call_ollama_fn: Optional function to call Ollama (for translation)
 
     Returns:
         Formatted lesson text
@@ -189,17 +189,17 @@ async def format_lesson_message(lesson: Lesson, language: Optional[str]) -> str:
     lang = (language or "en").lower()
     if lang in ["en"]:
         return text
-    return await translate_text(text, lang)
+    return await translate_text(text, lang, call_ollama_fn)
 
 
-async def translate_text(text: str, language: str) -> str:
+async def translate_text(text: str, language: str, call_ollama_fn=None) -> str:
     """
     Translate text to target language using Ollama.
 
     Args:
         text: Text to translate
         language: Target language
-        call_ollama_fn: Function to call Ollama
+        call_ollama_fn: Optional function to call Ollama
 
     Returns:
         Translated text or original if translation fails
@@ -210,7 +210,8 @@ async def translate_text(text: str, language: str) -> str:
             "Preserve paragraph breaks and meaning. Return only the translation. Be as close to original text as possible. Text:\n\n"
             f"{text}"
         )
-        result = await ollama_client.call_ollama(prompt, None, language)
+        call_fn = call_ollama_fn or ollama_client.call_ollama
+        result = await call_fn(prompt, None, language)
         return result or text
     except Exception as e:
         logger.warning(f"Translation failed, sending original text: {e}")
