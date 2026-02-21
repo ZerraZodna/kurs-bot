@@ -6,9 +6,10 @@ import os
 import sys
 import argparse
 from pathlib import Path
+from typing import Union
 
 
-def load_dotenv(repo_root: str | Path) -> None:
+def load_dotenv(repo_root: Union[str, Path]) -> None:
     """Load simple KEY=VALUE pairs from a .env file into os.environ if not set.
 
     This avoids adding a dependency on python-dotenv while providing the

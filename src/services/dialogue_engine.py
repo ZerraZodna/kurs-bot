@@ -29,6 +29,7 @@ from src.services.dialogue import (
     maybe_send_next_lesson,
     handle_list_memories,
 )
+from src.services.dialogue.lesson_handler import process_lesson_query
 from src.config import settings
 from src.models.database import User, Memory, Lesson
 from src.services.timezone_utils import ensure_user_timezone, format_dt_in_timezone
@@ -193,42 +194,19 @@ class DialogueEngine:
         if lesson_response:
             return lesson_response
 
-        # Check if user is asking about a specific lesson (run regardless of onboarding)
-        lesson_request = detect_lesson_request(text)
-        if lesson_request:
-            # If the user is currently in the onboarding 'lesson_status' step,
-            # let the onboarding flow handle this message so we persist the
-            # lesson and create the default schedule instead of sending the
-            # lesson content immediately.
-            pending = None
-            if self.memory_manager:
-                pending = self.memory_manager.get_memory(user_id, "onboarding_step_pending")
-            if pending:
-                val = (pending[0].get("value") or "").lower()
-                if val == "lesson_status" and self.onboarding_flow:
-                    onboarding_resp = await self.onboarding_flow.handle_onboarding(user_id, text, session)
-                    if onboarding_resp:
-                        return onboarding_resp
-                    
-            # Support 'today' requests which need resolution to an actual lesson id
-            if lesson_request.get("today") and self.prompt_builder:
-                today_ctx = self.prompt_builder.get_today_lesson_context(user_id)
-                state = today_ctx.get("state", {})
-                lesson_id = state.get("lesson_id")
-                if lesson_id:
-                    lesson_response = await handle_lesson_request(lesson_id, text, session, user_language=user_lang)
-                    if lesson_response:
-                        return lesson_response
-                else:
-                    # No lesson known for today — fall back to LLM explaining how to get lessons
-                    return "I couldn't determine your current lesson. Tell me which lesson number you'd like, e.g. 'Lesson 7'."
-
-            if lesson_request.get("lesson_id"):
-                lesson_response = await handle_lesson_request(
-                    lesson_request["lesson_id"], text, session, user_language=user_lang
-                )
-                if lesson_response:
-                    return lesson_response
+        # Handle lesson-related queries via the dedicated handler
+        lesson_resp = await process_lesson_query(
+            user_id=user_id,
+            text=text,
+            session=session,
+            prompt_builder=self.prompt_builder,
+            memory_manager=self.memory_manager,
+            onboarding_flow=self.onboarding_flow,
+            onboarding_service=self.onboarding,
+            user_language=user_lang,
+        )
+        if lesson_resp:
+            return lesson_resp
 
         # Handle schedule follow-ups (e.g., user clarifying a previous deferred schedule request)
         schedule_response = await handle_schedule_messages(
@@ -341,7 +319,6 @@ class DialogueEngine:
             session=session,
             prompt_builder=self.prompt_builder,
             user_lang=user_lang,
-            call_ollama_fn=self.call_ollama,
         )
         if pre:
             return pre

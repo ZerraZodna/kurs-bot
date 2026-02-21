@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 from src.services.timezone_utils import validate_timezone_name, format_dt_in_timezone
 from src.services.timezone_utils import ensure_user_timezone, to_utc
@@ -47,7 +47,7 @@ class TriggerDispatcher:
         except Exception as e:
             logger.warning(f"Failed to write trigger audit memory: {e}")
 
-    def _parse_run_at(self, run_at_val) -> "datetime | None":
+    def _parse_run_at(self, run_at_val) -> Optional[datetime]:
         """Attempt to parse run_at values from multiple formats."""
         if run_at_val is None:
             return None
@@ -435,10 +435,10 @@ class TriggerDispatcher:
 
 
 # module-level convenience
-_dispatcher: TriggerDispatcher | None = None
+_dispatcher: Optional[TriggerDispatcher] = None
 
 
-def get_trigger_dispatcher(db=None, memory_manager: MemoryManager = None) -> TriggerDispatcher:
+def get_trigger_dispatcher(db=None, memory_manager: Optional[MemoryManager] = None) -> TriggerDispatcher:
     global _dispatcher
     if _dispatcher is None:
         _dispatcher = TriggerDispatcher(db=db, memory_manager=memory_manager)

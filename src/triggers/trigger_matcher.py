@@ -25,6 +25,19 @@ STARTER = [
     {"name": "set_timezone", "action_type": "set_timezone", "utterance": "My timezone is America/Los_Angeles", "threshold": 0.75},
     {"name": "enter_rag", "action_type": "enter_rag", "utterance": "Use RAG for this", "threshold": 0.75},
     {"name": "exit_rag", "action_type": "exit_rag", "utterance": "Stop using RAG", "threshold": 0.75},
+    {"name": "create_schedule", "action_type": "create_schedule", "utterance": "Påminn meg hver dag kl. 09:00", "threshold": 0.75},
+    {"name": "create_schedule", "action_type": "create_schedule", "utterance": "Minne meg på hver dag klokken 09:00", "threshold": 0.75},
+    {"name": "update_schedule", "action_type": "update_schedule", "utterance": "Endre påminnelsen min til kl. 20:00", "threshold": 0.75},
+    {"name": "update_schedule", "action_type": "update_schedule", "utterance": "Endre påminnelse til 20:00", "threshold": 0.75},
+    {"name": "next_lesson", "action_type": "next_lesson", "utterance": "Send meg neste leksjon", "threshold": 0.75},
+    {"name": "next_lesson", "action_type": "next_lesson", "utterance": "Hva er neste leksjon?", "threshold": 0.75},
+    {"name": "set_timezone", "action_type": "set_timezone", "utterance": "Jeg er i Oslo", "threshold": 0.75},
+    {"name": "set_timezone", "action_type": "set_timezone", "utterance": "Min tidssone er Europe/Oslo", "threshold": 0.75},
+    {"name": "set_timezone", "action_type": "set_timezone", "utterance": "Jeg bor i Oslo", "threshold": 0.75},
+    {"name": "set_timezone", "action_type": "set_timezone", "utterance": "Jeg er i New York", "threshold": 0.75},
+    {"name": "set_timezone", "action_type": "set_timezone", "utterance": "Min tidssone er America/Los_Angeles", "threshold": 0.75},
+    {"name": "enter_rag", "action_type": "enter_rag", "utterance": "Bruk RAG for dette", "threshold": 0.75},
+    {"name": "exit_rag", "action_type": "exit_rag", "utterance": "Slutt å bruke RAG", "threshold": 0.75},
 ]
 
 # Add common phrasings for requesting today's/next lesson, including Norwegian
@@ -34,12 +47,64 @@ lesson_phrases = [
     "What is today's lesson",
     "Show me today's lesson",
     "Which lesson is it today",
+    "Which lesson is it today?",
     "Send me today's lesson",
+    "Send me today's lesson please",
+    "Give me today's lesson",
+    "Give me the lesson for today",
+    "Whats todays lesson",
+    "what is todays lesson",
+    "what is today's lesson",
+    "what's today's lesson",
+    "show me todays lesson",
+    "which lesson is today",
+    "which lesson is today?",
+    "send me today's lesson",
+    "today's lesson",
+    "todays lesson",
     "Hva er dagens leksjon",
     "Hva er dagens leksjon?",
     "Vis meg dagens leksjon",
     "Hvilken leksjon er det i dag",
+    "Vis meg leksjonen for i dag",
+    "Send meg dagens leksjon",
 ]
+
+# Phrases that explicitly request the raw/exact lesson text
+raw_lesson_phrases = [
+    "What's today's lesson?",
+    "What is today's lesson?",
+    "Which lesson is scheduled for today?",
+    "Show me today's lesson.",
+    "Send me today's lesson, please.",
+    "Give me the lesson for today.",
+    "Show me the full text of today's lesson.",
+    "Can you provide the exact text of the lesson?",
+    "What is the exact text of the lesson?",
+    "Give me the exact words of the lesson.",
+    "Show me the lesson text exactly as written.",
+    "I want the full, verbatim lesson text.",
+    "Send me the lesson text.",
+    "Show the exact words of this lesson.",
+    "What exactly is the lesson about?",
+    "What are the exact words of this lesson?",
+    "Display the lesson text.",
+    "Please provide the exact text of the lesson.",
+    "Give me the lesson content word-for-word.",
+    "Show me the exact lesson (no summary).",
+    # Norwegian variants
+    "Hva er den eksakte teksten til leksjonen?",
+    "Vis meg leksjonsteksten ordrett.",
+    "Gi meg den eksakte teksten til leksjonen.",
+    "Gi meg de eksakte ordene i leksjonen.",
+    "Vis meg leksjonsteksten.",
+    "Send meg leksjonsteksten.",
+    "Gi meg leksjonens tekst ordrett.",
+    "Hva er den eksakte teksten i leksjonen?",
+    "Hva er leksjonsteksten?",
+]
+for p in raw_lesson_phrases:
+    STARTER.append({"name": "raw_lesson", "action_type": "raw_lesson", "utterance": p, "threshold": 0.75})
 for p in lesson_phrases:
     STARTER.append({"name": "next_lesson", "action_type": "next_lesson", "utterance": p, "threshold": 0.75})
 
@@ -92,6 +157,16 @@ SCHEDULE_STATUS_EXAMPLES = [
     "show my reminders",
     "list my reminders",
     "which schedules do i have",
+    # Norwegian variants
+    "har jeg noen påminnelser",
+    "hvilke påminnelser har jeg",
+    "hva påminnelser har jeg",
+    "har jeg en plan",
+    "har jeg en påminnelse",
+    "hva er planen min",
+    "vis mine påminnelser",
+    "list påminnelsene mine",
+    "hvilke avtaler har jeg",
 ]
 
 for ex in SCHEDULE_STATUS_EXAMPLES:
@@ -212,11 +287,8 @@ class TriggerMatcher:
                 db.close()
 
             # During test runs we should NOT attempt to auto-seed embeddings
-            # from a live embedding service. Detect pytest presence and refuse
-            # to perform runtime seeding so tests must provide precomputed
-            # trigger rows (via CI data or test fixtures).
-            import os, sys
-            if os.getenv("PYTEST_CURRENT_TEST") or "pytest" in sys.modules:
+            # from a live embedding service. Use settings flag to detect tests.
+            if getattr(settings, "IS_TEST_ENV", False):
                 logger.error("Trigger embeddings missing during test run; refusing to auto-seed. Ensure scripts/ci_trigger_data.py is present or tests seed the DB.")
                 return
 

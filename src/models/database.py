@@ -4,7 +4,6 @@ from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from sqlalchemy import DateTime
 import datetime
 import logging
-import os
 import sys
 
 # Use Settings from config.py for database URL
@@ -18,17 +17,18 @@ if not isinstance(DATABASE_URL, str) or DATABASE_URL.strip() == "":
 
 is_sqlite = isinstance(DATABASE_URL, str) and DATABASE_URL.startswith("sqlite")
 
-# Safety: if running under pytest, ensure we never point at a production DB.
-# This prevents accidental destructive test fixtures from operating on prod.db.
-if "PYTEST_CURRENT_TEST" in os.environ or any("pytest" in str(a) for a in sys.argv):
+# Safety: if running under pytest (or explicit test env flag), ensure we never
+# point at a production DB. This prevents accidental destructive test fixtures
+# from operating on prod.db.
+if getattr(settings, "IS_TEST_ENV", False) or any("pytest" in str(a) for a in sys.argv):
     if "prod.db" in DATABASE_URL:
         logging.getLogger(__name__).warning(
-            "Detected pytest run with DATABASE_URL pointing to prod.db - overriding to test.db to avoid data loss."
+            "Detected test run with DATABASE_URL pointing to prod.db - overriding to test.db to avoid data loss."
         )
         DATABASE_URL = "sqlite:///./src/data/test.db"
     else:
         # Ensure there's a sensible default for tests when none provided
-        DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./src/data/test.db")
+        DATABASE_URL = DATABASE_URL or "sqlite:///./src/data/test.db"
 
 engine = create_engine(
     DATABASE_URL,

@@ -10,6 +10,24 @@ A chatbot/consultant with persistent memory that delivers daily lessons and inte
 - Alembic (migrations)
 - pytest (testing)
 
+## macOS (Apple Silicon) quick start + Faiss note
+- The PyPI `faiss-cpu` wheel can segfault on macOS/arm64 (libomp/Accelerate issue). Use the conda-forge build instead.
+- Install Miniforge (conda-forge) first:
+  ```bash
+  /bin/bash -c "$(curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh)"
+  exec $SHELL
+  ```
+- Create a fresh env with Faiss:
+  ```bash
+  conda create -n kurs-bot python=3.10 faiss-cpu -c conda-forge
+  conda activate kurs-bot
+  pip install --upgrade pip
+  pip install --no-cache-dir sentence-transformers hnswlib
+  pip install --no-cache-dir -r requirements.txt
+  ```
+- Enable Faiss at runtime: `USE_REAL_FAISS=1 npm run start:api` (macOS default is off to avoid crashes).
+- If you already installed the PyPI Faiss wheel, remove it first: `pip uninstall -y faiss-cpu faiss`.
+
 ## Setup for Windows:
 
 1. Clone the repo and create a virtual environment:
@@ -159,13 +177,7 @@ source ./.venv/bin/activate && python ./scripts/utils/import_acim_lessons.py --p
 
 
 6) Start the app (development): (Do step 7 first once)
-Windows:
-\.\scripts\start-windows.ps1
-
-Unix:
-chmod +x ./scripts/start-linux.sh
-source .venv/bin/activate
-./scripts/start-linux.sh
+npm start
 
 Or totally manual:
 ```bash
@@ -265,7 +277,34 @@ The repository includes convenience scripts for getting a local development envi
    .\start_kursbot.ps1 -StartInfra
    ```
 
-See `DEPLOYMENT.md` for production deployment notes and recommended startup order.
+## Deployment (production)
+
+This project can be deployed with a standard Python WSGI/ASGI process (uvicorn) and a production SQL database. Key points:
+
+- Infrastructure: use Postgres (or other production SQL) and configure `DATABASE_URL` in environment. Optionally run worker processes for background tasks and a vector index (Faiss or managed vector DB) if required.
+- Important environment variables:
+   - `DATABASE_URL` — production DB connection string.
+   - `OLLAMA_EMBED_URL` and `OLLAMA_EMBED_MODEL` — embedding service endpoint and model (if using Ollama).
+   - `EMBEDDING_DIMENSION` — ensure this matches the embed model used.
+   - `NGROK_PATH` — local dev only; not required in production.
+
+- Recommended startup order:
+   1. Start the database and run migrations (`alembic upgrade head`).
+   2. Start background workers (if used).
+   3. Start the API: `uvicorn src.api.app:app`.
+
+- Upgrades and reindexing:
+   - If changing the embedding model or vector configuration, plan a backfill job to regenerate embeddings during a low-traffic window.
+   - Workers should check existing metadata before regenerating to avoid duplicate work.
+
+- CI and local development:
+   - CI runs `pytest` against SQLite by default; configure CI to opt-in to real backends if necessary.
+
+- Security & backups:
+   - Protect API keys and DB credentials with your secrets manager and follow GDPR/export controls when handling user memories.
+   - Implement regular DB backups and vector index dumps if used.
+
+Contact your ops/backend team to finalize sizing, alerting, and other production roll-out tasks.
 
 ## Configuration (.env)
 - `DATABASE_URL` - Database connection string (default: SQLite for dev)

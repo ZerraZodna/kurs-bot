@@ -4,6 +4,7 @@ import pytest
 import sys
 from pathlib import Path
 from datetime import datetime, timezone
+from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -14,7 +15,7 @@ from tests.utils import create_test_user, make_ready_user
 from src.scheduler.lesson_state import get_current_lesson
 
 
-def create_test_user(db, external_id: str, first_name: str | None = "Test") -> int:
+def create_test_user(db, external_id: str, first_name: Optional[str] = "Test") -> int:
     existing = db.query(User).filter_by(external_id=external_id).first()
     if existing:
         db.query(Memory).filter_by(user_id=existing.user_id).delete()

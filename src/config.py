@@ -1,6 +1,13 @@
 
+import platform
+
 from pydantic_settings import BaseSettings
 from pydantic import ConfigDict
+
+
+# Default to disabling native Faiss on macOS where the wheel can segfault with
+# Apple's libomp / Accelerate stack. Users can still opt-in via USE_REAL_FAISS=1.
+_DEFAULT_USE_REAL_FAISS = platform.system().lower() != "darwin"
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./src/data/prod.db"
@@ -36,6 +43,11 @@ class Settings(BaseSettings):
     # Trigger matcher defaults
     TRIGGER_SIMILARITY_THRESHOLD: float = 0.75
     TRIGGER_MATCHER_REFRESH_SECS: int = 300
+    # Marks execution as test context; lets code avoid prod DB, real services
+    IS_TEST_ENV: bool = False
+    # Enable native Faiss index when available; defaults to False on macOS to
+    # avoid intermittent libomp crashes, True elsewhere. Override via env.
+    USE_REAL_FAISS: bool = _DEFAULT_USE_REAL_FAISS
     GDPR_ADMIN_TOKEN: str = ""
     API_AUTH_TOKEN: str = ""
     MESSAGE_LOG_RETENTION_DAYS: int = 30

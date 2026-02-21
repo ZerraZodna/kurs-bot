@@ -3,16 +3,14 @@
 Small, synchronous helpers used by the FastAPI startup lifespan to keep
 the health-check logic organized and testable.
 """
-
-from __future__ import annotations
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from urllib.parse import urlparse
 import logging
 import re
 import httpx
 
 
-def _is_cloud_model(model: str | None) -> bool:
+def _is_cloud_model(model: Optional[str]) -> bool:
     try:
         return isinstance(model, str) and str(model).lower().endswith("cloud")
     except Exception:
@@ -42,17 +40,50 @@ def _probe_tags(base: str, timeout: float = 2.0):
         return None
 
 
-def _attempt_generate_ping(base: str, model: str | None, timeout: float = 3.0) -> bool:
+def _attempt_generate_ping(base: str, model: Optional[str], timeout: float = 3.0) -> dict:
     try:
         ping = httpx.post(
             f"{base}/api/generate",
             json={"model": model, "prompt": "ping", "stream": False},
             timeout=timeout,
         )
-        return ping.status_code == 200
+        return {
+            "ok": ping.status_code == 200,
+            "status": int(ping.status_code),
+            "body": ping.text[:200],
+        }
+    except Exception as e:
+        logging.debug("/api/generate ping failed at %s for model %s: %s", base, model, e)
+        return {"ok": False, "error": str(e)}
+
+
+def _parse_tag_names(response) -> set:
+    """Extract model names from /api/tags response (list or dict shapes)."""
+    names = set()
+    try:
+        data = response.json()
     except Exception:
-        logging.debug("/api/generate ping failed at %s for model %s", base, model)
-        return False
+        return names
+
+    items = []
+    if isinstance(data, list):
+        items = data
+    elif isinstance(data, dict):
+        if isinstance(data.get("models"), list):
+            items = data.get("models")
+        elif isinstance(data.get("data"), list):
+            items = data.get("data")
+        else:
+            items = list(data.values())
+
+    for item in items:
+        if isinstance(item, dict):
+            n = item.get("name") or item.get("model")
+        else:
+            n = item
+        if n:
+            names.add(str(n).lower())
+    return names
 
 
 def run_ollama_checks(settings) -> Tuple[bool, List[Dict]]:
@@ -154,28 +185,30 @@ def run_ollama_checks(settings) -> Tuple[bool, List[Dict]]:
                         any_ok = False
             diagnostics.append(entry)
 
-    # Step B: If any non-cloud models exist, check local service and verify with /api/generate
-    # Note: /api/tags is used only for cloud models per requirement; local models are
-    # verified by attempting /api/generate for each model name.
+    # Step B: If any non-cloud models exist, check local service via /api/tags
     if local_models:
         if not local:
             diagnostics.append({"error": "local models configured but LOCAL_OLLAMA_URL not set", "models": local_models})
             any_ok = False
         else:
             b = _strip_api(local)
-            logging.info("Checking local Ollama endpoint at %s (verifying models via /api/generate)", b)
-            entry = {"base": b, "kind": "local", "models": {}}
-
-            for k, m in local_models.items():
-                # For local models, call /api/generate to confirm the model responds
-                try:
-                    ping_ok = _attempt_generate_ping(b, m)
-                except Exception:
-                    ping_ok = False
-                entry["models"][k] = {"model": m, "found": bool(ping_ok)}
-                if not ping_ok:
-                    any_ok = False
-
+            logging.info("Checking local Ollama endpoint at %s (verifying via /api/tags)", b)
+            entry = {"base": b, "kind": "local", "tags_status": None, "models": {}}
+            tags = _probe_tags(b)
+            if tags is None:
+                entry["tags_error"] = "no_response"
+                any_ok = False
+            else:
+                entry["tags_status"] = int(getattr(tags, "status_code", 0) or 0)
+                names = _parse_tag_names(tags)
+                logging.info("Ollama local tags: %s", sorted(names))
+                logging.info("Ollama local required models: %s", list(local_models.values()))
+                for k, m in local_models.items():
+                    found = str(m).lower() in names
+                    entry["models"][k] = {"model": m, "found": found}
+                    if not found:
+                        logging.warning("Ollama model missing from /api/tags: %s", m)
+                        any_ok = False
             diagnostics.append(entry)
 
     # If no models at all, note this but treat as ok

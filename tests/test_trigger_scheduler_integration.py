@@ -26,9 +26,10 @@ async def test_trigger_based_schedule_edit(monkeypatch):
         dialogue = DialogueEngine(db)
 
         # Make Ollama return a structured intent so the dispatcher is called directly
-        async def fake_call_ollama_with_intent(prompt: str, model: str = None) -> str:
+        async def fake_call_ollama_with_intent(prompt: str, model: str = None, language: str = None) -> str:
             return '{"intent": {"name": "update_schedule", "action_type": "update_schedule"}}'
-        monkeypatch.setattr(dialogue, "call_ollama", fake_call_ollama_with_intent)
+        # Patch the module-level ollama client so all call sites use the fake
+        monkeypatch.setattr("src.services.dialogue.ollama_client.call_ollama", fake_call_ollama_with_intent)
 
         # Patch dispatcher to apply the schedule update when dispatched
         class DummyDispatcher:

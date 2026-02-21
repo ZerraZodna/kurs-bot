@@ -10,7 +10,6 @@ clear logging and fallbacks.
 
 import asyncio
 import logging
-import os
 from typing import Any, Optional
 from urllib.parse import urlparse
 
@@ -48,19 +47,8 @@ def _is_cloud_url(url: Optional[str]) -> bool:
     return "ollama.com" in hostname
 
 
-def _test_use_real_ollama_enabled() -> bool:
-    """Return True when tests explicitly request real Ollama calls.
-
-    Accepts common truthy values in env vars: 1, true, yes (case-insensitive).
-    """
-    v = os.getenv("TEST_USE_REAL_OLLAMA") or os.getenv("USE_REAL_OLLAMA")
-    if not v:
-        return False
-    return str(v).strip().lower() in ("1", "true", "yes", "y")
-
-
-# Cache the test-flag at import time to avoid repeated getenv() calls
-_TEST_USE_REAL_OLLAMA = _test_use_real_ollama_enabled()
+_TEST_USE_REAL_OLLAMA = bool(getattr(settings, "TEST_USE_REAL_OLLAMA", False))
+_IS_TEST_ENV = bool(getattr(settings, "IS_TEST_ENV", False))
 
 
 # Note: cloud-model name normalization removed. Cloud-only models must run in cloud
@@ -119,7 +107,7 @@ def _extract_chat_text(resp: Any) -> Optional[str]:
     return None
 
 
-async def _call_local_http(model: str, prompt: str, temperature: float | None = None) -> str:
+async def _call_local_http(model: str, prompt: str, temperature: Optional[float] = None) -> str:
     url = LOCAL_OLLAMA_URL
     temp = OLLAMA_TEMPERATURE if temperature is None else temperature
     payload = {"model": model, "prompt": prompt, "stream": False, "temperature": float(temp)}
@@ -148,7 +136,7 @@ def _cloud_call_sync(host_base: str, api_key: Optional[str], model: str, prompt:
         return client.chat(str(model), messages=messages, stream=False)
 
 
-async def call_ollama(prompt: str, model: str | None = None, language: str | None = None, temperature: float | None = None) -> str:
+async def call_ollama(prompt: str, model: Optional[str] = None, language: Optional[str] = None, temperature: Optional[float] = None) -> str:
     """Top-level async method to call Ollama (cloud or local) and return text.
 
     Behavior summary:
@@ -160,6 +148,16 @@ async def call_ollama(prompt: str, model: str | None = None, language: str | Non
     chosen_model = model or OLLAMA_MODEL
     if language and language.lower() != "en":
         chosen_model = getattr(settings, "NON_ENGLISH_OLLAMA_MODEL", chosen_model)
+
+    # Safety short-circuit: only block real calls in explicit test context.
+    # In production (IS_TEST_ENV=False), always allow real Ollama regardless
+    # of TEST_USE_REAL_OLLAMA.
+    if _IS_TEST_ENV and not _TEST_USE_REAL_OLLAMA:
+        short = (prompt[:160] + "...") if prompt and len(prompt) > 160 else (prompt or "")
+        raise RuntimeError(
+            "Real Ollama calls are disabled in this test process (TEST_USE_REAL_OLLAMA is falsy). "
+            f"Attempted model={chosen_model or 'none'} lang={language or 'en'} prompt_snippet={short[:200]}"
+        )
 
     # Determine cloud vs local endpoint. Use cloud ONLY when the model
     # explicitly ends with '-cloud' and a cloud URL is configured.

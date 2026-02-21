@@ -31,12 +31,15 @@ from src.services.ollama_online_test import run_ollama_checks
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Start background threads
-    t = threading.Thread(target=nightly_memory_purge, daemon=True)
-    t.start()
+    # Start background threads unless running in explicit test context
+    if not getattr(settings, "IS_TEST_ENV", False):
+        t = threading.Thread(target=nightly_memory_purge, daemon=True)
+        t.start()
 
-    t2 = threading.Thread(target=run_downtime_monitor, daemon=True)
-    t2.start()
+        t2 = threading.Thread(target=run_downtime_monitor, daemon=True)
+        t2.start()
+    else:
+        logging.info("Background threads disabled in test environment")
 
     # Ensure APScheduler is explicitly initialized at application startup
     try:

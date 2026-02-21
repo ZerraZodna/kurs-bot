@@ -108,6 +108,12 @@ class MemoryManager:
                 self.db.add(e)
                 self.db.commit()
                 
+                # Post-store actions (e.g., update lesson state)
+                try:
+                    self._after_store(user_id, key, value, category)
+                except Exception:
+                    logger.exception("Post-store action failed")
+
                 # Generate embedding if needed — removed in this branch.
                 return e.memory_id
 
@@ -127,6 +133,12 @@ class MemoryManager:
             self.db.add(new)
             self.db.commit()
             
+            # Post-store actions (e.g., update lesson state)
+            try:
+                self._after_store(user_id, key, value, category)
+            except Exception:
+                logger.exception("Post-store action failed")
+
             # Generate embedding if needed — removed in this branch.
             return new.memory_id
 
@@ -153,6 +165,12 @@ class MemoryManager:
             self.db.add(new)
             self.db.commit()
             
+            # Post-store actions (e.g., update lesson state)
+            try:
+                self._after_store(user_id, key, value, category)
+            except Exception:
+                logger.exception("Post-store action failed")
+
             # Generate embedding if needed — removed in this branch.
             return new.memory_id
 
@@ -177,7 +195,37 @@ class MemoryManager:
         if key == "preferred_lesson_time":
             logger.info(f"Stored preferred_lesson_time for user {user_id} (no auto-schedule created)")
 
+        # Post-store actions (e.g., update lesson state)
+        try:
+            self._after_store(user_id, key, value, category)
+        except Exception:
+            logger.exception("Post-store action failed")
+
         return new.memory_id
+
+    def _after_store(self, user_id: int, key: str, value: str, category: str) -> None:
+        """Run post-store side-effects for certain memory keys.
+
+        Currently used to keep consolidated lesson_state in sync when
+        the user reports a completed lesson.
+        """
+        if key != "lesson_completed":
+            return
+
+        # Only react to progress category values
+        if category and category != "progress":
+            return
+
+        try:
+            # Normalize and compute next lesson id
+            n = int(str(value).strip())
+            next_id = n + 1 if n < 365 else 365
+            # Lazy import to avoid circular imports
+            from src.scheduler.lesson_state import set_current_lesson
+
+            set_current_lesson(self, user_id, next_id)
+        except Exception:
+            logger.exception("Failed to update lesson state after lesson_completed memory")
 
     def archive_memories(self, user_id: int, memory_ids: List[int]) -> int:
         """Archive (soft-delete) memories by IDs for a user. Returns count archived."""
