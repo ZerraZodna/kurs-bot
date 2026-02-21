@@ -1,3 +1,4 @@
+import os
 import pytest
 
 from src.models.database import SessionLocal, User, Lesson
@@ -5,6 +6,7 @@ from src.services.dialogue_engine import DialogueEngine
 from src.services.dialogue.lesson_handler import process_lesson_query
 
 
+@pytest.mark.skipif(os.getenv("EMBEDDING_BACKEND", "local").lower() == "none", reason="Embeddings disabled")
 @pytest.mark.asyncio
 async def test_pre_llm_lesson_short_circuit(monkeypatch):
     # Setup DB objects and mark onboarding complete so extractor/LLM isn't called
@@ -49,6 +51,7 @@ async def test_pre_llm_lesson_short_circuit(monkeypatch):
     # The short-circuit should return the lesson content (not an LLM reply).
     # Accept either the older "Lesson 1" header or the text-based lesson
     # formatting returned by the dialogue engine.
+    assert resp is not None, "short-circuit should return lesson content, not None"
     assert "Lesson 1" in resp
 
     resp = await process_lesson_query(
@@ -64,4 +67,5 @@ async def test_pre_llm_lesson_short_circuit(monkeypatch):
 
     # The short-circuit should return the full lesson formatting (not a brief
     # LLM reply). Assert we receive a lesson header for lesson 1.
+    assert resp is not None, "short-circuit should return lesson content, not None"
     assert "Lesson 1" in resp

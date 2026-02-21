@@ -1,6 +1,9 @@
+import os
+import pytest
 from src.triggers.trigger_matcher import get_trigger_matcher
 
 
+@pytest.mark.skipif(os.getenv("EMBEDDING_BACKEND", "local").lower() == "none", reason="Embeddings disabled")
 def test_raw_lesson_trigger_matches_simple():
     """Simpler test: rely on test fixtures (conftest.py) which seed triggers.
 

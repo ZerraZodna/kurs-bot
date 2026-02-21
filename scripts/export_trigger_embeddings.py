@@ -15,6 +15,7 @@ operate on the `prod.db` unless `ALLOW_EXPORT_PROD=true` is set in env.
 from __future__ import annotations
 
 import argparse
+from typing import Optional
 import sys
 from pathlib import Path
 import os
@@ -70,7 +71,7 @@ TRIGGERS = \
         db.close()
 
 
-def export_from_starter(out_path: Path, model_name: str | None = None) -> int:
+def export_from_starter(out_path: Path, model_name: Optional[str] = None) -> int:
     """Export embeddings computed from the STARTER utterances using the local model.
 
     This avoids touching the DB and directly computes model embeddings for each

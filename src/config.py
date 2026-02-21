@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     # Trigger matcher defaults
     TRIGGER_SIMILARITY_THRESHOLD: float = 0.75
     TRIGGER_MATCHER_REFRESH_SECS: int = 300
+    # Marks execution as test context; lets code avoid prod DB, real services
+    IS_TEST_ENV: bool = False
+    # Enable native Faiss index when available; set False to force numpy fallback
+    USE_REAL_FAISS: bool = True
     GDPR_ADMIN_TOKEN: str = ""
     API_AUTH_TOKEN: str = ""
     MESSAGE_LOG_RETENTION_DAYS: int = 30

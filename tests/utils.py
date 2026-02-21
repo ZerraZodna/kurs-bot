@@ -1,9 +1,11 @@
+from typing import Optional
+
 from src.models.database import User
 from src.memories import MemoryManager
 from src.scheduler.lesson_state import set_current_lesson
 
 
-def create_test_user(db, external_id: str, first_name: str | None = None) -> int:
+def create_test_user(db, external_id: str, first_name: Optional[str] = None) -> int:
     """Create a fresh user row for tests (does NOT add onboarding memories).
 
     Removes any existing user with the same external_id, creates a new

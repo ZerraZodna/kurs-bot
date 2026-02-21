@@ -10,7 +10,6 @@ clear logging and fallbacks.
 
 import asyncio
 import logging
-import os
 from typing import Any, Optional
 from urllib.parse import urlparse
 
@@ -48,23 +47,6 @@ def _is_cloud_url(url: Optional[str]) -> bool:
     return "ollama.com" in hostname
 
 
-def _test_use_real_ollama_enabled() -> bool:
-    """Return True when tests explicitly request real Ollama calls.
-
-    Accepts common truthy values in env vars: 1, true, yes (case-insensitive).
-    """
-    v = os.getenv("TEST_USE_REAL_OLLAMA") or os.getenv("USE_REAL_OLLAMA")
-    if not v:
-        return False
-    return str(v).strip().lower() in ("1", "true", "yes", "y")
-
-
-# Historically the code used raw env vars read at import time which meant
-# values in .env (loaded via Pydantic `settings`) did not enable real calls
-# unless the env var was present before the process started. Prefer the
-# Pydantic `settings.TEST_USE_REAL_OLLAMA` value so `.env` controls behavior
-# in development without requiring pre-start environment variables.
-# Keep a cached boolean for efficiency.
 _TEST_USE_REAL_OLLAMA = bool(getattr(settings, "TEST_USE_REAL_OLLAMA", False))
 
 

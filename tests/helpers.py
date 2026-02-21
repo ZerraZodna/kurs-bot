@@ -2,6 +2,8 @@ import os
 import sys
 import types
 import importlib
+from typing import Optional
+
 import pytest
 
 # NOTE: import-time prevention for the real Ollama client lives in
@@ -36,7 +38,9 @@ def _register_fake_faiss() -> None:
             import numpy as _np
 
             if "faiss" not in sys.modules:
+                import importlib.machinery
                 fake_faiss = types.ModuleType("faiss")
+                fake_faiss.__spec__ = importlib.machinery.ModuleSpec("faiss", None, is_package=False)
 
                 class _IndexFlatIP:
                     def __init__(self, dim):
@@ -99,7 +103,7 @@ def _register_fake_faiss() -> None:
 
 
 def _make_fake_call_ollama():
-    async def _fake_call_ollama(prompt: str, model: str | None = None, language: str | None = None) -> str:
+    async def _fake_call_ollama(prompt: str, model: Optional[str] = None, language: Optional[str] = None) -> str:
         short = (prompt[:160] + "...") if prompt and len(prompt) > 160 else (prompt or "")
         return f"[MOCK_OLLAMA_REPLY] model={model or 'default'} lang={language or 'en'} text={short}"
 

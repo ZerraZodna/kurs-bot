@@ -86,7 +86,7 @@ function installDeps() {
   console.log('Installing sentence-transformers and hnswlib...');
   runPip(['-m', 'pip', 'install', '--no-cache-dir', 'sentence-transformers', 'hnswlib']);
 
-  // Install FAISS
+  // Install faiss-cpu only here (not in requirements.txt) so CI does not install it.
   console.log('Installing faiss-cpu (if available via pip); will advise conda on failure)');
   const faissRes = runPip(['-m', 'pip', 'install', '--no-cache-dir', 'faiss-cpu']);
   if (faissRes && faissRes.status !== 0) {
@@ -208,8 +208,8 @@ switch (cmd) {
   case 'test':
     // ensure venv exists but don't fail if creation isn't possible
     if (!venvPython()) ensureVenv();
-    // Treat Python warnings as errors by default to catch resource leaks.
-    runPyModule('pytest', cmdArgs.length ? cmdArgs : ['--maxfail=3', '-v', '-W', 'error']);
+    // Same as: python -m pytest tests/ -v (no -W error so env warnings e.g. urllib3/OpenSSL don't fail the run).
+    runPyModule('pytest', cmdArgs.length ? cmdArgs : ['--maxfail=3', '-v']);
     break;
   case 'run':
     if (!cmdArgs[0]) {

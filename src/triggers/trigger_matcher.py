@@ -223,8 +223,7 @@ class TriggerMatcher:
                         embs.append(emb)
                         self._id_to_trigger[int(t["trigger_id"])]=t
                 if ids and embs:
-                    # Faiss on macOS + Python 3.9/libomp can segfault; use numpy fallback.
-                    vi = VectorIndex(use_faiss=False)
+                    vi = VectorIndex()
                     vi.build(ids, embs)
                     self._vector_index = vi
                 else:
@@ -249,11 +248,8 @@ class TriggerMatcher:
                 db.close()
 
             # During test runs we should NOT attempt to auto-seed embeddings
-            # from a live embedding service. Detect pytest presence and refuse
-            # to perform runtime seeding so tests must provide precomputed
-            # trigger rows (via CI data or test fixtures).
-            import os, sys
-            if os.getenv("PYTEST_CURRENT_TEST") or "pytest" in sys.modules:
+            # from a live embedding service. Use settings flag to detect tests.
+            if getattr(settings, "IS_TEST_ENV", False):
                 logger.error("Trigger embeddings missing during test run; refusing to auto-seed. Ensure scripts/ci_trigger_data.py is present or tests seed the DB.")
                 return
 

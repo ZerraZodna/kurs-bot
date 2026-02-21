@@ -3,6 +3,8 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 
+from src.config import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -15,11 +17,13 @@ class VectorIndex:
       results = vi.search(query, top_k=5)  # returns list of (id, score)
     """
 
-    def __init__(self, use_faiss: bool = True):
+    def __init__(self, use_faiss: Optional[bool] = None):
         self._ids: List[int] = []
         self._matrix: Optional[np.ndarray] = None
         self._faiss_index = None
         self._use_faiss = False
+        if use_faiss is None:
+            use_faiss = settings.USE_REAL_FAISS
         if use_faiss:
             try:
                 import faiss  # type: ignore

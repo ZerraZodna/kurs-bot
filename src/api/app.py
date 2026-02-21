@@ -26,15 +26,13 @@ from pathlib import Path
 import asyncio
 import logging
 import httpx
-import os
 from sqlalchemy.exc import OperationalError
 from src.services.ollama_online_test import run_ollama_checks
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Start background threads
-    # Allow tests to disable background threads by setting DISABLE_BACKGROUND_THREADS=1
-    if not (os.getenv("DISABLE_BACKGROUND_THREADS") or os.getenv("TEST_DISABLE_BACKGROUND_THREADS")):
+    # Start background threads unless running in explicit test context
+    if not getattr(settings, "IS_TEST_ENV", False):
         t = threading.Thread(target=nightly_memory_purge, daemon=True)
         t.start()
 

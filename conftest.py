@@ -3,10 +3,11 @@ Pytest configuration for kurs-bot tests.
 Central location for all test database setup and configuration.
 """
 
-# Load .env early so its variables (e.g. TEST_USE_REAL_OLLAMA) are available
-# to pytest and any imported project modules during collection. We implement a
-# small, dependency-free loader so tests do not need `python-dotenv` installed.
+# Load .env early so its variables are available to pytest and any imported
+# project modules during collection. We implement a small, dependency-free
+# loader so tests do not need `python-dotenv` installed.
 import os
+os.environ.setdefault("IS_TEST_ENV", "1")
 from pathlib import Path
 
 def _load_dotenv_if_present():
@@ -36,17 +37,18 @@ def _load_dotenv_if_present():
 _load_dotenv_if_present()
 import sys
 import types
+from typing import Optional
 # Insert an import-time stub for the Ollama client so early imports during
 # pytest collection cannot trigger real Ollama/model initialization when
-# `TEST_USE_REAL_OLLAMA` is not enabled. This prevents import-order races
+# TEST_USE_REAL_OLLAMA is not set truthy. This prevents import-order races
 # where other modules bind `call_ollama` before test fixtures run.
-_test_use_real = os.getenv("TEST_USE_REAL_OLLAMA") or os.getenv("USE_REAL_OLLAMA")
+_test_use_real = os.getenv("TEST_USE_REAL_OLLAMA")
 if not _test_use_real or str(_test_use_real).strip().lower() not in ("1", "true", "yes", "y"):
     mod_name = "src.services.dialogue.ollama_client"
     if mod_name not in sys.modules:
         _fake = types.ModuleType(mod_name)
 
-        async def _fake_call_ollama(prompt: str, model: str | None = None, language: str | None = None) -> str:
+        async def _fake_call_ollama(prompt: str, model: Optional[str] = None, language: Optional[str] = None) -> str:
             short = (prompt[:160] + "...") if prompt and len(prompt) > 160 else (prompt or "")
             return f"[MOCK_OLLAMA_REPLY] model={model or 'default'} lang={language or 'en'} text={short}"
 
@@ -100,8 +102,8 @@ def setup_test_environment():
     print(f"🧪 Using test database: {TEST_DB_URL}")
     # Ensure schema exists in test DB
     try:
-        # Prevent background threads from starting during tests
-        os.environ.setdefault("DISABLE_BACKGROUND_THREADS", "1")
+        # Prevent background threads (lifespan) from starting during tests
+        os.environ.setdefault("IS_TEST_ENV", "1")
         # Prevent native Faiss C-extension from being imported during tests
         # unless explicitly requested. Some environments (Windows CI/dev)
         # can crash when the faiss binary wheel isn't compatible; provide a
@@ -117,7 +119,9 @@ def setup_test_environment():
                 import sys, types, numpy as _np
 
                 if "faiss" not in sys.modules:
+                    import importlib.machinery
                     fake_faiss = types.ModuleType("faiss")
+                    fake_faiss.__spec__ = importlib.machinery.ModuleSpec("faiss", None, is_package=False)
 
                     class _IndexFlatIP:
                         def __init__(self, dim):

@@ -2,13 +2,15 @@ import os
 from pathlib import Path
 import sys
 import types
+from typing import Optional
+
 import pytest
 
 # Insert an import-time stub for the Ollama client to avoid any real
 # initialization (model/DB/HTTP) during test collection. Conftest is
 # imported by pytest early, so placing the stub here ensures it runs before
 # other project modules are imported.
-_test_use_real = os.getenv("TEST_USE_REAL_OLLAMA") or os.getenv("USE_REAL_OLLAMA")
+_test_use_real = os.getenv("TEST_USE_REAL_OLLAMA")
 if not _test_use_real or str(_test_use_real).strip().lower() not in ("1", "true", "yes", "y"):
     # Also block the top-level `ollama` package import entirely so any
     # attempt to `from ollama import Client` or similar fails fast during
@@ -31,7 +33,7 @@ if not _test_use_real or str(_test_use_real).strip().lower() not in ("1", "true"
                     return None
                 # Only raise when test-run protection is triggered by real use
                 raise RuntimeError(
-                    "Access to the 'ollama' package is blocked in test runs (TEST_USE_REAL_OLLAMA is falsy)."
+                    "Access to the 'ollama' package is blocked in test runs (enable with TEST_USE_REAL_OLLAMA=1)."
                 )
 
         blk = _BlockedOllama("ollama")
@@ -45,7 +47,7 @@ if not _test_use_real or str(_test_use_real).strip().lower() not in ("1", "true"
     if _mod not in sys.modules:
         _fake = types.ModuleType(_mod)
 
-        async def _fake_call_ollama(prompt: str, model: str | None = None, language: str | None = None) -> str:
+        async def _fake_call_ollama(prompt: str, model: Optional[str] = None, language: Optional[str] = None) -> str:
             short = (prompt[:160] + "...") if prompt and len(prompt) > 160 else (prompt or "")
             return f"[MOCK_OLLAMA_REPLY] model={model or 'default'} lang={language or 'en'} text={short}"
 
@@ -81,12 +83,12 @@ if not _test_use_real or str(_test_use_real).strip().lower() not in ("1", "true"
 from src.models.database import engine, Base
 
 
-# Prevent accidental outbound HTTP requests to Ollama during tests when
-# TEST_USE_REAL_OLLAMA is not enabled. This guard raises if any code
-# attempts to contact the local or cloud Ollama endpoints.
+# Prevent accidental outbound HTTP requests to Ollama during tests unless
+# TEST_USE_REAL_OLLAMA is set. This guard raises if any code attempts to
+# contact the local or cloud Ollama endpoints.
 @pytest.fixture(scope="session", autouse=True)
 def _block_ollama_http_requests():
-    v = os.getenv("TEST_USE_REAL_OLLAMA") or os.getenv("USE_REAL_OLLAMA")
+    v = os.getenv("TEST_USE_REAL_OLLAMA")
     if v and str(v).strip().lower() in ("1", "true", "yes", "y"):
         yield
         return
@@ -110,17 +112,17 @@ def _block_ollama_http_requests():
 
         async def _async_request(self, method, url, *args, **kwargs):
             if _is_ollama_url(url):
-                raise RuntimeError("Blocked outgoing HTTP request to Ollama in tests (TEST_USE_REAL_OLLAMA is falsy)")
+                raise RuntimeError("Blocked outgoing HTTP request to Ollama in tests (enable with TEST_USE_REAL_OLLAMA=1)")
             return await _orig_async_request(self, method, url, *args, **kwargs)
 
         def _sync_request(self, method, url, *args, **kwargs):
             if _is_ollama_url(url):
-                raise RuntimeError("Blocked outgoing HTTP request to Ollama in tests (TEST_USE_REAL_OLLAMA is falsy)")
+                raise RuntimeError("Blocked outgoing HTTP request to Ollama in tests (enable with TEST_USE_REAL_OLLAMA=1)")
             return _orig_sync_request(self, method, url, *args, **kwargs)
 
         def _module_request(method, url, *args, **kwargs):
             if _is_ollama_url(url):
-                raise RuntimeError("Blocked outgoing HTTP request to Ollama in tests (TEST_USE_REAL_OLLAMA is falsy)")
+                raise RuntimeError("Blocked outgoing HTTP request to Ollama in tests (enable with TEST_USE_REAL_OLLAMA=1)")
             return _orig_module_request(method, url, *args, **kwargs)
 
         httpx.AsyncClient.request = _async_request
