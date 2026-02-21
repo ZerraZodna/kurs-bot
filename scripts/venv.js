@@ -575,36 +575,34 @@ switch (cmd) {
           }
         }
 
-        // If we still haven't found processes by port, fall back to pattern-based pkill/pgrep
-        if (killedPids.size === 0) {
-          console.log('No processes found by port; falling back to pattern matching (pgrep/pkill)...');
-          const patterns = ['ngrok.*8000', 'ngrok', 'uvicorn', 'python.*uvicorn'];
-          let anyFound = false;
-          for (const pat of patterns) {
-            try {
-              const list = spawnSync('pgrep', ['-a', '-f', pat], { encoding: 'utf8' });
-              if (list && list.stdout && list.stdout.trim()) {
-                anyFound = true;
-                console.log(`\nProcesses matching /${pat}/:`);
-                console.log(list.stdout.trim());
-                const pids = list.stdout.split(/\r?\n/).map(l => (l || '').trim().split(/\s+/)[0]).filter(Boolean);
-                for (const pid of pids) if (!killedPids.has(pid)) killPid(pid, `matched /${pat}/`);
-              }
-            } catch (e) {
-              // pgrep might not be available; continue
+        // Always try to stop ngrok/uvicorn by pattern in case they're not on the target port.
+        console.log('Stopping services by pattern matching (pgrep/pkill)...');
+        const patterns = ['ngrok.*8000', 'ngrok', 'uvicorn', 'python.*uvicorn'];
+        let anyFound = false;
+        for (const pat of patterns) {
+          try {
+            const list = spawnSync('pgrep', ['-a', '-f', pat], { encoding: 'utf8' });
+            if (list && list.stdout && list.stdout.trim()) {
+              anyFound = true;
+              console.log(`\nProcesses matching /${pat}/:`);
+              console.log(list.stdout.trim());
+              const pids = list.stdout.split(/\r?\n/).map(l => (l || '').trim().split(/\s+/)[0]).filter(Boolean);
+              for (const pid of pids) if (!killedPids.has(pid)) killPid(pid, `matched /${pat}/`);
             }
+          } catch (e) {
+            // pgrep might not be available; continue
           }
+        }
 
-          if (!anyFound) {
-            console.log('Attempting pkill as a last resort...');
-            for (const p of ['ngrok.*8000', 'ngrok', 'uvicorn', 'python.*uvicorn']) {
-              try {
-                const r = spawnSync('pkill', ['-f', p], { encoding: 'utf8' });
-                if (r && (r.status === 0)) console.log(`pkill matched pattern /${p}/ and exited 0`);
-                else if (r && r.status !== 0 && r.stderr) console.log(`pkill pattern /${p}/ exited ${r.status}: ${r.stderr.trim()}`);
-              } catch (e) {
-                // ignore
-              }
+        if (!anyFound) {
+          console.log('Attempting pkill as a last resort...');
+          for (const p of ['ngrok.*8000', 'ngrok', 'uvicorn', 'python.*uvicorn']) {
+            try {
+              const r = spawnSync('pkill', ['-f', p], { encoding: 'utf8' });
+              if (r && (r.status === 0)) console.log(`pkill matched pattern /${p}/ and exited 0`);
+              else if (r && r.status !== 0 && r.stderr) console.log(`pkill pattern /${p}/ exited ${r.status}: ${r.stderr.trim()}`);
+            } catch (e) {
+              // ignore
             }
           }
         }
