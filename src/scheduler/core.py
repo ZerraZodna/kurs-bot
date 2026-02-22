@@ -22,9 +22,7 @@ from sqlalchemy.orm import Session
 from src.models.database import Schedule, User, Lesson
 from src.models.database import SessionLocal
 from src.memories import MemoryManager
-from src.config import settings
-from .time_utils import parse_time_string
-from .memory_utils import (
+from src.memories.scheduler_helpers import (
     get_schedule_message,
     get_user_language,
     get_last_sent_lesson_id,
@@ -32,6 +30,8 @@ from .memory_utils import (
     get_pending_confirmation,
     set_pending_confirmation,
 )
+from src.config import settings
+from .time_utils import parse_time_string
 from .message_utils import (
     format_lesson_message,
     send_outbound_message,
@@ -74,7 +74,7 @@ class SchedulerService:
         If the user has a reported current lesson (numeric), return a
         confirmation prompt. Otherwise return Lesson 1 text or None.
         """
-        from src.scheduler.lesson_state import get_current_lesson
+        from src.memories.lesson_state import get_current_lesson
 
         cur = get_current_lesson(memory_manager, user_id)
         lesson_id = SchedulerService._parse_lesson_int(cur)
@@ -109,7 +109,7 @@ class SchedulerService:
             preferred = SchedulerService._parse_lesson_int(schedule.lesson_id)
 
         if preferred is None:
-            from src.scheduler.lesson_state import get_current_lesson
+            from src.memories.lesson_state import get_current_lesson
 
             cur = get_current_lesson(memory_manager, schedule.user_id)
             lesson_id = SchedulerService._parse_lesson_int(cur)

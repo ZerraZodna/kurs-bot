@@ -12,7 +12,7 @@ from src.models.database import SessionLocal, User, Memory, Schedule, init_db
 from src.services.dialogue_engine import DialogueEngine
 from src.memories import MemoryManager
 from tests.utils import create_test_user, make_ready_user
-from src.scheduler.lesson_state import get_current_lesson
+from src.memories.lesson_state import get_current_lesson
 
 
 def create_test_user(db, external_id: str, first_name: Optional[str] = "Test") -> int:

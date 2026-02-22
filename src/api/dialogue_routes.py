@@ -326,7 +326,7 @@ async def semantic_search(request: SemanticSearchRequest, db: Session = Depends(
     Returns:
         List of memories ranked by semantic similarity
     """
-    from src.services.semantic_search import get_semantic_search_service
+    from src.memories.semantic_search import get_semantic_search_service
     
     # Verify user exists
     user = db.query(User).filter_by(user_id=request.user_id).first()

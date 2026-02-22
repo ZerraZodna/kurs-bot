@@ -3,7 +3,7 @@ Test semantic search with threshold adjustment
 """
 import asyncio
 from src.models.database import SessionLocal
-from src.services.semantic_search import get_semantic_search_service
+from src.memories.semantic_search import get_semantic_search_service
 
 def test_search():
     session = SessionLocal()

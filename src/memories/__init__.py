@@ -12,10 +12,10 @@ from .memory_extractor import MemoryExtractor
 from .memory_classifier import MemoryDecision, decide_memory_store
 
 __all__ = [
-	"MemoryService",
-	"MemoryManager",
-	"manager",
-	"MemoryExtractor",
-	"MemoryDecision",
-	"decide_memory_store",
+    "MemoryService",
+    "MemoryManager",
+    "manager",
+    "MemoryExtractor",
+    "MemoryDecision",
+    "decide_memory_store",
 ]

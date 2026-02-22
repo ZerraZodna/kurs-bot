@@ -6,9 +6,10 @@ import logging
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
-from src.memories import MemoryManager, MemoryExtractor
+from src.memories.manager import MemoryManager
+from src.memories.memory_extractor import MemoryExtractor
 from src.config import settings
-from src.scheduler.lesson_state import set_current_lesson
+from src.memories.lesson_state import set_current_lesson
 
 logger = logging.getLogger(__name__)
 

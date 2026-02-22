@@ -11,7 +11,7 @@ import re
 # One-time reminder keyword parsing removed — handled by assistant + triggers
 from src.services.dialogue.pause_handler import detect_pause_request
 from src.scheduler.schedule_query_handler import detect_schedule_status_request, build_schedule_status_response
-from src.services.dialogue.memory_helpers import get_user_language
+from src.memories.dialogue_helpers import get_user_language
 from src.services.dialogue.lesson_handler import translate_text
 
 

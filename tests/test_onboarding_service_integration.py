@@ -1,7 +1,7 @@
 from src.memories import MemoryManager
 from src.onboarding import OnboardingService
 from src.models.database import SessionLocal
-from src.scheduler.lesson_state import get_current_lesson
+from src.memories.lesson_state import get_current_lesson
 
 
 def test_persist_explicit_lesson_number():

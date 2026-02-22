@@ -10,13 +10,13 @@ from __future__ import annotations
 from datetime import datetime, date, timezone, timedelta
 from typing import Any, Dict, Optional
 
-from src.scheduler.lesson_state import (
+from src.memories.lesson_state import (
     compute_current_lesson_state,
     get_lesson_state,
     set_current_lesson,
     set_last_sent_lesson_id,
 )
-from src.memories import MemoryManager
+from src.memories.manager import MemoryManager
 
 
 def _parse_updated_at(updated_at: Any) -> Optional[datetime]:

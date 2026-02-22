@@ -221,7 +221,7 @@ class MemoryManager:
             n = int(str(value).strip())
             next_id = n + 1 if n < 365 else 365
             # Lazy import to avoid circular imports
-            from src.scheduler.lesson_state import set_current_lesson
+            from src.memories.lesson_state import set_current_lesson
 
             set_current_lesson(self, user_id, next_id)
         except Exception:
@@ -248,7 +248,7 @@ class MemoryManager:
     def set_next_lesson(self, user_id: int, lesson_id: int) -> None:
         """Helper: set the last sent / next lesson id for a user (used by trigger dispatcher)."""
         # Use consolidated lesson_state helper so state stays consistent.
-        from src.scheduler.lesson_state import set_last_sent_lesson_id
+        from src.memories.lesson_state import set_last_sent_lesson_id
         set_last_sent_lesson_id(self, user_id, lesson_id, write_legacy=True)
 
 if __name__ == '__main__':

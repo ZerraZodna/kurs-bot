@@ -1,6 +1,6 @@
 import pytest
 
-from src.services.semantic_search import SemanticSearchService
+from src.memories.semantic_search import SemanticSearchService
 
 
 class DummyMemory:

@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 
 from src.memories.manager import MemoryManager
-from src.scheduler.lesson_state import get_lesson_state, get_current_lesson
+from src.memories.lesson_state import get_lesson_state, get_current_lesson
 
 
 def test_onboarding_reports_current_lesson_advances_next(tmp_path):

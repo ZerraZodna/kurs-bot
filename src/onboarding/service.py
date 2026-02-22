@@ -29,7 +29,7 @@ from src.onboarding.status import get_onboarding_status_dict
 from src.onboarding.schedule_setup import create_auto_schedule
 from src.services.timezone_utils import ensure_user_timezone
 from src.onboarding.user_management import delete_user_and_data, is_user_new
-from src.scheduler.lesson_state import set_current_lesson, get_lesson_state, has_lesson_status
+from src.memories.lesson_state import set_current_lesson, get_lesson_state, has_lesson_status
 
 logger = logging.getLogger(__name__)
 

@@ -12,7 +12,7 @@ from .reminder_handler import (
     resolve_pending_confirmation,
     handle_lesson_confirmation,
 )
-from .memory_helpers import (
+from src.memories.dialogue_helpers import (
     get_user_language,
     extract_and_store_memories,
     delete_user_and_data,

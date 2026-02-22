@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
-from src.memories import MemoryManager
+from src.memories.manager import MemoryManager
 from datetime import date
 
 

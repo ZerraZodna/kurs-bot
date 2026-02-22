@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from apscheduler.triggers.date import DateTrigger
 from datetime import datetime, timezone, timedelta
 
-from src.services.semantic_search import get_semantic_search_service
+from src.memories.semantic_search import get_semantic_search_service
 from src.scheduler import SchedulerService
 from src.models.database import Schedule
 from src.services.gdpr_service import (

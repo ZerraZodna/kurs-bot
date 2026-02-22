@@ -8,7 +8,7 @@ from src.models.database import SessionLocal
 from src.integrations.telegram import send_message
 
 from .core import SchedulerService
-from . import jobs, manager, memory_utils, message_utils, time_utils
+from . import jobs, manager, message_utils, time_utils
 
 __all__ = [
     "SchedulerService",
@@ -16,7 +16,6 @@ __all__ = [
     "send_message",
     "jobs",
     "manager",
-    "memory_utils",
     "message_utils",
     "time_utils",
 ]
@@ -76,7 +75,6 @@ __all__ = [
     "core",
     "jobs",
     "manager",
-    "memory_utils",
     "message_utils",
     "time_utils",
 ]

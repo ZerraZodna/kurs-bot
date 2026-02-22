@@ -8,11 +8,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.models.database import SessionLocal
 from tests.utils import create_test_user
 from src.memories import MemoryManager
-from src.scheduler.lesson_state import set_current_lesson
+from src.memories.lesson_state import set_current_lesson
 from src.services.dialogue.command_handlers import handle_debug_next_day
 from src.services.dialogue.lesson_advance import maybe_send_next_lesson
 from src.services.prompt_builder import PromptBuilder
-from src.scheduler.memory_utils import get_pending_confirmation
+from src.memories.scheduler_helpers import get_pending_confirmation
 
 
 @pytest.mark.asyncio

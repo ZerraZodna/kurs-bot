@@ -44,7 +44,7 @@ def create_auto_schedule(db: Session, user_id: int) -> bool:
         # delivery does not always default to Lesson 1 for continuing users.
         try:
             from src.memories import MemoryManager
-            from src.scheduler.lesson_state import get_current_lesson
+            from src.memories.lesson_state import get_current_lesson
 
             memory_manager = MemoryManager(db)
             cur = get_current_lesson(memory_manager, user_id)

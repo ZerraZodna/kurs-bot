@@ -3,7 +3,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from src.memories import MemoryManager
 from src.services.prompt_builder import PromptBuilder
-from src.services.semantic_search import get_semantic_search_service
+from src.memories.semantic_search import get_semantic_search_service
 from src.memories import MemoryExtractor
 from src.onboarding.service import OnboardingService
 from src.onboarding.flow import OnboardingFlow

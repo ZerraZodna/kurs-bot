@@ -8,7 +8,7 @@ from src.models.database import SessionLocal, Memory, Schedule
 from tests.utils import create_test_user
 from src.services.dialogue_engine import DialogueEngine
 from src.memories import MemoryManager
-from src.scheduler.lesson_state import get_current_lesson
+from src.memories.lesson_state import get_current_lesson
 
 
 @pytest.mark.asyncio

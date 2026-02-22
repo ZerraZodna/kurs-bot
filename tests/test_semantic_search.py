@@ -5,7 +5,7 @@ Tests for semantic search service
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from sqlalchemy.orm import Session
-from src.services.semantic_search import SemanticSearchService
+from src.memories.semantic_search import SemanticSearchService
 from src.models.database import Memory
 from datetime import datetime, timezone
 
@@ -83,7 +83,7 @@ class TestSemanticSearchService:
         import pytest
         from unittest.mock import AsyncMock, patch, MagicMock
         from sqlalchemy.orm import Session
-        from src.services.semantic_search import SemanticSearchService
+        from src.memories.semantic_search import SemanticSearchService
         from src.models.database import Memory
         from src.config import settings
         from datetime import datetime, timezone

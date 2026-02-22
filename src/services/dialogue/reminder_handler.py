@@ -11,8 +11,8 @@ from src.services.timezone_utils import to_utc
 from sqlalchemy.orm import Session
 from src.models.database import Lesson
 from src.memories import MemoryManager
-from src.scheduler.lesson_state import set_last_sent_lesson_id
-from src.scheduler.lesson_state_flow import apply_reported_progress
+from src.memories.lesson_state import set_last_sent_lesson_id
+from src.memories.lesson_state_flow import apply_reported_progress
 from src.triggers.trigger_matcher import get_trigger_matcher
 
 logger = logging.getLogger(__name__)

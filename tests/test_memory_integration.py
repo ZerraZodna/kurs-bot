@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from src.models.database import Base, User
 from src.memories import MemoryManager
 from src.memories.memory_extractor import MemoryExtractor
-from src.services.dialogue.memory_helpers import extract_and_store_memories
+from src.memories.dialogue_helpers import extract_and_store_memories
 
 
 @pytest.fixture(scope="function")
