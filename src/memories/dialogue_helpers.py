@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from src.memories.manager import MemoryManager
 from src.memories.memory_extractor import MemoryExtractor
+from src.memories.memory_handler import MemoryHandler
 from src.config import settings
 from src.memories.lesson_state import set_current_lesson
 
@@ -103,9 +104,9 @@ def delete_user_and_data(db: Session, user_id: int) -> None:
     Called when user declines consent during onboarding.
     """
     try:
-        from src.models.database import Memory, Schedule, MessageLog, User
+        from src.models.database import Schedule, MessageLog, User
 
-        db.query(Memory).filter_by(user_id=user_id).delete(synchronize_session=False)
+        MemoryHandler(db).delete_user_memories(user_id)
 
         # Use single helper to delete schedules and remove any active jobs.
         from src.scheduler import delete_user_schedules_and_remove_jobs

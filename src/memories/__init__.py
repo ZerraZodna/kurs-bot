@@ -8,12 +8,14 @@ Public API:
 from .service import MemoryService
 from .manager import MemoryManager
 from . import manager
+from .memory_handler import MemoryHandler
 from .memory_extractor import MemoryExtractor
 from .memory_classifier import MemoryDecision, decide_memory_store
 
 __all__ = [
     "MemoryService",
     "MemoryManager",
+    "MemoryHandler",
     "manager",
     "MemoryExtractor",
     "MemoryDecision",

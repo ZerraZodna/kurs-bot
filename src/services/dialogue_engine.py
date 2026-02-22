@@ -31,7 +31,7 @@ from src.services.dialogue import (
 )
 from src.services.dialogue.lesson_handler import process_lesson_query
 from src.config import settings
-from src.models.database import User, Memory, Lesson
+from src.models.database import User, Lesson
 from src.services.timezone_utils import ensure_user_timezone, format_dt_in_timezone
 from src.services.prompt_registry import get_prompt_registry
 

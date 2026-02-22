@@ -11,6 +11,7 @@ from apscheduler.triggers.date import DateTrigger
 from datetime import datetime, timezone, timedelta
 
 from src.memories.semantic_search import get_semantic_search_service
+from src.memories.memory_handler import MemoryHandler
 from src.scheduler import SchedulerService
 from src.models.database import Schedule
 from src.services.gdpr_service import (
@@ -468,9 +469,7 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
         # If no query provided or user asked for '*', list all memories as before
         if not query_tail or query_tail.strip() == "*":
             rows = (
-                session.query(_Memory)
-                .filter(_Memory.user_id == user_id)
-                .filter(_Memory.is_active == True)
+                MemoryHandler.build_active_query(session=session, user_id=user_id)
                 .order_by(_Memory.created_at.asc())
                 .all()
             )

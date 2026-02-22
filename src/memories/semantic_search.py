@@ -9,6 +9,7 @@ import logging
 from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 from src.models.database import Memory
+from src.memories.memory_handler import MemoryHandler
 from src.services.embedding_service import get_embedding_service
 from src.config import settings
 
@@ -52,9 +53,7 @@ class SemanticSearchService:
             return []
 
         # First: try a simple SQL keyword search (case-insensitive LIKE)
-        q = session.query(Memory).filter(Memory.user_id == user_id).filter(Memory.is_active == True)
-        if categories:
-            q = q.filter(Memory.category.in_(categories))
+        q = MemoryHandler.build_active_query(session=session, user_id=user_id, categories=categories)
 
         like_pattern = f"%{query_text.strip()}%"
         try:

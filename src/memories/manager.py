@@ -1,13 +1,9 @@
-import hashlib
-import uuid
-import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict
 from sqlalchemy.orm import Session
-from src.models.database import SessionLocal, Memory, init_db
+from src.models.database import SessionLocal
 from src.services.embedding_service import get_embedding_service
-from src.config import settings
+from src.memories.memory_handler import MemoryHandler
 
 logger = logging.getLogger(__name__)
 
@@ -16,43 +12,14 @@ class MemoryManager:
     def __init__(self, db: Optional[Session] = None):
         self.db = db or SessionLocal()
         self.embedding_service = get_embedding_service()
-
-    def _hash_value(self, value: str) -> str:
-        return hashlib.sha256(value.encode("utf-8")).hexdigest()
+        self.memory_handler = MemoryHandler(self.db)
 
     # Note: embedding generation scheduling and persistence removed.
     # The private helpers that generated and stored embeddings were deleted
     # to avoid persisting per-memory embedding bytes.
 
     def get_memory(self, user_id: int, key: str) -> List[Dict]:
-        now = datetime.now(timezone.utc)
-        q = self.db.query(Memory).filter(
-            Memory.user_id == user_id,
-            Memory.key == key,
-            Memory.is_active == True,
-        )
-        rows = q.all()
-        results = []
-        for r in rows:
-            if r.ttl_expires_at:
-                ttl = r.ttl_expires_at
-                if ttl.tzinfo is None:
-                    # assume UTC if naive
-                    from src.services.timezone_utils import to_utc
-
-                    ttl = to_utc(ttl)
-                if ttl < now:
-                    # skip expired
-                    continue
-            results.append({
-                "memory_id": r.memory_id,
-                "key": r.key,
-                "value": r.value,
-                "confidence": r.confidence,
-                "source": r.source,
-                "created_at": r.created_at,
-            })
-        return results
+        return self.memory_handler.get_memory(user_id=user_id, key=key)
 
     def store_memory(self, user_id: int, key: str, value: str, confidence: float = 1.0,
                      source: str = "dialogue_engine", ttl_hours: Optional[int] = None, category: str = "fact",
@@ -81,113 +48,16 @@ class MemoryManager:
         Returns:
             Memory ID of stored memory
         """
-        now = datetime.now(timezone.utc)
-        value_hash = self._hash_value(value)
-        ttl = None
-        if ttl_hours:
-            ttl = now + timedelta(hours=ttl_hours)
-
-        # ensure tables exist
-        init_db()
-
-        # fetch active entries for same user/key/category
-        existing = self.db.query(Memory).filter(
-            Memory.user_id == user_id,
-            Memory.key == key,
-            Memory.category == category,
-            Memory.is_active == True,
-        ).all()
-
-        # identical value exists -> merge
-        for e in existing:
-            if e.value_hash == value_hash:
-                e.confidence = max(e.confidence, float(confidence))
-                e.updated_at = now
-                if ttl:
-                    e.ttl_expires_at = ttl
-                self.db.add(e)
-                self.db.commit()
-                
-                # Post-store actions (e.g., update lesson state)
-                try:
-                    self._after_store(user_id, key, value, category)
-                except Exception:
-                    logger.exception("Post-store action failed")
-
-                # Generate embedding if needed — removed in this branch.
-                return e.memory_id
-
-        # If allow_duplicates, just insert new memory
-        if allow_duplicates:
-            new = Memory(
-                user_id=user_id,
-                category=category,
-                key=key,
-                value=value,
-                value_hash=value_hash,
-                confidence=float(confidence),
-                source=source,
-                is_active=True,
-                ttl_expires_at=ttl,
-            )
-            self.db.add(new)
-            self.db.commit()
-            
-            # Post-store actions (e.g., update lesson state)
-            try:
-                self._after_store(user_id, key, value, category)
-            except Exception:
-                logger.exception("Post-store action failed")
-
-            # Generate embedding if needed — removed in this branch.
-            return new.memory_id
-
-        if existing:
-            # conflict: archive existing and insert new with conflict_group
-            group_id = str(uuid.uuid4())
-            for e in existing:
-                e.is_active = False
-                e.archived_at = now
-                e.conflict_group_id = group_id
-                self.db.add(e)
-            new = Memory(
-                user_id=user_id,
-                category=category,
-                key=key,
-                value=value,
-                value_hash=value_hash,
-                confidence=float(confidence),
-                source=source,
-                is_active=True,
-                conflict_group_id=group_id,
-                ttl_expires_at=ttl,
-            )
-            self.db.add(new)
-            self.db.commit()
-            
-            # Post-store actions (e.g., update lesson state)
-            try:
-                self._after_store(user_id, key, value, category)
-            except Exception:
-                logger.exception("Post-store action failed")
-
-            # Generate embedding if needed — removed in this branch.
-            return new.memory_id
-
-        # no existing -> insert
-        new = Memory(
+        memory_id = self.memory_handler.store_memory(
             user_id=user_id,
-            category=category,
             key=key,
             value=value,
-            value_hash=value_hash,
-            confidence=float(confidence),
+            confidence=confidence,
             source=source,
-            is_active=True,
-            ttl_expires_at=ttl,
+            ttl_hours=ttl_hours,
+            category=category,
+            allow_duplicates=allow_duplicates,
         )
-        self.db.add(new)
-        self.db.commit()
         # Generate embedding if needed — removed in this branch.
         # If this memory indicates a preferred lesson time, do NOT modify schedules here.
         # Creating schedules is the responsibility of the schedule/triggering codepath
@@ -201,7 +71,7 @@ class MemoryManager:
         except Exception:
             logger.exception("Post-store action failed")
 
-        return new.memory_id
+        return memory_id
 
     def _after_store(self, user_id: int, key: str, value: str, category: str) -> None:
         """Run post-store side-effects for certain memory keys.
@@ -229,20 +99,7 @@ class MemoryManager:
 
     def archive_memories(self, user_id: int, memory_ids: List[int]) -> int:
         """Archive (soft-delete) memories by IDs for a user. Returns count archived."""
-        if not memory_ids:
-            return 0
-        now = datetime.now(timezone.utc)
-        q = self.db.query(Memory).filter(
-            Memory.user_id == user_id,
-            Memory.memory_id.in_(memory_ids),
-            Memory.is_active == True,
-        )
-        updated = q.update(
-            {Memory.is_active: False, Memory.archived_at: now},
-            synchronize_session=False,
-        )
-        self.db.commit()
-        return updated
+        return self.memory_handler.archive_memories(user_id=user_id, memory_ids=memory_ids)
 
 
     def set_next_lesson(self, user_id: int, lesson_id: int) -> None:
@@ -253,6 +110,7 @@ class MemoryManager:
 
 if __name__ == '__main__':
     # quick manual test
+    from src.models.database import init_db
     init_db()
     mm = MemoryManager()
     uid = 1
