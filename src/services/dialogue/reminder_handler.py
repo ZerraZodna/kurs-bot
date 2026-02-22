@@ -11,7 +11,8 @@ from src.services.timezone_utils import to_utc
 from sqlalchemy.orm import Session
 from src.models.database import Lesson
 from src.memories import MemoryManager
-from src.memories.lesson_state import set_last_sent_lesson_id
+from src.memories.constants import MemoryCategory, MemoryKey
+from src.memories.lesson_state import set_current_lesson, set_last_sent_lesson_id
 from src.memories.lesson_state_flow import apply_reported_progress
 from src.triggers.trigger_matcher import get_trigger_matcher
 
@@ -51,7 +52,7 @@ def get_pending_confirmation(
     Returns:
         Dict with lesson_id and next_lesson_id if pending, None otherwise
     """
-    memories = memory_manager.get_memory(user_id, "lesson_confirmation_pending")
+    memories = memory_manager.get_memory(user_id, MemoryKey.LESSON_CONFIRMATION_PENDING)
     if not memories:
         return None
 
@@ -75,11 +76,11 @@ def resolve_pending_confirmation(memory_manager: MemoryManager, user_id: int) ->
     """Mark lesson confirmation as resolved."""
     memory_manager.store_memory(
         user_id=user_id,
-        key="lesson_confirmation_pending",
+        key=MemoryKey.LESSON_CONFIRMATION_PENDING,
         value=json.dumps(
             {"resolved": True, "timestamp": datetime.now(timezone.utc).isoformat()}
         ),
-        category="conversation",
+        category=MemoryCategory.CONVERSATION.value,
         ttl_hours=12,
         source="dialogue_engine",
     )
@@ -167,14 +168,14 @@ async def handle_lesson_confirmation(
 
     # Yes: mark completed and send next lesson
     if lesson_id:
-        memory_manager.store_memory(
-            user_id=user_id,
-            key="lesson_completed",
-            value=str(lesson_id),
-            category="progress",
-            confidence=1.0,
-            source="dialogue_engine_lesson_confirmation",
-        )
+            memory_manager.store_memory(
+                user_id=user_id,
+                key=MemoryKey.LESSON_COMPLETED,
+                value=str(lesson_id),
+                category=MemoryCategory.PROGRESS.value,
+                confidence=1.0,
+                source="dialogue_engine_lesson_confirmation",
+            )
 
     # Update explicit current_lesson state to the next lesson (if known).
     if lesson_id:

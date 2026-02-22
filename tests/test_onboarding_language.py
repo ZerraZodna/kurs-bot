@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.models.database import SessionLocal, User, Memory, init_db
+from src.memories.memory_handler import MemoryHandler
 from src.services.dialogue_engine import DialogueEngine
 from src.onboarding.service import OnboardingService
 
@@ -20,7 +21,7 @@ def create_new_test_user(db) -> int:
             delete_user_and_data(db, existing.user_id)
         except Exception:
             # Fallback to manual deletion if the helper is unavailable for any reason
-            db.query(Memory).filter_by(user_id=existing.user_id).delete()
+            MemoryHandler(db).delete_user_memories(existing.user_id)
             db.query(User).filter_by(user_id=existing.user_id).delete()
             db.commit()
 

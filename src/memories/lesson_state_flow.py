@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime, date, timezone, timedelta
 from typing import Any, Dict, Optional
 
+from src.memories.constants import MemoryCategory, MemoryKey
 from src.memories.lesson_state import (
     compute_current_lesson_state,
     get_lesson_state,
@@ -133,9 +134,9 @@ def apply_reported_progress(
 
     memory_manager.store_memory(
         user_id=user_id,
-        key="lesson_completed",
+        key=MemoryKey.LESSON_COMPLETED,
         value=str(completed),
-        category="progress",
+        category=MemoryCategory.PROGRESS.value,
         confidence=1.0,
         source="lesson_state_flow",
     )

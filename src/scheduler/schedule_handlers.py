@@ -12,6 +12,7 @@ import re
 from src.services.dialogue.pause_handler import detect_pause_request
 from src.scheduler.schedule_query_handler import detect_schedule_status_request, build_schedule_status_response
 from src.memories.dialogue_helpers import get_user_language
+from src.memories.constants import MemoryCategory, MemoryKey
 from src.services.dialogue.lesson_handler import translate_text
 
 
@@ -53,12 +54,12 @@ async def handle_schedule_messages(
         if memory_manager:
             memory_manager.store_memory(
                 user_id=user_id,
-                key="schedule_request_pending",
+                key=MemoryKey.SCHEDULE_REQUEST_PENDING,
                 value="false",
                 confidence=1.0,
                 source="dialogue_engine",
                 ttl_hours=1,
-                category="conversation",
+                category=MemoryCategory.CONVERSATION.value,
             )
         if deactivated > 0:
             response = "Okay — I paused your daily lessons. Tell me when you want to resume."
@@ -96,7 +97,13 @@ async def handle_schedule_messages(
         # Persist preferred time if memory manager available
         try:
             if memory_manager:
-                memory_manager.store_memory(user_id, "preferred_lesson_time", normalized, category="profile", source="schedule_handlers")
+                memory_manager.store_memory(
+                    user_id,
+                    MemoryKey.PREFERRED_LESSON_TIME,
+                    normalized,
+                    category=MemoryCategory.PROFILE.value,
+                    source="schedule_handlers",
+                )
         except Exception:
             pass
 
@@ -120,7 +127,7 @@ async def handle_schedule_messages(
         return resp
 
     if memory_manager:
-        pending = memory_manager.get_memory(user_id, "schedule_request_pending")
+        pending = memory_manager.get_memory(user_id, MemoryKey.SCHEDULE_REQUEST_PENDING)
         if pending and pending[0].get("value") == "true":
             schedule_response = await schedule_request_handler(user_id, text, session)
             if schedule_response:
@@ -140,12 +147,12 @@ async def handle_schedule_messages(
             if memory_manager:
                 memory_manager.store_memory(
                     user_id=user_id,
-                    key="schedule_request_pending",
+                    key=MemoryKey.SCHEDULE_REQUEST_PENDING,
                     value="true",
                     confidence=1.0,
                     source="dialogue_engine",
                     ttl_hours=1,
-                    category="conversation",
+                    category=MemoryCategory.CONVERSATION.value,
                 )
             schedule_response = await schedule_request_handler(user_id, text, session)
             if schedule_response:

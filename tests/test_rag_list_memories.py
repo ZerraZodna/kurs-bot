@@ -8,20 +8,22 @@ from sqlalchemy.orm import sessionmaker
 def test_rag_list_memories_personal_assistant(monkeypatch):
     # Import inside test to ensure patched symbols resolve correctly
     from src.services.dialogue.command_handlers import parse_rag_prefix, handle_list_memories
-    from src.models.database import Memory
 
     # Create an in-memory engine/session so Session.get_bind() works
     engine = create_engine("sqlite:///:memory:")
     SessionLocal = sessionmaker(bind=engine)
     session = SessionLocal()
 
-    # Construct a fake Memory object (no DB insert required)
-    mem = Memory()
-    mem.created_at = datetime.datetime(2020, 1, 1, 12, 0)
-    mem.category = "note"
-    mem.key = "acim"
-    mem.value = "Personal Assistant — ACIM commitments and notes."
-    mem.is_active = True
+    # Construct a fake memory-like object (no DB insert required)
+    class FakeMemory:
+        def __init__(self):
+            self.created_at = datetime.datetime(2020, 1, 1, 12, 0)
+            self.category = "note"
+            self.key = "acim"
+            self.value = "Personal Assistant — ACIM commitments and notes."
+            self.is_active = True
+
+    mem = FakeMemory()
 
     class FakeSearchService:
         async def search_memories(self, user_id, query_text, session, limit=20):

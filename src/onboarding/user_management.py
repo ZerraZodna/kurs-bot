@@ -6,6 +6,8 @@ from typing import Optional
 from sqlalchemy.orm import Session
 import logging
 
+from src.memories.user_data_service import delete_user_content_rows
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,7 +30,7 @@ def delete_user_and_data(db: Session, user_id: int) -> bool:
         True if successful, False otherwise
     """
     try:
-        from src.models.database import User, Memory, MessageLog, Schedule
+        from src.models.database import User
         from src.services.admin_notifier import send_admin_notification
 
         user = db.query(User).filter_by(user_id=user_id).first()
@@ -37,13 +39,7 @@ def delete_user_and_data(db: Session, user_id: int) -> bool:
             name = str(user_id)
 
         # Delete in order of dependencies
-        db.query(Memory).filter_by(user_id=user_id).delete()
-        db.query(MessageLog).filter_by(user_id=user_id).delete()
-
-        # Use single helper to delete schedules and remove any active jobs.
-        from src.scheduler import delete_user_schedules_and_remove_jobs
-
-        delete_user_schedules_and_remove_jobs(user_id=user_id, session=db)
+        delete_user_content_rows(db, user_id)
 
         db.query(User).filter_by(user_id=user_id).delete()
 

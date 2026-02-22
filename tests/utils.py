@@ -3,6 +3,7 @@ from typing import Optional
 
 from src.models.database import User
 from src.memories import MemoryManager
+from src.memories.memory_handler import MemoryHandler
 from src.memories.lesson_state import set_current_lesson
 
 
@@ -12,11 +13,11 @@ def create_test_user(db, external_id: str, first_name: Optional[str] = None) -> 
     Removes any existing user with the same external_id, creates a new
     `User` row and returns the `user_id`.
     """
-    from src.models.database import Memory, Schedule
+    from src.models.database import Schedule
 
     existing = db.query(User).filter_by(external_id=external_id).first()
     if existing:
-        db.query(Memory).filter_by(user_id=existing.user_id).delete()
+        MemoryHandler(db).delete_user_memories(existing.user_id)
         db.query(Schedule).filter_by(user_id=existing.user_id).delete()
         db.query(User).filter_by(user_id=existing.user_id).delete()
         db.commit()

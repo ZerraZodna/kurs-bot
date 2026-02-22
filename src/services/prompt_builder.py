@@ -9,6 +9,7 @@ from datetime import datetime, timezone, timedelta
 from src.services.timezone_utils import get_user_timezone_name, format_dt_in_timezone, to_utc
 from src.models.database import MessageLog, User, Lesson
 from src.memories import MemoryManager
+from src.memories.constants import MemoryKey
 import json
 
 
@@ -290,7 +291,7 @@ class PromptBuilder:
 
     def _get_debug_day_offset(self, user_id: int) -> int:
         """Return temporary day offset for testing (e.g., via 'next_day' command)."""
-        debug_offsets = self.memory_manager.get_memory(user_id, "debug_day_offset")
+        debug_offsets = self.memory_manager.get_memory(user_id, MemoryKey.DEBUG_DAY_OFFSET)
         if not debug_offsets:
             return 0
 
@@ -343,7 +344,7 @@ class PromptBuilder:
         parts = []
         
         # Check for stored full_name memory first, fall back to database name
-        stored_name = self.memory_manager.get_memory(user.user_id, "full_name")
+        stored_name = self.memory_manager.get_memory(user.user_id, MemoryKey.FULL_NAME)
         if stored_name:
             parts.append(f"Name: {stored_name[0]['value']}")
         elif user.first_name:
@@ -353,7 +354,7 @@ class PromptBuilder:
             parts.append(f"Name: {name}")
         
         # Add personal background if stored
-        personal_bg = self.memory_manager.get_memory(user.user_id, "personal_background")
+        personal_bg = self.memory_manager.get_memory(user.user_id, MemoryKey.PERSONAL_BACKGROUND)
         if personal_bg:
             parts.append(f"Background: {personal_bg[0]['value']}")
         
@@ -378,8 +379,8 @@ class PromptBuilder:
     
     def _build_goals_context(self, user_id: int) -> str:
         """Retrieve user goals and learning objectives."""
-        goals = self.memory_manager.get_memory(user_id, "learning_goal")
-        milestones = self.memory_manager.get_memory(user_id, "milestone")
+        goals = self.memory_manager.get_memory(user_id, MemoryKey.LEARNING_GOAL)
+        milestones = self.memory_manager.get_memory(user_id, MemoryKey.MILESTONE)
         
         parts = []
         if goals:
@@ -397,9 +398,9 @@ class PromptBuilder:
     
     def _build_preferences_context(self, user_id: int) -> str:
         """Retrieve user communication and learning preferences."""
-        style = self.memory_manager.get_memory(user_id, "learning_style")
-        tone = self.memory_manager.get_memory(user_id, "preferred_tone")
-        frequency = self.memory_manager.get_memory(user_id, "contact_frequency")
+        style = self.memory_manager.get_memory(user_id, MemoryKey.LEARNING_STYLE)
+        tone = self.memory_manager.get_memory(user_id, MemoryKey.PREFERRED_TONE)
+        frequency = self.memory_manager.get_memory(user_id, MemoryKey.CONTACT_FREQUENCY)
         
         parts = []
         if style:
@@ -413,8 +414,8 @@ class PromptBuilder:
     
     def _build_progress_context(self, user_id: int) -> str:
         """Retrieve recent progress and insights."""
-        lessons_completed = self.memory_manager.get_memory(user_id, "lesson_completed")
-        insights = self.memory_manager.get_memory(user_id, "insight")
+        lessons_completed = self.memory_manager.get_memory(user_id, MemoryKey.LESSON_COMPLETED)
+        insights = self.memory_manager.get_memory(user_id, MemoryKey.INSIGHT)
         
         parts = []
         if lessons_completed:

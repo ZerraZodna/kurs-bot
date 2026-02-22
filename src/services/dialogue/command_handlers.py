@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from apscheduler.triggers.date import DateTrigger
 from datetime import datetime, timezone, timedelta
 
+from src.memories.constants import MemoryCategory, MemoryKey
 from src.memories.semantic_search import get_semantic_search_service
 from src.memories.memory_handler import MemoryHandler
 from src.scheduler import SchedulerService
@@ -35,7 +36,7 @@ def handle_rag_mode_toggle(text: str, memory_manager, user_id: int) -> Optional[
 
     # Accept 'rag', 'rag mode', 'rag_mode', and 'ragmode' as aliases
     if normalized in ("rag_mode", "rag mode", "rag", "ragmode"):
-        rag_mode_memory = memory_manager.get_memory(user_id, "rag_mode_enabled")
+        rag_mode_memory = memory_manager.get_memory(user_id, MemoryKey.RAG_MODE_ENABLED)
         is_on = bool(rag_mode_memory and rag_mode_memory[0].get("value") == "true")
         return f"RAG mode is {'on' if is_on else 'off'}."
 
@@ -57,11 +58,11 @@ def handle_rag_mode_toggle(text: str, memory_manager, user_id: int) -> Optional[
     if mode_cmd == "on":
         memory_manager.store_memory(
             user_id=user_id,
-            key="rag_mode_enabled",
+            key=MemoryKey.RAG_MODE_ENABLED,
             value="true",
             confidence=1.0,
             source="user_command",
-            category="conversation",
+            category=MemoryCategory.CONVERSATION.value,
         )
         return (
             "RAG mode enabled. I will use semantic search over your memories for future messages.\n\n"
@@ -75,11 +76,11 @@ def handle_rag_mode_toggle(text: str, memory_manager, user_id: int) -> Optional[
     if mode_cmd == "off":
         memory_manager.store_memory(
             user_id=user_id,
-            key="rag_mode_enabled",
+            key=MemoryKey.RAG_MODE_ENABLED,
             value="false",
             confidence=1.0,
             source="user_command",
-            category="conversation",
+            category=MemoryCategory.CONVERSATION.value,
         )
         return "RAG mode disabled. Back to standard workflow."
 
@@ -95,7 +96,7 @@ def parse_rag_prefix(text: str) -> Tuple[str, bool]:
 
 
 def is_rag_mode_enabled(memory_manager, user_id: int) -> bool:
-    rag_mode_memory = memory_manager.get_memory(user_id, "rag_mode_enabled")
+    rag_mode_memory = memory_manager.get_memory(user_id, MemoryKey.RAG_MODE_ENABLED)
     return bool(rag_mode_memory and rag_mode_memory[0].get("value") == "true")
 
 
@@ -150,7 +151,7 @@ async def handle_schedule_deletion_commands(
     text_lower = (text or "").strip().lower()
 
     # Check for an outstanding pending confirmation
-    pending = memory_manager.get_memory(user_id, "delete_schedules_pending")
+    pending = memory_manager.get_memory(user_id, MemoryKey.DELETE_SCHEDULES_PENDING)
     affirmatives = {"yes", "y", "ja", "bekreft", "confirm", "ok", "okey", "sure"}
     if pending and pending[0].get("value") == "true":
         if text_lower in affirmatives:
@@ -164,22 +165,22 @@ async def handle_schedule_deletion_commands(
             # Clear pending flag
             memory_manager.store_memory(
                 user_id=user_id,
-                key="delete_schedules_pending",
+                key=MemoryKey.DELETE_SCHEDULES_PENDING,
                 value="false",
                 confidence=1.0,
                 source="dialogue_engine",
-                category="conversation",
+                category=MemoryCategory.CONVERSATION.value,
             )
             return "Okay — I've deleted your reminders. You won't receive further scheduled messages unless you set new reminders."
 
         # If user responded something else, cancel pending
         memory_manager.store_memory(
             user_id=user_id,
-            key="delete_schedules_pending",
+            key=MemoryKey.DELETE_SCHEDULES_PENDING,
             value="false",
             confidence=1.0,
             source="dialogue_engine",
-            category="conversation",
+            category=MemoryCategory.CONVERSATION.value,
         )
         return "Okay — I won't delete your reminders."
 
@@ -203,11 +204,11 @@ async def handle_schedule_deletion_commands(
 
         memory_manager.store_memory(
             user_id=user_id,
-            key="delete_schedules_pending",
+            key=MemoryKey.DELETE_SCHEDULES_PENDING,
             value="true",
             confidence=1.0,
             source="dialogue_engine",
-            category="conversation",
+            category=MemoryCategory.CONVERSATION.value,
         )
         return "Are you sure you want to delete all your reminders? Reply 'yes' to confirm."
 
@@ -328,7 +329,7 @@ def handle_debug_next_day(
         # Increment existing debug offset if present so repeated `next_day`
         # calls advance the simulated day consecutively.
         try:
-            offsets = memory_manager.get_memory(user_id, "debug_day_offset")
+            offsets = memory_manager.get_memory(user_id, MemoryKey.DEBUG_DAY_OFFSET)
             current = 0
             if offsets:
                 latest = max(offsets, key=lambda x: x.get("created_at") or datetime(1970, 1, 1, tzinfo=timezone.utc))
@@ -340,23 +341,23 @@ def handle_debug_next_day(
             new_value = str(current + 1)
             memory_manager.store_memory(
                 user_id=user_id,
-                key="debug_day_offset",
+                key=MemoryKey.DEBUG_DAY_OFFSET,
                 value=new_value,
                 confidence=1.0,
                 source="debug_command",
                 ttl_hours=1,
-                category="conversation",
+                category=MemoryCategory.CONVERSATION.value,
             )
         except Exception:
             # Fall back to writing '1' if anything goes wrong
             memory_manager.store_memory(
                 user_id=user_id,
-                key="debug_day_offset",
+                key=MemoryKey.DEBUG_DAY_OFFSET,
                 value="1",
                 confidence=1.0,
                 source="debug_command",
                 ttl_hours=1,
-                category="conversation",
+                category=MemoryCategory.CONVERSATION.value,
             )
     schedules = []
     if session:
@@ -426,9 +427,6 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
         pass
 
     try:
-        # Query Memory model directly to build the list
-        from src.models.database import Memory as _Memory
-
         def _format_mem_lines(mems: list) -> list:
             out = []
             for mem in mems:
@@ -469,9 +467,8 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
         # If no query provided or user asked for '*', list all memories as before
         if not query_tail or query_tail.strip() == "*":
             rows = (
-                MemoryHandler.build_active_query(session=session, user_id=user_id)
-                .order_by(_Memory.created_at.asc())
-                .all()
+                MemoryHandler(session)
+                .list_active_memories(user_id=user_id, order_ascending=True)
             )
             if not rows:
                 return "You have no memories stored."
@@ -580,7 +577,7 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> Option
             active_type = None
             active_key = None
             try:
-                custom_mem = memory_manager.get_memory(user_id, "custom_rag_prompt")
+                custom_mem = memory_manager.get_memory(user_id, MemoryKey.CUSTOM_RAG_PROMPT)
                 custom_val = custom_mem[0].get("value") if custom_mem else None
                 if custom_val and custom_val.strip():
                     active_type = "custom"
@@ -588,7 +585,7 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> Option
                 custom_val = None
 
             try:
-                sel_mem = memory_manager.get_memory(user_id, "selected_rag_prompt_key")
+                sel_mem = memory_manager.get_memory(user_id, MemoryKey.SELECTED_RAG_PROMPT_KEY)
                 sel_key = sel_mem[0].get("value") if sel_mem else None
                 if active_type is None and sel_key:
                     active_type = "selected"
@@ -634,11 +631,11 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> Option
                 return f"Prompt template '{key}' not found. Use 'rag_prompt list' to view available keys."
             memory_manager.store_memory(
                 user_id=user_id,
-                key="selected_rag_prompt_key",
+                key=MemoryKey.SELECTED_RAG_PROMPT_KEY,
                 value=key,
                 confidence=1.0,
                 source="user_command",
-                category="conversation",
+                category=MemoryCategory.CONVERSATION.value,
             )
             return f"Selected prompt '{key}' ({tmpl.title})."
 
@@ -650,11 +647,11 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> Option
             # Store in user memory (keeps existing behavior)
             memory_manager.store_memory(
                 user_id=user_id,
-                key="custom_rag_prompt",
+                key=MemoryKey.CUSTOM_RAG_PROMPT,
                 value=rest,
                 confidence=1.0,
                 source="user_command",
-                category="conversation",
+                category=MemoryCategory.CONVERSATION.value,
             )
 
             # Also persist as a private PromptTemplate row so it appears in listings
@@ -685,8 +682,8 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> Option
             return "Custom RAG prompt saved for your account."
 
         if sub == "show":
-            sel = memory_manager.get_memory(user_id, "selected_rag_prompt_key")
-            custom = memory_manager.get_memory(user_id, "custom_rag_prompt")
+            sel = memory_manager.get_memory(user_id, MemoryKey.SELECTED_RAG_PROMPT_KEY)
+            custom = memory_manager.get_memory(user_id, MemoryKey.CUSTOM_RAG_PROMPT)
             parts_out = []
             if custom and custom[0].get("value"):
                 parts_out.append("Custom prompt: " + (custom[0].get("value")[:200] + ("..." if len(custom[0].get("value")) > 200 else "")))

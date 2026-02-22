@@ -13,6 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.models.database import SessionLocal, User
+from src.memories.memory_handler import MemoryHandler
 from src.services.dialogue_engine import DialogueEngine
 from datetime import datetime, timezone
 
@@ -20,9 +21,9 @@ from datetime import datetime, timezone
 def create_test_user(db, external_id: str = "test_lang_user") -> int:
     existing_user = db.query(User).filter_by(external_id=external_id).first()
     if existing_user:
-        from src.models.database import Memory, Schedule
+        from src.models.database import Schedule
 
-        db.query(Memory).filter_by(user_id=existing_user.user_id).delete()
+        MemoryHandler(db).delete_user_memories(existing_user.user_id)
         db.query(Schedule).filter_by(user_id=existing_user.user_id).delete()
         db.query(User).filter_by(user_id=existing_user.user_id).delete()
         db.commit()

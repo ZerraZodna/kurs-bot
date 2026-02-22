@@ -5,11 +5,12 @@ from datetime import datetime, timezone
 from src.services.timezone_utils import to_utc
 from typing import Optional
 from src.memories.lesson_state import get_last_sent_lesson_id as _get_last_sent_lesson_id, set_last_sent_lesson_id as _set_last_sent_lesson_id
+from src.memories.constants import MemoryCategory, MemoryKey
 
 from src.memories.manager import MemoryManager
 
 def get_schedule_message(memory_manager: MemoryManager, user_id: int, schedule_id: int) -> Optional[str]:
-    memories = memory_manager.get_memory(user_id=user_id, key="schedule_message")
+    memories = memory_manager.get_memory(user_id=user_id, key=MemoryKey.SCHEDULE_MESSAGE)
     for memory in memories:
         try:
             data = json.loads(memory.get("value", ""))
@@ -20,9 +21,8 @@ def get_schedule_message(memory_manager: MemoryManager, user_id: int, schedule_i
     return None
 
 def get_user_language(memory_manager: MemoryManager, user_id: int) -> str:
-    return "en"
-    #memories = memory_manager.get_memory(user_id, "user_language")
-    #return memories[0].get("value", "en") if memories else "en"
+    memories = memory_manager.get_memory(user_id, MemoryKey.USER_LANGUAGE)
+    return memories[0].get("value", "en") if memories else "en"
 
 def get_last_sent_lesson_id(memory_manager: MemoryManager, user_id: int) -> Optional[int]:
     """Wrapper: use consolidated lesson_state getter."""
@@ -33,7 +33,7 @@ def set_last_sent_lesson_id(memory_manager: MemoryManager, user_id: int, lesson_
     _set_last_sent_lesson_id(memory_manager, user_id, lesson_id, write_legacy=True)
 
 def get_pending_confirmation(memory_manager: MemoryManager, user_id: int) -> Optional[dict]:
-    memories = memory_manager.get_memory(user_id, "lesson_confirmation_pending")
+    memories = memory_manager.get_memory(user_id, MemoryKey.LESSON_CONFIRMATION_PENDING)
     if not memories:
         return None
 
@@ -61,9 +61,9 @@ def set_pending_confirmation(
     payload = json.dumps({"lesson_id": lesson_id, "next_lesson_id": next_lesson_id})
     memory_manager.store_memory(
         user_id=user_id,
-        key="lesson_confirmation_pending",
+        key=MemoryKey.LESSON_CONFIRMATION_PENDING,
         value=payload,
-        category="conversation",
+        category=MemoryCategory.CONVERSATION.value,
         ttl_hours=24,
         source="scheduler",
     )

@@ -10,6 +10,7 @@ import logging
 from typing import Optional
 from src.models.database import PromptTemplate
 from src.memories import MemoryManager
+from src.memories.constants import MemoryKey
 from src.models.database import SessionLocal
 from src.config import settings
 
@@ -30,14 +31,14 @@ class PromptRegistry:
         """
         try:
             # 1) custom prompt stored directly by user
-            custom = memory_manager.get_memory(user_id, "custom_rag_prompt")
+            custom = memory_manager.get_memory(user_id, MemoryKey.CUSTOM_RAG_PROMPT)
             if custom:
                 txt = custom[0].get("value")
                 if txt and txt.strip():
                     return txt
 
             # 2) selected key referencing a template
-            sel = memory_manager.get_memory(user_id, "selected_rag_prompt_key")
+            sel = memory_manager.get_memory(user_id, MemoryKey.SELECTED_RAG_PROMPT_KEY)
             if sel:
                 key = sel[0].get("value")
                 if key:

@@ -4,8 +4,9 @@ import logging
 import json
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
-from src.services.timezone_utils import validate_timezone_name, format_dt_in_timezone
+from src.services.timezone_utils import format_dt_in_timezone
 from src.services.timezone_utils import ensure_user_timezone, to_utc
+from src.memories.constants import MemoryCategory, MemoryKey
 from src.memories.scheduler_helpers import get_user_language
 from src.scheduler.message_utils import translate_text_sync
 
@@ -36,13 +37,12 @@ class TriggerDispatcher:
         try:
             self.memory_manager.store_memory(
                 user_id=user_id,
-                key="trigger_audit",
+                key=MemoryKey.TRIGGER_AUDIT,
                 value=payload,
-                category="audit",
+                category=MemoryCategory.AUDIT.value,
                 source="trigger_dispatcher",
                 ttl_hours=24 * 30,
                 allow_duplicates=False,
-                generate_embedding=False,
             )
         except Exception as e:
             logger.warning(f"Failed to write trigger audit memory: {e}")
@@ -69,7 +69,12 @@ class TriggerDispatcher:
         run_at_dt = self._parse_run_at(run_at_val)
         if run_at_dt is None:
             # Could not parse run_at -> defer and ask assistant/user to clarify
-            self.memory_manager.store_memory(user_id, "schedule_request_pending", "true", category="conversation")
+            self.memory_manager.store_memory(
+                user_id,
+                MemoryKey.SCHEDULE_REQUEST_PENDING,
+                "true",
+                category=MemoryCategory.CONVERSATION.value,
+            )
             return {"ok": True, "note": "deferred", "error": "invalid_run_at"}
 
         # Normalize to UTC-aware datetime using helper
@@ -114,9 +119,9 @@ class TriggerDispatcher:
             try:
                 self.memory_manager.store_memory(
                     user_id,
-                    "preferred_lesson_time",
+                    MemoryKey.PREFERRED_LESSON_TIME,
                     normalized_time,
-                    category="profile",
+                    category=MemoryCategory.PROFILE.value,
                     source="trigger_dispatcher",
                 )
             except Exception:
@@ -178,7 +183,12 @@ class TriggerDispatcher:
             return result
         else:
             # Could not infer -> record request in memory for later handling
-            self.memory_manager.store_memory(user_id, "schedule_request_pending", "true", category="conversation")
+            self.memory_manager.store_memory(
+                user_id,
+                MemoryKey.SCHEDULE_REQUEST_PENDING,
+                "true",
+                category=MemoryCategory.CONVERSATION.value,
+            )
             result.update({"ok": True, "note": "deferred"})
             return result
 
@@ -226,9 +236,9 @@ class TriggerDispatcher:
 
             self.memory_manager.store_memory(
                 user_id,
-                "preferred_lesson_time",
+                MemoryKey.PREFERRED_LESSON_TIME,
                 time_str,
-                category="profile",
+                category=MemoryCategory.PROFILE.value,
                 source="trigger_dispatcher",
             )
 
@@ -323,7 +333,7 @@ class TriggerDispatcher:
             SchedulerService = _scheduler_pkg.SchedulerService
             active_schedules = self.db.query(Schedule).filter_by(user_id=user_id, is_active=True, schedule_type="daily").all()
             for sched in active_schedules:
-                preferred = self.memory_manager.get_memory(user_id, "preferred_lesson_time")
+                preferred = self.memory_manager.get_memory(user_id, MemoryKey.PREFERRED_LESSON_TIME)
                 if preferred and preferred[0].get("value"):
                     time_str = preferred[0].get("value")
                 else:
@@ -412,10 +422,22 @@ class TriggerDispatcher:
                     self.memory_manager.set_next_lesson(user_id, int(lesson_id))
                     result.update({"ok": True, "lesson_id": int(lesson_id)})
             elif action == "enter_rag":
-                self.memory_manager.store_memory(user_id, "rag_mode", "on", category="conversation", source="trigger_dispatcher")
+                self.memory_manager.store_memory(
+                    user_id,
+                    MemoryKey.RAG_MODE_ENABLED,
+                    "true",
+                    category=MemoryCategory.CONVERSATION.value,
+                    source="trigger_dispatcher",
+                )
                 result.update({"ok": True})
             elif action == "exit_rag":
-                self.memory_manager.store_memory(user_id, "rag_mode", "off", category="conversation", source="trigger_dispatcher")
+                self.memory_manager.store_memory(
+                    user_id,
+                    MemoryKey.RAG_MODE_ENABLED,
+                    "false",
+                    category=MemoryCategory.CONVERSATION.value,
+                    source="trigger_dispatcher",
+                )
                 result.update({"ok": True})
             elif action == "set_timezone":
                 result = self._handle_set_timezone(match, context)

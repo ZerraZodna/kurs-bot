@@ -16,6 +16,7 @@ import re
 from langdetect import detect_langs
 from src.services.language.keyword_detector import detect_language as keyword_detect
 from src.config import settings
+from src.memories.constants import MemoryCategory, MemoryKey
 
 # Comprehensive supported ISO-639-1 two-letter codes.
 # This whitelist is used to validate LLM outputs before accepting
@@ -92,81 +93,79 @@ from src.memories import MemoryManager
 from src.models.database import MessageLog
 
 
-async def detect_and_store_language(memory_manager: MemoryManager, user_id: int, user_message: str) -> Optional[str]:
-	"""Detect language for `user_message` and store `user_language` memory when appropriate.
+async def detect_and_store_language(
+    memory_manager: MemoryManager,
+    user_id: int,
+    user_message: str,
+) -> Optional[str]:
+    """Detect language for `user_message` and store `user_language` memory."""
 
-	Stores two-letter language codes (e.g., 'en', 'no'). Returns the stored
-	or existing language code.
-	"""
+    # Keep only Norwegian/English support. If user has an existing preference,
+    # return it. If not, run the lightweight `keyword_detect` and store only
+    # `en` or `no` (map `nb`/`nn` -> `no`). If detection fails, default to `en`.
+    try:
+        existing = memory_manager.get_memory(user_id, MemoryKey.USER_LANGUAGE)
+        existing_value = existing[0].get("value") if existing else None
+    except Exception:
+        existing_value = None
 
-	# Keep only Norwegian/English support. If user has an existing preference,
-	# return it. If not, run the lightweight `keyword_detect` and store only
-	# `en` or `no` (map `nb`/`nn` -> `no`). If detection fails, default to `en`.
+    if existing_value:
+        # If the user explicitly requests a language change (e.g. "Set language to English"),
+        # allow overwriting the existing preference.
+        low = (user_message or "").strip().lower()
+        import re as _re
 
-	try:
-		existing = memory_manager.get_memory(user_id, "user_language")
-		existing_value = existing[0].get("value") if existing else None
-	except Exception:
-		existing_value = None
+        m = _re.search(r"(?:set|change) (?:my )?language to\s+([a-zA-Z]+)", low)
+        if m:
+            target = m.group(1).strip().lower()
+            if target in ("english", "en"):
+                chosen = "en"
+            elif target in ("norwegian", "norsk", "no", "nb", "nn"):
+                chosen = "no"
+            else:
+                chosen = None
+            if chosen:
+                try:
+                    memory_manager.store_memory(
+                        user_id=user_id,
+                        key=MemoryKey.USER_LANGUAGE,
+                        value=chosen,
+                        confidence=1.0,
+                        source="user_override",
+                        category=MemoryCategory.PREFERENCE.value,
+                    )
+                except Exception:
+                    pass
+                return chosen
+        return existing_value
 
-	if existing_value:
-		# If the user explicitly requests a language change (e.g. "Set language to English"),
-		# allow overwriting the existing preference.
-		low = (user_message or "").strip().lower()
-		import re as _re
-		m = _re.search(r"(?:set|change) (?:my )?language to\s+([a-zA-Z]+)", low)
-		if m:
-			target = m.group(1).strip().lower()
-			if target in ("english", "en"):
-				chosen = "en"
-			elif target in ("norwegian", "norsk", "no", "nb", "nn"):
-				chosen = "no"
-			else:
-				chosen = None
-			if chosen:
-				try:
-					memory_manager.store_memory(
-						user_id=user_id,
-						key="user_language",
-						value=chosen,
-						confidence=1.0,
-						source="user_override",
-						category="preference",
-					)
-				except Exception:
-					pass
-				return chosen
-		# otherwise keep existing
-		return existing_value
+    # No existing preference -> use the keyword detector (fast, deterministic)
+    try:
+        code, conf, meta = keyword_detect(user_message)
+    except Exception:
+        code, conf, meta = None, 0.0, {}
 
-	# No existing preference -> use the keyword detector (fast, deterministic)
-	try:
-		code, conf, meta = keyword_detect(user_message)
-	except Exception:
-		code, conf, meta = None, 0.0, {}
+    if code:
+        code = code.lower()
+        if code in ("nb", "nn", "no"):
+            chosen = "no"
+        elif code == "en":
+            chosen = "en"
+        else:
+            chosen = "en"
+    else:
+        chosen = "en"
 
-	if code:
-		code = code.lower()
-		if code in ("nb", "nn", "no"):
-			chosen = "no"
-		elif code == "en":
-			chosen = "en"
-		else:
-			chosen = "en"
-	else:
-		chosen = "en"
+    try:
+        memory_manager.store_memory(
+            user_id=user_id,
+            key=MemoryKey.USER_LANGUAGE,
+            value=chosen,
+            confidence=float(conf or 1.0),
+            source="dialogue_engine_language_detection",
+            category=MemoryCategory.PREFERENCE.value,
+        )
+    except Exception:
+        pass
 
-	# store the chosen preference
-	try:
-		memory_manager.store_memory(
-			user_id=user_id,
-			key="user_language",
-			value=chosen,
-			confidence=float(conf or 1.0),
-			source="dialogue_engine_language_detection",
-			category="preference",
-		)
-	except Exception:
-		pass
-
-	return chosen
+    return chosen

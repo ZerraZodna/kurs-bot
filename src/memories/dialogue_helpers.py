@@ -8,7 +8,8 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from src.memories.manager import MemoryManager
 from src.memories.memory_extractor import MemoryExtractor
-from src.memories.memory_handler import MemoryHandler
+from src.memories.constants import MemoryKey
+from src.memories.user_data_service import delete_user_content_rows
 from src.config import settings
 from src.memories.lesson_state import set_current_lesson
 
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def get_user_language(memory_manager: MemoryManager, user_id: int) -> str:
     #"""Get user's preferred language."""
-    memories = memory_manager.get_memory(user_id, "user_language")
+    memories = memory_manager.get_memory(user_id, MemoryKey.USER_LANGUAGE)
     ## Stored values are ISO codes (e.g., 'en', 'no'). Return stored value or 'en'.
     return memories[0].get("value", "en") if memories else "en"
 
@@ -40,7 +41,11 @@ async def extract_and_store_memories(
     """
     try:
         existing_memories = {}
-        for key in ["first_name", "acim_commitment", "learning_goal"]:
+        for key in [
+            MemoryKey.FIRST_NAME,
+            MemoryKey.ACIM_COMMITMENT,
+            MemoryKey.LEARNING_GOAL,
+        ]:
             memories = memory_manager.get_memory(user_id, key)
             if memories:
                 existing_memories[key] = memories[0].get("value")
@@ -68,7 +73,7 @@ async def extract_and_store_memories(
                 key = memory.get("key")
                 val = memory.get("value")
                 # Route lesson state writes through the centralized helper
-                if key == "current_lesson":
+                if key == MemoryKey.CURRENT_LESSON:
                     # Normalize numeric lesson values to int, keep strings like 'continuing'
                     parsed = None
                     try:
@@ -84,7 +89,6 @@ async def extract_and_store_memories(
                         confidence=memory.get("confidence", 1.0),
                         ttl_hours=memory.get("ttl_hours"),
                         source="dialogue_engine_extractor",
-                        generate_embedding=False,  # Disable embedding to avoid lock contention
                     )
                 print(f"[EXTRACT DEBUG] stored memory for user {user_id}: {memory.get('key')}={memory.get('value')}")
                 val = memory.get('value')
@@ -104,18 +108,9 @@ def delete_user_and_data(db: Session, user_id: int) -> None:
     Called when user declines consent during onboarding.
     """
     try:
-        from src.models.database import Schedule, MessageLog, User
+        from src.models.database import User
 
-        MemoryHandler(db).delete_user_memories(user_id)
-
-        # Use single helper to delete schedules and remove any active jobs.
-        from src.scheduler import delete_user_schedules_and_remove_jobs
-
-        delete_user_schedules_and_remove_jobs(user_id=user_id, session=db)
-
-        db.query(MessageLog).filter_by(user_id=user_id).delete(
-            synchronize_session=False
-        )
+        delete_user_content_rows(db, user_id)
         db.query(User).filter_by(user_id=user_id).delete(synchronize_session=False)
 
         db.commit()

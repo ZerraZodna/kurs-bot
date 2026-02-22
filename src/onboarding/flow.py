@@ -11,6 +11,7 @@ from src.models.database import Lesson
 from src.services.gdpr_service import record_consent
 from src.services.dialogue.lesson_handler import format_lesson_message
 from src.memories.dialogue_helpers import delete_user_and_data, get_user_language
+from src.memories.constants import MemoryCategory, MemoryKey
 from src.onboarding.language import prompts as prompts_module
 from src.memories.lesson_state import set_current_lesson, get_current_lesson
 
@@ -32,7 +33,7 @@ class OnboardingFlow:
         self.call_ollama = call_ollama
 
     def _get_pending_step(self, user_id: int) -> Optional[str]:
-        pending_step = self.memory_manager.get_memory(user_id, "onboarding_step_pending")
+        pending_step = self.memory_manager.get_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING)
         # Debug trace
         print(f"[ONBOARD DEBUG] _get_pending_step - user_id={user_id} -> {pending_step}")
         if pending_step:
@@ -42,9 +43,9 @@ class OnboardingFlow:
     def _resolve_pending_step(self, user_id: int):
         self.memory_manager.store_memory(
             user_id=user_id,
-            key="onboarding_step_pending",
+            key=MemoryKey.ONBOARDING_STEP_PENDING,
             value="resolved",
-            category="conversation",
+            category=MemoryCategory.CONVERSATION.value,
             ttl_hours=0.1,
             source="dialogue_engine",
             allow_duplicates=False,
@@ -55,15 +56,24 @@ class OnboardingFlow:
         ttl_hours = 0.1 if lesson_id == "" else 1
         self.memory_manager.store_memory(
             user_id=user_id,
-            key="pending_lesson_delivery",
+            key=MemoryKey.PENDING_LESSON_DELIVERY,
             value=lesson_id,
-            category="conversation",
+            category=MemoryCategory.CONVERSATION.value,
             ttl_hours=ttl_hours,
             source="dialogue_engine",
             allow_duplicates=False,
         )
 
-    def _store_memory(self, user_id: int, key: str, value: str, category: str = "conversation", confidence: float = 1.0, source: str = "dialogue_engine", ttl_hours: Optional[float] = None):
+    def _store_memory(
+        self,
+        user_id: int,
+        key: str,
+        value: str,
+        category: str = MemoryCategory.CONVERSATION.value,
+        confidence: float = 1.0,
+        source: str = "dialogue_engine",
+        ttl_hours: Optional[float] = None,
+    ):
         self.memory_manager.store_memory(
             user_id=user_id,
             key=key,
@@ -83,9 +93,9 @@ class OnboardingFlow:
         return prompts_module.get_onboarding_message(key, language)
 
     def _get_user_name(self, user_id: int) -> str:
-        name_memories = self.memory_manager.get_memory(user_id, "first_name")
+        name_memories = self.memory_manager.get_memory(user_id, MemoryKey.FIRST_NAME)
         if not name_memories:
-            name_memories = self.memory_manager.get_memory(user_id, "name")
+            name_memories = self.memory_manager.get_memory(user_id, MemoryKey.NAME)
         name = name_memories[0]["value"] if name_memories else "friend"
         print(f"[ONBOARD DEBUG] _get_user_name - user_id={user_id} -> {name}")
         return name
@@ -138,13 +148,13 @@ class OnboardingFlow:
             try:
                 db_user = session.query(User).filter(User.user_id == user_id).first()
                 if db_user and db_user.first_name:
-                    self._store_memory(user_id, "first_name", db_user.first_name, category="profile")
+                    self._store_memory(user_id, MemoryKey.FIRST_NAME, db_user.first_name, category=MemoryCategory.PROFILE.value)
                     self._resolve_pending_step(user_id)
                     return self.onboarding.get_onboarding_prompt(user_id)
             except Exception:
                 pass
             # fallback: ask for name explicitly
-            self._store_memory(user_id, "onboarding_step_pending", OnboardingStep.NAME.value, ttl_hours=2)
+            self._store_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING, OnboardingStep.NAME.value, ttl_hours=2)
             language = get_user_language(self.memory_manager, user_id)
             if language == "no":
                 return "Hva vil du at jeg skal kalle deg?"
@@ -152,7 +162,7 @@ class OnboardingFlow:
 
         if lname in negatives:
             # user declined — ask for preferred name explicitly
-            self._store_memory(user_id, "onboarding_step_pending", OnboardingStep.NAME.value, ttl_hours=2)
+            self._store_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING, OnboardingStep.NAME.value, ttl_hours=2)
             language = get_user_language(self.memory_manager, user_id)
             if language == "no":
                 return "Hva vil du at jeg skal kalle deg?"
@@ -161,7 +171,7 @@ class OnboardingFlow:
         # Otherwise, treat the reply as the preferred name and store it
         preferred = t
         if preferred:
-            self._store_memory(user_id, "first_name", preferred, category="profile")
+            self._store_memory(user_id, MemoryKey.FIRST_NAME, preferred, category=MemoryCategory.PROFILE.value)
             self._resolve_pending_step(user_id)
             return self.onboarding.get_onboarding_prompt(user_id)
 
@@ -171,7 +181,7 @@ class OnboardingFlow:
         print(f"[ONBOARD DEBUG] _handle_consent_pending - user_id={user_id} text={text}")
         consent = self.onboarding.detect_consent_keywords(text)
         if consent is True:
-            self._store_memory(user_id, "data_consent", "granted", category="profile")
+            self._store_memory(user_id, MemoryKey.DATA_CONSENT, "granted", category=MemoryCategory.PROFILE.value)
             record_consent(session, user_id, "data_storage", True, "dialogue_engine_consent")
             self._resolve_pending_step(user_id)
             # Return a localized thank-you and continue onboarding flow
@@ -195,7 +205,7 @@ class OnboardingFlow:
                 # Fallback to thank-you only if any helper fails
                 return thank_you
         elif consent is False:
-            self._store_memory(user_id, "data_consent", "declined", category="profile")
+            self._store_memory(user_id, MemoryKey.DATA_CONSENT, "declined", category=MemoryCategory.PROFILE.value)
             record_consent(session, user_id, "data_storage", False, "dialogue_engine_consent")
             delete_user_and_data(session, user_id)
             self._resolve_pending_step(user_id)
@@ -204,10 +214,10 @@ class OnboardingFlow:
 
     def _handle_commitment_pending(self, user_id: int, text: str) -> Optional[str]:
         if self.onboarding.detect_decline_keywords(text):
-            self._store_memory(user_id, "acim_commitment", "declined", category="goals")
+            self._store_memory(user_id, MemoryKey.ACIM_COMMITMENT, "declined", category=MemoryCategory.GOALS.value)
             return self._get_message("commitment_declined")
         if self.onboarding.detect_commitment_keywords(text):
-            self._store_memory(user_id, "acim_commitment", "committed to ACIM lessons", category="goals")
+            self._store_memory(user_id, MemoryKey.ACIM_COMMITMENT, "committed to ACIM lessons", category=MemoryCategory.GOALS.value)
             return self.onboarding.get_onboarding_prompt(user_id)
         return None
 
@@ -284,11 +294,11 @@ class OnboardingFlow:
 
         elif action == "ask_lesson_number":
             language = get_user_language(self.memory_manager, user_id)
-            self._store_memory(user_id, "onboarding_step_pending", OnboardingStep.LESSON_STATUS.value, ttl_hours=2)
+            self._store_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING, OnboardingStep.LESSON_STATUS.value, ttl_hours=2)
             return self._get_message("ask_lesson_number", language)
 
         language = get_user_language(self.memory_manager, user_id)
-        self._store_memory(user_id, "onboarding_step_pending", OnboardingStep.LESSON_STATUS.value, ttl_hours=2)
+        self._store_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING, OnboardingStep.LESSON_STATUS.value, ttl_hours=2)
         return self._get_message("ask_new_or_continuing", language).format(name=self._get_user_name(user_id))
 
     async def _deliver_lesson(self, user_id: int, lesson_id: int, session: Session, is_first: bool) -> str:
@@ -314,13 +324,13 @@ class OnboardingFlow:
         return f"{welcome_msg}\n\n{lesson_msg}"
 
     def _check_and_send_completion_message(self, user_id: int) -> Optional[str]:
-        completion_sent = self.memory_manager.get_memory(user_id, "onboarding_complete_message_sent")
+        completion_sent = self.memory_manager.get_memory(user_id, MemoryKey.ONBOARDING_COMPLETE_MESSAGE_SENT)
         if completion_sent:
             return None
 
         status = self.onboarding.get_onboarding_status(user_id)
         if status.get("has_name") and status.get("has_consent") and status.get("has_commitment"):
-            self._store_memory(user_id, "onboarding_complete_message_sent", "true", ttl_hours=365 * 24)
+            self._store_memory(user_id, MemoryKey.ONBOARDING_COMPLETE_MESSAGE_SENT, "true", ttl_hours=365 * 24)
             return self.onboarding.get_onboarding_complete_message(user_id)
         return None
 
@@ -355,7 +365,7 @@ class OnboardingFlow:
         # If no consent, ask for consent
         if not status.get("has_consent"):
             language = get_user_language(self.memory_manager, user_id)
-            self._store_memory(user_id, "onboarding_step_pending", "consent", ttl_hours=2)
+            self._store_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING, "consent", ttl_hours=2)
             print(f"[ONBOARD DEBUG] asking for consent (no consent) user_id={user_id} language={language}")
             return self._get_message("consent_prompt", language)
 
@@ -363,14 +373,14 @@ class OnboardingFlow:
         if not status.get("has_commitment"):
             language = get_user_language(self.memory_manager, user_id)
             name = self._get_user_name(user_id)
-            self._store_memory(user_id, "onboarding_step_pending", "commitment", ttl_hours=2)
+            self._store_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING, "commitment", ttl_hours=2)
             return self._get_commitment_prompt(language, name)
 
         # If no lesson status, ask for lesson status
         if not status.get("has_lesson_status"):
             language = get_user_language(self.memory_manager, user_id)
             name = self._get_user_name(user_id)
-            self._store_memory(user_id, "onboarding_step_pending", "lesson_status", ttl_hours=2)
+            self._store_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING, "lesson_status", ttl_hours=2)
             return self._get_lesson_status_prompt(language, name)
 
         # Handle declined cases
@@ -384,7 +394,7 @@ class OnboardingFlow:
 
         # Handle explicit decline
         if self.onboarding.detect_decline_keywords(text) and "acim" in text.lower():
-            self._store_memory(user_id, "acim_commitment", "declined", category="goals")
+            self._store_memory(user_id, MemoryKey.ACIM_COMMITMENT, "declined", category=MemoryCategory.GOALS.value)
             return self._get_message("commitment_declined")
 
         # Return next onboarding prompt

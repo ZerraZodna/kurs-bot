@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
 from src.memories.manager import MemoryManager
+from src.memories.constants import MemoryCategory, MemoryKey
 from datetime import date
 
 
@@ -42,7 +43,7 @@ def get_lesson_state(memory_manager: MemoryManager, user_id: int) -> Dict[str, A
     integer, the string "continuing", or None.
     """
     # Try new consolidated memory first
-    memories = memory_manager.get_memory(user_id, "lesson_state")
+    memories = memory_manager.get_memory(user_id, MemoryKey.LESSON_STATE)
     latest = _latest_memory(memories)
     if latest:
         raw = latest.get("value", "")
@@ -59,14 +60,14 @@ def get_lesson_state(memory_manager: MemoryManager, user_id: int) -> Dict[str, A
             pass
 
     # Fallback to legacy memories
-    cur_mems = memory_manager.get_memory(user_id, "current_lesson")
+    cur_mems = memory_manager.get_memory(user_id, MemoryKey.CURRENT_LESSON)
     cur = None
     if cur_mems:
         cur_val = cur_mems[0].get("value")
         cur_int = _parse_int(cur_val)
         cur = cur_int if cur_int is not None else str(cur_val)
 
-    last_mems = memory_manager.get_memory(user_id, "last_sent_lesson_id")
+    last_mems = memory_manager.get_memory(user_id, MemoryKey.LAST_SENT_LESSON_ID)
     last = None
     if last_mems:
         last = _parse_int(last_mems[0].get("value"))
@@ -96,9 +97,9 @@ def set_lesson_state(
     payload = json.dumps(state)
     memory_manager.store_memory(
         user_id=user_id,
-        key="lesson_state",
+        key=MemoryKey.LESSON_STATE,
         value=payload,
-        category="progress",
+        category=MemoryCategory.PROGRESS.value,
         source="lesson_state_manager",
         allow_duplicates=False,
     )

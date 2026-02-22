@@ -32,6 +32,7 @@ from src.services.dialogue import (
 from src.services.dialogue.lesson_handler import process_lesson_query
 from src.config import settings
 from src.models.database import User, Lesson
+from src.memories.constants import MemoryCategory, MemoryKey
 from src.services.timezone_utils import ensure_user_timezone, format_dt_in_timezone
 from src.services.prompt_registry import get_prompt_registry
 
@@ -377,12 +378,12 @@ class DialogueEngine:
             if self.memory_manager:
                 self.memory_manager.store_memory(
                     user_id=user_id,
-                    key="schedule_request_pending",
+                    key=MemoryKey.SCHEDULE_REQUEST_PENDING,
                     value="false",
                     confidence=1.0,
                     source="dialogue_engine",
                     ttl_hours=1,
-                    category="conversation",
+                    category=MemoryCategory.CONVERSATION.value,
                 )
 
             user_lang = get_user_language(self.memory_manager, user_id)
@@ -392,19 +393,19 @@ class DialogueEngine:
             return resp_text
 
         # Check if they have a preferred time stored
-        time_memories = self.memory_manager.get_memory(user_id, "preferred_lesson_time")
+        time_memories = self.memory_manager.get_memory(user_id, MemoryKey.PREFERRED_LESSON_TIME)
 
         if not time_memories:
             # Ask for their preferred time
             if self.memory_manager:
                 self.memory_manager.store_memory(
                     user_id=user_id,
-                    key="schedule_request_pending",
+                    key=MemoryKey.SCHEDULE_REQUEST_PENDING,
                     value="true",
                     confidence=1.0,
                     source="dialogue_engine",
                     ttl_hours=1,
-                    category="conversation",
+                    category=MemoryCategory.CONVERSATION.value,
                 )
             return """Great! I'll set up daily reminders for your ACIM lessons.
 
@@ -437,18 +438,18 @@ When would you like to receive them? (e.g., "9:00 AM", "morning", "evening", "8:
                 hour, minute = SchedulerService.parse_time_string(time_str)
                 time_display = f"{hour:02d}:{minute:02d}"
 
-            name_memories = self.memory_manager.get_memory(user_id, "first_name")
+            name_memories = self.memory_manager.get_memory(user_id, MemoryKey.FIRST_NAME)
             name = name_memories[0]["value"] if name_memories else "friend"
 
             if self.memory_manager:
                 self.memory_manager.store_memory(
                     user_id=user_id,
-                    key="schedule_request_pending",
+                    key=MemoryKey.SCHEDULE_REQUEST_PENDING,
                     value="false",
                     confidence=1.0,
                     source="dialogue_engine",
                     ttl_hours=1,
-                    category="conversation",
+                    category=MemoryCategory.CONVERSATION.value,
                 )
 
             return f"""Perfect, {name}! ✨

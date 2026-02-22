@@ -1,29 +1,30 @@
 import logging
-from typing import Optional, List, Dict
+from typing import Optional, List
 from sqlalchemy.orm import Session
 from src.models.database import SessionLocal
-from src.services.embedding_service import get_embedding_service
+from src.memories.store import MemoryStore
+from src.memories.types import MemoryRecord
 from src.memories.memory_handler import MemoryHandler
+from src.memories.constants import MemoryCategory, MemoryKey
 
 logger = logging.getLogger(__name__)
 
 
 class MemoryManager:
-    def __init__(self, db: Optional[Session] = None):
+    def __init__(self, db: Optional[Session] = None, memory_store: Optional[MemoryStore] = None):
         self.db = db or SessionLocal()
-        self.embedding_service = get_embedding_service()
-        self.memory_handler = MemoryHandler(self.db)
+        self.memory_handler: MemoryStore = memory_store or MemoryHandler(self.db)
 
     # Note: embedding generation scheduling and persistence removed.
     # The private helpers that generated and stored embeddings were deleted
     # to avoid persisting per-memory embedding bytes.
 
-    def get_memory(self, user_id: int, key: str) -> List[Dict]:
+    def get_memory(self, user_id: int, key: str) -> List[MemoryRecord]:
         return self.memory_handler.get_memory(user_id=user_id, key=key)
 
     def store_memory(self, user_id: int, key: str, value: str, confidence: float = 1.0,
                      source: str = "dialogue_engine", ttl_hours: Optional[int] = None, category: str = "fact",
-                     allow_duplicates: bool = False, generate_embedding: bool = True) -> int:
+                     allow_duplicates: bool = False) -> int:
         """Store a memory with simple conflict resolution.
 
         Rules (when allow_duplicates=False):
@@ -43,8 +44,6 @@ class MemoryManager:
             ttl_hours: Hours until memory expires (None = never)
             category: Memory category
             allow_duplicates: Allow duplicate values
-            generate_embedding: Generate embedding for semantic search (runs async)
-        
         Returns:
             Memory ID of stored memory
         """
@@ -62,7 +61,7 @@ class MemoryManager:
         # If this memory indicates a preferred lesson time, do NOT modify schedules here.
         # Creating schedules is the responsibility of the schedule/triggering codepath
         # (e.g. TriggerDispatcher) to avoid unexpected side-effects from memory writes.
-        if key == "preferred_lesson_time":
+        if key == MemoryKey.PREFERRED_LESSON_TIME:
             logger.info(f"Stored preferred_lesson_time for user {user_id} (no auto-schedule created)")
 
         # Post-store actions (e.g., update lesson state)
@@ -79,11 +78,11 @@ class MemoryManager:
         Currently used to keep consolidated lesson_state in sync when
         the user reports a completed lesson.
         """
-        if key != "lesson_completed":
+        if key != MemoryKey.LESSON_COMPLETED:
             return
 
         # Only react to progress category values
-        if category and category != "progress":
+        if category and category != MemoryCategory.PROGRESS.value:
             return
 
         try:

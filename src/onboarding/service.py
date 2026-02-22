@@ -30,6 +30,7 @@ from src.onboarding.schedule_setup import create_auto_schedule
 from src.services.timezone_utils import ensure_user_timezone
 from src.onboarding.user_management import delete_user_and_data, is_user_new
 from src.memories.lesson_state import set_current_lesson, get_lesson_state, has_lesson_status
+from src.memories.constants import MemoryCategory, MemoryKey
 
 logger = logging.getLogger(__name__)
 
@@ -48,29 +49,29 @@ class OnboardingService:
         Returns:
             Dict with onboarding_complete, steps_completed, next_step
         """
-        commitment_memories = self.memory_manager.get_memory(user_id, "acim_commitment")
+        commitment_memories = self.memory_manager.get_memory(user_id, MemoryKey.ACIM_COMMITMENT)
         has_commitment = bool(commitment_memories)
         declined_commitment = any(
             str(m.get("value", "")).lower() in ["declined", "no", "not interested"]
             for m in commitment_memories
         )
 
-        first_name_memories = self.memory_manager.get_memory(user_id, "first_name")
-        name_memories = self.memory_manager.get_memory(user_id, "name")
+        first_name_memories = self.memory_manager.get_memory(user_id, MemoryKey.FIRST_NAME)
+        name_memories = self.memory_manager.get_memory(user_id, MemoryKey.NAME)
         has_name = bool(first_name_memories or name_memories)
 
         # Migrate name if needed
         if name_memories and not first_name_memories:
-            self.memory_manager.store_memory(
-                user_id=user_id,
-                key="first_name",
-                value=name_memories[0].get("value"),
-                confidence=name_memories[0].get("confidence", 1.0),
-                source="onboarding_service_name_migration",
-                category="profile",
-            )
+                self.memory_manager.store_memory(
+                    user_id=user_id,
+                    key=MemoryKey.FIRST_NAME,
+                    value=name_memories[0].get("value"),
+                    confidence=name_memories[0].get("confidence", 1.0),
+                    source="onboarding_service_name_migration",
+                    category=MemoryCategory.PROFILE.value,
+                )
 
-        consent_memories = self.memory_manager.get_memory(user_id, "data_consent")
+        consent_memories = self.memory_manager.get_memory(user_id, MemoryKey.DATA_CONSENT)
         has_consent = bool(consent_memories)
         declined_consent = any(
             str(m.get("value", "")).lower() in ["declined", "no", "not consent"]
@@ -97,21 +98,21 @@ class OnboardingService:
             return None
 
         #language = get_user_language(self.memory_manager, user_id)
-        lang_memories = self.memory_manager.get_memory(user_id, "user_language")
+        lang_memories = self.memory_manager.get_memory(user_id, MemoryKey.USER_LANGUAGE)
         language = lang_memories[0]["value"] if lang_memories else "en"
 
         next_step = status["next_step"]
-        name_memories = self.memory_manager.get_memory(user_id, "first_name")
+        name_memories = self.memory_manager.get_memory(user_id, MemoryKey.FIRST_NAME)
         if not name_memories:
-            name_memories = self.memory_manager.get_memory(user_id, "name")
+            name_memories = self.memory_manager.get_memory(user_id, MemoryKey.NAME)
         name = name_memories[0]["value"] if name_memories else "friend"
 
         if next_step == "name":
             self.memory_manager.store_memory(
                 user_id=user_id,
-                key="onboarding_step_pending",
+                key=MemoryKey.ONBOARDING_STEP_PENDING,
                 value="name",
-                category="conversation",
+                category=MemoryCategory.CONVERSATION.value,
                 ttl_hours=2,
                 source="onboarding_service",
                 allow_duplicates=False,
@@ -122,8 +123,8 @@ class OnboardingService:
             # format it with `first` and `full` placeholders. If no name is
             # available at all, fall back to a simple, generic "What's your
             # name?" question (don't return an unformatted template).
-            first_name_memories = self.memory_manager.get_memory(user_id, "first_name")
-            last_name_memories = self.memory_manager.get_memory(user_id, "last_name")
+            first_name_memories = self.memory_manager.get_memory(user_id, MemoryKey.FIRST_NAME)
+            last_name_memories = self.memory_manager.get_memory(user_id, MemoryKey.LAST_NAME)
 
             # Helper to format the template with available parts
             def _format_with(first: str, last: Optional[str] = None) -> str:
@@ -154,9 +155,9 @@ class OnboardingService:
         elif next_step == "consent":
             self.memory_manager.store_memory(
                 user_id=user_id,
-                key="onboarding_step_pending",
+                key=MemoryKey.ONBOARDING_STEP_PENDING,
                 value="consent",
-                category="conversation",
+                category=MemoryCategory.CONVERSATION.value,
                 ttl_hours=2,
                 source="onboarding_service",
                 allow_duplicates=False,
@@ -165,9 +166,9 @@ class OnboardingService:
         elif next_step == "commitment":
             self.memory_manager.store_memory(
                 user_id=user_id,
-                key="onboarding_step_pending",
+                key=MemoryKey.ONBOARDING_STEP_PENDING,
                 value="commitment",
-                category="conversation",
+                category=MemoryCategory.CONVERSATION.value,
                 ttl_hours=2,
                 source="onboarding_service",
                 allow_duplicates=False,
@@ -177,9 +178,9 @@ class OnboardingService:
         elif next_step == "lesson_status":
             self.memory_manager.store_memory(
                 user_id=user_id,
-                key="onboarding_step_pending",
+                key=MemoryKey.ONBOARDING_STEP_PENDING,
                 value="lesson_status",
-                category="conversation",
+                category=MemoryCategory.CONVERSATION.value,
                 ttl_hours=2,
                 source="onboarding_service",
                 allow_duplicates=False,
@@ -193,12 +194,12 @@ class OnboardingService:
         Finalize onboarding side-effects (timezone, schedule) and return
         the onboarding completion message text for the user.
         """
-        name_memories = self.memory_manager.get_memory(user_id, "first_name")
+        name_memories = self.memory_manager.get_memory(user_id, MemoryKey.FIRST_NAME)
         if not name_memories:
-            name_memories = self.memory_manager.get_memory(user_id, "name")
+            name_memories = self.memory_manager.get_memory(user_id, MemoryKey.NAME)
         name = name_memories[0]["value"] if name_memories else "friend"
 
-        lang_memories = self.memory_manager.get_memory(user_id, "user_language")
+        lang_memories = self.memory_manager.get_memory(user_id, MemoryKey.USER_LANGUAGE)
         language = lang_memories[0]["value"] if lang_memories else "en"
 
         ensure_user_timezone(self.memory_manager, user_id, language)
@@ -295,24 +296,24 @@ class OnboardingService:
 
     def get_lesson_1_welcome_message(self, user_id: int) -> str:
         """Welcome message for brand new users starting with Lesson 1."""
-        name_memories = self.memory_manager.get_memory(user_id, "first_name")
+        name_memories = self.memory_manager.get_memory(user_id, MemoryKey.FIRST_NAME)
         if not name_memories:
-            name_memories = self.memory_manager.get_memory(user_id, "name")
+            name_memories = self.memory_manager.get_memory(user_id, MemoryKey.NAME)
         name = name_memories[0]["value"] if name_memories else "friend"
 
-        lang_memories = self.memory_manager.get_memory(user_id, "user_language")
+        lang_memories = self.memory_manager.get_memory(user_id, MemoryKey.USER_LANGUAGE)
         language = lang_memories[0]["value"] if lang_memories else "en"
 
         return get_lesson_1_welcome_message(language, name)
 
     def get_continuation_welcome_message(self, user_id: int, lesson_id: int) -> str:
         """Welcome message for users continuing from a specific lesson."""
-        name_memories = self.memory_manager.get_memory(user_id, "first_name")
+        name_memories = self.memory_manager.get_memory(user_id, MemoryKey.FIRST_NAME)
         if not name_memories:
-            name_memories = self.memory_manager.get_memory(user_id, "name")
+            name_memories = self.memory_manager.get_memory(user_id, MemoryKey.NAME)
         name = name_memories[0]["value"] if name_memories else "friend"
 
-        lang_memories = self.memory_manager.get_memory(user_id, "user_language")
+        lang_memories = self.memory_manager.get_memory(user_id, MemoryKey.USER_LANGUAGE)
         language = lang_memories[0]["value"] if lang_memories else "en"
 
         return get_continuation_welcome_message(language, name, lesson_id)

@@ -7,6 +7,7 @@ import re
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from src.models.database import Lesson
+from src.memories.constants import MemoryKey
 from src.config import settings
 from src.services.dialogue import ollama_client
 
@@ -280,7 +281,7 @@ async def process_lesson_query(
     # schedule instead of sending the lesson content immediately.
     pending = None
     if memory_manager:
-        pending = memory_manager.get_memory(user_id, "onboarding_step_pending")
+        pending = memory_manager.get_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING)
     if pending:
         val = (pending[0].get("value") or "").lower()
         if val == "lesson_status" and onboarding_flow:

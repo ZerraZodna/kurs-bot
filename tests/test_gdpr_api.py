@@ -17,6 +17,7 @@ from src.models.database import (
     GdprRequest,
     GdprAuditLog,
 )
+from src.memories.memory_handler import MemoryHandler
 from src.services.gdpr_service import record_consent
 
 
@@ -39,7 +40,7 @@ def _reset_db():
         db.query(Unsubscribe).delete()
         db.query(MessageLog).delete()
         db.query(Schedule).delete()
-        db.query(Memory).delete()
+        MemoryHandler(db).delete_all_memories()
         db.query(User).delete()
         db.commit()
     finally:

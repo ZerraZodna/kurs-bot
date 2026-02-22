@@ -7,9 +7,10 @@ from typing import Any, Dict, List, Optional, cast
 
 from sqlalchemy.orm import Session
 
+from src.memories.memory_handler import MemoryHandler
+from src.memories.user_data_service import delete_user_content_rows
 from src.models.database import (
     User,
-    Memory,
     MessageLog,
     Schedule,
     Unsubscribe,
@@ -97,7 +98,8 @@ def export_user_data(session: Session, user_id: int) -> Dict[str, Any]:
         raise ValueError("User not found")
     user = cast(Any, user)
 
-    memories = [cast(Any, m) for m in session.query(Memory).filter_by(user_id=user_id).all()]
+    memory_handler = MemoryHandler(session)
+    memories = [cast(Any, m) for m in memory_handler.list_user_memories(user_id=user_id)]
     schedules = [cast(Any, s) for s in session.query(Schedule).filter_by(user_id=user_id).all()]
     messages = [cast(Any, m) for m in session.query(MessageLog).filter_by(user_id=user_id).all()]
     unsubscribes = [cast(Any, u) for u in session.query(Unsubscribe).filter_by(user_id=user_id).all()]
@@ -339,6 +341,7 @@ def rectify_user(
     if not user:
         raise ValueError("User not found")
     user = cast(Any, user)
+    memory_handler = MemoryHandler(session)
 
     allowed_fields = {"first_name", "last_name", "email", "phone_number"}
     for field, value in updates.items():
@@ -351,7 +354,7 @@ def rectify_user(
             value = update.get("value")
             if memory_id is None or value is None:
                 continue
-            memory = session.query(Memory).filter_by(memory_id=memory_id, user_id=user_id).first()
+            memory = memory_handler.get_user_memory_by_id(user_id=user_id, memory_id=memory_id)
             if memory:
                 memory = cast(Any, memory)
                 memory.value = value
@@ -393,13 +396,7 @@ def erase_user_data(
 
     name = " ".join([n for n in [user.first_name, user.last_name] if n]) or str(user_id)
 
-    session.query(Memory).filter_by(user_id=user_id).delete(synchronize_session=False)
-    session.query(MessageLog).filter_by(user_id=user_id).delete(synchronize_session=False)
-
-    # Use scheduler helper to delete schedules and remove any active jobs.
-    from src.scheduler import delete_user_schedules_and_remove_jobs
-
-    deleted_schedule_ids = delete_user_schedules_and_remove_jobs(user_id=user_id, session=session)
+    deleted_metrics = delete_user_content_rows(session, user_id)
 
     user.first_name = None
     user.last_name = None
@@ -429,7 +426,7 @@ def erase_user_data(
         user_id=user_id,
         action="erase",
         actor=actor,
-        details={"reason": reason},
+        details={"reason": reason, **deleted_metrics},
     )
 
 

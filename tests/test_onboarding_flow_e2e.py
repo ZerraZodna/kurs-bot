@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.models.database import SessionLocal, User, Memory, Schedule, init_db
 from src.services.dialogue_engine import DialogueEngine
 from src.memories import MemoryManager
+from src.memories.memory_handler import MemoryHandler
 from tests.utils import create_test_user, make_ready_user
 from src.memories.lesson_state import get_current_lesson
 
@@ -18,7 +19,7 @@ from src.memories.lesson_state import get_current_lesson
 def create_test_user(db, external_id: str, first_name: Optional[str] = "Test") -> int:
     existing = db.query(User).filter_by(external_id=external_id).first()
     if existing:
-        db.query(Memory).filter_by(user_id=existing.user_id).delete()
+        MemoryHandler(db).delete_user_memories(existing.user_id)
         db.query(Schedule).filter_by(user_id=existing.user_id).delete()
         db.query(User).filter_by(user_id=existing.user_id).delete()
         db.commit()

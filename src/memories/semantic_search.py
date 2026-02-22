@@ -8,8 +8,8 @@ Returns memories ranked by relevance to a query text or embedding.
 import logging
 from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
-from src.models.database import Memory
 from src.memories.memory_handler import MemoryHandler
+from src.memories.types import MemoryEntity
 from src.services.embedding_service import get_embedding_service
 from src.config import settings
 
@@ -33,7 +33,7 @@ class SemanticSearchService:
         threshold: Optional[float] = None,
         categories: Optional[List[str]] = None,
         query_embedding: Optional[List[float]] = None,
-    ) -> List[Tuple[Memory, float]]:
+    ) -> List[Tuple[MemoryEntity, float]]:
         """
         Search for memories similar to query text
         
@@ -46,22 +46,21 @@ class SemanticSearchService:
             categories: Optional list of memory categories to filter by
             
         Returns:
-            List of tuples (Memory, similarity_score) sorted by relevance
+            List of tuples (memory, similarity_score) sorted by relevance
         """
         if not query_text or not query_text.strip():
             logger.warning("Cannot search with empty query text")
             return []
 
         # First: try a simple SQL keyword search (case-insensitive LIKE)
-        q = MemoryHandler.build_active_query(session=session, user_id=user_id, categories=categories)
-
-        like_pattern = f"%{query_text.strip()}%"
+        memory_handler = MemoryHandler(session)
         try:
-            c_q = q.filter(Memory.value.ilike(like_pattern))
-            candidates = c_q.all()
-            # Sort and cap results in Python to remain compatible with mocked sessions
-            candidates.sort(key=lambda m: getattr(m, 'confidence', 0.0), reverse=True)
-            candidates = candidates[: ((limit or self.max_results) * 5)]
+            candidates = memory_handler.keyword_candidates(
+                user_id=user_id,
+                query_text=query_text,
+                categories=categories,
+                limit=((limit or self.max_results) * 5),
+            )
         except Exception as ex:
             logger.warning(f"Keyword search failed: {ex}")
             candidates = []
@@ -69,9 +68,11 @@ class SemanticSearchService:
         # If we found no candidates via keyword, fall back to scanning a capped set
         if not candidates:
             try:
-                candidates = q.all()
-                candidates.sort(key=lambda m: getattr(m, 'confidence', 0.0), reverse=True)
-                candidates = candidates[:100]
+                candidates = memory_handler.top_active_memories(
+                    user_id=user_id,
+                    categories=categories,
+                    limit=100,
+                )
             except Exception as ex:
                 logger.warning(f"Fallback memory scan failed: {ex}")
                 return []
@@ -97,10 +98,10 @@ class SemanticSearchService:
     
     async def rerank_memories(
         self,
-        memories: List[Memory],
+        memories: List[MemoryEntity],
         query_text: str,
         query_embedding: Optional[List[float]] = None,
-    ) -> List[Tuple[Memory, float]]:
+    ) -> List[Tuple[MemoryEntity, float]]:
         """
         Rerank a list of memories by relevance to query text
         
@@ -109,7 +110,7 @@ class SemanticSearchService:
             query_text: Query text for ranking
             
         Returns:
-            Sorted list of tuples (Memory, similarity_score)
+            Sorted list of tuples (memory, similarity_score)
         """
         if not query_text or not query_text.strip():
             # Return in original order with equal scores
@@ -148,7 +149,7 @@ class SemanticSearchService:
             for i, emb in enumerate(batch_results):
                 mem_embeddings[to_batch_indices[i]] = emb
 
-        scored: List[Tuple[Memory, float]] = []
+        scored: List[Tuple[MemoryEntity, float]] = []
         for mem, emb in zip(memories, mem_embeddings):
             if emb is None:
                 score = 0.0
@@ -162,18 +163,18 @@ class SemanticSearchService:
     
     def filter_by_similarity(
         self,
-        memories_with_scores: List[Tuple[Memory, float]],
+        memories_with_scores: List[Tuple[MemoryEntity, float]],
         threshold: Optional[float] = None
-    ) -> List[Memory]:
+    ) -> List[MemoryEntity]:
         """
         Filter memory results by similarity threshold
         
         Args:
-            memories_with_scores: List of (Memory, score) tuples
+            memories_with_scores: List of (memory, score) tuples
             threshold: Similarity threshold
             
         Returns:
-            Filtered list of Memory objects
+            Filtered list of memory objects
         """
         if threshold is None:
             threshold = self.similarity_threshold

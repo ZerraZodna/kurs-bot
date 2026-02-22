@@ -10,14 +10,16 @@ from __future__ import annotations
 import hashlib
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
 from src.models.database import Memory, init_db
+from src.memories.store import MemoryStore
+from src.memories.types import MemoryEntity, MemoryRecord
 
 
-class MemoryHandler:
+class MemoryHandler(MemoryStore):
     """DB-focused operations for memory persistence."""
 
     def __init__(self, db: Session):
@@ -35,11 +37,60 @@ class MemoryHandler:
             q = q.filter(Memory.category.in_(categories))
         return q
 
-    def list_active_by_key(self, user_id: int, key: str) -> List[Memory]:
+    def list_active_by_key(self, user_id: int, key: str) -> List[MemoryEntity]:
         return (
             self.db.query(Memory)
             .filter(Memory.user_id == user_id, Memory.key == key, Memory.is_active == True)
             .all()
+        )
+
+    def list_active_memories(
+        self,
+        user_id: int,
+        categories: Optional[List[str]] = None,
+        order_ascending: bool = False,
+    ) -> List[MemoryEntity]:
+        q = self.build_active_query(session=self.db, user_id=user_id, categories=categories)
+        if order_ascending:
+            q = q.order_by(Memory.created_at.asc())
+        return q.all()
+
+    def keyword_candidates(
+        self,
+        user_id: int,
+        query_text: str,
+        categories: Optional[List[str]] = None,
+        limit: Optional[int] = None,
+    ) -> List[MemoryEntity]:
+        like_pattern = f"%{query_text.strip()}%"
+        rows = (
+            self.build_active_query(session=self.db, user_id=user_id, categories=categories)
+            .filter(Memory.value.ilike(like_pattern))
+            .all()
+        )
+        rows.sort(key=lambda m: getattr(m, "confidence", 0.0), reverse=True)
+        if limit is not None:
+            rows = rows[:limit]
+        return rows
+
+    def top_active_memories(
+        self,
+        user_id: int,
+        categories: Optional[List[str]] = None,
+        limit: int = 100,
+    ) -> List[MemoryEntity]:
+        rows = self.list_active_memories(user_id=user_id, categories=categories)
+        rows.sort(key=lambda m: getattr(m, "confidence", 0.0), reverse=True)
+        return rows[:limit]
+
+    def list_user_memories(self, user_id: int) -> List[MemoryEntity]:
+        return self.db.query(Memory).filter(Memory.user_id == user_id).all()
+
+    def get_user_memory_by_id(self, user_id: int, memory_id: int) -> Optional[MemoryEntity]:
+        return (
+            self.db.query(Memory)
+            .filter(Memory.memory_id == memory_id, Memory.user_id == user_id)
+            .first()
         )
 
     @staticmethod
@@ -55,7 +106,7 @@ class MemoryHandler:
         return ttl < now_utc
 
     @staticmethod
-    def _to_public_dict(row: Memory) -> Dict:
+    def _to_public_dict(row: MemoryEntity) -> MemoryRecord:
         return {
             "memory_id": row.memory_id,
             "key": row.key,
@@ -65,7 +116,7 @@ class MemoryHandler:
             "created_at": row.created_at,
         }
 
-    def get_memory(self, user_id: int, key: str) -> List[Dict]:
+    def get_memory(self, user_id: int, key: str) -> List[MemoryRecord]:
         """Fetch active, non-expired memories for a key."""
         now = datetime.now(timezone.utc)
         rows = self.list_active_by_key(user_id=user_id, key=key)
@@ -189,11 +240,40 @@ class MemoryHandler:
         self.db.commit()
         return updated
 
-    def delete_user_memories(self, user_id: int) -> int:
+    def delete_user_memories(self, user_id: int, commit: bool = False) -> int:
         """Hard-delete all memory rows for a user."""
         deleted = (
             self.db.query(Memory)
             .filter(Memory.user_id == user_id)
             .delete(synchronize_session=False)
         )
+        if commit:
+            self.db.commit()
+        return int(deleted or 0)
+
+    def delete_all_memories(self, commit: bool = False) -> int:
+        deleted = self.db.query(Memory).delete(synchronize_session=False)
+        if commit:
+            self.db.commit()
+        return int(deleted or 0)
+
+    def purge_archived_before(self, cutoff: datetime) -> int:
+        q = self.db.query(Memory).filter(
+            Memory.is_active == False,
+            Memory.archived_at != None,
+            Memory.archived_at < cutoff,
+        )
+        deleted = q.count()
+        q.delete(synchronize_session=False)
+        self.db.commit()
+        return int(deleted or 0)
+
+    def purge_expired_ttl_before(self, cutoff: datetime) -> int:
+        q = self.db.query(Memory).filter(
+            Memory.ttl_expires_at != None,
+            Memory.ttl_expires_at < cutoff,
+        )
+        deleted = q.count()
+        q.delete(synchronize_session=False)
+        self.db.commit()
         return int(deleted or 0)

@@ -1,6 +1,7 @@
 import pytest
 from src.models.database import SessionLocal, User, init_db
 from src.memories import MemoryManager
+from src.memories.memory_handler import MemoryHandler
 from src.services.dialogue_engine import DialogueEngine
 from src.scheduler import SchedulerService
 
@@ -8,9 +9,9 @@ from src.scheduler import SchedulerService
 def create_new_test_user(db) -> int:
     existing_user = db.query(User).filter_by(external_id="test_memory_user").first()
     if existing_user:
-        from src.models.database import Memory, Schedule
+        from src.models.database import Schedule
 
-        db.query(Memory).filter_by(user_id=existing_user.user_id).delete()
+        MemoryHandler(db).delete_user_memories(existing_user.user_id)
         db.query(Schedule).filter_by(user_id=existing_user.user_id).delete()
         db.query(User).filter_by(user_id=existing_user.user_id).delete()
         db.commit()
@@ -37,8 +38,8 @@ async def test_memory_driven_schedule_creation():
 
         # Store commitment and preferred time as memories (no embedding generation)
         mm = MemoryManager(db)
-        mm.store_memory(user_id=user_id, key="acim_commitment", value="yes", generate_embedding=False)
-        mm.store_memory(user_id=user_id, key="preferred_lesson_time", value="10:15", generate_embedding=False)
+        mm.store_memory(user_id=user_id, key="acim_commitment", value="yes")
+        mm.store_memory(user_id=user_id, key="preferred_lesson_time", value="10:15")
 
         dialogue = DialogueEngine(db)
 

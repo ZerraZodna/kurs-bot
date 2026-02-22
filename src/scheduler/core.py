@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from src.models.database import Schedule, User, Lesson
 from src.models.database import SessionLocal
 from src.memories import MemoryManager
+from src.memories.constants import MemoryCategory, MemoryKey
 from src.memories.scheduler_helpers import (
     get_schedule_message,
     get_user_language,
@@ -482,9 +483,9 @@ class SchedulerService:
             payload = json.dumps({"schedule_id": schedule.schedule_id, "message": message})
             memory_manager.store_memory(
                 user_id=user_id,
-                key="schedule_message",
+                key=MemoryKey.SCHEDULE_MESSAGE,
                 value=payload,
-                category="conversation",
+                category=MemoryCategory.CONVERSATION.value,
                 ttl_hours=48,
                 source="scheduler",
                 allow_duplicates=True,

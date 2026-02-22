@@ -5,7 +5,8 @@ from typing import Optional
 import time
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
-from src.models.database import SessionLocal, MessageLog, Memory, Schedule, JobState
+from src.models.database import SessionLocal, MessageLog, Schedule, JobState
+from src.memories.memory_handler import MemoryHandler
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -20,14 +21,7 @@ def purge_archived_memories(days_keep: int = 365, session: Optional[Session] = N
 
     try:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days_keep)
-        q = session.query(Memory).filter(
-            Memory.is_active == False,
-            Memory.archived_at != None,
-            Memory.archived_at < cutoff,
-        )
-        deleted = q.count()
-        q.delete(synchronize_session=False)
-        session.commit()
+        deleted = MemoryHandler(session).purge_archived_before(cutoff=cutoff)
         logger.info("Purged %s archived memories older than %s days", deleted, days_keep)
         return deleted
     finally:
@@ -44,13 +38,7 @@ def purge_expired_ttl_memories(session: Optional[Session] = None) -> int:
 
     try:
         cutoff = datetime.now(timezone.utc)
-        q = session.query(Memory).filter(
-            Memory.ttl_expires_at != None,
-            Memory.ttl_expires_at < cutoff,
-        )
-        deleted = q.count()
-        q.delete(synchronize_session=False)
-        session.commit()
+        deleted = MemoryHandler(session).purge_expired_ttl_before(cutoff=cutoff)
         logger.info("Purged %s memories with expired TTL", deleted)
         return deleted
     finally:
