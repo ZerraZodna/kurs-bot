@@ -71,25 +71,47 @@ class DialogueEngine:
     ) -> str:
         """
         Process user message with full context awareness.
-        
-        Automatically extracts and stores memories from the user message.
-        Handles onboarding flow and schedule creation.
-        
-        Args:
-            user_id: User ID from database
-            text: User message
-            session: SQLAlchemy session
-            include_history: Include conversation history in context
-            history_turns: Number of conversation turns to include
-        
-        Returns:
-            AI response from Ollama
         """
         user = session.query(User).filter_by(user_id=user_id).first()
         if not user:
             return "User not found."
 
-        # Keep original user text for trigger matching
+        # 1. Restrictions and GDPR
+        restriction_response = await self._check_user_restrictions(user_id, text, user, session)
+        if restriction_response:
+            return restriction_response
+
+        user_lang = await detect_and_store_language(self.memory_manager, user_id, text)
+
+        # 2. RAG and Language Setup
+        text, use_rag_for_this_message, rag_response = self._setup_rag_configuration(user_id, text)
+        if rag_response:
+            return rag_response
+
+        # 3. Command Handling (RAG management, Schedule deletion, Forget, Debug)
+        command_response = await self._handle_commands(user_id, text, session, use_rag_for_this_message)
+        if command_response:
+            return command_response
+
+        # 4. Memory Extraction and Onboarding
+        onboarding_response = await self._handle_onboarding_stage(user_id, text, session, use_rag_for_this_message)
+        if onboarding_response:
+            return onboarding_response
+
+        # 5. Lesson and Schedule logic
+        lesson_schedule_response = await self._handle_lesson_and_schedule_stage(
+            user_id, text, session, user_lang, include_lesson, use_rag_for_this_message
+        )
+        if lesson_schedule_response:
+            return lesson_schedule_response
+
+        # 6. Core Dialogue (LLM Response and Triggers)
+        return await self._generate_llm_response(
+            user_id, text, session, user_lang, use_rag_for_this_message, include_history, history_turns, include_lesson
+        )
+
+    async def _check_user_restrictions(self, user_id: int, text: str, user: User, session: Session) -> Optional[str]:
+        """Handle GDPR commands and check if user is deleted or restricted."""
         gdpr_response = await handle_gdpr_commands(
             text=text,
             session=session,
@@ -103,23 +125,28 @@ class DialogueEngine:
             return "Your data has been deleted. If you want to start again, please re-register."
         if user.processing_restricted or not user.opted_in:
             return "Your data processing is restricted. If you want to resume, please update your consent settings."
+        return None
 
-        user_lang = await detect_and_store_language(self.memory_manager, user_id, text)
-
+    def _setup_rag_configuration(self, user_id: int, text: str) -> tuple[str, bool, Optional[str]]:
+        """Detect and configure RAG mode for the current message."""
         # Handle RAG mode toggle: rag_mode on/off
         rag_toggle_response = handle_rag_mode_toggle(text, self.memory_manager, user_id)
         if rag_toggle_response:
-            return rag_toggle_response
+            return text, False, rag_toggle_response
 
         # Detect RAG prefix: "rag my question" or "rag: my question"
-        text, use_rag_for_this_message = parse_rag_prefix(text)
+        text, use_rag = parse_rag_prefix(text)
 
         # Check if RAG mode is persistently enabled
-        if not use_rag_for_this_message and self.memory_manager:
-            use_rag_for_this_message = is_rag_mode_enabled(self.memory_manager, user_id)
+        if not use_rag and self.memory_manager:
+            use_rag = is_rag_mode_enabled(self.memory_manager, user_id)
+        
+        return text, use_rag, None
 
+    async def _handle_commands(self, user_id: int, text: str, session: Session, use_rag: bool) -> Optional[str]:
+        """Handle various specialized commands (RAG management, schedule deletion, etc.)."""
         # If user is in RAG mode and asked to list memories, return full list
-        if use_rag_for_this_message:
+        if use_rag:
             list_memories = handle_list_memories(text, self.memory_manager, session, user_id)
             if list_memories:
                 return list_memories
@@ -129,59 +156,53 @@ class DialogueEngine:
             if prompt_cmd_response:
                 return prompt_cmd_response
 
-
-        # Handle schedule deletion confirmation/commands (ask for confirmation first)
+        # Handle schedule deletion confirmation/commands
         from src.services.dialogue import handle_schedule_deletion_commands
-
         deletion_response = await handle_schedule_deletion_commands(
-            text,
-            self.memory_manager,
-            session,
-            user_id,
+            text, self.memory_manager, session, user_id
         )
         if deletion_response:
             return deletion_response
 
         # Handle forget commands (semantic memory deletion)
         forget_response = await handle_forget_commands(
-            text,
-            self.memory_manager,
-            session,
-            user_id,
+            text, self.memory_manager, session, user_id
         )
         if forget_response:
             return forget_response
 
         # Debug magic command: simulate next day for lesson progression
         debug_response = handle_debug_next_day(
-            text,
-            self.memory_manager,
-            session,
-            user_id,
+            text, self.memory_manager, session, user_id
         )
         if debug_response:
             return debug_response
-        # FIRST: Extract memories from user message (this might store commitment, name, time, etc.)
-        # Run extraction early so simple factual replies during onboarding (e.g., "My name is Johannes")
-        # are captured and persisted before onboarding flow generates follow-ups.
+        
+        return None
+
+    async def _handle_onboarding_stage(self, user_id: int, text: str, session: Session, use_rag: bool) -> Optional[str]:
+        """Handle memory extraction and onboarding flow."""
+        # Extract memories from user message
         if self.onboarding_flow:
             await extract_and_store_memories(
-                self.memory_manager, self.memory_extractor, user_id, text, rag_mode=use_rag_for_this_message
+                self.memory_manager, self.memory_extractor, user_id, text, rag_mode=use_rag
             )
 
-        # If user needs onboarding, handle onboarding now to prioritise pending
-        # onboarding prompts (e.g., consent, lesson-status) after extraction.
+        # Handle onboarding flow if needed
         if (
             self.onboarding_flow
             and self.onboarding.should_show_onboarding(user_id)
-            and not use_rag_for_this_message
+            and not use_rag
         ):
-            onboarding_response = await self.onboarding_flow.handle_onboarding(user_id, text, session)
-            if onboarding_response:
-                return onboarding_response
- 
+            return await self.onboarding_flow.handle_onboarding(user_id, text, session)
+        
+        return None
 
-        # Handle lesson confirmation replies (before onboarding/schedule logic)
+    async def _handle_lesson_and_schedule_stage(
+        self, user_id: int, text: str, session: Session, user_lang: str, include_lesson: bool, use_rag: bool
+    ) -> Optional[str]:
+        """Handle lesson confirmations, queries, and schedule-related messages."""
+        # Handle lesson confirmation replies
         lesson_response = await handle_lesson_confirmation(
             user_id,
             text,
@@ -195,7 +216,7 @@ class DialogueEngine:
         if lesson_response:
             return lesson_response
 
-        # Handle lesson-related queries via the dedicated handler
+        # Handle lesson-related queries
         lesson_resp = await process_lesson_query(
             user_id=user_id,
             text=text,
@@ -209,7 +230,7 @@ class DialogueEngine:
         if lesson_resp:
             return lesson_resp
 
-        # Handle schedule follow-ups (e.g., user clarifying a previous deferred schedule request)
+        # Handle schedule follow-ups
         schedule_response = await handle_schedule_messages(
             user_id=user_id,
             text=text,
@@ -218,15 +239,13 @@ class DialogueEngine:
             onboarding_service=self.onboarding,
             schedule_request_handler=self._handle_schedule_request,
             call_ollama=self.call_ollama,
-            use_rag_for_this_message=use_rag_for_this_message,
+            use_rag_for_this_message=use_rag,
         )
         if schedule_response:
             return schedule_response
 
-        # Schedule handled after LLM response via trigger matching; skip pre-LLM scheduling
-
         # Auto-send next lesson on a new day when user makes contact
-        if include_lesson and self.prompt_builder and not use_rag_for_this_message:
+        if include_lesson and self.prompt_builder and not use_rag:
             auto_message = await maybe_send_next_lesson(
                 user_id=user_id,
                 text=text,
@@ -238,54 +257,33 @@ class DialogueEngine:
             if auto_message:
                 return auto_message
         
-        # Regular conversation
+        return None
+
+    async def _generate_llm_response(
+        self,
+        user_id: int,
+        text: str,
+        session: Session,
+        user_lang: str,
+        use_rag: bool,
+        include_history: bool,
+        history_turns: int,
+        include_lesson: bool,
+    ) -> str:
+        """Build prompt, call LLM, and handle post-response triggers."""
         if not self.prompt_builder:
             # Fallback for cases without DB session
             prompt = f"{settings.SYSTEM_PROMPT}\nUser: {text}\n\nAssistant:"
+            user_text_embedding = None
         else:
             # Build context-aware prompt
-            relevant_memories = []
-            # Compute the user's query embedding once for this turn so it can
-            # be reused by semantic search and later trigger matching.
             from src.services.embedding_service import get_embedding_service
             user_text_embedding = await get_embedding_service().generate_embedding(text)
 
-            # Guard semantic search: failures in the search backend or embedding
-            # generation should not crash the whole message turn. Also ensure
-            # the search_session is closed in all cases.
-            try:
-                search_service = get_semantic_search_service()
-                # Use a fresh session for semantic search to avoid lock conflicts
-                search_session = Session(bind=session.get_bind())
-                try:
-                    results = await search_service.search_memories(
-                        user_id=user_id,
-                        query_text=text,
-                        session=search_session,
-                        query_embedding=user_text_embedding,
-                    )
-                    relevant_memories = [
-                        {
-                            "memory_id": memory.memory_id,
-                            "key": memory.key,
-                            "value": memory.value,
-                            "category": memory.category,
-                            "confidence": memory.confidence,
-                            "similarity": score,
-                        }
-                        for memory, score in results
-                    ]
-                finally:
-                    search_session.close()
-            except Exception as ex:
-                # Log and continue — semantic search is optional context.
-                logger.warning(f"Semantic search failed: {ex}")
+            relevant_memories = await self._get_relevant_memories(user_id, text, session, user_text_embedding)
 
             # Use RAG prompt if RAG mode is active for this message
-            if use_rag_for_this_message:
-                # Resolve per-user prompt via PromptRegistry (falls back to SYSTEM_PROMPT_RAG)
-                # Prompt registry may fail (database/unexpected errors). Fall
-                # back to the default RAG system prompt rather than raising.
+            if use_rag:
                 try:
                     system_prompt = self.prompt_registry.get_prompt_for_user(self.memory_manager, user_id)
                 except Exception:
@@ -325,11 +323,12 @@ class DialogueEngine:
             return pre
 
         response = await self.call_ollama(
-            prompt, model=settings.OLLAMA_CHAT_RAG_MODEL if use_rag_for_this_message else None, language=user_lang
+            prompt, model=settings.OLLAMA_CHAT_RAG_MODEL if use_rag else None, language=user_lang
         )
         if response is None:
             logger.warning("LLM returned None; coercing to placeholder string")
             response = "[No response from LLM]"
+
         # Trigger matching and dispatch (always enabled)
         from src.triggers.triggering import handle_triggers
 
@@ -344,14 +343,39 @@ class DialogueEngine:
 
         return response
 
-
+    async def _get_relevant_memories(self, user_id: int, text: str, session: Session, query_embedding) -> list:
+        """Retrieve relevant memories for the current context."""
+        relevant_memories = []
+        try:
+            search_service = get_semantic_search_service()
+            search_session = Session(bind=session.get_bind())
+            try:
+                results = await search_service.search_memories(
+                    user_id=user_id,
+                    query_text=text,
+                    session=search_session,
+                    query_embedding=query_embedding,
+                )
+                relevant_memories = [
+                    {
+                        "memory_id": memory.memory_id,
+                        "key": memory.key,
+                        "value": memory.value,
+                        "category": memory.category,
+                        "confidence": memory.confidence,
+                        "similarity": score,
+                    }
+                    for memory, score in results
+                ]
+            finally:
+                search_session.close()
+        except Exception as ex:
+            logger.warning(f"Semantic search failed: {ex}")
+        return relevant_memories
 
     async def _handle_schedule_request(self, user_id: int, text: str, session: Session) -> Optional[str]:
         """
         Handle explicit schedule/reminder requests.
-        
-        Returns:
-            Schedule setup response or None
         """
         # Check if user already has commitment
         status = self.onboarding.get_onboarding_status(user_id)
@@ -464,7 +488,6 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
             logger.error(f"Error creating schedule: {e}")
             return "I had trouble setting up your schedule. Could you tell me your preferred time? (e.g., '9:00 AM' or 'morning')"
 
-
     def get_onboarding_prompt(self) -> str:
         """
         Return onboarding prompt sequence for new users.
@@ -473,7 +496,6 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
             return "Welcome! What's your name?"
         
         return self.prompt_builder.build_onboarding_prompt(settings.SYSTEM_PROMPT)
-
 
 # Module-level wrapper so tests can monkeypatch `src.services.dialogue_engine.get_trigger_dispatcher`
 def get_trigger_dispatcher(db=None, memory_manager: MemoryManager = None) -> object:
