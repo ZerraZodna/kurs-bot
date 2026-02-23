@@ -9,7 +9,13 @@ from sqlalchemy.orm import Session
 from src.models.database import Lesson
 from src.memories.constants import MemoryKey
 from src.config import settings
-from src.services.dialogue.ollama_client import call_ollama
+
+
+def _get_ollama_client():
+    from src.services.dialogue.ollama_client import call_ollama
+
+    return call_ollama
+
 
 logger = logging.getLogger(__name__)
 
@@ -31,10 +37,10 @@ def detect_lesson_request(text: str) -> Optional[Dict[str, Any]]:
     # (except apostrophes which are handled explicitly) with spaces and
     # collapse multiple whitespace. This helps match variants like
     # "What's today's lesson?" or "what is todays lesson".
-    raw = (text or "")
+    raw = text or ""
     text_lower = raw.lower()
-    text_normalized = re.sub(r"[^\w\s']", ' ', text_lower)
-    text_normalized = re.sub(r"\s+", ' ', text_normalized).strip()
+    text_normalized = re.sub(r"[^\w\s']", " ", text_lower)
+    text_normalized = re.sub(r"\s+", " ", text_normalized).strip()
 
     def _extract_number(s: str) -> Optional[int]:
         m = re.search(r"\b(?:lesson|leksjon|day)\s*#?\s*(\d+)\b", s)
@@ -51,7 +57,12 @@ def detect_lesson_request(text: str) -> Optional[Dict[str, Any]]:
 
     # Direct command forms: "show lesson 6", "send me lesson 6", "give lesson 6"
     def _is_command_like(s: str) -> bool:
-        return bool(re.search(r"^\s*(?:show|send|give|read|display)(?: me)?(?: the)?\b", s)) and "lesson" in s
+        return (
+            bool(
+                re.search(r"^\s*(?:show|send|give|read|display)(?: me)?(?: the)?\b", s)
+            )
+            and "lesson" in s
+        )
 
     # 1) explicit numbered lesson
     num = _extract_number(text_normalized)
@@ -91,7 +102,9 @@ async def handle_lesson_request(
 
             ok = ensure_lessons_available(session)
             if ok:
-                lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
+                lesson = (
+                    session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
+                )
 
             if not lesson:
                 return f"I couldn't find lesson {lesson_id} in my database. ACIM has 365 lessons - please ask for a lesson between 1 and 365."
@@ -106,12 +119,16 @@ async def handle_lesson_request(
         matcher = get_trigger_matcher()
         matches = await matcher.match_triggers(user_input)
         for m in matches:
-            if m.get("action_type") == "raw_lesson" and m.get("score", 0.0) >= m.get("threshold", settings.TRIGGER_SIMILARITY_THRESHOLD):
+            if m.get("action_type") == "raw_lesson" and m.get("score", 0.0) >= m.get(
+                "threshold", settings.TRIGGER_SIMILARITY_THRESHOLD
+            ):
                 return await format_lesson_message(lesson, user_language or "en")
 
         # Conservative regex fallback for explicit requests asking for the
         # exact text/words of the lesson.
-        if re.search(r"\bwhat exactly is\b.*\blesson\b", user_lower) or re.search(r"\b(exact|exactly|the text of|exact text|exact words)\b", user_lower):
+        if re.search(r"\bwhat exactly is\b.*\blesson\b", user_lower) or re.search(
+            r"\b(exact|exactly|the text of|exact text|exact words)\b", user_lower
+        ):
             return await format_lesson_message(lesson, user_language or "en")
 
         # Otherwise (including plain "Give me lesson N"), use RAG/LLM to discuss the lesson
@@ -133,12 +150,14 @@ async def handle_lesson_request(
     ### Response
     Provide a thoughtful, detailed response about this ACIM lesson. Reference specific points from the lesson content above. Be warm and encouraging."""
 
-        response = await call_ollama(prompt, None, user_language)
+        response = await _get_ollama_client()(prompt, None, user_language)
         return response
 
     except Exception as e:
         logger.error(f"[Lesson request error] Failed to handle lesson {lesson_id}: {e}")
-        return f"I encountered an error retrieving lesson {lesson_id}. Please try again."
+        return (
+            f"I encountered an error retrieving lesson {lesson_id}. Please try again."
+        )
 
 
 async def pre_llm_lesson_short_circuit(
@@ -160,21 +179,31 @@ async def pre_llm_lesson_short_circuit(
     from src.triggers.trigger_matcher import get_trigger_matcher
 
     matcher = get_trigger_matcher()
-    matches = await matcher.match_triggers(original_text, precomputed_embedding=precomputed_embedding)
+    matches = await matcher.match_triggers(
+        original_text, precomputed_embedding=precomputed_embedding
+    )
     for m in matches:
-        if m.get("score", 0.0) >= m.get("threshold", settings.TRIGGER_SIMILARITY_THRESHOLD):
+        if m.get("score", 0.0) >= m.get(
+            "threshold", settings.TRIGGER_SIMILARITY_THRESHOLD
+        ):
             action = m.get("action_type")
             if action in ("next_lesson", "raw_lesson") and prompt_builder:
                 today_ctx = prompt_builder.get_today_lesson_context(user_id)
                 state = today_ctx.get("state", {})
                 lesson_id = state.get("lesson_id")
                 if lesson_id:
-                    lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
+                    lesson = (
+                        session.query(Lesson)
+                        .filter(Lesson.lesson_id == lesson_id)
+                        .first()
+                    )
                     if lesson:
                         return await format_lesson_message(lesson, user_lang)
 
 
-async def format_lesson_message(lesson: Lesson, language: Optional[str], call_ollama_fn=None) -> str:
+async def format_lesson_message(
+    lesson: Lesson, language: Optional[str], call_ollama_fn=None
+) -> str:
     """
     Format lesson for display with optional translation.
 
@@ -211,7 +240,7 @@ async def translate_text(text: str, language: str, call_ollama_fn=None) -> str:
             "Preserve paragraph breaks and meaning. Return only the translation. Be as close to original text as possible. Text:\n\n"
             f"{text}"
         )
-        call_fn = call_ollama_fn or call_ollama
+        call_fn = call_ollama_fn or _get_ollama_client()
         result = await call_fn(prompt, None, language)
         return result or text
     except Exception as e:
@@ -285,7 +314,9 @@ async def process_lesson_query(
     if pending:
         val = (pending[0].get("value") or "").lower()
         if val == "lesson_status" and onboarding_flow:
-            onboarding_resp = await onboarding_flow.handle_onboarding(user_id, text, session)
+            onboarding_resp = await onboarding_flow.handle_onboarding(
+                user_id, text, session
+            )
             if onboarding_resp:
                 return onboarding_resp
 
@@ -304,7 +335,11 @@ async def process_lesson_query(
 
     if lesson_request.get("lesson_id"):
         # Return the raw lesson text directly to avoid invoking the LLM
-        lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_request["lesson_id"]).first()
+        lesson = (
+            session.query(Lesson)
+            .filter(Lesson.lesson_id == lesson_request["lesson_id"])
+            .first()
+        )
         if lesson:
             return await format_lesson_message(lesson, user_language)
 

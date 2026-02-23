@@ -152,3 +152,4 @@ src/data/Sparkly_ACIM_extracted.txt
 node_modules/
 package-lock.json
 yarn.lock
+.grok/settings.json
