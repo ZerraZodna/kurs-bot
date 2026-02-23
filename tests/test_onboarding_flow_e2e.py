@@ -85,10 +85,17 @@ async def test_onboarding_new_user_end_to_end_creates_daily_schedule():
     print("commitment memories:", [m.value for m in commit_mems])
     assert any("commit" in (m.value or "").lower() or m.value.lower() in ("committed to acim lessons", "committed to 365 acim lessons") for m in commit_mems), f"Expected acim_commitment stored, got {[m.value for m in commit_mems]}"
 
-    # 4. Indicate new
+    # 4. Indicate new -> bot should offer optional introduction
     resp4 = await dialogue.process_message(user_id, "new", db)
     print("resp4:", resp4)
     assert resp4 is not None
+    assert "introduction" in resp4.lower() or "introduksjon" in resp4.lower()
+
+    # 5. Accept introduction now
+    resp5 = await dialogue.process_message(user_id, "yes", db)
+    print("resp5:", resp5)
+    assert resp5 is not None
+    assert "introduction" in resp5.lower() or "introduksjon" in resp5.lower()
 
     # After full conversational flow, onboarding completion should auto-create schedule
     schedules = db.query(Schedule).filter_by(user_id=user_id).all()
@@ -130,8 +137,8 @@ async def test_onboarding_continuing_user_end_to_end_lesson10_sets_memory_and_sc
     print("resp3:", resp3)
     assert resp3 is not None
 
-    # 4. Indicate old
-    resp4 = await dialogue.process_message(user_id, "No I am not new", db)
+    # 4. Indicate continuing user
+    resp4 = await dialogue.process_message(user_id, "I've completed the course before", db)
     print("resp4:", resp4)
     assert resp4 is not None
 

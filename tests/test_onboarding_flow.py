@@ -37,13 +37,14 @@ async def test_onboarding_new_user_creates_daily_schedule():
         resp3 = await dialogue.process_message(user_id, "Yes", db)
         assert resp3 is not None
 
-        # Indicate new user so lesson 1 is delivered (this triggers completion + schedule creation)
+        # Indicate new user so bot offers optional introduction
         resp4 = await dialogue.process_message(user_id, "new", db)
         assert resp4 is not None
+        assert "introduction" in resp4.lower() or "introduksjon" in resp4.lower()
 
-        # Simulate final onboarding completion step which creates the auto schedule
-        # (this is normally triggered when a lesson is delivered).
-        _ = dialogue.onboarding.get_onboarding_complete_message(user_id)
+        # Accept intro now; onboarding completion side-effects should run.
+        resp5 = await dialogue.process_message(user_id, "yes", db)
+        assert resp5 is not None
         schedules = db.query(Schedule).filter_by(user_id=user_id).all()
         assert any(s.schedule_type.startswith("daily") and s.is_active for s in schedules), f"Expected active daily schedule, got {schedules}"
 
@@ -83,3 +84,59 @@ async def test_onboarding_continuing_user_lesson10_sets_memory_and_schedule():
     assert any(s.schedule_type.startswith("daily") and s.is_active for s in schedules), f"Expected active daily schedule, got {schedules}"
 
     db.close()
+
+
+@pytest.mark.asyncio
+async def test_onboarding_new_user_can_decline_intro_and_still_complete():
+    """If user says no to optional intro, onboarding should still complete and schedule should be created."""
+    db = SessionLocal()
+    try:
+        user_id = create_test_user(db, "test_onboarding_flow_new_user_decline_intro", first_name="Alice")
+        dialogue = DialogueEngine(db)
+
+        assert await dialogue.process_message(user_id, "Hi", db) is not None
+        assert await dialogue.process_message(user_id, "Yes", db) is not None
+        assert await dialogue.process_message(user_id, "Yes", db) is not None
+
+        intro_offer = await dialogue.process_message(user_id, "new", db)
+        assert intro_offer is not None
+        assert "introduction" in intro_offer.lower() or "introduksjon" in intro_offer.lower()
+
+        decline_intro = await dialogue.process_message(user_id, "no", db)
+        assert decline_intro is not None
+
+        schedules = db.query(Schedule).filter_by(user_id=user_id).all()
+        assert any(s.schedule_type.startswith("daily") and s.is_active for s in schedules), f"Expected active daily schedule, got {schedules}"
+    finally:
+        db.close()
+
+
+@pytest.mark.asyncio
+async def test_onboarding_new_user_norwegian_gets_intro_offer_and_introduction():
+    """Norwegian onboarding should ask for Introduction and send it when user says yes."""
+    db = SessionLocal()
+    try:
+        user_id = create_test_user(db, "test_onboarding_flow_new_user_no_intro", first_name="Ola")
+        dialogue = DialogueEngine(db)
+
+        resp1 = await dialogue.process_message(user_id, "Hei", db)
+        assert resp1 is not None
+        assert "ja/nei" in resp1.lower() or "gdpr erase" in resp1.lower()
+
+        resp2 = await dialogue.process_message(user_id, "Ja", db)
+        assert resp2 is not None
+
+        resp3 = await dialogue.process_message(user_id, "Ja", db)
+        assert resp3 is not None
+        assert "er du ny" in resp3.lower() or "acim" in resp3.lower()
+
+        resp4 = await dialogue.process_message(user_id, "Jeg er ny", db)
+        assert resp4 is not None
+        assert "introduksjon" in resp4.lower()
+        assert "ja/nei" in resp4.lower()
+
+        resp5 = await dialogue.process_message(user_id, "Ja", db)
+        assert resp5 is not None
+        assert "introduksjon" in resp5.lower() or "introduction" in resp5.lower()
+    finally:
+        db.close()

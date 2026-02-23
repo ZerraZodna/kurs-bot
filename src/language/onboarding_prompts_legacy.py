@@ -85,6 +85,10 @@ ONBOARD_MESSAGES = {
         "en": "I couldn't load Lesson 1 right now. Please try again. 🔁",
         "no": "Jeg kunne ikke laste inn Leksjon 1 akkurat nå. Vennligst prøv igjen. 🔁",
     },
+    "lesson_0_fallback": {
+        "en": "Introduction\n\nWelcome to A Course in Miracles. This introduction gives you the context for the journey ahead and how to work with the lessons gently, one day at a time.",
+        "no": "Introduksjon\n\nVelkommen til Et kurs i mirakler. Denne introduksjonen gir deg rammen for reisen videre og hvordan du kan jobbe med leksjonene rolig, én dag av gangen.",
+    },
     "ask_lesson_number": {
         "en": "Great! Which lesson are you currently working on? 📚",
         "no": "Flott! Hvilken leksjon jobber du med nå? 📚",
@@ -108,6 +112,10 @@ ONBOARD_MESSAGES = {
     "ask_new_or_continuing": {
         "en": "Now, {name}, are you new to ACIM, or have you already begun working with the lessons? 🌱",
         "no": "Nå, {name}, er du ny til ACIM, eller har du allerede begynt med leksjonene? 🌱",
+    },
+    "offer_course_intro_now": {
+        "en": "Thank you, {name}. As a gentle first step, would you like me to send the Introduction now? It is a short introduction to the course. 🌿 (yes/no)",
+        "no": "Takk, {name}. Som et mykt første steg: vil du at jeg sender Introduksjonen nå? Det er en kort introduksjon til kurset. 🌿 (ja/nei)",
     },
 }
 

@@ -18,3 +18,10 @@
 - [ ] Move other models (GDPR, Logs, Triggers, PromptTemplate) to appropriate files
 - [ ] Update imports across the codebase
 - [ ] Verify with tests
+
+## 4. Onboarding Intro Step
+- [x] Add a new onboarding pending step for intro confirmation after "new user" detection
+- [x] Add localized onboarding prompt(s) for asking whether to send Lesson 0 now
+- [x] Route affirmative response to deliver Lesson 0 (course introduction)
+- [x] Keep negative/unclear responses in onboarding with clear next action
+- [x] Update and run onboarding tests

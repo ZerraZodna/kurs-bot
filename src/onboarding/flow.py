@@ -9,7 +9,7 @@ from src.models.database import User
 
 from src.models.database import Lesson
 from src.services.gdpr_service import record_consent
-from src.lessons.handler import format_lesson_message
+from src.lessons.handler import format_lesson_message, translate_text
 from src.memories.dialogue_helpers import delete_user_and_data, get_user_language
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.language import onboarding_prompts_legacy as prompts_module
@@ -22,6 +22,7 @@ class OnboardingStep(Enum):
     CONSENT = "consent"
     COMMITMENT = "commitment"
     LESSON_STATUS = "lesson_status"
+    INTRO_OFFER = "intro_offer"
     NAME = "name"
 
 
@@ -122,6 +123,8 @@ class OnboardingFlow:
             return self._handle_commitment_pending(user_id, text)
         elif step == OnboardingStep.LESSON_STATUS.value:
             return await self._handle_lesson_status_pending(user_id, text, session)
+        elif step == OnboardingStep.INTRO_OFFER.value:
+            return await self._handle_intro_offer_pending(user_id, text, session)
         elif step == "name":
             return await self._handle_name_pending(user_id, text, session)
         return None
@@ -267,9 +270,20 @@ class OnboardingFlow:
         response = self.onboarding.handle_lesson_status_response(user_id, text)
         action = response.get("action")
 
-        # If user explicitly asks to start with Lesson 1, deliver it now
+        # For brand new users, mark lesson status as initialized to Lesson 1
+        # and ask whether they want Lesson 0 (course introduction) now.
         if action == "send_lesson_1":
-            return await self._deliver_lesson(user_id, 1, session, is_first=True)
+            set_current_lesson(self.memory_manager, user_id, 1)
+            language = get_user_language(self.memory_manager, user_id)
+            self._store_memory(
+                user_id,
+                MemoryKey.ONBOARDING_STEP_PENDING,
+                OnboardingStep.INTRO_OFFER.value,
+                ttl_hours=2,
+            )
+            return self._get_message("offer_course_intro_now", language).format(
+                name=self._get_user_name(user_id)
+            )
 
         # If user indicates a specific lesson number, persist the lesson
         # but do NOT automatically deliver the lesson during onboarding.
@@ -301,6 +315,31 @@ class OnboardingFlow:
         self._store_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING, OnboardingStep.LESSON_STATUS.value, ttl_hours=2)
         return self._get_message("ask_new_or_continuing", language).format(name=self._get_user_name(user_id))
 
+    async def _handle_intro_offer_pending(self, user_id: int, text: str, session: Session) -> Optional[str]:
+        """Handle yes/no reply for optional Lesson 0 delivery."""
+        consent_like = self.onboarding.detect_consent_keywords(text)
+
+        if consent_like is True:
+            return await self._deliver_intro_lesson(user_id, session)
+
+        if consent_like is False:
+            self._resolve_pending_step(user_id)
+            completion = self._check_and_send_completion_message(user_id)
+            if completion:
+                return completion
+            return self.onboarding.get_onboarding_complete_message(user_id)
+
+        language = get_user_language(self.memory_manager, user_id)
+        self._store_memory(
+            user_id,
+            MemoryKey.ONBOARDING_STEP_PENDING,
+            OnboardingStep.INTRO_OFFER.value,
+            ttl_hours=2,
+        )
+        return self._get_message("offer_course_intro_now", language).format(
+            name=self._get_user_name(user_id)
+        )
+
     async def _deliver_lesson(self, user_id: int, lesson_id: int, session: Session, is_first: bool) -> str:
         # Record user progress using consolidated lesson_state helper
         set_current_lesson(self.memory_manager, user_id, lesson_id)
@@ -322,6 +361,47 @@ class OnboardingFlow:
         self._resolve_pending_step(user_id)
 
         return f"{welcome_msg}\n\n{lesson_msg}"
+
+    async def _deliver_intro_lesson(self, user_id: int, session: Session) -> str:
+        """Deliver Lesson 0 introduction while keeping lesson progression at Lesson 1."""
+        import re
+
+        language = get_user_language(self.memory_manager, user_id)
+        completion_msg = self._check_and_send_completion_message(user_id)
+
+        lesson = session.query(Lesson).filter(Lesson.lesson_id == 0).first()
+        if not lesson:
+            try:
+                from src.lessons.importer import ensure_lessons_available
+
+                if ensure_lessons_available(session):
+                    lesson = session.query(Lesson).filter(Lesson.lesson_id == 0).first()
+            except Exception:
+                lesson = None
+        if not lesson:
+            self._resolve_pending_step(user_id)
+            intro_fallback = self._get_message("lesson_0_fallback", language)
+            if completion_msg:
+                return f"{completion_msg}\n\n{intro_fallback}"
+            return intro_fallback or self._get_message("lesson_load_error", language)
+
+        # For the course introduction we intentionally avoid showing "Lesson 0"
+        # in user-facing text to prevent confusion; present it as "Introduction".
+        raw_title = (lesson.title or "").strip()
+        cleaned_title = re.sub(r"(?i)^\s*(lesson|leksjon)\s*0\s*[:\-]?\s*", "", raw_title).strip()
+        if not cleaned_title:
+            cleaned_title = "Introduksjon" if (language or "").lower() in ["no", "norwegian", "nb", "nn"] else "Introduction"
+        intro_text = f"{cleaned_title}\n\n{lesson.content}"
+        if (language or "").lower() not in ["en"]:
+            lesson_msg = await translate_text(intro_text, language, self.call_ollama)
+        else:
+            lesson_msg = intro_text
+        self._set_pending_lesson_delivery(user_id)
+        self._resolve_pending_step(user_id)
+
+        if completion_msg:
+            return f"{completion_msg}\n\n{lesson_msg}"
+        return lesson_msg
 
     def _check_and_send_completion_message(self, user_id: int) -> Optional[str]:
         completion_sent = self.memory_manager.get_memory(user_id, MemoryKey.ONBOARDING_COMPLETE_MESSAGE_SENT)

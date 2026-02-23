@@ -220,6 +220,12 @@ class OnboardingService:
         Returns:
             True if user needs onboarding
         """
+        pending_step = self.memory_manager.get_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING)
+        if pending_step:
+            val = str(pending_step[0].get("value", "")).lower().strip()
+            if val and val != "resolved":
+                return True
+
         status = self.get_onboarding_status(user_id)
         
         # Show if not complete and user is relatively new (or never completed)
