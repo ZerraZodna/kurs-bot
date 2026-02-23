@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.models.database import SessionLocal
 from src.memories import MemoryManager
-from src.services.language.language_service import detect_and_store_language
+from src.language.language_service import detect_and_store_language
 from tests.utils import create_test_user
 
 

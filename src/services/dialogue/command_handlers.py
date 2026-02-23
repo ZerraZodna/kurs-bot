@@ -25,7 +25,7 @@ from src.services.gdpr_service import (
 )
 from src.services.gdpr_verification import create_verification, verify_code
 from src.models.database import PromptTemplate, SessionLocal
-from src.services.prompt_registry import get_prompt_registry
+from src.language.prompt_registry import get_prompt_registry
 
 logger = logging.getLogger(__name__)
 

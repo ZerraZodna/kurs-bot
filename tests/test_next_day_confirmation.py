@@ -11,7 +11,7 @@ from src.memories import MemoryManager
 from src.lessons.state import set_current_lesson
 from src.services.dialogue.command_handlers import handle_debug_next_day
 from src.lessons.advance import maybe_send_next_lesson
-from src.services.prompt_builder import PromptBuilder
+from src.language.prompt_builder import PromptBuilder
 from src.memories.scheduler_helpers import get_pending_confirmation
 
 
@@ -71,7 +71,7 @@ async def test_next_day_triggers_confirmation_prompt():
 
 def test_confirmation_prompt_wording():
     # direct check of the template helper to ensure updated language
-    from src.onboarding.prompts import get_lesson_confirmation_prompt
+    from src.language.onboarding_prompts import get_lesson_confirmation_prompt
 
     prompt_en = get_lesson_confirmation_prompt("en", 9)
     assert "yesterday" not in prompt_en.lower()

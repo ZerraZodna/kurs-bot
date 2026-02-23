@@ -1,6 +1,6 @@
 import pytest
 
-from src.services.language.keyword_detector import detect_language
+from src.language.keyword_detector import detect_language
 
 
 def test_keyword_detector_basic_english():

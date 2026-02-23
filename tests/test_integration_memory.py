@@ -7,9 +7,9 @@ import asyncio
 from sqlalchemy.orm import Session
 from src.models.database import SessionLocal, User, Memory, MessageLog, init_db
 from src.memories import MemoryManager
-from src.services.prompt_builder import PromptBuilder
+from src.language.prompt_builder import PromptBuilder
 from src.services.dialogue_engine import DialogueEngine
-from src.services.prompt_optimizer import PromptOptimizer
+from src.language.prompt_optimizer import PromptOptimizer
 from src.services.context_utils import MemoryKey, MemoryCategory
 
 

@@ -9,7 +9,7 @@ from src.models.database import Lesson
 
 from .handler import format_lesson_message, translate_text
 from src.memories.dialogue_helpers import get_user_language
-from src.onboarding.prompts import get_lesson_confirmation_prompt
+from src.language.onboarding_prompts import get_lesson_confirmation_prompt
 from src.lessons.state import set_last_sent_lesson_id
 from src.scheduler.memory_helpers import set_pending_confirmation
 

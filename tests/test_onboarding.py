@@ -23,7 +23,7 @@ from src.services.dialogue_engine import DialogueEngine
 from src.onboarding.service import OnboardingService
 from src.scheduler import SchedulerService
 from datetime import datetime, timezone
-from src.onboarding.language.prompts import get_onboarding_message
+from src.language.onboarding_prompts_legacy import get_onboarding_message
 from src.memories import MemoryManager
 from uuid import uuid4
 
@@ -253,7 +253,7 @@ async def test_onboarding_greeting_hei_detects_norwegian():
     # The bot's response should be the Norwegian name prompt.
     # Onboarding now prefers fetching the name from Telegram when available,
     # so accept either the original templated prompt or the Telegram-autofill phrasing.
-    from src.onboarding.language.prompts import get_onboarding_message
+    from src.language.onboarding_prompts_legacy import get_onboarding_message
     expected = get_onboarding_message("name_prompt", "no")
     if not (expected and expected in response):
         # Accept phrasing that references the Telegram name being present

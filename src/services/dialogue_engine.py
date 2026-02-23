@@ -2,7 +2,7 @@ import logging
 from typing import Optional
 from sqlalchemy.orm import Session
 from src.memories import MemoryManager
-from src.services.prompt_builder import PromptBuilder
+from src.language.prompt_builder import PromptBuilder
 from src.memories.semantic_search import get_semantic_search_service
 from src.memories import MemoryExtractor
 from src.onboarding.service import OnboardingService
@@ -34,7 +34,7 @@ from src.config import settings
 from src.models.database import User, Lesson
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.services.timezone_utils import ensure_user_timezone, format_dt_in_timezone
-from src.services.prompt_registry import get_prompt_registry
+from src.language.prompt_registry import get_prompt_registry
 
 logger = logging.getLogger(__name__)
 

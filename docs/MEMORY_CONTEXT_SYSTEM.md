@@ -290,7 +290,7 @@ memory_manager.store_memory(
 ### Building Custom Prompts
 
 ```python
-from src.services.prompt_builder import PromptBuilder
+from src.language.prompt_builder import PromptBuilder
 
 prompt_builder = PromptBuilder(db, memory_manager)
 

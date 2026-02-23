@@ -18,7 +18,7 @@ from src.onboarding.detectors import (
     detect_schedule_request,
     handle_lesson_status_response,
 )
-from src.onboarding.language.prompts import (
+from src.language.onboarding_prompts_legacy import (
     get_continuation_welcome_message,
     get_lesson_1_welcome_message,
     get_onboarding_complete_message_text,

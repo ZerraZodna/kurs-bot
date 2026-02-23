@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 def _confirmation_prompt(language: str, lesson_id: int) -> str:
     # Local import to avoid module import cycles
-    from src.onboarding.language.prompts import get_lesson_confirmation_prompt
+    from src.language.onboarding_prompts_legacy import get_lesson_confirmation_prompt
 
     return get_lesson_confirmation_prompt(language, lesson_id)
 

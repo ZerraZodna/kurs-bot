@@ -10,7 +10,7 @@ from src.models.database import SessionLocal, User
 from src.services.dialogue_engine import DialogueEngine
 from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
-from src.services.prompt_builder import PromptBuilder
+from src.language.prompt_builder import PromptBuilder
 
 router = APIRouter(prefix="/api/v1/dialogue", tags=["dialogue"])
 

@@ -14,7 +14,7 @@ from collections import Counter
 import re
 
 from langdetect import detect_langs
-from src.services.language.keyword_detector import detect_language as keyword_detect
+from src.language.keyword_detector import detect_language as keyword_detect
 from src.config import settings
 from src.memories.constants import MemoryCategory, MemoryKey
 
