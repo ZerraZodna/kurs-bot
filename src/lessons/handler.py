@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from src.models.database import Lesson
 from src.memories.constants import MemoryKey
 from src.config import settings
-from src.services.dialogue import ollama_client
+from src.services.dialogue.ollama_client import call_ollama
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ async def handle_lesson_request(
 
         if not lesson:
             # Try to ensure lessons are present (import bundled lessons if DB empty)
-            from src.services.lesson_importer import ensure_lessons_available
+            from src.lessons.importer import ensure_lessons_available
 
             ok = ensure_lessons_available(session)
             if ok:
@@ -133,7 +133,7 @@ async def handle_lesson_request(
     ### Response
     Provide a thoughtful, detailed response about this ACIM lesson. Reference specific points from the lesson content above. Be warm and encouraging."""
 
-        response = await ollama_client.call_ollama(prompt, None, user_language)
+        response = await call_ollama(prompt, None, user_language)
         return response
 
     except Exception as e:
@@ -211,7 +211,7 @@ async def translate_text(text: str, language: str, call_ollama_fn=None) -> str:
             "Preserve paragraph breaks and meaning. Return only the translation. Be as close to original text as possible. Text:\n\n"
             f"{text}"
         )
-        call_fn = call_ollama_fn or ollama_client.call_ollama
+        call_fn = call_ollama_fn or call_ollama
         result = await call_fn(prompt, None, language)
         return result or text
     except Exception as e:

@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 from src.models.database import SessionLocal, User
 from src.services.dialogue_engine import DialogueEngine
 from src.memories import MemoryManager
+from src.memories.constants import MemoryCategory, MemoryKey
 from src.services.prompt_builder import PromptBuilder
-from src.services.context_utils import MemoryKey, MemoryCategory
 
 router = APIRouter(prefix="/api/v1/dialogue", tags=["dialogue"])
 

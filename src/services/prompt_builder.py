@@ -261,7 +261,7 @@ class PromptBuilder:
         This implementation uses the centralized `lesson_state` helpers for
         consistent reads of `current_lesson` and `last_sent_lesson_id`.
         """
-        from src.memories.lesson_state import compute_current_lesson_state
+        from src.lessons.state import compute_current_lesson_state
 
         now = datetime.now(timezone.utc)
         day_offset = self._get_debug_day_offset(user_id)

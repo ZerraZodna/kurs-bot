@@ -29,7 +29,7 @@ from src.services.dialogue import (
     maybe_send_next_lesson,
     handle_list_memories,
 )
-from src.services.dialogue.lesson_handler import process_lesson_query
+from src.lessons.handler import process_lesson_query
 from src.config import settings
 from src.models.database import User, Lesson
 from src.memories.constants import MemoryCategory, MemoryKey
@@ -311,7 +311,7 @@ class DialogueEngine:
                 )
         
         # Run trigger matching on original user text before calling the LLM.
-        from src.services.dialogue.lesson_handler import pre_llm_lesson_short_circuit
+        from src.lessons.handler import pre_llm_lesson_short_circuit
 
         pre = await pre_llm_lesson_short_circuit(
             original_text=text,

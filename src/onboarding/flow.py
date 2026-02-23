@@ -9,11 +9,11 @@ from src.models.database import User
 
 from src.models.database import Lesson
 from src.services.gdpr_service import record_consent
-from src.services.dialogue.lesson_handler import format_lesson_message
+from src.lessons.handler import format_lesson_message
 from src.memories.dialogue_helpers import delete_user_and_data, get_user_language
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.onboarding.language import prompts as prompts_module
-from src.memories.lesson_state import set_current_lesson, get_current_lesson
+from src.lessons.state import set_current_lesson, get_current_lesson
 
 logger = logging.getLogger(__name__)
 

@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timezone
 from src.services.timezone_utils import to_utc
 from typing import Optional
-from src.memories.lesson_state import get_last_sent_lesson_id as _get_last_sent_lesson_id, set_last_sent_lesson_id as _set_last_sent_lesson_id
+from src.lessons.state import get_last_sent_lesson_id as _get_last_sent_lesson_id, set_last_sent_lesson_id as _set_last_sent_lesson_id
 from src.memories.constants import MemoryCategory, MemoryKey
 
 from src.memories.manager import MemoryManager

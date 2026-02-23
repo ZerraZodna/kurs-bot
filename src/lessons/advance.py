@@ -7,10 +7,10 @@ from sqlalchemy.orm import Session
 
 from src.models.database import Lesson
 
-from .lesson_handler import format_lesson_message, translate_text
+from .handler import format_lesson_message, translate_text
 from src.memories.dialogue_helpers import get_user_language
 from src.onboarding.prompts import get_lesson_confirmation_prompt
-from src.memories.lesson_state import set_last_sent_lesson_id
+from src.lessons.state import set_last_sent_lesson_id
 from src.memories.scheduler_helpers import set_pending_confirmation
 
 

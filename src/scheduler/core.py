@@ -75,7 +75,7 @@ class SchedulerService:
         If the user has a reported current lesson (numeric), return a
         confirmation prompt. Otherwise return Lesson 1 text or None.
         """
-        from src.memories.lesson_state import get_current_lesson
+        from src.lessons.state import get_current_lesson
 
         cur = get_current_lesson(memory_manager, user_id)
         lesson_id = SchedulerService._parse_lesson_int(cur)
@@ -110,7 +110,7 @@ class SchedulerService:
             preferred = SchedulerService._parse_lesson_int(schedule.lesson_id)
 
         if preferred is None:
-            from src.memories.lesson_state import get_current_lesson
+            from src.lessons.state import get_current_lesson
 
             cur = get_current_lesson(memory_manager, schedule.user_id)
             lesson_id = SchedulerService._parse_lesson_int(cur)

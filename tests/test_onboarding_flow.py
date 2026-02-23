@@ -9,7 +9,7 @@ from src.models.database import SessionLocal, User, Memory, Schedule, init_db
 from tests.utils import create_test_user
 from src.services.dialogue_engine import DialogueEngine
 from src.memories import MemoryManager
-from src.memories.lesson_state import get_current_lesson
+from src.lessons.state import get_current_lesson
 
 
 # Use shared `create_test_user` from tests.utils

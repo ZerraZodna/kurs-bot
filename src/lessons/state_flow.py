@@ -11,7 +11,7 @@ from datetime import datetime, date, timezone, timedelta
 from typing import Any, Dict, Optional
 
 from src.memories.constants import MemoryCategory, MemoryKey
-from src.memories.lesson_state import (
+from src.lessons.state import (
     compute_current_lesson_state,
     get_lesson_state,
     set_current_lesson,

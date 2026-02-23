@@ -3,7 +3,7 @@ import pytest
 
 from src.models.database import SessionLocal, User, Lesson
 from src.services.dialogue_engine import DialogueEngine
-from src.services.dialogue.lesson_handler import process_lesson_query
+from src.lessons.handler import process_lesson_query
 
 
 @pytest.mark.skipif(os.getenv("EMBEDDING_BACKEND", "local").lower() == "none", reason="Embeddings disabled")

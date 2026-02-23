@@ -11,7 +11,7 @@ from src.memories.memory_extractor import MemoryExtractor
 from src.memories.constants import MemoryKey
 from src.memories.user_data_service import delete_user_content_rows
 from src.config import settings
-from src.memories.lesson_state import set_current_lesson
+from src.lessons.state import set_current_lesson
 
 logger = logging.getLogger(__name__)
 

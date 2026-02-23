@@ -12,8 +12,8 @@ from sqlalchemy.orm import Session
 from src.models.database import Lesson
 from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
-from src.memories.lesson_state import set_current_lesson, set_last_sent_lesson_id
-from src.memories.lesson_state_flow import apply_reported_progress
+from src.lessons.state import set_current_lesson, set_last_sent_lesson_id
+from src.lessons.state_flow import apply_reported_progress
 from src.triggers.trigger_matcher import get_trigger_matcher
 
 logger = logging.getLogger(__name__)
@@ -190,7 +190,7 @@ async def handle_lesson_confirmation(
     if not lesson:
         # Try centralized helper to import bundled lessons if DB is empty
         try:
-            from src.services.lesson_importer import ensure_lessons_available
+            from src.lessons.importer import ensure_lessons_available
 
             ok = ensure_lessons_available(session)
             if ok:

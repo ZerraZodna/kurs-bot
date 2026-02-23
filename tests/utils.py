@@ -4,7 +4,7 @@ from typing import Optional
 from src.models.database import User
 from src.memories import MemoryManager
 from src.memories.memory_handler import MemoryHandler
-from src.memories.lesson_state import set_current_lesson
+from src.lessons.state import set_current_lesson
 
 
 def create_test_user(db, external_id: str, first_name: Optional[str] = None) -> int:

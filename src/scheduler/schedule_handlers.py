@@ -13,7 +13,7 @@ from src.services.dialogue.pause_handler import detect_pause_request
 from src.scheduler.schedule_query_handler import detect_schedule_status_request, build_schedule_status_response
 from src.memories.dialogue_helpers import get_user_language
 from src.memories.constants import MemoryCategory, MemoryKey
-from src.services.dialogue.lesson_handler import translate_text
+from src.lessons.handler import translate_text
 
 
 async def handle_schedule_messages(

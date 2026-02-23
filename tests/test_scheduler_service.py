@@ -73,7 +73,7 @@ def test_execute_scheduled_task_sends_lesson_one(db_session, scheduler_session_f
 
     # Use canonical lesson_state getter to verify last-sent was persisted
     from src.memories import MemoryManager
-    from src.memories.lesson_state import get_last_sent_lesson_id
+    from src.lessons.state import get_last_sent_lesson_id
 
     mm = MemoryManager(db_session)
     last_sent = get_last_sent_lesson_id(mm, user.user_id)
@@ -108,7 +108,7 @@ def test_execute_scheduled_task_prompts_confirmation(db_session, scheduler_sessi
 
     # Simulate last sent lesson via canonical helper
     from src.memories import MemoryManager
-    from src.memories.lesson_state import set_last_sent_lesson_id
+    from src.lessons.state import set_last_sent_lesson_id
 
     mm = MemoryManager(db_session)
     set_last_sent_lesson_id(mm, user.user_id, 1)
