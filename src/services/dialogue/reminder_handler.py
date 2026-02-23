@@ -12,11 +12,67 @@ from sqlalchemy.orm import Session
 from src.models.database import Lesson
 from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
-from src.lessons.state import set_current_lesson, set_last_sent_lesson_id
+from src.lessons.state import (
+    get_last_sent_lesson_id,
+    set_current_lesson,
+    set_last_sent_lesson_id,
+)
 from src.lessons.state_flow import apply_reported_progress
+from src.scheduler.memory_helpers import (
+    is_auto_advance_lessons_enabled,
+    set_auto_advance_lessons_preference,
+)
 from src.triggers.trigger_matcher import get_trigger_matcher
 
 logger = logging.getLogger(__name__)
+
+
+def _detect_auto_advance_preference_intent(text: str) -> Optional[bool]:
+    normalized = re.sub(r"\s+", " ", (text or "").strip().lower())
+    if not normalized:
+        return None
+
+    if re.search(
+        r"\b(?:don't|dont|do not|stop)\s+(?:auto[-\s]*)?assume\b",
+        normalized,
+    ):
+        return False
+    if re.search(r"\bask me before\b.*\b(?:next lesson|advance)\b", normalized):
+        return False
+
+    has_assume = "assume" in normalized
+    has_lesson = "lesson" in normalized
+    has_day = (
+        "each day" in normalized
+        or "every day" in normalized
+        or "daily" in normalized
+        or "a day" in normalized
+    )
+    if has_assume and has_lesson and has_day:
+        return True
+
+    if re.search(r"\bskip\b.*\b(?:daily )?lesson confirmation\b", normalized):
+        return True
+    if re.search(
+        r"\bno need\b.*\b(?:ask|confirmation)\b.*\b(?:lesson|daily)\b",
+        normalized,
+    ):
+        return True
+
+    return None
+
+
+def _is_progress_override_negative(text: str) -> bool:
+    normalized = re.sub(r"\s+", " ", (text or "").strip().lower())
+    if not normalized:
+        return False
+    patterns = [
+        r"\bi (?:did not|didn't|didnt) (?:do|finish|complete) (?:it|that|the lesson)\b",
+        r"\bi (?:have not|haven't|havent) (?:done|finished|completed) (?:it|the lesson)\b",
+        r"\bi was not able to (?:do|finish|complete) (?:it|the lesson)\b",
+    ]
+    return any(re.search(pattern, normalized) for pattern in patterns)
+
 
 async def _semantic_yes_no(text: str, onboarding_service) -> (bool, bool):
     """Classify yes/no using trigger embeddings; no keyword fallback."""
@@ -112,11 +168,41 @@ async def handle_lesson_confirmation(
     Returns:
         Response message or None if not a confirmation response
     """
-    pending = get_pending_confirmation(memory_manager, user_id)
-    if not pending:
-        return None
-
     message_lower = text.lower().strip()
+    pref_update = _detect_auto_advance_preference_intent(message_lower)
+    if pref_update is not None:
+        set_auto_advance_lessons_preference(
+            memory_manager,
+            user_id,
+            pref_update,
+            source="dialogue_auto_advance_preference",
+        )
+
+    pending = get_pending_confirmation(memory_manager, user_id)
+    auto_advance_enabled = is_auto_advance_lessons_enabled(memory_manager, user_id)
+    if not pending:
+        if pref_update is True:
+            return (
+                "Understood. I'll auto-advance one lesson per day and skip the daily confirmation prompt. "
+                "If you didn't do a lesson, just tell me."
+            )
+        if pref_update is False:
+            return "Okay, I will ask for confirmation before moving to the next lesson."
+
+        if auto_advance_enabled and _is_progress_override_negative(message_lower):
+            last_sent = get_last_sent_lesson_id(memory_manager, user_id)
+            if last_sent is None:
+                return "No problem. I can pause progression whenever you tell me."
+
+            repeat_lesson = max(int(last_sent) - 1, 1)
+            set_current_lesson(memory_manager, user_id, repeat_lesson)
+            set_last_sent_lesson_id(memory_manager, user_id, repeat_lesson)
+            return (
+                f"No problem. I'll pause progression and keep you on Lesson {repeat_lesson}. "
+                "Tell me when you're ready to continue."
+            )
+
+        return None
 
     # First, look for explicit lesson numbers in the reply (e.g., "on lesson 8").
     # When present we treat the highest lesson number as the user's current lesson
@@ -150,7 +236,13 @@ async def handle_lesson_confirmation(
 
         return message
 
-    is_yes, is_no = await _semantic_yes_no(message_lower, onboarding_service)
+    if pref_update is True:
+        is_yes, is_no = True, False
+    else:
+        is_yes, is_no = await _semantic_yes_no(message_lower, onboarding_service)
+
+    if not is_yes and not is_no and _is_progress_override_negative(message_lower):
+        is_no = True
 
     if not is_yes and not is_no:
         return None

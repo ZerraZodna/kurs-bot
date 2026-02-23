@@ -32,6 +32,7 @@ class MemoryKey:
     LESSON_STATE = "lesson_state"
     LAST_SENT_LESSON_ID = "last_sent_lesson_id"
     LESSON_CONFIRMATION_PENDING = "lesson_confirmation_pending"
+    AUTO_ADVANCE_LESSONS = "auto_advance_lessons"
 
     SCHEDULE_MESSAGE = "schedule_message"
     SCHEDULE_REQUEST_PENDING = "schedule_request_pending"

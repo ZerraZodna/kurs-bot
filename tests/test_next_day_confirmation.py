@@ -2,17 +2,27 @@ import pytest
 import asyncio
 from pathlib import Path
 import sys
+from datetime import datetime, timezone
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.models.database import SessionLocal
+from src.models.database import Lesson, SessionLocal
 from tests.utils import create_test_user
 from src.memories import MemoryManager
-from src.lessons.state import set_current_lesson
+from src.lessons.state import (
+    get_last_sent_lesson_id,
+    set_current_lesson,
+    set_last_sent_lesson_id,
+)
 from src.services.dialogue.command_handlers import handle_debug_next_day
 from src.lessons.advance import maybe_send_next_lesson
+from src.services.dialogue.reminder_handler import handle_lesson_confirmation
 from src.language.prompt_builder import PromptBuilder
-from src.memories.scheduler_helpers import get_pending_confirmation
+from src.memories.scheduler_helpers import (
+    get_pending_confirmation,
+    is_auto_advance_lessons_enabled,
+    set_auto_advance_lessons_preference,
+)
 
 
 @pytest.mark.asyncio
@@ -83,3 +93,119 @@ def test_confirmation_prompt_wording():
     assert "i går" not in prompt_no.lower()
     assert "fortsette med leksjon 12 i dag" in prompt_no.lower()
     assert "nei' for å repetere leksjon 12" in prompt_no.lower()
+
+
+@pytest.mark.asyncio
+async def test_next_day_auto_advance_preference_skips_confirmation_prompt():
+    db = SessionLocal()
+    user_id = create_test_user(db, "test_next_day_auto_assume")
+
+    mm = MemoryManager(db)
+    set_current_lesson(mm, user_id, 8)
+    set_auto_advance_lessons_preference(mm, user_id, True, source="test")
+
+    if db.query(Lesson).filter(Lesson.lesson_id == 9).first() is None:
+        db.add(
+            Lesson(
+                lesson_id=9,
+                title="Lesson Nine",
+                content="Lesson nine content.",
+                created_at=datetime.now(timezone.utc),
+            )
+        )
+        db.commit()
+
+    async def _fake_call_ollama(prompt, model=None, language=None):
+        return ""
+
+    prompt_builder = PromptBuilder(db, mm)
+    result = await maybe_send_next_lesson(
+        user_id=user_id,
+        text="Hi",
+        session=db,
+        prompt_builder=prompt_builder,
+        memory_manager=mm,
+        call_ollama=_fake_call_ollama,
+    )
+
+    assert result is not None
+    assert "Lesson 9" in result
+    assert get_pending_confirmation(mm, user_id) is None
+    assert get_last_sent_lesson_id(mm, user_id) == 9
+
+    db.close()
+
+
+@pytest.mark.asyncio
+async def test_auto_advance_intent_is_persisted_and_negative_override_adjusts_progress():
+    db = SessionLocal()
+    user_id = create_test_user(db, "test_next_day_auto_assume_override")
+    mm = MemoryManager(db)
+    set_last_sent_lesson_id(mm, user_id, 9)
+
+    async def _fake_translate(text: str, language: str):
+        return text
+
+    async def _fake_format_lesson(lesson, language: str):
+        return f"Lesson {lesson.lesson_id}: {lesson.title}"
+
+    response = await handle_lesson_confirmation(
+        user_id=user_id,
+        text="Assume I do one lesson each day.",
+        session=db,
+        memory_manager=mm,
+        onboarding_service=None,
+        translate_fn=_fake_translate,
+        get_language_fn=lambda uid: "en",
+        format_lesson_fn=_fake_format_lesson,
+    )
+    assert response is not None
+    assert "auto-advance" in response.lower()
+    assert is_auto_advance_lessons_enabled(mm, user_id) is True
+
+    override_response = await handle_lesson_confirmation(
+        user_id=user_id,
+        text="I did not do it.",
+        session=db,
+        memory_manager=mm,
+        onboarding_service=None,
+        translate_fn=_fake_translate,
+        get_language_fn=lambda uid: "en",
+        format_lesson_fn=_fake_format_lesson,
+    )
+    assert override_response is not None
+    assert "keep you on lesson 8" in override_response.lower()
+    assert get_last_sent_lesson_id(mm, user_id) == 8
+
+    db.close()
+
+
+@pytest.mark.asyncio
+async def test_auto_advance_preference_can_be_disabled_by_user_intent():
+    db = SessionLocal()
+    user_id = create_test_user(db, "test_next_day_auto_assume_disable")
+    mm = MemoryManager(db)
+    set_auto_advance_lessons_preference(mm, user_id, True, source="test")
+
+    async def _fake_translate(text: str, language: str):
+        return text
+
+    async def _fake_format_lesson(lesson, language: str):
+        return f"Lesson {lesson.lesson_id}: {lesson.title}"
+
+    response = await handle_lesson_confirmation(
+        user_id=user_id,
+        text="Don't assume I do one lesson each day.",
+        session=db,
+        memory_manager=mm,
+        onboarding_service=None,
+        translate_fn=_fake_translate,
+        get_language_fn=lambda uid: "en",
+        format_lesson_fn=_fake_format_lesson,
+    )
+
+    assert response is not None
+    assert "ask for confirmation" in response.lower()
+    assert is_auto_advance_lessons_enabled(mm, user_id) is False
+
+    db.close()

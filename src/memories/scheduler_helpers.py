@@ -8,6 +8,8 @@ from src.scheduler.memory_helpers import (
     get_user_language,
     get_last_sent_lesson_id,
     set_last_sent_lesson_id,
+    is_auto_advance_lessons_enabled,
+    set_auto_advance_lessons_preference,
     get_pending_confirmation,
     set_pending_confirmation,
 )
@@ -17,6 +19,8 @@ __all__ = [
     "get_user_language",
     "get_last_sent_lesson_id",
     "set_last_sent_lesson_id",
+    "is_auto_advance_lessons_enabled",
+    "set_auto_advance_lessons_preference",
     "get_pending_confirmation",
     "set_pending_confirmation",
 ]

@@ -28,8 +28,15 @@ def db_session():
         content="Lesson one content.",
         created_at=datetime.now(timezone.utc),
     )
+    lesson_two = Lesson(
+        lesson_id=2,
+        title="I have given everything I see all the meaning that it has for me",
+        content="Lesson two content.",
+        created_at=datetime.now(timezone.utc),
+    )
     session.add(user)
     session.add(lesson)
+    session.add(lesson_two)
     session.commit()
 
     yield session
@@ -121,6 +128,53 @@ def test_execute_scheduled_task_prompts_confirmation(db_session, scheduler_sessi
 
     pending = db_session.query(Memory).filter_by(key="lesson_confirmation_pending").first()
     assert pending is not None
+
+
+def test_execute_scheduled_task_auto_advance_skips_confirmation_when_preference_enabled(
+    db_session, scheduler_session_factory, monkeypatch
+):
+    sent = []
+
+    async def fake_send_message(chat_id: int, text: str):
+        sent.append((chat_id, text))
+        return {"ok": True}
+
+    monkeypatch.setattr(scheduler_module, "send_message", fake_send_message)
+
+    user = db_session.query(User).first()
+    schedule = Schedule(
+        user_id=user.user_id,
+        lesson_id=None,
+        schedule_type="daily",
+        cron_expression="0 9 * * *",
+        next_send_time=datetime.now(timezone.utc),
+        is_active=True,
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add(schedule)
+    db_session.commit()
+
+    from src.memories import MemoryManager
+    from src.lessons.state import set_last_sent_lesson_id, get_last_sent_lesson_id
+    from src.scheduler.memory_helpers import set_auto_advance_lessons_preference
+
+    mm = MemoryManager(db_session)
+    set_last_sent_lesson_id(mm, user.user_id, 1)
+    set_auto_advance_lessons_preference(mm, user.user_id, True, source="test")
+
+    scheduler_module.SchedulerService.execute_scheduled_task(schedule.schedule_id)
+
+    assert sent, "Expected next lesson message to be sent"
+    assert "Lesson 2" in sent[0][1]
+
+    pending = db_session.query(Memory).filter_by(key="lesson_confirmation_pending").first()
+    assert pending is None
+
+    completed = db_session.query(Memory).filter_by(key="lesson_completed").first()
+    assert completed is not None
+    assert completed.value == "1"
+
+    assert get_last_sent_lesson_id(mm, user.user_id) == 2
 
 
 def test_deactivate_user_schedules(db_session, scheduler_session_factory, monkeypatch):

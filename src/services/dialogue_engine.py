@@ -24,8 +24,10 @@ from src.services.dialogue import (
     parse_rag_prefix,
     is_rag_mode_enabled,
     handle_forget_commands,
+    handle_trigger_admin_commands,
     handle_gdpr_commands,
     handle_debug_next_day,
+    handle_debug_trigger_match,
     maybe_send_next_lesson,
     handle_list_memories,
 )
@@ -170,12 +172,27 @@ class DialogueEngine:
         if forget_response:
             return forget_response
 
+        trigger_admin_response = await handle_trigger_admin_commands(
+            text=text,
+            session=session,
+            user_id=user_id,
+        )
+        if trigger_admin_response:
+            return trigger_admin_response
+
         # Debug magic command: simulate next day for lesson progression
         debug_response = handle_debug_next_day(
             text, self.memory_manager, session, user_id
         )
         if debug_response:
             return debug_response
+
+        trigger_debug_response = await handle_debug_trigger_match(
+            text=text,
+            user_id=user_id,
+        )
+        if trigger_debug_response:
+            return trigger_debug_response
         
         return None
 

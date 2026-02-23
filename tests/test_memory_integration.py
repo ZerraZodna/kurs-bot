@@ -5,6 +5,7 @@ from src.models.database import Base, User
 from src.memories import MemoryManager
 from src.memories.memory_extractor import MemoryExtractor
 from src.memories.dialogue_helpers import extract_and_store_memories
+from src.lessons.state import get_current_lesson
 
 
 @pytest.fixture(scope="function")
@@ -40,3 +41,42 @@ async def test_birthdate_memory_stored(db_session, monkeypatch):
     memories = mm.get_memory(user.user_id, "birth_date")
     assert len(memories) == 1
     assert "1966" in memories[0]["value"]
+
+
+@pytest.mark.asyncio
+async def test_invalid_lesson_completed_memory_is_skipped(db_session, monkeypatch):
+    """Invalid lesson_completed values should not be persisted."""
+
+    async def fake_call_ollama(prompt, model=None, language=None):
+        return '{"memories": [{"store": true, "key": "lesson_completed", "value": "current_lesson", "confidence": 0.95, "ttl_hours": null}]}'
+
+    monkeypatch.setattr("src.services.dialogue.ollama_client.call_ollama", fake_call_ollama)
+
+    mm = MemoryManager(db=db_session)
+    user = db_session.query(User).first()
+
+    await extract_and_store_memories(mm, MemoryExtractor, user.user_id, "I did not finish it")
+
+    memories = mm.get_memory(user.user_id, "lesson_completed")
+    assert memories == []
+    assert get_current_lesson(mm, user.user_id) is None
+
+
+@pytest.mark.asyncio
+async def test_valid_lesson_completed_memory_is_normalized_and_applied(db_session, monkeypatch):
+    """Valid lesson_completed values should be normalized and update current lesson."""
+
+    async def fake_call_ollama(prompt, model=None, language=None):
+        return '{"memories": [{"store": true, "key": "lesson_completed", "value": "lesson 5", "confidence": 0.95, "ttl_hours": null}]}'
+
+    monkeypatch.setattr("src.services.dialogue.ollama_client.call_ollama", fake_call_ollama)
+
+    mm = MemoryManager(db=db_session)
+    user = db_session.query(User).first()
+
+    await extract_and_store_memories(mm, MemoryExtractor, user.user_id, "I finished lesson five")
+
+    memories = mm.get_memory(user.user_id, "lesson_completed")
+    assert len(memories) == 1
+    assert memories[0]["value"] == "5"
+    assert get_current_lesson(mm, user.user_id) == 6

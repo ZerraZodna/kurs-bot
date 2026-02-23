@@ -1,6 +1,6 @@
 import time
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 from src.models.database import SessionLocal, TriggerEmbedding
 from src.services.embedding_service import get_embedding_service
@@ -320,6 +320,8 @@ class TriggerMatcher:
             embedding = await self.embedding_service.generate_embedding(user_text)
         if not embedding:
             return []
+        fallback_path_used = False
+
         # Prefer vector-index based search for speed/scale
         if self._vector_index is not None:
             try:
@@ -335,10 +337,13 @@ class TriggerMatcher:
                         "action_type": t["action_type"],
                         "score": float(score),
                         "threshold": float(t.get("threshold", settings.TRIGGER_SIMILARITY_THRESHOLD)),
+                        "fallback_path_used": False,
+                        "match_source": "vector_index",
                     })
                 return matches
             except Exception:
                 # If index search fails, gracefully fall back to brute-force
+                fallback_path_used = True
                 logger.debug("Vector index search failed, falling back to brute-force matching")
 
         # Brute-force fallback (existing behavior)
@@ -375,11 +380,55 @@ class TriggerMatcher:
                 "action_type": t["action_type"],
                 "score": float(score),
                 "threshold": float(t.get("threshold", settings.TRIGGER_SIMILARITY_THRESHOLD)),
+                "fallback_path_used": fallback_path_used,
+                "match_source": "brute_force",
             })
 
         # Sort by score desc and return top_k
         matches.sort(key=lambda x: x["score"], reverse=True)
         return matches[:top_k]
+
+    async def explain_match(
+        self,
+        user_text: str,
+        top_k: int = 3,
+        precomputed_embedding: Optional[List[float]] = None,
+    ) -> Dict[str, Any]:
+        """Return a compact, test-friendly explanation for trigger matching."""
+        matches = await self.match_triggers(
+            user_text=user_text,
+            top_k=top_k,
+            precomputed_embedding=precomputed_embedding,
+        )
+        top = matches[0] if matches else None
+
+        score = float(top.get("score", 0.0)) if top else 0.0
+        threshold = float(
+            top.get("threshold", settings.TRIGGER_SIMILARITY_THRESHOLD)
+        ) if top else float(settings.TRIGGER_SIMILARITY_THRESHOLD)
+        matched = bool(top) and score >= threshold
+
+        return {
+            "input_text": user_text,
+            "matched": matched,
+            "matched_action": top.get("action_type") if matched else None,
+            "score": score,
+            "threshold": threshold,
+            "fallback_path_used": bool(top.get("fallback_path_used")) if top else False,
+            "match_source": top.get("match_source") if top else "none",
+            "top_matches": [
+                {
+                    "action_type": m.get("action_type"),
+                    "score": float(m.get("score", 0.0)),
+                    "threshold": float(
+                        m.get("threshold", settings.TRIGGER_SIMILARITY_THRESHOLD)
+                    ),
+                    "fallback_path_used": bool(m.get("fallback_path_used")),
+                    "match_source": m.get("match_source"),
+                }
+                for m in matches
+            ],
+        }
 
 
 # Module-level singleton
@@ -391,3 +440,14 @@ def get_trigger_matcher() -> TriggerMatcher:
     if _matcher is None:
         _matcher = TriggerMatcher()
     return _matcher
+
+
+def refresh_trigger_matcher_cache() -> None:
+    """Invalidate cached trigger rows/index so DB updates are visible quickly."""
+    global _matcher
+    if _matcher is None:
+        return
+    _matcher._loaded_at = 0.0
+    _matcher._triggers = []
+    _matcher._vector_index = None
+    _matcher._id_to_trigger = {}

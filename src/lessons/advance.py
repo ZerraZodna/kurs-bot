@@ -5,6 +5,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from src.memories.constants import MemoryCategory, MemoryKey
 from src.models.database import Lesson
 
 from .handler import format_lesson_message, translate_text
@@ -77,13 +78,36 @@ async def maybe_send_next_lesson(
     # confirmation exists we simply return None until it's resolved.
     if state.get("need_confirmation") and lesson_id and is_simple_greeting(text):
         # avoid re-sending the question if already pending
-        from src.scheduler.memory_helpers import get_pending_confirmation
+        from src.scheduler.memory_helpers import (
+            get_pending_confirmation,
+            is_auto_advance_lessons_enabled,
+        )
 
         if get_pending_confirmation(memory_manager, user_id):
             return None
 
-        # Persist a pending confirmation so dialogue handlers can resolve it
         next_id = (int(lesson_id) % 365) + 1
+        if is_auto_advance_lessons_enabled(memory_manager, user_id):
+            lesson = session.query(Lesson).filter(Lesson.lesson_id == next_id).first()
+            if not lesson:
+                return None
+
+            message = await format_lesson_message(lesson, "en", call_ollama)
+            if (language or "").lower() not in ["en"]:
+                message = await translate_text(message, language, call_ollama)
+
+            memory_manager.store_memory(
+                user_id=user_id,
+                key=MemoryKey.LESSON_COMPLETED,
+                value=str(int(lesson_id)),
+                category=MemoryCategory.PROGRESS.value,
+                confidence=1.0,
+                source="dialogue_auto_advance",
+            )
+            set_last_sent_lesson_id(memory_manager, user_id, lesson.lesson_id)
+            return message
+
+        # Persist a pending confirmation so dialogue handlers can resolve it
         _get_set_pending_confirmation()(
             memory_manager, user_id, int(lesson_id), next_id
         )

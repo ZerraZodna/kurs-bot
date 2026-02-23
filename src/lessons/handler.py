@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import json
 import re
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
@@ -118,17 +119,51 @@ async def handle_lesson_request(
 
         matcher = get_trigger_matcher()
         matches = await matcher.match_triggers(user_input)
+        semantic_match = None
         for m in matches:
             if m.get("action_type") == "raw_lesson" and m.get("score", 0.0) >= m.get(
                 "threshold", settings.TRIGGER_SIMILARITY_THRESHOLD
             ):
-                return await format_lesson_message(lesson, user_language or "en")
+                semantic_match = m
+                break
+        if semantic_match:
+            logger.info(
+                "lesson_trigger_decision payload=%s",
+                json.dumps(
+                    {
+                        "matched_action": "raw_lesson",
+                        "score": float(semantic_match.get("score", 0.0)),
+                        "threshold": float(
+                            semantic_match.get(
+                                "threshold", settings.TRIGGER_SIMILARITY_THRESHOLD
+                            )
+                        ),
+                        "fallback_path_used": False,
+                        "match_source": semantic_match.get("match_source", "unknown"),
+                    },
+                    sort_keys=True,
+                ),
+            )
+            return await format_lesson_message(lesson, user_language or "en")
 
         # Conservative regex fallback for explicit requests asking for the
         # exact text/words of the lesson.
         if re.search(r"\bwhat exactly is\b.*\blesson\b", user_lower) or re.search(
             r"\b(exact|exactly|the text of|exact text|exact words)\b", user_lower
         ):
+            logger.info(
+                "lesson_trigger_decision payload=%s",
+                json.dumps(
+                    {
+                        "matched_action": "raw_lesson",
+                        "score": 0.0,
+                        "threshold": float(settings.TRIGGER_SIMILARITY_THRESHOLD),
+                        "fallback_path_used": True,
+                        "match_source": "regex_fallback",
+                    },
+                    sort_keys=True,
+                ),
+            )
             return await format_lesson_message(lesson, user_language or "en")
 
         # Otherwise (including plain "Give me lesson N"), use RAG/LLM to discuss the lesson

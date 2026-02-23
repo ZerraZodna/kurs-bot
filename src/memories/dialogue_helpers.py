@@ -3,17 +3,48 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 from src.memories.manager import MemoryManager
 from src.memories.memory_extractor import MemoryExtractor
-from src.memories.constants import MemoryKey
+from src.memories.constants import MemoryCategory, MemoryKey
 from src.memories.user_data_service import delete_user_content_rows
 from src.config import settings
 from src.lessons.state import set_current_lesson
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_lesson_completed_value(value) -> str | None:
+    """Return a normalized lesson id string (1-365) or None for invalid input."""
+    try:
+        if isinstance(value, int):
+            lesson_id = value
+        elif isinstance(value, float):
+            if not value.is_integer():
+                return None
+            lesson_id = int(value)
+        elif isinstance(value, str):
+            raw = value.strip()
+            if not raw:
+                return None
+            if raw.isdigit():
+                lesson_id = int(raw)
+            else:
+                m = re.search(r"\b(?:lesson|leksjon)?\s*(\d{1,3})\b", raw.lower())
+                if not m:
+                    return None
+                lesson_id = int(m.group(1))
+        else:
+            return None
+    except Exception:
+        return None
+
+    if 1 <= int(lesson_id) <= 365:
+        return str(int(lesson_id))
+    return None
 
 def get_user_language(memory_manager: MemoryManager, user_id: int) -> str:
     #"""Get user's preferred language."""
@@ -81,6 +112,24 @@ async def extract_and_store_memories(
                     except Exception:
                         parsed = val
                     set_current_lesson(memory_manager, user_id, parsed)
+                elif key == MemoryKey.LESSON_COMPLETED:
+                    normalized = _normalize_lesson_completed_value(val)
+                    if normalized is None:
+                        logger.info(
+                            "Skipping invalid lesson_completed memory for user %s: %r",
+                            user_id,
+                            val,
+                        )
+                        continue
+                    memory_manager.store_memory(
+                        user_id=user_id,
+                        key=key,
+                        value=normalized,
+                        confidence=memory.get("confidence", 1.0),
+                        ttl_hours=memory.get("ttl_hours"),
+                        source="dialogue_engine_extractor",
+                        category=MemoryCategory.PROGRESS.value,
+                    )
                 else:
                     memory_manager.store_memory(
                         user_id=user_id,

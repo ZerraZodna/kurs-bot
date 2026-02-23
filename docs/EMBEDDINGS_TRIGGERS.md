@@ -65,4 +65,48 @@ This document describes how text embeddings are produced, stored, seeded, and ma
 - Logging: enable debug logs for `src.triggers.trigger_matcher` and `src.services.embedding_service` to inspect embedding dims, conversion errors, and match scores.
 - If matches are missing: check that `generate_embedding()` returns a non-empty vector with the expected dimension; verify persisted embedding dimension matches runtime embedding dimension; check DB seeding.
 
+## Trigger Tuning Workflow
+
+1. Add or refine trigger phrases:
+   - Edit `STARTER` in `src/triggers/trigger_matcher.py`.
+   - Add paraphrases for the same action (especially natural variants and localized phrasing).
+   - Keep `name`/`action_type` stable when adding variants for an existing intent.
+2. Tune thresholds:
+   - Set per-trigger `threshold` directly in `STARTER` entries.
+   - Use `TRIGGER_SIMILARITY_THRESHOLD` as a global fallback when per-trigger threshold is missing.
+   - Raise thresholds to reduce false positives, lower slightly to improve recall for paraphrases.
+3. Inspect why a message matched or missed:
+   - Use the runtime debug command:
+     - `debug_trigger <message>`
+     - `trigger_debug <message>`
+   - The output includes matched action, score, threshold, fallback-path usage, and top candidate actions.
+4. Verify with tests:
+   - Trigger-focused tests:
+     - `npm test -- tests/test_trigger_matcher.py tests/test_trigger_observability.py -q`
+   - Dialogue fallback-order tests:
+     - `npm test -- tests/test_lesson_trigger_order.py -q`
+   - Scheduler integration tests:
+     - `npm test -- tests/test_scheduler_service.py tests/test_trigger_scheduler_integration.py -q`
+5. Re-check logs after tuning:
+   - Structured trigger decision logs are emitted from `src/triggers/triggering.py` as `trigger_decision` lines.
+   - For lesson raw-text decisions, `src/lessons/handler.py` logs whether semantic matching or regex fallback was used.
+
+## Telegram Admin Commands (Trigger Embeddings)
+
+These commands are available in chat for the configured Telegram admin only.
+
+- `trigger_add <action_type> | <phrase> | <threshold_optional>`
+  - Example: `trigger_add create_schedule | remind me after lunch | 0.66`
+  - Adds one embedding phrase to an existing `action_type`.
+- `trigger_list [action_type]`
+  - Example: `trigger_list create_schedule`
+  - Lists latest trigger rows (up to 50).
+- `trigger_delete <trigger_id>`
+  - Example: `trigger_delete 123`
+  - Deletes one trigger row by id.
+
+Authorization note:
+- Commands are allowed only when the message sender matches the stored admin Telegram chat id.
+- The admin chat id is set when a message arrives from `ADMIN_TELEGRAM_USERNAME` in webhook handling.
+
 If you'd like, I can add the exporter script (`scripts/export_trigger_embeddings.py`) into the repo so you can generate `scripts/ci_trigger_data.py` locally and commit it. I can also add a short troubleshooting checklist to this doc.

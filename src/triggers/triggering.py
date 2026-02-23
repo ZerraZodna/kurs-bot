@@ -9,6 +9,37 @@ from src.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _decision_from_matches(
+    source: str,
+    matches: Optional[list],
+    fallback_path_used: bool = False,
+) -> Dict[str, Any]:
+    top = (matches or [None])[0]
+    threshold = float(
+        top.get("threshold", settings.TRIGGER_SIMILARITY_THRESHOLD)
+    ) if top else float(settings.TRIGGER_SIMILARITY_THRESHOLD)
+    score = float(top.get("score", 0.0)) if top else 0.0
+    matched = bool(top) and score >= threshold
+    return {
+        "source": source,
+        "matched": matched,
+        "matched_action": top.get("action_type") if matched else None,
+        "score": score,
+        "threshold": threshold,
+        "fallback_path_used": bool(fallback_path_used or (top and top.get("fallback_path_used"))),
+        "match_source": top.get("match_source") if top else "none",
+        "top_candidate_action": top.get("action_type") if top else None,
+    }
+
+
+def _log_trigger_decision(user_id: int, decision: Dict[str, Any]) -> None:
+    logger.info(
+        "trigger_decision user=%s payload=%s",
+        user_id,
+        json.dumps(decision, ensure_ascii=False, sort_keys=True),
+    )
+
+
 async def handle_triggers(
     response: str,
     original_text: str,
@@ -16,7 +47,7 @@ async def handle_triggers(
     memory_manager,
     user_id: int,
     original_text_embedding=None,
-) -> None:
+) -> Dict[str, Any]:
     """Run trigger dispatching for a dialogue turn.
 
     This will prefer structured intent from the assistant response, and
@@ -24,11 +55,28 @@ async def handle_triggers(
     text and the assistant response. Matches that meet their threshold are
     dispatched.
     """
+    diagnostics: Dict[str, Any] = {
+        "structured_intent_used": False,
+        "original_text_decision": None,
+        "assistant_response_decision": None,
+        "dispatched_actions": [],
+    }
+
     try:
         # Guard: if response is None, skip matching
         if response is None:
             logger.warning("Assistant response is None; skipping trigger matching")
-            return
+            diagnostics["original_text_decision"] = {
+                "source": "original_text",
+                "matched": False,
+                "matched_action": None,
+                "score": 0.0,
+                "threshold": float(settings.TRIGGER_SIMILARITY_THRESHOLD),
+                "fallback_path_used": False,
+                "match_source": "none",
+                "top_candidate_action": None,
+            }
+            return diagnostics
 
         # Prefer structured intent from LLM if present
         intent = None
@@ -60,12 +108,29 @@ async def handle_triggers(
             result = dispatcher.dispatch(match, {"user_id": user_id, "intent": intent, "original_text": original_text})
             if result and result.get("ok"):
                 dispatched_actions.add(action)
-            return
+            decision = {
+                "source": "structured_intent",
+                "matched": True,
+                "matched_action": action,
+                "score": 1.0,
+                "threshold": float(settings.TRIGGER_SIMILARITY_THRESHOLD),
+                "fallback_path_used": False,
+                "match_source": "structured_intent",
+                "top_candidate_action": action,
+            }
+            diagnostics["structured_intent_used"] = True
+            diagnostics["original_text_decision"] = decision
+            diagnostics["dispatched_actions"] = sorted(dispatched_actions)
+            _log_trigger_decision(user_id, decision)
+            return diagnostics
 
         matcher = get_trigger_matcher()
         try:
             # Match on original user text
             matches = await matcher.match_triggers(original_text, precomputed_embedding=original_text_embedding)
+            original_decision = _decision_from_matches("original_text", matches)
+            diagnostics["original_text_decision"] = original_decision
+            _log_trigger_decision(user_id, original_decision)
             for m in matches:
                 if m.get("score", 0.0) >= m.get("threshold", settings.TRIGGER_SIMILARITY_THRESHOLD):
                     action = m.get("action_type")
@@ -82,7 +147,8 @@ async def handle_triggers(
             # on the assistant response to avoid computing an extra embedding.
             if dispatched_actions:
                 logger.info(f"Skipping assistant-response trigger matching; actions already dispatched for user={user_id}: {dispatched_actions}")
-                return
+                diagnostics["dispatched_actions"] = sorted(dispatched_actions)
+                return diagnostics
 
             # Also attempt matching on the assistant response text
             try:
@@ -108,6 +174,13 @@ async def handle_triggers(
 
                 condensed = _normalize_response(response)
                 resp_matches = await matcher.match_triggers(condensed)
+                response_decision = _decision_from_matches(
+                    "assistant_response",
+                    resp_matches,
+                    fallback_path_used=True,
+                )
+                diagnostics["assistant_response_decision"] = response_decision
+                _log_trigger_decision(user_id, response_decision)
                 for m in resp_matches:
                     action = m.get("action_type")
                     # Skip if this action was already dispatched for original_text
@@ -122,8 +195,50 @@ async def handle_triggers(
                             dispatched_actions.add(action)
             except Exception as e:
                 logger.warning(f"Response matching failed: {e}")
+                decision = {
+                    "source": "assistant_response",
+                    "matched": False,
+                    "matched_action": None,
+                    "score": 0.0,
+                    "threshold": float(settings.TRIGGER_SIMILARITY_THRESHOLD),
+                    "fallback_path_used": True,
+                    "match_source": "error",
+                    "top_candidate_action": None,
+                    "error": str(e),
+                }
+                diagnostics["assistant_response_decision"] = decision
+                _log_trigger_decision(user_id, decision)
         except Exception as e:
             logger.warning(f"Trigger matcher error: {e}")
+            if diagnostics.get("original_text_decision") is None:
+                diagnostics["original_text_decision"] = {
+                    "source": "original_text",
+                    "matched": False,
+                    "matched_action": None,
+                    "score": 0.0,
+                    "threshold": float(settings.TRIGGER_SIMILARITY_THRESHOLD),
+                    "fallback_path_used": False,
+                    "match_source": "error",
+                    "top_candidate_action": None,
+                    "error": str(e),
+                }
+                _log_trigger_decision(user_id, diagnostics["original_text_decision"])
 
     except Exception as e:
         logger.warning(f"Triggers failed: {e}")
+        if diagnostics.get("original_text_decision") is None:
+            diagnostics["original_text_decision"] = {
+                "source": "original_text",
+                "matched": False,
+                "matched_action": None,
+                "score": 0.0,
+                "threshold": float(settings.TRIGGER_SIMILARITY_THRESHOLD),
+                "fallback_path_used": False,
+                "match_source": "error",
+                "top_candidate_action": None,
+                "error": str(e),
+            }
+            _log_trigger_decision(user_id, diagnostics["original_text_decision"])
+
+    diagnostics["dispatched_actions"] = sorted(dispatched_actions) if "dispatched_actions" in locals() else []
+    return diagnostics
