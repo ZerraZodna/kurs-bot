@@ -106,6 +106,7 @@ async def test_trigger_add_list_delete_roundtrip(monkeypatch, db_session):
     assert list_out is not None
     assert "Trigger embeddings" in list_out
     assert "action=create_schedule" in list_out
+    assert "remind me after lunch" in list_out
 
     latest = (
         db_session.query(TriggerEmbedding)

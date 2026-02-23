@@ -14,6 +14,15 @@ from src.triggers.trigger_matcher import refresh_trigger_matcher_cache
 logger = logging.getLogger(__name__)
 
 
+def _normalize_phrase_for_name(value: str) -> str:
+    compact = " ".join((value or "").split()).strip()
+    if not compact:
+        return "-"
+    if len(compact) <= 255:
+        return compact
+    return compact[:252] + "..."
+
+
 def _is_trigger_admin(session: Session, user_id: int) -> bool:
     """Authorize trigger-management commands for the configured Telegram admin."""
     if session is None:
@@ -102,7 +111,7 @@ async def handle_trigger_admin_commands(
             return "Failed to generate embedding for phrase. Check embedding backend availability."
 
         row = TriggerEmbedding(
-            name=f"{action_type}_admin",
+            name=_normalize_phrase_for_name(phrase),
             action_type=action_type,
             embedding=emb_svc.embedding_to_bytes(embedding),
             threshold=float(threshold),
@@ -137,8 +146,9 @@ async def handle_trigger_admin_commands(
 
         lines = [f"Trigger embeddings ({len(rows)} shown):"]
         for r in rows:
+            phrase = _normalize_phrase_for_name(r.name)
             lines.append(
-                f"id={r.id} action={r.action_type} threshold={float(r.threshold or 0.0):.2f} name={r.name}"
+                f"id={r.id} action={r.action_type} threshold={float(r.threshold or 0.0):.2f} phrase=\"{phrase}\""
             )
         if len(rows) == 50:
             lines.append("Showing latest 50 entries.")

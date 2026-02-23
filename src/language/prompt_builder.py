@@ -6,6 +6,7 @@ Supports dynamic context assembly for Ollama LLM with token optimization.
 from typing import Dict, List, Optional, Any, Tuple
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
+import re
 from src.services.timezone_utils import get_user_timezone_name, format_dt_in_timezone, to_utc
 from src.models.database import MessageLog, User, Lesson
 from src.memories import MemoryManager
@@ -50,6 +51,13 @@ class PromptBuilder:
         "- Never use ASCII/Unicode tables, box-drawing tables, or markdown tables.\n"
         "- Use short paragraphs and simple bullet or numbered lists instead.\n"
         "- Keep layout plain and mobile-friendly."
+    )
+
+    LESSON_TEXT_RETRIEVAL_RULES = (
+        "### Lesson Text Retrieval Rules\n"
+        "- If the user asks for today's lesson or a specific lesson number/text, return the lesson text exactly as provided.\n"
+        "- Do not summarize, interpret, explain, or rewrite the lesson text.\n"
+        "- Return only the lesson header and lesson body."
     )
     
     def __init__(self, db: Session, memory_manager: Optional[MemoryManager] = None):
@@ -101,6 +109,8 @@ class PromptBuilder:
                 context_parts.append(f"\n### Today's ACIM Lesson\n{lesson_context}")
             if progress_note:
                 context_parts.append(f"\n### Lesson Progress Note\n{progress_note}")
+            if self._is_direct_lesson_text_request(user_input):
+                context_parts.append(f"\n{self.LESSON_TEXT_RETRIEVAL_RULES}")
 
         # 2. User Profile Context
         profile_context = self._build_profile_context(user)
@@ -137,6 +147,31 @@ class PromptBuilder:
         context_parts.append(f"\n### Current Message\nUser: {user_input}\n\nAssistant:")
         
         return "".join(context_parts)
+
+    def _is_direct_lesson_text_request(self, user_input: str) -> bool:
+        """Detect direct requests for today's lesson or specific lesson text."""
+        raw = (user_input or "").lower()
+        if not raw:
+            return False
+
+        normalized = re.sub(r"[^\w\s]", " ", raw)
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        tokens = set(normalized.split())
+
+        lesson_words = {"lesson", "leksjon", "lekse"}
+        has_lesson_word = bool(tokens & lesson_words)
+        if not has_lesson_word:
+            return False
+
+        if re.search(
+            r"\b(?:lesson|leksjon|lekse)\s*(?:number|nr|no|text|tekst|content|innhold)?\s*#?\s*\d{1,3}\b",
+            normalized,
+        ):
+            return True
+
+        today_words = {"today", "todays", "idag", "dagens"}
+        has_today_word = bool(tokens & today_words) or ("i dag" in normalized)
+        return has_today_word
 
     def build_rag_prompt(
         self,

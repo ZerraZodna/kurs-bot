@@ -179,6 +179,31 @@ class TestPromptBuilder:
         assert "Output Format Rules" in prompt
         assert "Never use ASCII/Unicode tables" in prompt
 
+    def test_build_prompt_includes_lesson_text_retrieval_rules_for_direct_lesson_request(
+        self, prompt_builder: PromptBuilder, test_user: User
+    ):
+        prompt = prompt_builder.build_prompt(
+            user_id=test_user.user_id,
+            user_input="Give me lesson text 13",
+            system_prompt="You are a helpful assistant.",
+            include_conversation_history=False,
+        )
+
+        assert "Lesson Text Retrieval Rules" in prompt
+        assert "return the lesson text exactly as provided" in prompt.lower()
+
+    def test_build_prompt_omits_lesson_text_retrieval_rules_for_non_lesson_request(
+        self, prompt_builder: PromptBuilder, test_user: User
+    ):
+        prompt = prompt_builder.build_prompt(
+            user_id=test_user.user_id,
+            user_input="How are you today?",
+            system_prompt="You are a helpful assistant.",
+            include_conversation_history=False,
+        )
+
+        assert "Lesson Text Retrieval Rules" not in prompt
+
 
 class TestContextOptimizer:
     """Test ContextOptimizer utilities."""
