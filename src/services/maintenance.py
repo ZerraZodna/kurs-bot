@@ -5,8 +5,12 @@ from typing import Optional
 import time
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
-from src.models.database import SessionLocal, MessageLog, Schedule, JobState
+from src.models.database import SessionLocal, MessageLog
 from src.memories.memory_handler import MemoryHandler
+from src.scheduler.maintenance import (
+    purge_inactive_schedules as _scheduler_purge_inactive_schedules,
+    purge_job_states as _scheduler_purge_job_states,
+)
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -89,50 +93,13 @@ def purge_message_logs(days_keep: int = 30, session: Optional[Session] = None) -
 
 
 def purge_inactive_schedules(days_keep: int = 7, session: Optional[Session] = None) -> int:
-    """Delete schedules that are inactive and older than days_keep. Returns number deleted."""
-    close_session = False
-    if session is None:
-        session = SessionLocal()
-        close_session = True
-
-    try:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days_keep)
-        q = session.query(Schedule).filter(
-            Schedule.is_active == False,
-            Schedule.created_at < cutoff,
-        )
-        deleted = q.count()
-        q.delete(synchronize_session=False)
-        session.commit()
-        logger.info("Purged %s inactive Schedule rows older than %s days", deleted, days_keep)
-        return deleted
-    finally:
-        if close_session:
-            session.close()
+    """Compatibility wrapper for scheduler-owned purge helper."""
+    return _scheduler_purge_inactive_schedules(days_keep=days_keep, session=session)
 
 
 def purge_job_states(days_keep: int = 30, session: Optional[Session] = None) -> int:
-    """Delete JobState rows older than days_keep. Returns number deleted.
-
-    Note: `JobState` is a simple key/value table; ensure callers are ok with
-    removing old keys before enabling this in production.
-    """
-    close_session = False
-    if session is None:
-        session = SessionLocal()
-        close_session = True
-
-    try:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days_keep)
-        q = session.query(JobState).filter(JobState.created_at < cutoff)
-        deleted = q.count()
-        q.delete(synchronize_session=False)
-        session.commit()
-        logger.info("Purged %s JobState rows older than %s days", deleted, days_keep)
-        return deleted
-    finally:
-        if close_session:
-            session.close()
+    """Compatibility wrapper for scheduler-owned purge helper."""
+    return _scheduler_purge_job_states(days_keep=days_keep, session=session)
 
 
 def run_daily_maintenance(days_keep: int = 365) -> None:

@@ -7,7 +7,7 @@ from typing import Optional
 from src.config import settings
 from src.integrations.telegram import send_message
 import httpx
-from src.services.job_state import get_state, set_state
+from src.scheduler.job_state import get_state, set_state
 
 logger = logging.getLogger(__name__)
 

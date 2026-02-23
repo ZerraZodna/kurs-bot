@@ -23,7 +23,7 @@ from src.models.database import Schedule, User, Lesson
 from src.models.database import SessionLocal
 from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
-from src.memories.scheduler_helpers import (
+from .memory_helpers import (
     get_schedule_message,
     get_user_language,
     get_last_sent_lesson_id,

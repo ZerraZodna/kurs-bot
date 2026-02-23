@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from src.services.timezone_utils import format_dt_in_timezone
 from src.services.timezone_utils import ensure_user_timezone, to_utc
 from src.memories.constants import MemoryCategory, MemoryKey
-from src.memories.scheduler_helpers import get_user_language
+from src.scheduler.memory_helpers import get_user_language
 from src.scheduler.message_utils import translate_text_sync
 
 from src.memories.manager import MemoryManager

@@ -11,7 +11,7 @@ from .handler import format_lesson_message, translate_text
 from src.memories.dialogue_helpers import get_user_language
 from src.onboarding.prompts import get_lesson_confirmation_prompt
 from src.lessons.state import set_last_sent_lesson_id
-from src.memories.scheduler_helpers import set_pending_confirmation
+from src.scheduler.memory_helpers import set_pending_confirmation
 
 
 def is_simple_greeting(text: str) -> bool:
@@ -72,7 +72,7 @@ async def maybe_send_next_lesson(
     # confirmation exists we simply return None until it's resolved.
     if state.get("need_confirmation") and lesson_id and is_simple_greeting(text):
         # avoid re-sending the question if already pending
-        from src.memories.scheduler_helpers import get_pending_confirmation
+        from src.scheduler.memory_helpers import get_pending_confirmation
 
         if get_pending_confirmation(memory_manager, user_id):
             return None

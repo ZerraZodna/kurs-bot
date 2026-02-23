@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timezone
 from typing import List, Dict, Optional
 
-from src.services.job_state import get_state_json, set_state_json, set_state_datetime
+from src.scheduler.job_state import get_state_json, set_state_json, set_state_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ def record_traffic_event() -> None:
 
 
 def get_last_message_at() -> Optional[datetime]:
-    from src.services.job_state import get_state_datetime
+    from src.scheduler.job_state import get_state_datetime
 
     return get_state_datetime(_LAST_MESSAGE_KEY)
 

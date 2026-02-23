@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from src.config import settings
-from src.services.job_state import get_state_datetime, set_state_datetime
+from src.scheduler.job_state import get_state_datetime, set_state_datetime
 from src.services.traffic_tracker import get_last_message_at, is_today_lowest_traffic
 from src.services.maintenance import perform_maintenance
 from src.scheduler import SchedulerService
