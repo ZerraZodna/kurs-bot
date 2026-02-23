@@ -511,6 +511,11 @@ class SchedulerService:
         Execute a scheduled task (send lesson or reminder).
 
         This is called by APScheduler when a job triggers.
+
+        `simulate=True` is used by debug "next_day" flows to simulate that a
+        day boundary has happened. It is not a dry-run flag: outbound sends and
+        memory updates may still occur. It primarily avoids schedule timestamp
+        progression/commits in this method.
         """
         from src import scheduler as _scheduler_pkg
         close_db = False

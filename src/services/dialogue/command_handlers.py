@@ -322,6 +322,13 @@ def handle_debug_next_day(
     session: Session,
     user_id: int,
 ) -> Optional[str]:
+    """Advance the debug day offset and execute daily schedules once.
+
+    This command intentionally exercises production scheduling logic by calling
+    `SchedulerService.execute_scheduled_task(..., simulate=True)`. In this codebase,
+    `simulate=True` means "simulate a new day trigger" for flow testing, not a
+    dry run; outbound messages can still be sent.
+    """
     if text.strip().lower() != "next_day":
         return None
 
