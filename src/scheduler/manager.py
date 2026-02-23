@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from src.models.database import SessionLocal, Schedule
 from src.services.timezone_utils import to_utc
+from .domain import SCHEDULE_TYPE_DAILY
 
 
 def create_schedule(
@@ -129,7 +130,7 @@ def find_active_daily_schedule(user_id: int, session=None) -> Optional[Schedule]
     try:
         return (
             session.query(Schedule)
-            .filter_by(user_id=user_id, is_active=True, schedule_type="daily")
+            .filter_by(user_id=user_id, is_active=True, schedule_type=SCHEDULE_TYPE_DAILY)
             .order_by(Schedule.created_at)
             .first()
         )

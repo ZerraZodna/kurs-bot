@@ -14,6 +14,7 @@ from src.memories.constants import MemoryCategory, MemoryKey
 from src.memories.semantic_search import get_semantic_search_service
 from src.memories.memory_handler import MemoryHandler
 from src.scheduler import SchedulerService
+from src.scheduler.domain import SCHEDULE_TYPE_DAILY
 from src.models.database import Schedule
 from src.services.gdpr_service import (
     export_user_data,
@@ -373,7 +374,7 @@ def handle_debug_next_day(
             .filter(
                 Schedule.user_id == user_id,
                 Schedule.is_active == True,
-                Schedule.schedule_type == "daily",
+                Schedule.schedule_type == SCHEDULE_TYPE_DAILY,
             )
             .all()
         )

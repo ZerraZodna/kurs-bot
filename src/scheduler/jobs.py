@@ -9,6 +9,10 @@ from typing import Any
 from datetime import timezone
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
+from .domain import (
+    is_one_time_schedule_type,
+    job_id_for_schedule as build_job_id_for_schedule,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -27,7 +31,7 @@ def shutdown_scheduler():
 
 
 def _job_id_for(schedule_id: int) -> str:
-    return f"schedule_{schedule_id}"
+    return build_job_id_for_schedule(schedule_id)
 
 
 def job_id_for_schedule(schedule_id: int) -> str:
@@ -46,7 +50,7 @@ def sync_job_for_schedule(schedule: Any) -> None:
     job_id = _job_id_for(getattr(schedule, "schedule_id"))
 
     try:
-        if getattr(schedule, "schedule_type", "").startswith("one_time"):
+        if is_one_time_schedule_type(getattr(schedule, "schedule_type", "")):
             run_at = getattr(schedule, "next_send_time")
             if run_at is None:
                 logger.warning("one_time schedule %s has no next_send_time", job_id)

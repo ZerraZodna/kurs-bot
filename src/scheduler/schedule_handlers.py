@@ -5,6 +5,7 @@ from typing import Optional, Callable
 from sqlalchemy.orm import Session
 
 from src.scheduler import SchedulerService
+from src.scheduler.domain import is_daily_schedule_family
 from src.services.timezone_utils import ensure_user_timezone
 import re
 
@@ -108,7 +109,7 @@ async def handle_schedule_messages(
             pass
 
         existing = SchedulerService.get_user_schedules(user_id)
-        daily_existing = next((s for s in existing if s.schedule_type and s.schedule_type.startswith("daily")), None)
+        daily_existing = next((s for s in existing if is_daily_schedule_family(s.schedule_type)), None)
         if daily_existing:
             SchedulerService.update_daily_schedule(daily_existing.schedule_id, normalized, session=session)
             resp = f"Okay — I updated your daily reminder to {normalized}."

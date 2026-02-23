@@ -9,6 +9,10 @@ from src.services.timezone_utils import ensure_user_timezone, to_utc
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.scheduler.memory_helpers import get_user_language
 from src.scheduler.message_utils import translate_text_sync
+from src.scheduler.domain import (
+    SCHEDULE_TYPE_DAILY,
+    is_one_time_schedule_type,
+)
 
 from src.memories.manager import MemoryManager
 from src import scheduler as _scheduler_pkg
@@ -102,7 +106,7 @@ class TriggerDispatcher:
                 return result
 
         # Use scheduler helper - attempt daily creation when time_str provided
-        if spec.get("schedule_type") == "daily" and spec.get("time_str"):
+        if spec.get("schedule_type") == SCHEDULE_TYPE_DAILY and spec.get("time_str"):
             from src.scheduler.time_utils import compute_next_send_and_cron
 
             # Normalize provided time_str to canonical HH:MM (local time) and persist
@@ -148,7 +152,7 @@ class TriggerDispatcher:
             return result
 
         # One-time via structured spec
-        if spec.get("schedule_type") and spec.get("schedule_type").startswith("one_time"):
+        if is_one_time_schedule_type(spec.get("schedule_type")):
             return self._create_one_time_from_spec(user_id, spec)
 
         # Fallback: try to infer a one-time reminder from texts
@@ -331,7 +335,11 @@ class TriggerDispatcher:
                 self.db.commit()
 
             SchedulerService = _scheduler_pkg.SchedulerService
-            active_schedules = self.db.query(Schedule).filter_by(user_id=user_id, is_active=True, schedule_type="daily").all()
+            active_schedules = self.db.query(Schedule).filter_by(
+                user_id=user_id,
+                is_active=True,
+                schedule_type=SCHEDULE_TYPE_DAILY,
+            ).all()
             for sched in active_schedules:
                 preferred = self.memory_manager.get_memory(user_id, MemoryKey.PREFERRED_LESSON_TIME)
                 if preferred and preferred[0].get("value"):

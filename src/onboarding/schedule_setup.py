@@ -33,6 +33,7 @@ def create_auto_schedule(db: Session, user_id: int) -> bool:
     """
     from src.scheduler import SchedulerService
     from src.scheduler import manager as schedule_manager
+    from src.scheduler.domain import SCHEDULE_TYPE_DAILY
 
     try:
         existing = schedule_manager.find_active_daily_schedule(user_id, session=db)
@@ -62,7 +63,7 @@ def create_auto_schedule(db: Session, user_id: int) -> bool:
             user_id=user_id,
             lesson_id=lesson_id,
             time_str="07:30",
-            schedule_type="daily",
+            schedule_type=SCHEDULE_TYPE_DAILY,
             session=db,
         )
         logger.info(f"✓ Auto-created daily schedule at 07:30 AM for user {user_id}")

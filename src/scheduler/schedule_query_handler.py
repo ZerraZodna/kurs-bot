@@ -9,6 +9,7 @@ from src.models.database import Schedule
 from src.services.timezone_utils import format_dt_in_timezone
 import src.triggers.trigger_matcher as trigger_matcher
 from src.config import settings
+from .domain import is_one_time_schedule_type
 
 
 async def detect_schedule_status_request(text: str) -> bool:
@@ -48,7 +49,7 @@ def build_schedule_status_response(schedules: Iterable[Schedule], tz_name: str =
 
     lines = ["Here are your active reminders:"]
     for schedule in schedules:
-        if schedule.schedule_type.startswith("one_time"):
+        if is_one_time_schedule_type(schedule.schedule_type):
             if schedule.next_send_time:
                 ts, _ = format_dt_in_timezone(schedule.next_send_time, tz_name)
                 lines.append(f"- One-time reminder at {ts:%Y-%m-%d %H:%M}")
