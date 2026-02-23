@@ -25,3 +25,9 @@
 - [x] Route affirmative response to deliver Lesson 0 (course introduction)
 - [x] Keep negative/unclear responses in onboarding with clear next action
 - [x] Update and run onboarding tests
+
+## 5. Remove Legacy Onboarding Prompts Module
+- [x] Replace `onboarding_prompts_legacy` imports with `onboarding_prompts`
+- [x] Update tests to import the non-legacy prompt module
+- [x] Delete `src/language/onboarding_prompts_legacy.py`
+- [x] Run targeted tests covering onboarding, scheduler, and next-day confirmation

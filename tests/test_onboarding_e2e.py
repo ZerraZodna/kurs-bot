@@ -31,7 +31,7 @@ async def test_onboarding_reported_current_lesson_triggers_confirmation_on_sched
     # Expect at least one message (the confirmation prompt)
     assert messages is not None
     combined = "\n\n".join(messages) if isinstance(messages, list) else str(messages)
-    assert "did you complete" in combined.lower() or "fullførte du" in combined.lower()
+    assert "quick check-in" in combined.lower() or "liten innsjekk" in combined.lower()
 
     # Verify pending confirmation persisted
     pending = get_pending_confirmation(mm, user_id)

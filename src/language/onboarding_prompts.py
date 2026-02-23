@@ -142,9 +142,7 @@ def get_onboarding_message(key: str, language: str = "en") -> str:
 
 
 def get_lesson_confirmation_prompt(language: str, lesson_id: int) -> str:
-	"""Return a bilingual, gentle confirmation prompt asking if the user
-	completed the reported lesson yesterday.
-	"""
+	"""Return a bilingual, gentle confirmation prompt with a repeat option."""
 	template = get_onboarding_message("confirm_lesson", language)
 	try:
 		return template.format(lesson_id=lesson_id)
@@ -155,9 +153,6 @@ def get_lesson_confirmation_prompt(language: str, lesson_id: int) -> str:
 
 # Confirmation prompt template for when a user reports a current lesson
 ONBOARD_MESSAGES["confirm_lesson"] = {
-    # use wording that doesn't assume a day boundary; the prompt may be shown
-    # multiple times if the session is restarted, and talking about "yesterday"
-    # can be confusing if it's still the same day.
-    "en": "The last time we spoke you told me you were on Lesson {lesson_id}. From a gentle, loving place: did you complete that lesson? Reply 'yes' to receive next lesson, or 'no' if you'd like to continue where you left off.",
-    "no": "Sist vi snakket sa du at du var på Leksjon {lesson_id}. Fra et mildt, kjærlig sted: fullførte du den leksjonen? Svar 'ja' for å motta neste leksjon, eller 'nei' hvis du vil fortsette der du slapp.",
+    "en": "Quick check-in: would you like to stay with Lesson {lesson_id} today, or continue to the next one? Both are completely okay. Reply 'yes' to continue, or 'no' to repeat Lesson {lesson_id}.",
+    "no": "Liten innsjekk: vil du fortsette med Leksjon {lesson_id} i dag, eller gå videre til neste? Begge deler er helt fint. Svar 'ja' for å gå videre, eller 'nei' for å repetere Leksjon {lesson_id}.",
 }

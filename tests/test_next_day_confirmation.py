@@ -41,7 +41,7 @@ async def test_next_day_triggers_confirmation_prompt():
     )
 
     assert result is not None, "Expected a confirmation prompt but got None"
-    assert "did you complete" in result.lower() or "fullførte du" in result.lower()
+    assert "quick check-in" in result.lower() or "liten innsjekk" in result.lower()
 
     # Verify that a pending confirmation was persisted for the user
     pending = get_pending_confirmation(mm, user_id)
@@ -75,9 +75,11 @@ def test_confirmation_prompt_wording():
 
     prompt_en = get_lesson_confirmation_prompt("en", 9)
     assert "yesterday" not in prompt_en.lower()
-    assert "last time" in prompt_en.lower() or "spoke" in prompt_en.lower()
+    assert "stay with lesson 9" in prompt_en.lower()
+    assert "no' to repeat lesson 9" in prompt_en.lower()
 
     prompt_no = get_lesson_confirmation_prompt("no", 12)
     # norwegian text should also avoid the literal word for "yesterday"
     assert "i går" not in prompt_no.lower()
-    assert "sist" in prompt_no.lower() or "snakket" in prompt_no.lower()
+    assert "fortsette med leksjon 12 i dag" in prompt_no.lower()
+    assert "nei' for å repetere leksjon 12" in prompt_no.lower()
