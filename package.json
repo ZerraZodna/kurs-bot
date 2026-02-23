@@ -28,6 +28,7 @@
     "restart": "npm run stop && npm run start",
     "tail": "node ./scripts/venv.js tail",
     "list": "node ./scripts/venv.js list",
+    "status": "node ./scripts/venv.js status",
     "lint": "echo \"No linter configured\" && exit 0"
   },
   "dependencies": {

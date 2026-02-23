@@ -184,6 +184,7 @@ switch (cmd) {
       '  npm run start:ui     # serve the dev frontend (equivalent to serve_dev_ui.ps1) — opens browser by default; use `--no-open` or set BROWSER=none to disable',
       '  npm run init_db     # initialize database (defaults to prod.db)',
       '  npm run seed        # regenerate ci_trigger_data.py and seed trigger_embeddings',
+      '  npm run status      # print DB counts for active users, lessons, embeddings, and messages',
       '  npm run config       # create .env from .env.template (if missing) and open it in your editor',
       "  npm run update       # run 'git pull' and, if changes were pulled, restart services (stop then start)",
       '  npm run ping         # check Telegram API and Ollama endpoints based on .env',
@@ -205,6 +206,7 @@ switch (cmd) {
     console.log('  run <script> [args] Run a Python script');
     console.log('  exec <python-args>  Run arbitrary python with args');
     console.log('  seed              Regenerate ci_trigger_data.py and seed trigger_embeddings');
+    console.log('  status            Print current DB counts for active users, lessons, embeddings, and messages');
     process.exit(0);
     break;
   case 'ensure-venv':
@@ -725,6 +727,11 @@ switch (cmd) {
         }
         process.exit(0);
       }
+      break;
+    case 'status':
+      // Print status counts from the currently configured DB
+      if (!venvPython()) ensureVenv();
+      runScript(path.join(repoRoot, 'scripts', 'inspect', 'inspect_status.py'));
       break;
     case 'seed':
       // Regenerate ci_trigger_data.py from STARTER and seed trigger_embeddings
