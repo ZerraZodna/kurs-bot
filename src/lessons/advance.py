@@ -11,7 +11,12 @@ from .handler import format_lesson_message, translate_text
 from src.memories.dialogue_helpers import get_user_language
 from src.language.onboarding_prompts import get_lesson_confirmation_prompt
 from src.lessons.state import set_last_sent_lesson_id
-from src.scheduler.memory_helpers import set_pending_confirmation
+
+
+def _get_set_pending_confirmation():
+    from src.scheduler.memory_helpers import set_pending_confirmation
+
+    return set_pending_confirmation
 
 
 def is_simple_greeting(text: str) -> bool:
@@ -79,7 +84,9 @@ async def maybe_send_next_lesson(
 
         # Persist a pending confirmation so dialogue handlers can resolve it
         next_id = (int(lesson_id) % 365) + 1
-        set_pending_confirmation(memory_manager, user_id, int(lesson_id), next_id)
+        _get_set_pending_confirmation()(
+            memory_manager, user_id, int(lesson_id), next_id
+        )
         return get_lesson_confirmation_prompt(language, lesson_id)
 
     # Only proceed to auto-send when today's lesson was advanced by the
