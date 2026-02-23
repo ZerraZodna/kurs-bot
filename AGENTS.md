@@ -1,40 +1,46 @@
 # Repository Guidelines
 
+## Scope and Source of Truth
+- This file is the canonical contributor and AI-agent workflow guide for this repository.
+- `README.md` remains the source of truth for setup, runtime, and deployment.
+- `CLAUDE.md` and `GEMINI.md` are adapter files and should only contain tool-specific deltas.
+
 ## Project Structure & Module Organization
-- Core application code lives in `src/`:
-- `src/api/` (FastAPI entrypoints and routes), `src/services/` (business logic), `src/memories/` (memory system), `src/scheduler/` (lesson/reminder jobs), `src/integrations/` (Telegram/Slack/etc.), `src/models/` (SQLAlchemy models).
-- Tests are in `tests/` and currently mostly flat (`tests/test_*.py`).
-- Database migrations are in `migrations/`.
-- Utility scripts are in `scripts/`; static assets are in `static/`; operational notes are in `docs/` and `tasks/`.
+- Main app code: `src/`.
+- API and webhooks: `src/api/`; business logic: `src/services/`; memory stack: `src/memories/`; scheduling: `src/scheduler/`; integrations: `src/integrations/`; data models: `src/models/`.
+- Tests: `tests/` (current pattern: `tests/test_*.py`).
+- Migrations: `migrations/`; helper scripts: `scripts/`; docs: `docs/`; task tracking: `tasks/`.
 
 ## Build, Test, and Development Commands
-- `npm install`: creates `.venv` and installs Python dependencies via project helper scripts.
-- `npm run init_db -- --db prod` (or `--db dev`): initialize database schema and seed required data.
-- `npm start`: start API (and ngrok if available in environment).
-- `npm run start:foreground`: run only the API locally (`uvicorn` on `127.0.0.1:8000`).
-- `npm test` or `python -m pytest tests/ -v`: run test suite.
-- `npm run test:fast`: quick pytest run (`--maxfail=3 -q`).
+- `npm install`: create `.venv` and install Python dependencies.
+- `npm run init_db -- --db prod` or `npm run init_db -- --db dev`: initialize database.
+- `npm start`: start local stack via helper scripts.
+- `npm run start:foreground`: run API only (`uvicorn src.api.app:app --host 127.0.0.1 --port 8000`).
+- `npm test`: run test suite through the project wrapper.
+- `npm test -- tests/test_telegram_handler.py -q`: run targeted tests through the same wrapper.
+- On this machine, prefer `npm test` / `node ./scripts/venv.js test` (see `tasks/lessons.md`).
 
-## Coding Style & Naming Conventions
-- Python style: 4-space indentation, `snake_case` for functions/variables, `PascalCase` for classes, clear module names (`src/services/dialogue_engine.py` style).
-- Prefer small, focused changes; fix root causes rather than surface patches.
-- Use SQLAlchemy ORM patterns already present in the repo; avoid ad-hoc raw SQL unless necessary.
-- Keep error handling explicit; avoid broad silent `except` blocks.
-- `npm run lint` currently reports no configured linter, so follow existing code patterns and keep imports/types tidy.
+## Engineering Workflow (All Contributors)
+- Plan first for non-trivial work (3+ steps): write short checklist in `tasks/todo.md`.
+- Implement smallest viable root-cause fix; avoid broad or speculative refactors unless requested.
+- Verify before claiming done: run relevant tests and inspect diffs.
+- After user-corrected mistakes, log a brief lesson in `tasks/lessons.md` (cause + prevention).
 
-## Testing Guidelines
-- Framework: `pytest` (`pytest.ini` points to `tests/`).
-- Naming: test files as `test_*.py`; test functions as `test_*`.
-- Add or update tests for every behavior change or bug fix, especially around `src/services/`, `src/memories/`, and API routes.
-- Run targeted tests during development, then a broader suite before opening a PR.
+## Coding Style & Safety Rules
+- Python: 4 spaces, `snake_case` for functions/variables, `PascalCase` for classes.
+- Follow existing FastAPI, Pydantic, and SQLAlchemy ORM patterns.
+- Do not add ad-hoc hard-coded command handlers without owner approval.
+- Avoid silent exception handling (`except: pass`); prefer explicit handling and logging.
+- Never expose secrets or user-specific data in code, logs, commits, or PR text.
 
-## Commit & Pull Request Guidelines
-- Recent history uses terse messages (for example: `lazy import`, `refactor jobs`); prefer concise imperative messages with scope, such as `refactor: split dialogue scheduler checks`.
-- Keep commits small and single-purpose.
-- PRs should include: what changed, why, test evidence (commands run), and any config/migration impact.
-- Link related issues/tasks and call out risks or follow-ups explicitly.
+## Testing and Pull Requests
+- Test framework: `pytest` (`pytest.ini` uses `tests/`).
+- Naming: `test_*.py` files and `test_*` functions.
+- Add or update tests for behavior changes, bug fixes, and regressions.
+- Keep commits focused and imperative (for example: `refactor: split dialogue scheduler checks`).
+- PRs should include summary, rationale, test evidence, and migration/config impact.
 
-## Security & Configuration Tips
-- Never commit secrets; use `.env` from `.env.template`.
-- Required tokens include bot/auth/GDPR values documented in `README.md`.
-- Treat user memory and logs as sensitive; avoid exposing personal data in debug output.
+## Current Refactor Priorities
+- Reorganize flat tests into module-based directories.
+- Decompose `DialogueEngine.process_message` into smaller pipeline steps.
+- Split `src/models/database.py` into module-based model files when safe.

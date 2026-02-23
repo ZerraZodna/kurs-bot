@@ -43,6 +43,14 @@ class PromptBuilder:
         "progress": 150,
         "conversation_history": 400,
     }
+
+    TELEGRAM_OUTPUT_RULES = (
+        "### Output Format Rules\n"
+        "- The user reads replies in Telegram on a small screen.\n"
+        "- Never use ASCII/Unicode tables, box-drawing tables, or markdown tables.\n"
+        "- Use short paragraphs and simple bullet or numbered lists instead.\n"
+        "- Keep layout plain and mobile-friendly."
+    )
     
     def __init__(self, db: Session, memory_manager: Optional[MemoryManager] = None):
         self.db = db
@@ -82,6 +90,9 @@ class PromptBuilder:
         
         # Build context blocks
         context_parts = [system_prompt]
+        output_rules = self._build_channel_output_rules(user)
+        if output_rules:
+            context_parts.append(f"\n\n{output_rules}")
         
         # 1. Today's Lesson (optional)
         if include_lesson:
@@ -161,6 +172,9 @@ class PromptBuilder:
             return f"{system_prompt}\n\nUser: {user_input}\n\nAssistant:"
         
         context_parts = [system_prompt]
+        output_rules = self._build_channel_output_rules(user)
+        if output_rules:
+            context_parts.append(f"\n\n{output_rules}")
         
         # 1. Minimal user profile (just name if available)
         if user.first_name:
@@ -187,6 +201,13 @@ class PromptBuilder:
         context_parts.append(f"\n### Current Message\nUser: {user_input}\n\nAssistant:")
         
         return "".join(context_parts)
+
+    def _build_channel_output_rules(self, user: Any) -> str:
+        """Return channel-specific output formatting constraints."""
+        channel = (getattr(user, "channel", "") or "").strip().lower()
+        if channel == "telegram":
+            return self.TELEGRAM_OUTPUT_RULES
+        return ""
 
     def _build_semantic_memory_context(
         self,

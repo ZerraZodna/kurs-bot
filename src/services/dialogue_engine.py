@@ -40,17 +40,16 @@ logger = logging.getLogger(__name__)
 
 class DialogueEngine:
     def __init__(self, db: Optional[Session] = None, memory_manager: Optional[MemoryManager] = None):
+        if db is None:
+            raise ValueError("DialogueEngine requires an active DB session")
+
         self.db = db
         self.memory_manager = memory_manager or MemoryManager(db)
         self.prompt_registry = get_prompt_registry()
-        self.prompt_builder = PromptBuilder(db, self.memory_manager) if db else None
+        self.prompt_builder = PromptBuilder(db, self.memory_manager)
         self.memory_extractor = MemoryExtractor()
-        self.onboarding = OnboardingService(db) if db else None
-        self.onboarding_flow = (
-            OnboardingFlow(self.memory_manager, self.onboarding, self.call_ollama)
-            if self.onboarding
-            else None
-        )
+        self.onboarding = OnboardingService(db)
+        self.onboarding_flow = OnboardingFlow(self.memory_manager, self.onboarding, self.call_ollama)
     
     def get_trigger_dispatcher(self, db=None, memory_manager: MemoryManager = None) -> object:
         from src.triggers import get_trigger_dispatcher as _get
@@ -245,7 +244,7 @@ class DialogueEngine:
             return schedule_response
 
         # Auto-send next lesson on a new day when user makes contact
-        if include_lesson and self.prompt_builder and not use_rag:
+        if include_lesson and not use_rag:
             auto_message = await maybe_send_next_lesson(
                 user_id=user_id,
                 text=text,
@@ -271,42 +270,37 @@ class DialogueEngine:
         include_lesson: bool,
     ) -> str:
         """Build prompt, call LLM, and handle post-response triggers."""
-        if not self.prompt_builder:
-            # Fallback for cases without DB session
-            prompt = f"{settings.SYSTEM_PROMPT}\nUser: {text}\n\nAssistant:"
-            user_text_embedding = None
+        # Build context-aware prompt
+        from src.services.embedding_service import get_embedding_service
+        user_text_embedding = await get_embedding_service().generate_embedding(text)
+
+        relevant_memories = await self._get_relevant_memories(user_id, text, session, user_text_embedding)
+
+        # Use RAG prompt if RAG mode is active for this message
+        if use_rag:
+            try:
+                system_prompt = self.prompt_registry.get_prompt_for_user(self.memory_manager, user_id)
+            except Exception:
+                system_prompt = settings.SYSTEM_PROMPT_RAG
+            prompt = self.prompt_builder.build_rag_prompt(
+                user_id=user_id,
+                user_input=text,
+                system_prompt=system_prompt,
+                relevant_memories=relevant_memories,
+                include_conversation_history=include_history,
+                history_turns=history_turns,
+            )
         else:
-            # Build context-aware prompt
-            from src.services.embedding_service import get_embedding_service
-            user_text_embedding = await get_embedding_service().generate_embedding(text)
-
-            relevant_memories = await self._get_relevant_memories(user_id, text, session, user_text_embedding)
-
-            # Use RAG prompt if RAG mode is active for this message
-            if use_rag:
-                try:
-                    system_prompt = self.prompt_registry.get_prompt_for_user(self.memory_manager, user_id)
-                except Exception:
-                    system_prompt = settings.SYSTEM_PROMPT_RAG
-                prompt = self.prompt_builder.build_rag_prompt(
-                    user_id=user_id,
-                    user_input=text,
-                    system_prompt=system_prompt,
-                    relevant_memories=relevant_memories,
-                    include_conversation_history=include_history,
-                    history_turns=history_turns,
-                )
-            else:
-                system_prompt = settings.SYSTEM_PROMPT
-                prompt = self.prompt_builder.build_prompt(
-                    user_id=user_id,
-                    user_input=text,
-                    system_prompt=system_prompt,
-                    include_lesson=include_lesson,
-                    include_conversation_history=include_history,
-                    history_turns=history_turns,
-                    relevant_memories=relevant_memories,
-                )
+            system_prompt = settings.SYSTEM_PROMPT
+            prompt = self.prompt_builder.build_prompt(
+                user_id=user_id,
+                user_input=text,
+                system_prompt=system_prompt,
+                include_lesson=include_lesson,
+                include_conversation_history=include_history,
+                history_turns=history_turns,
+                relevant_memories=relevant_memories,
+            )
         
         # Run trigger matching on original user text before calling the LLM.
         from src.lessons.handler import pre_llm_lesson_short_circuit
@@ -492,9 +486,6 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
         """
         Return onboarding prompt sequence for new users.
         """
-        if not self.prompt_builder:
-            return "Welcome! What's your name?"
-        
         return self.prompt_builder.build_onboarding_prompt(settings.SYSTEM_PROMPT)
 
 # Module-level wrapper so tests can monkeypatch `src.services.dialogue_engine.get_trigger_dispatcher`

@@ -155,6 +155,30 @@ class TestPromptBuilder:
         assert "Onboarding" in prompt
         assert "name" in prompt.lower()
 
+    def test_build_prompt_includes_telegram_table_guard(self, prompt_builder: PromptBuilder, test_user: User):
+        """Telegram prompts should include anti-table formatting guidance."""
+        prompt = prompt_builder.build_prompt(
+            user_id=test_user.user_id,
+            user_input="Show me my plans",
+            system_prompt="You are a helpful assistant.",
+            include_conversation_history=False,
+        )
+
+        assert "Output Format Rules" in prompt
+        assert "Never use ASCII/Unicode tables" in prompt
+
+    def test_build_rag_prompt_includes_telegram_table_guard(self, prompt_builder: PromptBuilder, test_user: User):
+        """RAG prompts should include anti-table formatting guidance for Telegram."""
+        prompt = prompt_builder.build_rag_prompt(
+            user_id=test_user.user_id,
+            user_input="Summarize my reminders",
+            system_prompt="You are a helpful assistant.",
+            include_conversation_history=False,
+        )
+
+        assert "Output Format Rules" in prompt
+        assert "Never use ASCII/Unicode tables" in prompt
+
 
 class TestContextOptimizer:
     """Test ContextOptimizer utilities."""

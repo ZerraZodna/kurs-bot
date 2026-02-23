@@ -1,5 +1,5 @@
 import pytest
-from src.integrations.telegram import TelegramHandler
+from src.integrations.telegram import TelegramHandler, _markdown_to_html
 from datetime import datetime
 
 def test_parse_webhook_valid_message():
@@ -59,3 +59,31 @@ def test_parse_webhook_edited_message():
     assert result["user_id"] == "45"
     assert result["text"] == "Edited text"
     assert result["external_message_id"] == "126"
+
+
+def test_markdown_to_html_wraps_ascii_box_table_in_pre():
+    text = (
+        "Here is the summary:\n"
+        "+-------+-------+\n"
+        "| Name  | Score |\n"
+        "+-------+-------+\n"
+        "| Anna  | 10    |\n"
+        "+-------+-------+"
+    )
+    rendered = _markdown_to_html(text)
+    assert "<pre>" in rendered
+    assert "</pre>" in rendered
+    assert "| Name  | Score |" in rendered
+
+
+def test_markdown_to_html_wraps_markdown_table_in_pre():
+    text = "Name | Score\n--- | ---\nAnna | 10\nBen | 9"
+    rendered = _markdown_to_html(text)
+    assert "<pre>" in rendered
+    assert "Name | Score" in rendered
+
+
+def test_markdown_to_html_does_not_wrap_single_pipe_sentence():
+    text = "Use A | B when comparing two options."
+    rendered = _markdown_to_html(text)
+    assert "<pre>" not in rendered

@@ -89,8 +89,15 @@ def _markdown_to_html(text: str) -> str:
     - `text` -> <code>text</code> (code)
     - [text](url) -> <a href="url">text</a> (links)
     """
+    # Promote table-like plain text into fenced blocks so Telegram renders them
+    # in a monospaced <pre> block instead of proportional body text.
+    text = _promote_table_blocks_to_fenced_code(text)
+
     # Escape HTML-sensitive characters first to avoid invalid HTML
     text = _escape_html(text)
+
+    # Convert fenced code blocks first to avoid further markdown substitutions.
+    text = _fenced_code_to_pre(text)
 
     # Order matters: process longest patterns first to avoid conflicts
     
@@ -140,3 +147,88 @@ def _split_text(text: str, max_len: int) -> list[str]:
     if remaining:
         chunks.append(remaining)
     return chunks
+
+
+def _fenced_code_to_pre(text: str) -> str:
+    pattern = re.compile(r"```(?:[A-Za-z0-9_+-]+)?\n?(.*?)```", re.DOTALL)
+
+    def _replace(match: re.Match) -> str:
+        content = match.group(1).strip("\n")
+        return f"<pre>{content}</pre>"
+
+    return pattern.sub(_replace, text)
+
+
+def _promote_table_blocks_to_fenced_code(text: str) -> str:
+    lines = text.splitlines()
+    if not lines:
+        return text
+
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        if not _is_table_candidate_line(lines[i]):
+            out.append(lines[i])
+            i += 1
+            continue
+
+        j = i
+        block: list[str] = []
+        while j < len(lines) and _is_table_candidate_line(lines[j]):
+            block.append(lines[j])
+            j += 1
+
+        if _should_wrap_table_block(block):
+            out.append("```")
+            out.extend(block)
+            out.append("```")
+        else:
+            out.extend(block)
+
+        i = j
+
+    return "\n".join(out)
+
+
+def _is_table_candidate_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped:
+        return False
+    if _contains_box_drawing_char(stripped):
+        return True
+    if re.match(r"^\+[-=:+\s]+(?:\+[-=:+\s]+)+\+?$", stripped):
+        return True
+    if stripped.startswith("|") and stripped.endswith("|") and stripped.count("|") >= 2:
+        return True
+    if "|" in stripped:
+        cells = [c.strip() for c in stripped.strip("|").split("|")]
+        if len(cells) >= 2 and any(cells):
+            return True
+    return False
+
+
+def _should_wrap_table_block(block: list[str]) -> bool:
+    if len(block) < 2:
+        return False
+
+    has_strong_separator = any(_is_table_separator_line(line.strip()) for line in block)
+    has_box = any(_contains_box_drawing_char(line) for line in block)
+    if has_box or has_strong_separator:
+        return True
+
+    # Fallback for simple pipe-based tables without explicit separators.
+    return len(block) >= 3 and any("|" in line for line in block)
+
+
+def _is_table_separator_line(stripped: str) -> bool:
+    if not stripped:
+        return False
+    if re.match(r"^\+[-=:+\s]+(?:\+[-=:+\s]+)+\+?$", stripped):
+        return True
+    if re.match(r"^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$", stripped):
+        return True
+    return False
+
+
+def _contains_box_drawing_char(line: str) -> bool:
+    return any(ch in line for ch in "┌┬┐├┼┤└┴┘│─═╔╗╚╝╠╣╦╩")
