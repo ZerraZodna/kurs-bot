@@ -89,6 +89,9 @@ def _markdown_to_html(text: str) -> str:
     - `text` -> <code>text</code> (code)
     - [text](url) -> <a href="url">text</a> (links)
     """
+    # Repair PDF/import artifacts like: a****** ******meaningless -> a meaningless
+    text = _repair_asterisk_artifacts(text)
+
     # Promote table-like plain text into fenced blocks so Telegram renders them
     # in a monospaced <pre> block instead of proportional body text.
     text = _promote_table_blocks_to_fenced_code(text)
@@ -133,6 +136,17 @@ def _escape_html(text: str) -> str:
         .replace("<", "&lt;")
         .replace(">", "&gt;")
     )
+
+
+def _repair_asterisk_artifacts(text: str) -> str:
+    # Common importer/PDF artifact in some lessons:
+    #   "a****** ******meaningless" -> "a meaningless"
+    #   "a**** ****meaningless" -> "a meaningless"
+    # Only strip multi-asterisk runs between word characters so legitimate
+    # markdown markers like *italic* / **bold** are unaffected.
+    text = re.sub(r'(?<=\w)\*{2,}(?:\s+\*{2,})+(?=\w)', ' ', text)
+    text = re.sub(r'(?<=\w)\*{2,}(?=\w)', '', text)
+    return text
 
 
 def _split_text(text: str, max_len: int) -> list[str]:
