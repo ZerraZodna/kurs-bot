@@ -108,13 +108,15 @@ def _markdown_to_html(text: str) -> str:
     text = re.sub(r'^# (.+?)$', r'\n<b>\1</b>', text, flags=re.MULTILINE)
     
     # 1. Bold italic: ***text*** -> <b><i>text</i></b>
-    text = re.sub(r'\*\*\*(.+?)\*\*\*', r'<b><i>\1</i></b>', text)
+    # Guard with lookarounds so literal asterisk runs (e.g. "a******")
+    # are not interpreted as nested formatting.
+    text = re.sub(r'(?<!\*)\*\*\*([^*\n]+?)\*\*\*(?!\*)', r'<b><i>\1</i></b>', text)
     
     # 2. Bold: **text** -> <b>text</b>
-    text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
+    text = re.sub(r'(?<!\*)\*\*(?!\*)([^*\n]+?)(?<!\*)\*\*(?!\*)', r'<b>\1</b>', text)
     
     # 3. Italic: *text* -> <i>text</i>
-    text = re.sub(r'\*(.+?)\*', r'<i>\1</i>', text)
+    text = re.sub(r'(?<!\*)\*(?!\*)([^*\n]+?)(?<!\*)\*(?!\*)', r'<i>\1</i>', text)
     
     # 4. Code: `text` -> <code>text</code>
     text = re.sub(r'`(.+?)`', r'<code>\1</code>', text)
