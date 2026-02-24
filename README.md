@@ -27,6 +27,10 @@ npm start                        # starts uvicorn + ngrok if present
 # Optional dev UI: set DEV_WEB_CLIENT=true in .env, then
 npm run start:ui
 npm stop                         # stops processes started by npm start
+
+# Trigger embedding workflows
+npm run seed                     # DEV/CI prep: regenerate scripts/ci_trigger_data.py and seed DB
+npm run seed_triggers            # Runtime reload (e.g., AWS): seed trigger_embeddings table from existing ci_trigger_data.py
 ```
 
 What `npm install` does: creates `.venv`, installs torch/sentence-transformers/faiss (when available) and project requirements. What it does **not** do: set any tokens/keys, install ngrok, or open firewall ports.

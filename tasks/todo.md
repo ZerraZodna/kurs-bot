@@ -10,7 +10,3 @@
 - [ ] Update imports across the codebase
 - [ ] Verify with tests
 
-## 2. Add `npm run status` command
-- [x] Add a Python status script that prints DB counts for active users, lessons, embeddings, and messages
-- [x] Wire the script into `scripts/venv.js` and `package.json` as `npm run status`
-- [x] Run the new command to verify output against the current DB

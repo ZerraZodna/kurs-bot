@@ -70,6 +70,8 @@ def extract_formatted_text(pdf_path: Path) -> str:
             for line in b.get('lines', []):
                 raw_parts = []
                 styled_parts = []
+                line_bbox = line.get('bbox', [0, 0, 0, 0])
+                line_x0 = float(line_bbox[0]) if line_bbox else 0.0
                 for span in line.get('spans', []):
                     raw = span.get('text', '')
                     if not raw:
@@ -92,11 +94,11 @@ def extract_formatted_text(pdf_path: Path) -> str:
                 if raw_parts:
                     raw_line = ''.join(raw_parts).strip()
                     styled_line = ''.join(styled_parts).strip()
-                    # store tuple (raw, styled) so we can detect headers/page numbers
-                    page_text_runs.append((raw_line, styled_line))
+                    # store tuple (raw, styled, x0) so we can detect headers/page numbers and indentation
+                    page_text_runs.append((raw_line, styled_line, line_x0))
 
         if page_text_runs:
-            # page_text_runs is list of (raw, styled) tuples. Drop leading
+            # page_text_runs is list of (raw, styled, x0) tuples. Drop leading
             # page headers like "PART 1" or "WORKBOOK" using raw text.
             first_raw = page_text_runs[0][0].strip()
             compact = re.sub(r'[^A-Za-z0-9]', '', first_raw).lower()
@@ -120,7 +122,11 @@ def extract_formatted_text(pdf_path: Path) -> str:
             header_tok = re.compile(pattern_str, flags=re.IGNORECASE)
             styled_header_re = re.compile(r"[*_\"']*" + pattern_str + r"[*_\"']*", flags=re.IGNORECASE)
             cleaned_runs = []
-            for raw, styled in page_text_runs:
+            # Estimate left margin per page and mark strongly-indented lines.
+            x_candidates = [x0 for (raw, _styled, x0) in page_text_runs if (raw or '').strip()]
+            base_x = min(x_candidates) if x_candidates else 0.0
+
+            for raw, styled, x0 in page_text_runs:
                 raw2 = header_tok.sub('', raw)
                 # remove styled variants that may include asterisks/underscores
                 styled2 = styled_header_re.sub('', styled)
@@ -129,6 +135,14 @@ def extract_formatted_text(pdf_path: Path) -> str:
                 # skip lines that become empty after header removal
                 if not raw2:
                     continue
+
+                # Preserve visual structure: lines with notable indentation should
+                # remain line-broken later instead of being merged into prior text.
+                # Avoid tagging lesson headers themselves.
+                is_lesson_header = bool(re.match(r'(?i)^lesson\s+\d{1,3}(?:\s*(?:to|-|–)\s*\d{1,3})?\b', raw2))
+                if (x0 - base_x) >= 12 and not is_lesson_header:
+                    styled2 = f'<<INDENT>> {styled2}'
+
                 cleaned_runs.append((raw2, styled2))
 
             if not cleaned_runs:
@@ -195,6 +209,27 @@ def extract_formatted_text(pdf_path: Path) -> str:
             current = []
             continue
 
+        is_indented_marker = s.startswith('<<INDENT>>')
+        if is_indented_marker:
+            s = s.replace('<<INDENT>>', '', 1).strip()
+            # Keep indented visual lines as their own line/paragraph unit.
+            flush_current()
+            current = [s]
+            flush_current()
+            current = []
+            continue
+
+        # Keep standalone quoted exercise lines on their own line/paragraph.
+        # This preserves structures like:
+        # “This table does not mean anything.”
+        is_quoted_line = bool(re.match(r'^[*]*["“][^\n]{3,220}["”][.!?]?[*]*$', s))
+        if is_quoted_line:
+            flush_current()
+            current = [s]
+            flush_current()
+            current = []
+            continue
+
         # If current is empty, start new paragraph
         if not current:
             current.append(s)
@@ -249,8 +284,14 @@ def extract_formatted_text(pdf_path: Path) -> str:
         starts_lower = p_strip[0].islower()
         prev_ends_sentence = bool(re.search(r'[\.\!\?\"]$', prev.strip()))
         is_header = bool(re.match(r'(?i)^(lesson\b|lesson\s+\d|intro|introduction|part\b|workbook\b)', p_strip))
-        # Never merge if the paragraph is an explicit header
-        if is_header:
+        is_quoted_para = bool(re.match(r'^[*]*["“].+["”][.!?]?[*]*$', p_strip))
+        prev_is_colon_intro = prev.strip().endswith(':')
+        # Never merge if the paragraph is an explicit header or a quoted exercise line
+        if is_header or is_quoted_para:
+            merged.append(p)
+            continue
+        # If previous paragraph introduces a list (colon), keep the next paragraph separate
+        if prev_is_colon_intro:
             merged.append(p)
             continue
         if starts_lower or not prev_ends_sentence:
@@ -268,7 +309,71 @@ def extract_formatted_text(pdf_path: Path) -> str:
     plain_text = plain_text.replace('\n\n', marker)
     plain_text = plain_text.replace('\n', ' ')
     plain_text = plain_text.replace(marker, '\n\n')
+
+    # Keep adjacent quoted exercise statements on separate lines.
+    # Example: *“This table...”* *“This chair...”* -> newline-separated.
+    plain_text = re.sub(
+        r'([*]*["“][^"”]{3,260}["”][.!?]?[*]*)\s+(?=[*]*["“])',
+        r'\1\n',
+        plain_text,
+    )
+    # Also split adjacent italic blocks so indented instructional lines keep line breaks.
+    plain_text = re.sub(
+        r'(\*[^\n*]{6,260}\*)\s+(?=\*[^\n*]{3,260}\*)',
+        r'\1\n',
+        plain_text,
+    )
+    # If a quoted/italic exercise line is followed by regular sentence text,
+    # keep that transition on a new paragraph.
+    plain_text = re.sub(r'(\*[^\n*]{6,260}\*)\s+([A-Z])', r'\1\n\n\2', plain_text)
+
     return plain_text.strip()
+
+
+def _normalize_sentence_spacing(text: str) -> str:
+    """Repair common PDF/OCR spacing artifacts after sentence punctuation."""
+    s = text or ""
+    # Add missing space after punctuation when next token starts a new word/quote.
+    s = re.sub(r'([\.,!?])(?=[A-Za-z"“])', r'\1 ', s)
+    # Add missing space after closing quotes before a letter.
+    s = re.sub(r'([”"])(?=[A-Za-z])', r'\1 ', s)
+    # Collapse accidental multi-spaces introduced during repair.
+    s = re.sub(r' {2,}', ' ', s)
+    return s
+
+
+def _normalize_lesson_content_header(content: str, lesson_id: int) -> str:
+    """Ensure lesson content starts with canonical `Lesson <id>` header."""
+    txt = (content or '').strip()
+    if not txt:
+        return txt
+
+    # Convert leading variants like `lesson 14`, `LESSON 14`, `lesson 14 to 20`
+    # into `Lesson 14` to enforce a stable canonical prefix.
+    txt = re.sub(
+        r'(?is)^\s*lesson\s+\d{1,3}(?:\s*(?:to|-|–)\s*\d{1,3})?\b',
+        f'Lesson {lesson_id}',
+        txt,
+        count=1,
+    )
+
+    # If no leading lesson header exists, prepend one.
+    if not re.match(rf'(?i)^\s*Lesson\s+{lesson_id}\b', txt):
+        txt = f'Lesson {lesson_id}\n\n{txt}'
+
+    # Keep a clear paragraph break after opening epigraph/title quote.
+    # Example: ...***“...means anything.”*** Now look slowly... -> ...***\n\nNow look slowly...
+    txt = re.sub(r'(\*\*\*["“][^"”]{20,260}["”]\*\*\*)\s+(?=[A-Z])', r'\1\n\n', txt, count=1)
+
+    # Lesson 1 formatting preference: keep this sentence attached to the prior paragraph.
+    txt = re.sub(
+        r'\n\n(One thing is like another as far as the application of the idea is concerned\.)',
+        r' \1',
+        txt,
+        flags=re.I,
+    )
+
+    return txt
 
 
 def parse_lessons_from_text(full_text: str) -> list[tuple[int, str, str]]:
@@ -316,7 +421,10 @@ def parse_lessons_from_text(full_text: str) -> list[tuple[int, str, str]]:
                     if mnum:
                         lid = int(mnum.group(1))
                         break
-            headers.append((i, lid))
+            # Only keep headers with a resolvable numeric lesson id.
+            # This avoids false positives like "lesson a day".
+            if lid is not None:
+                headers.append((i, lid))
 
     if not headers:
         return []
@@ -337,12 +445,30 @@ def parse_lessons_from_text(full_text: str) -> list[tuple[int, str, str]]:
         first_line = block.splitlines()[0].strip()
         if re.match(r'(?i)^(part\b|workbook\b|page\b)', first_line):
             continue
-        tmatch = re.search(r'"([^"]{5,200})"', block)
+        # Title extraction priority:
+        # 1) Quoted lesson title (ASCII or curly quotes)
+        # 2) First sentence after the lesson header line
+        # 3) Fallback lesson label
+        tmatch = re.search(r'["“”]([^"“”]{5,200})["“”]', block)
         if tmatch:
             title = tmatch.group(1).strip()
         else:
             blines = [l.strip() for l in block.splitlines() if l.strip()]
-            title = blines[1][:128] if len(blines) > 1 else (f'Lesson {lid}' if lid else 'Lesson')
+            title = None
+            # Find first non-header line and keep only first sentence.
+            for line in blines[1:] if len(blines) > 1 else []:
+                # Skip repeated header-like lines
+                if re.match(r'(?i)^lesson\s+\d{1,3}(?:\s*(?:to|-|–)\s*\d{1,3})?\b', line):
+                    continue
+                # Normalize spacing around sentence punctuation to avoid run-on titles
+                line_norm = re.sub(r'([.!?])(?=[A-Z"“])', r'\1 ', line).strip()
+                sm = re.match(r'^(.+?[.!?])(?:\s|$)', line_norm)
+                candidate = (sm.group(1).strip() if sm else line_norm).strip(' :;-')
+                if candidate:
+                    title = candidate[:128]
+                    break
+            if not title:
+                title = blines[1][:128] if len(blines) > 1 else (f'Lesson {lid}' if lid else 'Lesson')
         lessons_raw.append((lid, title, block))
 
     out = []
@@ -377,6 +503,8 @@ def parse_lessons_from_text(full_text: str) -> list[tuple[int, str, str]]:
                     break
             continue
         seen.add(lid)
+        content = _normalize_sentence_spacing(content)
+        content = _normalize_lesson_content_header(content, lid)
         out.append((lid, title, content))
     return out
 
