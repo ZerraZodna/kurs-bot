@@ -7,8 +7,6 @@ This document explains the organization and best practices for the test suite.
 ```
 tests/
 ├── conftest.py              # Global fixtures and configuration
-├── helpers.py               # Legacy helpers (deprecated, being phased out)
-├── utils.py                 # Legacy test utilities (deprecated)
 │
 ├── fixtures/                # Centralized test fixtures
 │   ├── database.py          # DB session, engine fixtures
@@ -245,7 +243,7 @@ def scheduler_service():
 | `make_ready_user(db, "id")` | Use `test_user_with_memories` or `user_factory.create_ready_user()` |
 | Inline memory creation | Use `MemoryBuilder` |
 | Inline schedule creation | Use `ScheduleBuilder` |
-| `helpers.py` mocks | Use `tests/mocks/` modules |
+| Inline mocks | Use `tests/mocks/` modules |
 
 ### Updating Existing Tests
 
