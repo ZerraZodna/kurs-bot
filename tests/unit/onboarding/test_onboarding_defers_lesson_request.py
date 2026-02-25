@@ -1,0 +1,62 @@
+"""Unit tests for onboarding deferring lesson requests.
+
+Migrated from tests/test_onboarding_defers_lesson_request.py to use new test fixtures.
+"""
+
+import pytest
+from datetime import datetime, timezone
+
+from src.models.database import User, Schedule
+from src.services.dialogue_engine import DialogueEngine
+from src.memories import MemoryManager
+from src.lessons.state import get_current_lesson
+
+
+class TestOnboardingDefersLessonRequest:
+    """Tests for onboarding deferring lesson requests."""
+
+    @pytest.mark.asyncio
+    async def test_onboarding_lesson_reply_defers_to_onboarding(self, db_session):
+        """Given: A user who has consent and commitment
+        When: Replying with lesson number during onboarding
+        Then: Should persist lesson, create schedule, and return onboarding-complete message
+        """
+        # Given: A user with consent and commitment
+        user = User(
+            external_id="test_onboarding_defers_lesson",
+            channel="telegram",
+            first_name="Carol",
+            opted_in=True,
+            created_at=datetime.now(timezone.utc),
+        )
+        db_session.add(user)
+        db_session.commit()
+        
+        mm = MemoryManager(db_session)
+        mm.store_memory(user.user_id, "data_consent", "granted", category="profile", source="test")
+        mm.store_memory(user.user_id, "acim_commitment", "committed to ACIM lessons", category="goals", source="test")
+        
+        dialogue = DialogueEngine(db_session)
+        
+        # When: Starting onboarding (bot will ask lesson status)
+        resp = await dialogue.process_message(user.user_id, "Hi", db_session)
+        assert resp is not None
+        
+        # And: User replies with an explicit lesson number
+        resp2 = await dialogue.process_message(user.user_id, "I am on lesson 8", db_session)
+        assert resp2 is not None
+        
+        # Note: The lesson may not exist in test DB, but onboarding should progress
+        # The response may indicate lesson not found OR show onboarding completion
+        # Either way, the current_lesson should be stored and schedule should be created
+        
+        # And: Memory should have recorded current_lesson=8
+        cur = get_current_lesson(mm, user.user_id)
+        assert cur == 8, f"Expected current_lesson=8, got {cur}"
+        
+        # And: Schedule should be created (by completing onboarding)
+        _ = dialogue.onboarding.get_onboarding_complete_message(user.user_id)
+        schedules = db_session.query(Schedule).filter_by(user_id=user.user_id).all()
+        assert any(s.schedule_type.startswith("daily") and s.is_active for s in schedules), \
+            f"Expected active daily schedule, got {schedules}"
+

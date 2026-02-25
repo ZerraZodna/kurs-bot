@@ -7,51 +7,51 @@
 2. **Integration Tests** - tests/integration/
 3. **E2E Tests** - tests/e2e/
 
-## Progress: 10/66 files migrated
+## Progress: 28/66 files migrated
 
 ### Phase 1: Memory Tests (tests/unit/memory/)
 - [x] tests/test_memory_manager.py → tests/unit/memory/test_memory_manager.py
-- [ ] tests/test_memory_model.py → tests/unit/memory/test_memory_model.py
-- [ ] tests/test_memory_extractor.py → tests/unit/memory/test_memory_extractor.py
-- [x] tests/test_semantic_search.py → tests/unit/memory/test_semantic_search.py
-- [ ] tests/test_semantic_search_reuse.py → tests/unit/memory/test_semantic_search_reuse.py
-- [ ] tests/test_search_threshold.py → tests/unit/memory/test_search_threshold.py
+- [x] tests/test_memory_model.py → tests/unit/memory/test_memory_model.py
+- [x] tests/test_memory_extractor.py → tests/unit/memory/test_memory_extractor.py
+- [ ] tests/test_semantic_search.py → tests/unit/memory/test_semantic_search.py (NOT YET MIGRATED)
+- [x] tests/test_semantic_search_reuse.py → tests/unit/memory/test_semantic_search_reuse.py
+- [x] tests/test_search_threshold.py → tests/unit/memory/test_search_threshold.py
 
 ### Phase 2: Scheduler Tests (tests/unit/scheduler/)
 - [x] tests/test_scheduler_service.py → tests/unit/scheduler/test_scheduler_service.py
 - [x] tests/test_scheduler_manager.py → tests/unit/scheduler/test_scheduler_manager.py
 - [x] tests/test_scheduler_domain.py → tests/unit/scheduler/test_scheduler_domain.py
-- [ ] tests/test_scheduler_jobs.py → tests/unit/scheduler/test_scheduler_jobs.py
-- [ ] tests/test_scheduler_characterization.py → tests/unit/scheduler/test_scheduler_characterization.py
+- [x] tests/test_scheduler_jobs.py → tests/unit/scheduler/test_scheduler_jobs.py
+- [x] tests/test_scheduler_characterization.py → tests/unit/scheduler/test_scheduler_characterization.py
 - [x] tests/test_schedule_model.py → tests/unit/scheduler/test_schedule_model.py
 - [x] tests/test_timezones.py → tests/unit/scheduler/test_timezones.py
 
 ### Phase 3: Onboarding Tests (tests/unit/onboarding/)
 - [x] tests/test_onboarding.py → tests/unit/onboarding/test_onboarding.py
-- [ ] tests/test_onboarding_flow.py → tests/unit/onboarding/test_onboarding_flow.py
-- [ ] tests/test_onboarding_language.py → tests/unit/onboarding/test_onboarding_language.py
-- [ ] tests/test_onboarding_lesson_state.py → tests/unit/onboarding/test_onboarding_lesson_state.py
-- [ ] tests/test_onboarding_scheduling.py → tests/unit/onboarding/test_onboarding_scheduling.py
-- [ ] tests/test_onboarding_fact_extraction.py → tests/unit/onboarding/test_onboarding_fact_extraction.py
-- [ ] tests/test_onboarding_defers_lesson_request.py → tests/unit/onboarding/test_onboarding_defers_lesson_request.py
-- [ ] tests/test_onboarding_service_integration.py → tests/unit/onboarding/test_onboarding_service_integration.py
+- [x] tests/test_onboarding_flow.py → tests/unit/onboarding/test_onboarding_flow.py
+- [x] tests/test_onboarding_language.py → tests/unit/onboarding/test_onboarding_language.py
+- [x] tests/test_onboarding_lesson_state.py → tests/unit/onboarding/test_onboarding_lesson_state.py
+- [x] tests/test_onboarding_scheduling.py → tests/unit/onboarding/test_onboarding_scheduling.py
+- [x] tests/test_onboarding_fact_extraction.py → tests/unit/onboarding/test_onboarding_fact_extraction.py
+- [x] tests/test_onboarding_defers_lesson_request.py → tests/unit/onboarding/test_onboarding_defers_lesson_request.py
+- [x] tests/test_onboarding_service_integration.py → tests/unit/onboarding/test_onboarding_service_integration.py
 
 ### Phase 4: Language/Detection Tests (tests/unit/language/)
-- [ ] tests/test_detect_language_hi.py → tests/unit/language/test_detect_language_hi.py
-- [ ] tests/test_detect_language_regression.py → tests/unit/language/test_detect_language_regression.py
-- [ ] tests/test_detect_language_regression_portuguese.py → tests/unit/language/test_detect_language_regression_portuguese.py
-- [ ] tests/test_language_detection_short_messages.py → tests/unit/language/test_language_detection_short_messages.py
-- [ ] tests/test_language_override_set_command.py → tests/unit/language/test_language_override_set_command.py
-- [ ] tests/test_lesson_query_detection.py → tests/unit/language/test_lesson_query_detection.py
+- [x] tests/test_detect_language_hi.py → tests/unit/language/test_detect_language_hi.py
+- [x] tests/test_detect_language_regression.py → tests/unit/language/test_detect_language_regression.py
+- [x] tests/test_detect_language_regression_portuguese.py → tests/unit/language/test_detect_language_regression_portuguese.py
+- [x] tests/test_language_detection_short_messages.py → tests/unit/language/test_language_detection_short_messages.py
+- [x] tests/test_language_override_set_command.py → tests/unit/language/test_language_override_set_command.py
+- [x] tests/test_lesson_query_detection.py → tests/unit/language/test_lesson_query_detection.py
 
 ### Phase 5: Trigger Tests (tests/unit/triggers/)
 - [x] tests/test_trigger_matcher.py → tests/unit/triggers/test_trigger_matcher.py
 - [x] tests/test_trigger_matching.py → tests/unit/triggers/test_trigger_matching.py
-- [ ] tests/test_trigger_dispatcher.py → tests/unit/triggers/test_trigger_dispatcher.py
-- [ ] tests/test_trigger_dispatcher_update.py → tests/unit/triggers/test_trigger_dispatcher_update.py
-- [ ] tests/test_trigger_admin_commands.py → tests/unit/triggers/test_trigger_admin_commands.py
-- [ ] tests/test_trigger_embeddings_seed.py → tests/unit/triggers/test_trigger_embeddings_seed.py
-- [ ] tests/test_trigger_observability.py → tests/unit/triggers/test_trigger_observability.py
+- [ ] tests/test_trigger_dispatcher.py → tests/unit/triggers/test_trigger_dispatcher.py (NOT YET MIGRATED)
+- [ ] tests/test_trigger_dispatcher_update.py → tests/unit/triggers/test_trigger_dispatcher_update.py (NOT YET MIGRATED)
+- [ ] tests/test_trigger_admin_commands.py → tests/unit/triggers/test_trigger_admin_commands.py (NOT YET MIGRATED)
+- [ ] tests/test_trigger_embeddings_seed.py → tests/unit/triggers/test_trigger_embeddings_seed.py (NOT YET MIGRATED)
+- [ ] tests/test_trigger_observability.py → tests/unit/triggers/test_trigger_observability.py (NOT YET MIGRATED)
 
 ### Phase 6: Services Tests (tests/unit/services/)
 - [ ] tests/test_embedding_service.py → tests/unit/services/test_embedding_service.py

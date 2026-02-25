@@ -11,6 +11,20 @@ from src.memories import MemoryManager
 from src.services.dialogue_engine import DialogueEngine
 from src.scheduler import SchedulerService
 from src.services.embedding_service import EmbeddingService
+from src.models.database import Lesson
+
+
+@pytest.fixture
+def lesson(db_session: Session) -> Lesson:
+    """A basic lesson for testing."""
+    lesson = Lesson(
+        title="Test Lesson",
+        content="This is test content for lesson 1.",
+        created_at=datetime.datetime.now(datetime.timezone.utc),
+    )
+    db_session.add(lesson)
+    db_session.commit()
+    return lesson
 
 
 @pytest.fixture
