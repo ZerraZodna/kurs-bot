@@ -7,13 +7,13 @@
 2. **Integration Tests** - tests/integration/
 3. **E2E Tests** - tests/e2e/
 
-## Progress: 28/66 files migrated
+## Progress: 46/66 files migrated (All duplicate source files deleted)
 
 ### Phase 1: Memory Tests (tests/unit/memory/)
 - [x] tests/test_memory_manager.py → tests/unit/memory/test_memory_manager.py
 - [x] tests/test_memory_model.py → tests/unit/memory/test_memory_model.py
 - [x] tests/test_memory_extractor.py → tests/unit/memory/test_memory_extractor.py
-- [ ] tests/test_semantic_search.py → tests/unit/memory/test_semantic_search.py (NOT YET MIGRATED)
+- [x] (tests/test_semantic_search.py - file does not exist, was likely removed)
 - [x] tests/test_semantic_search_reuse.py → tests/unit/memory/test_semantic_search_reuse.py
 - [x] tests/test_search_threshold.py → tests/unit/memory/test_search_threshold.py
 
@@ -47,25 +47,24 @@
 ### Phase 5: Trigger Tests (tests/unit/triggers/)
 - [x] tests/test_trigger_matcher.py → tests/unit/triggers/test_trigger_matcher.py
 - [x] tests/test_trigger_matching.py → tests/unit/triggers/test_trigger_matching.py
-- [ ] tests/test_trigger_dispatcher.py → tests/unit/triggers/test_trigger_dispatcher.py (NOT YET MIGRATED)
-- [ ] tests/test_trigger_dispatcher_update.py → tests/unit/triggers/test_trigger_dispatcher_update.py (NOT YET MIGRATED)
-- [ ] tests/test_trigger_admin_commands.py → tests/unit/triggers/test_trigger_admin_commands.py (NOT YET MIGRATED)
-- [ ] tests/test_trigger_embeddings_seed.py → tests/unit/triggers/test_trigger_embeddings_seed.py (NOT YET MIGRATED)
-- [ ] tests/test_trigger_observability.py → tests/unit/triggers/test_trigger_observability.py (NOT YET MIGRATED)
+- [x] tests/test_trigger_dispatcher.py → tests/unit/triggers/test_trigger_dispatcher.py (MIGRATED)
+- [x] tests/test_trigger_dispatcher_update.py → tests/unit/triggers/test_trigger_dispatcher_update.py (MIGRATED)
+- [x] tests/test_trigger_admin_commands.py → tests/unit/triggers/test_trigger_admin_commands.py (MIGRATED)
+- [x] tests/test_trigger_embeddings_seed.py → tests/unit/triggers/test_trigger_embeddings_seed.py (MIGRATED)
+- [x] tests/test_trigger_observability.py → tests/unit/triggers/test_trigger_observability.py (MIGRATED)
 
 ### Phase 6: Services Tests (tests/unit/services/)
-- [ ] tests/test_embedding_service.py → tests/unit/services/test_embedding_service.py
-- [ ] tests/test_prompt_builder.py → tests/unit/services/test_prompt_builder.py
+- [x] tests/test_embedding_service.py → tests/unit/services/test_embedding_service.py (MIGRATED)
+- [x] tests/test_prompt_builder.py → tests/unit/services/test_prompt_builder.py (MIGRATED)
 
 ### Phase 7: Integration Tests (tests/integration/)
-- [ ] tests/test_integration_memory.py → tests/integration/test_memory_integration.py
-- [ ] tests/test_integration_memory.py → tests/integration/test_memory_integration.py
-- [ ] tests/test_memory_driven_scheduler_integration.py → tests/integration/test_memory_driven_scheduler_integration.py
-- [ ] tests/test_trigger_scheduler_integration.py → tests/integration/test_trigger_scheduler_integration.py
+- [x] tests/test_integration_memory.py → tests/integration/test_memory_integration.py (MIGRATED)
+- [x] tests/test_memory_driven_scheduler_integration.py → tests/integration/test_memory_driven_scheduler_integration.py (MIGRATED)
+- [x] tests/test_trigger_scheduler_integration.py → tests/integration/test_trigger_scheduler_integration.py (MIGRATED)
 
 ### Phase 8: E2E Tests (tests/e2e/)
-- [ ] tests/test_onboarding_e2e.py → tests/e2e/test_onboarding_e2e.py
-- [ ] tests/test_onboarding_flow_e2e.py → tests/e2e/test_onboarding_flow_e2e.py
+- [x] tests/test_onboarding_e2e.py → tests/e2e/test_onboarding_e2e.py (MIGRATED)
+- [x] tests/test_onboarding_flow_e2e.py → tests/e2e/test_onboarding_flow_e2e.py (MIGRATED)
 
 ### Phase 9: Regression Tests (keep in root)
 - [ ] tests/test_regression_rag_one_time_flow.py
@@ -76,24 +75,28 @@
 - [ ] tests/test_gdpr.py
 - [ ] tests/test_gdpr_api.py
 - [ ] tests/test_gdpr_verification.py
-- [ ] tests/test_models.py
-- [ ] tests/test_user_model.py
-- [ ] tests/test_telegram_handler.py
-- [ ] tests/test_timezones.py
-- [ ] tests/test_timezone_migration.py
+- [x] tests/test_models.py (empty file - no migration needed)
+- [x] tests/test_user_model.py → tests/unit/test_user_model.py (MIGRATED - source deleted)
+- [x] tests/test_telegram_handler.py → tests/unit/integrations/test_telegram_handler.py (MIGRATED - source deleted)
+- [x] tests/test_timezones.py → tests/unit/scheduler/test_timezones.py (already migrated)
+- [x] tests/test_timezone_migration.py → tests/unit/scheduler/test_timezone_migration.py (MIGRATED - source deleted)
 - [ ] tests/test_next_day_confirmation.py
 - [ ] tests/test_one_time_does_not_modify_daily.py
 - [ ] tests/test_process_message_creates_one_time.py
 - [ ] tests/test_schedule_deletion_flow.py
 - [ ] tests/test_schedule_query_handler.py
-- [ ] tests/test_lesson_short_circuit.py
-- [ ] tests/test_lesson_trigger_order.py
-- [ ] tests/test_lesson_embeddings.py
-- [ ] tests/test_import_lesson_headers.py
+- [x] tests/test_lesson_short_circuit.py → tests/unit/lessons/test_lesson_short_circuit.py (MIGRATED - source deleted)
+- [x] tests/test_lesson_trigger_order.py → tests/unit/lessons/test_lesson_trigger_order.py (MIGRATED - source deleted)
+- [x] tests/test_lesson_embeddings.py (not a test file - it's a script - no migration needed)
+- [x] tests/test_import_lesson_headers.py → tests/unit/lessons/test_import_lesson_headers.py (MIGRATED - source deleted)
 - [ ] tests/test_rag_list_memories.py
 - [ ] tests/test_remind_text_is_stored_and_sent.py
-- [ ] tests/test_norwegian_onboarding.py
-- [ ] tests/test_keyword_detector.py
+- [x] tests/test_norwegian_onboarding.py → tests/unit/onboarding/test_norwegian_onboarding.py (MIGRATED - source deleted)
+- [x] tests/test_keyword_detector.py → tests/unit/language/test_keyword_detector.py (MIGRATED - source deleted)
+- [x] tests/test_memory_integration.py → tests/integration/test_memory_integration.py (MIGRATED - source deleted)
+- [x] tests/test_memory_driven_scheduler_integration.py → tests/integration/test_memory_driven_scheduler_integration.py (MIGRATED - source deleted)
+- [x] tests/test_onboarding_e2e.py → tests/e2e/test_onboarding_e2e.py (MIGRATED - source deleted)
+- [x] tests/test_onboarding_flow_e2e.py → tests/e2e/test_onboarding_flow_e2e.py (MIGRATED - source deleted)
 
 ---
 
