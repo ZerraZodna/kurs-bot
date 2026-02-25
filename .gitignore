@@ -153,3 +153,4 @@ node_modules/
 package-lock.json
 yarn.lock
 .grok/settings.json
+.aider*
