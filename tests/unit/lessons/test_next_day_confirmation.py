@@ -1,10 +1,14 @@
+"""
+Migrated tests for next day confirmation flow.
+ migrated from tests/test_next_day_confirmation.py
+"""
 import pytest
 import asyncio
 from pathlib import Path
 import sys
 from datetime import datetime, timezone
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.models.database import Lesson, SessionLocal
 from tests.utils import create_test_user
@@ -27,6 +31,10 @@ from src.memories.scheduler_helpers import (
 
 @pytest.mark.asyncio
 async def test_next_day_triggers_confirmation_prompt():
+    """Given: A user who has completed onboarding with lesson 8
+    When: The next day is triggered and maybe_send_next_lesson is called
+    Then: A confirmation prompt is sent and pending confirmation is stored
+    """
     db = SessionLocal()
     user_id = create_test_user(db, "test_next_day_user")
 
@@ -80,6 +88,10 @@ async def test_next_day_triggers_confirmation_prompt():
 
 
 def test_confirmation_prompt_wording():
+    """Given: A lesson confirmation prompt template
+    When: The template is retrieved
+    Then: It uses the updated wording without 'yesterday'
+    """
     # direct check of the template helper to ensure updated language
     from src.language.onboarding_prompts import get_lesson_confirmation_prompt
 
@@ -97,6 +109,10 @@ def test_confirmation_prompt_wording():
 
 @pytest.mark.asyncio
 async def test_next_day_auto_advance_preference_skips_confirmation_prompt():
+    """Given: A user with auto-advance preference enabled
+    When: The next day is triggered
+    Then: Next lesson is sent without confirmation prompt
+    """
     db = SessionLocal()
     user_id = create_test_user(db, "test_next_day_auto_assume")
 
@@ -138,6 +154,10 @@ async def test_next_day_auto_advance_preference_skips_confirmation_prompt():
 
 @pytest.mark.asyncio
 async def test_auto_advance_intent_is_persisted_and_negative_override_adjusts_progress():
+    """Given: A user who has auto-advance enabled
+    When: User says they did not do the lesson
+    Then: Auto-advance is disabled and progress is adjusted
+    """
     db = SessionLocal()
     user_id = create_test_user(db, "test_next_day_auto_assume_override")
     mm = MemoryManager(db)
@@ -182,6 +202,10 @@ async def test_auto_advance_intent_is_persisted_and_negative_override_adjusts_pr
 
 @pytest.mark.asyncio
 async def test_auto_advance_preference_can_be_disabled_by_user_intent():
+    """Given: A user with auto-advance enabled
+    When: User explicitly disables it
+    Then: Auto-advance preference is disabled
+    """
     db = SessionLocal()
     user_id = create_test_user(db, "test_next_day_auto_assume_disable")
     mm = MemoryManager(db)
@@ -209,3 +233,4 @@ async def test_auto_advance_preference_can_be_disabled_by_user_intent():
     assert is_auto_advance_lessons_enabled(mm, user_id) is False
 
     db.close()
+

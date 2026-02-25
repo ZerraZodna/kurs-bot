@@ -1,3 +1,7 @@
+"""
+Migrated tests for schedule query handler.
+ migrated from tests/test_schedule_query_handler.py
+"""
 import pytest
 
 from src.scheduler import schedule_query_handler
@@ -5,6 +9,8 @@ import src.triggers.trigger_matcher as trigger_matcher
 
 
 class DummyEmbedSvc:
+    """Dummy embedding service for testing."""
+
     def __init__(self):
         pass
 
@@ -46,8 +52,11 @@ class DummyEmbedSvc:
 
 @pytest.mark.asyncio
 async def test_change_phrase_not_detected_as_status(monkeypatch):
-    # Patch the trigger matcher used by schedule_query_handler to simulate
-    # the previous embedding-based behavior.
+    """Given: A user asks to change their reminder time
+    When: Detecting if it's a schedule status request
+    Then: It should NOT be detected as a status request
+    """
+    # Given: Patch the trigger matcher with dummy service
     svc = DummyEmbedSvc()
 
     class DummyMatcher:
@@ -69,14 +78,18 @@ async def test_change_phrase_not_detected_as_status(monkeypatch):
 
     monkeypatch.setattr(trigger_matcher, "get_trigger_matcher", lambda: DummyMatcher(svc))
 
-    # This should NOT be classified as a schedule-status query
+    # When: User asks to change their reminder
     text = "Change lesson reminder to 09:00"
     is_status = await schedule_query_handler.detect_schedule_status_request(text)
+    
+    # Then: Should NOT be detected as a status request
     assert not is_status
 
-    # Typo variant ("remder") should also NOT be classified as status
+    # When: User uses a typo variant
     typo_text = "Change lesson remder to 09:00"
     is_status_typo = await schedule_query_handler.detect_schedule_status_request(typo_text)
+    
+    # Then: Should NOT be detected as a status request
     assert not is_status_typo
 
     # Control: a status-like query should be detected
@@ -87,7 +100,11 @@ async def test_change_phrase_not_detected_as_status(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_explicit_change_phrase_not_detected(monkeypatch):
-    # Ensure the specific phrase does not get misclassified as a status query
+    """Given: A user explicitly asks to change their reminder
+    When: Detecting if it's a schedule status request
+    Then: It should NOT be detected as a status request
+    """
+    # Given: Patch with another dummy matcher
     svc = DummyEmbedSvc()
 
     class DummyMatcher2:
@@ -109,6 +126,10 @@ async def test_explicit_change_phrase_not_detected(monkeypatch):
 
     monkeypatch.setattr(trigger_matcher, "get_trigger_matcher", lambda: DummyMatcher2(svc))
 
+    # When: User asks to change their reminder
     text = "Change lesson reminder to 09:00"
     is_status = await schedule_query_handler.detect_schedule_status_request(text)
+    
+    # Then: Should NOT be detected as a status request
     assert not is_status
+
