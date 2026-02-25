@@ -23,7 +23,7 @@ async def test_process_message_creates_one_time_reminder(monkeypatch):
     db = SessionLocal()
     try:
         # Given: Create a ready user (onboarding complete)
-        from tests.utils import make_ready_user
+        from tests.fixtures.users import make_ready_user
 
         user_id = make_ready_user(db, external_id="procmsg_test_user", first_name="Proc")
         dialogue = DialogueEngine(db)

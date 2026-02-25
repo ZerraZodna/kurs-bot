@@ -1,7 +1,7 @@
 import pytest
 from src.models.database import SessionLocal, init_db
 from src.services.dialogue_engine import DialogueEngine
-from tests.utils import create_test_user
+from tests.fixtures.users import create_test_user
 from src.memories import MemoryManager
 
 

@@ -9,7 +9,7 @@ from src.models.database import SessionLocal
 from src.memories import MemoryManager
 from src.scheduler import SchedulerService
 from src.services.dialogue_engine import DialogueEngine
-from tests.utils import make_ready_user
+from tests.fixtures.users import make_ready_user
 
 
 @pytest.mark.asyncio

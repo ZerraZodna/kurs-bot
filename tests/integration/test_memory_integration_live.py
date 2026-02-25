@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from src.models.database import Base, User, Memory
 from src.services.dialogue_engine import DialogueEngine
 from src.config import settings
-from tests.utils import make_ready_user
+from tests.fixtures.users import make_ready_user
 
 
 @pytest.fixture(scope="function")

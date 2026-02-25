@@ -16,7 +16,7 @@ def test_one_time_creation_does_not_modify_daily():
     """
     db = SessionLocal()
     try:
-        from tests.utils import make_ready_user
+        from tests.fixtures.users import make_ready_user
 
         # Given: Create a ready user with onboarding completed
         user_id = make_ready_user(db, external_id="one_time_test", first_name="One")

@@ -19,7 +19,7 @@ def test_remind_me_creates_one_time_with_correct_message():
     """
     db = SessionLocal()
     try:
-        from tests.utils import make_ready_user
+        from tests.fixtures.users import make_ready_user
 
         # Given: Create a ready user with onboarding completed
         user_id = make_ready_user(db, external_id="remind_test_user", first_name="Remind")

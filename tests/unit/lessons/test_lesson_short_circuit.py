@@ -11,7 +11,7 @@ from src.lessons.handler import process_lesson_query
 async def test_pre_llm_lesson_short_circuit(monkeypatch):
     # Setup DB objects and mark onboarding complete so extractor/LLM isn't called
     session = SessionLocal()
-    from tests.utils import make_ready_user
+    from tests.fixtures.users import make_ready_user
 
     user_id = make_ready_user(session, external_id="u1", first_name="Test")
     lesson = Lesson(lesson_id=1, title="Lesson 1", content="Lesson 1\nFull lesson text")

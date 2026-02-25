@@ -20,7 +20,7 @@ from src.models.database import SessionLocal, User, init_db
 from src.services.dialogue_engine import DialogueEngine
 from src.onboarding.service import OnboardingService
 from datetime import datetime, timezone
-from tests.utils import create_test_user
+from tests.fixtures.users import create_test_user
 
 
 @pytest.mark.asyncio

@@ -22,7 +22,7 @@ async def test_rag_mode_one_time_reminder_preserves_daily(monkeypatch):
     """
     db = SessionLocal()
     try:
-        from tests.utils import make_ready_user
+        from tests.fixtures.users import make_ready_user
 
         # Given: Create a ready user
         user_id = make_ready_user(db, external_id="rag_one_time_user", first_name="RagUser")

@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.models.database import Lesson, SessionLocal
-from tests.utils import create_test_user
+from tests.fixtures.users import create_test_user
 from src.memories import MemoryManager
 from src.lessons.state import (
     get_last_sent_lesson_id,
