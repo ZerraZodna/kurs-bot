@@ -4,10 +4,11 @@ Migrated from tests/test_onboarding_language.py to use new test fixtures.
 """
 
 import pytest
-from datetime import datetime, timezone
 
-from src.models.database import User, Memory
+from src.models.database import Memory
 from src.services.dialogue_engine import DialogueEngine
+
+from tests.fixtures.users import create_test_user
 
 
 class TestOnboardingLanguage:
@@ -20,23 +21,15 @@ class TestOnboardingLanguage:
         Then: Should detect Norwegian and respond with Norwegian prompts
         """
         # Given: A new user
-        user = User(
-            external_id="test_onboarding_language_detect",
-            channel="test",
-            first_name=None,
-            opted_in=True,
-            created_at=datetime.now(timezone.utc),
-        )
-        db_session.add(user)
-        db_session.commit()
+        user_id = create_test_user(db_session, "test_onboarding_language_detect", None)
         
         dialogue = DialogueEngine(db_session)
         
         # When: Sending Norwegian greeting
-        resp = await dialogue.process_message(user.user_id, "Hei", db_session)
+        resp = await dialogue.process_message(user_id, "Hei", db_session)
         
         # Then: Memory should be created with Norwegian
-        mems = db_session.query(Memory).filter_by(user_id=user.user_id, key="user_language").all()
+        mems = db_session.query(Memory).filter_by(user_id=user_id, key="user_language").all()
         assert len(mems) > 0, "Expected a user_language memory to be stored"
         assert any(m.value == "no" for m in mems), f"Expected stored language 'no', got {[m.value for m in mems]}"
         

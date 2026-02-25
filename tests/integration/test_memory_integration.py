@@ -14,6 +14,8 @@ from src.services.dialogue_engine import DialogueEngine
 from src.language.prompt_optimizer import PromptOptimizer
 from src.services.context_utils import MemoryKey, MemoryCategory
 
+from tests.fixtures.users import create_test_user
+
 
 class TestCompleteWorkflow:
     """Test the complete memory/context/dialogue workflow."""
@@ -335,20 +337,12 @@ class TestErrorHandling:
         pb = PromptBuilder(db_session, MemoryManager(db_session))
         mm = MemoryManager(db_session)
 
-        # User with no memories - test_user has memories from fixture
-        # Create a new user without memories
-        new_user = User(
-            external_id="no_memory_user",
-            channel="test",
-            first_name="Empty",
-            opted_in=True,
-        )
-        db_session.add(new_user)
-        db_session.commit()
+        # User with no memories - create a new user without memories
+        user_id = create_test_user(db_session, "no_memory_user", "Empty")
 
         # Should build prompt without memories
         prompt = pb.build_prompt(
-            user_id=new_user.user_id,
+            user_id=user_id,
             user_input="Hello",
             system_prompt="You are helpful",
         )

@@ -4,12 +4,12 @@ Migrated from tests/test_onboarding_service_integration.py to use new test fixtu
 """
 
 import pytest
-from datetime import datetime, timezone
 
-from src.models.database import User
 from src.memories import MemoryManager
 from src.onboarding import OnboardingService
 from src.lessons.state import get_current_lesson
+
+from tests.fixtures.users import create_test_user
 
 
 class TestOnboardingServiceIntegration:
@@ -21,30 +21,22 @@ class TestOnboardingServiceIntegration:
         Then: Should persist the lesson number
         """
         # Given: A user
-        user = User(
-            external_id="test_onboarding_service_int",
-            channel="test",
-            first_name="Test",
-            opted_in=True,
-            created_at=datetime.now(timezone.utc),
-        )
-        db_session.add(user)
-        db_session.commit()
+        user_id = create_test_user(db_session, "test_onboarding_service_int", "Test")
         
         mm = MemoryManager(db_session)
         svc = OnboardingService(db_session)
         
         # Ensure no current_lesson initially
-        assert get_current_lesson(mm, user.user_id) is None
+        assert get_current_lesson(mm, user_id) is None
         
         # When: User indicates an explicit lesson
-        res = svc.handle_lesson_status_response(user.user_id, "I am on lesson 6")
+        res = svc.handle_lesson_status_response(user_id, "I am on lesson 6")
         
         # Then: Should return send_specific_lesson action
         assert res["action"] == "send_specific_lesson"
         
         # And: current_lesson should be persisted
-        cur = get_current_lesson(mm, user.user_id)
+        cur = get_current_lesson(mm, user_id)
         assert cur == 6
 
     def test_persist_continuing_when_completed_before(self, db_session):
@@ -53,26 +45,18 @@ class TestOnboardingServiceIntegration:
         Then: Should return ask_lesson_number action
         """
         # Given: A user
-        user = User(
-            external_id="test_onboarding_service_int2",
-            channel="test",
-            first_name="Test",
-            opted_in=True,
-            created_at=datetime.now(timezone.utc),
-        )
-        db_session.add(user)
-        db_session.commit()
+        user_id = create_test_user(db_session, "test_onboarding_service_int2", "Test")
         
         mm = MemoryManager(db_session)
         svc = OnboardingService(db_session)
         
         # When: User says they've completed the course
-        res = svc.handle_lesson_status_response(user.user_id, "I've completed the course")
+        res = svc.handle_lesson_status_response(user_id, "I've completed the course")
         
         # Then: Should return ask_lesson_number action
         assert res["action"] == "ask_lesson_number"
         
         # And: current_lesson should be "continuing"
-        cur = get_current_lesson(mm, user.user_id)
+        cur = get_current_lesson(mm, user_id)
         assert cur == "continuing"
 
