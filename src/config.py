@@ -65,7 +65,8 @@ class Settings(BaseSettings):
     # progressive message edits instead of waiting for the full LLM response.
     OLLAMA_STREAM_ENABLED: bool = True
     # Minimum seconds between Telegram editMessageText calls during streaming.
-    TELEGRAM_STREAM_UPDATE_INTERVAL: float = 1.0
+    # 0.3 s gives ~3 edits/second — smooth without hitting Telegram rate limits.
+    TELEGRAM_STREAM_UPDATE_INTERVAL: float = 0.3
     # Enable the developer web UI when True (set in .env during local dev)
     DEV_WEB_CLIENT: bool = False
     # Add more config as needed
