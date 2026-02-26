@@ -201,6 +201,150 @@ async def test_auto_advance_intent_is_persisted_and_negative_override_adjusts_pr
 
 
 @pytest.mark.asyncio
+async def test_scheduler_full_two_day_flow_after_onboarding():
+    """Given: A user who completed onboarding reporting lesson 17
+       (current_lesson=17, last_sent_lesson_id=None)
+    When: Day 1 scheduler fires, user confirms 'yes', then Day 2 scheduler fires
+    Then:
+      - Day 1: confirmation prompt for lesson 17 is sent
+      - After 'yes': lesson 18 is delivered, last_sent=18
+      - Day 2: confirmation prompt for lesson 18 is sent
+      - After 'yes': lesson 19 is delivered, last_sent=19
+    """
+    from src.scheduler.execution import execute_scheduled_task
+    from src.scheduler.core import SchedulerService
+
+    db = SessionLocal()
+    user_id = create_test_user(db, "test_two_day_flow_user")
+
+    mm = MemoryManager(db)
+    # Day 0: Onboarding sets current_lesson=17, last_sent=None
+    set_current_lesson(mm, user_id, 17)
+
+    # Verify initial state
+    assert get_last_sent_lesson_id(mm, user_id) is None, "last_sent should be None after onboarding"
+
+    # Seed lessons 17, 18, 19 if not present
+    for lid in (17, 18, 19):
+        if db.query(Lesson).filter(Lesson.lesson_id == lid).first() is None:
+            db.add(
+                Lesson(
+                    lesson_id=lid,
+                    title=f"Lesson {lid} Title",
+                    content=f"Lesson {lid} content text.",
+                    created_at=datetime.now(timezone.utc),
+                )
+            )
+    db.commit()
+
+    # Create a daily schedule for the user
+    schedule = SchedulerService.create_daily_schedule(
+        user_id=user_id, lesson_id=None, time_str="09:00", session=db
+    )
+
+    # ---- DAY 1: Scheduler fires ----
+    result_day1 = execute_scheduled_task(schedule.schedule_id, simulate=True, session=db)
+    assert result_day1 is not None, "Day 1: scheduler should return messages"
+    combined_day1 = "\n\n".join(result_day1) if isinstance(result_day1, list) else str(result_day1)
+
+    # Should be a confirmation prompt for lesson 17
+    assert "quick check-in" in combined_day1.lower() or "liten innsjekk" in combined_day1.lower(), \
+        f"Day 1: Expected confirmation prompt, got: {combined_day1}"
+    assert "17" in combined_day1, f"Day 1: Expected lesson 17 mentioned, got: {combined_day1}"
+
+    # Verify pending confirmation is set
+    pending_day1 = get_pending_confirmation(mm, user_id)
+    assert pending_day1 is not None, "Day 1: Expected pending confirmation"
+    assert int(pending_day1.get("lesson_id")) == 17, f"Day 1: Expected pending for lesson 17, got {pending_day1}"
+
+    # ---- User confirms 'yes' on Day 1 ----
+    async def _fake_translate(text: str, language: str):
+        return text
+
+    async def _fake_format_lesson(lesson, language: str):
+        return f"Lesson {lesson.lesson_id}: {lesson.title}\n\n{lesson.content}"
+
+    # Mock _semantic_yes_no to isolate this test from trigger matcher
+    # singleton caching. A dedicated test in test_ci_trigger_data_completeness
+    # verifies that the real _semantic_yes_no works with CI trigger data.
+    import src.services.dialogue.reminder_handler as _rh
+    _orig_semantic = _rh._semantic_yes_no
+
+    async def _mock_semantic_yes_no(text, onboarding_service):
+        if text.strip().lower() in ("yes", "ja", "y"):
+            return (True, False)
+        if text.strip().lower() in ("no", "nei", "n"):
+            return (False, True)
+        return await _orig_semantic(text, onboarding_service)
+
+    _rh._semantic_yes_no = _mock_semantic_yes_no
+    try:
+        confirmation_response = await handle_lesson_confirmation(
+            user_id=user_id,
+            text="yes",
+            session=db,
+            memory_manager=mm,
+            onboarding_service=None,
+            translate_fn=_fake_translate,
+            get_language_fn=lambda uid: "en",
+            format_lesson_fn=_fake_format_lesson,
+        )
+    finally:
+        _rh._semantic_yes_no = _orig_semantic
+
+    assert confirmation_response is not None, "Day 1 confirmation: Expected lesson delivery response"
+    assert "18" in confirmation_response, f"Day 1 confirmation: Expected lesson 18, got: {confirmation_response}"
+
+    # Verify last_sent is now 18
+    last_sent_after_confirm = get_last_sent_lesson_id(mm, user_id)
+    assert last_sent_after_confirm == 18, f"After Day 1 confirm: Expected last_sent=18, got {last_sent_after_confirm}"
+
+    # Verify pending confirmation is resolved
+    pending_after_confirm = get_pending_confirmation(mm, user_id)
+    assert pending_after_confirm is None, "After Day 1 confirm: pending should be resolved"
+
+    # ---- DAY 2: Scheduler fires again ----
+    result_day2 = execute_scheduled_task(schedule.schedule_id, simulate=True, session=db)
+    assert result_day2 is not None, "Day 2: scheduler should return messages"
+    combined_day2 = "\n\n".join(result_day2) if isinstance(result_day2, list) else str(result_day2)
+
+    # Should be a confirmation prompt for lesson 18
+    assert "quick check-in" in combined_day2.lower() or "liten innsjekk" in combined_day2.lower(), \
+        f"Day 2: Expected confirmation prompt, got: {combined_day2}"
+    assert "18" in combined_day2, f"Day 2: Expected lesson 18 mentioned, got: {combined_day2}"
+
+    # Verify pending confirmation is set for lesson 18
+    pending_day2 = get_pending_confirmation(mm, user_id)
+    assert pending_day2 is not None, "Day 2: Expected pending confirmation"
+    assert int(pending_day2.get("lesson_id")) == 18, f"Day 2: Expected pending for lesson 18, got {pending_day2}"
+
+    # ---- User confirms 'yes' on Day 2 ----
+    _rh._semantic_yes_no = _mock_semantic_yes_no
+    try:
+        confirmation_response_day2 = await handle_lesson_confirmation(
+            user_id=user_id,
+            text="yes",
+            session=db,
+            memory_manager=mm,
+            onboarding_service=None,
+            translate_fn=_fake_translate,
+            get_language_fn=lambda uid: "en",
+            format_lesson_fn=_fake_format_lesson,
+        )
+    finally:
+        _rh._semantic_yes_no = _orig_semantic
+
+    assert confirmation_response_day2 is not None, "Day 2 confirmation: Expected lesson delivery response"
+    assert "19" in confirmation_response_day2, f"Day 2 confirmation: Expected lesson 19, got: {confirmation_response_day2}"
+
+    # Verify last_sent is now 19
+    last_sent_after_day2 = get_last_sent_lesson_id(mm, user_id)
+    assert last_sent_after_day2 == 19, f"After Day 2 confirm: Expected last_sent=19, got {last_sent_after_day2}"
+
+    db.close()
+
+
+@pytest.mark.asyncio
 async def test_auto_advance_preference_can_be_disabled_by_user_intent():
     """Given: A user with auto-advance enabled
     When: User explicitly disables it

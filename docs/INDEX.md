@@ -24,9 +24,10 @@ A production-ready **User Memory & Context Prompt Building System** has been ful
 | [tests/test_prompt_builder.py](../tests/test_prompt_builder.py) | 450 | 20+ comprehensive tests |
 | [tests/test_integration_memory.py](../tests/test_integration_memory.py) | 500 | End-to-end integration tests |
 
-### Documentation (3 New)
+### Documentation (4 New)
 | File | Purpose | Audience |
 |------|---------|----------|
+| [LESSON_DELIVERY_FLOW.md](LESSON_DELIVERY_FLOW.md) | Lesson state machine, day-by-day flow, confirmation triggers | Developers, Agents |
 | [MEMORY_CONTEXT_SYSTEM.md](MEMORY_CONTEXT_SYSTEM.md) | Complete technical guide (400+ lines) | Developers |
 | [ARCHITECTURE.md](../ARCHITECTURE.md) | System design & diagrams (300+ lines) | Architects |
 | [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) | What was built & next steps | Project managers |

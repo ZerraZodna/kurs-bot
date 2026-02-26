@@ -40,6 +40,12 @@
 - Keep commits focused and imperative (for example: `refactor: split dialogue scheduler checks`).
 - PRs should include summary, rationale, test evidence, and migration/config impact.
 
+## Key Architecture Docs (Read These First for Context)
+- `docs/LESSON_DELIVERY_FLOW.md` — **Lesson state machine**: how `current_lesson` vs `last_sent_lesson_id` work, the day-by-day flow after onboarding, confirmation prompts, and `_semantic_yes_no` trigger dependency. Essential reading for any lesson/scheduler/onboarding work.
+- `docs/EMBEDDINGS_TRIGGERS.md` — **Trigger embeddings pipeline**: STARTER list, `ci_trigger_data.py` generation, CI seeding, staleness detection, and the critical `confirm_yes`/`confirm_no` requirement.
+- `docs/ONBOARDING.md` — Onboarding conversation flow.
+- `TODO.md` — Current pending tasks and session context for continuity.
+
 ## Current Refactor Priorities
 - Reorganize flat tests into module-based directories.
 - Decompose `DialogueEngine.process_message` into smaller pipeline steps.
