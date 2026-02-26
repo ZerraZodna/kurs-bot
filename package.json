@@ -21,7 +21,6 @@
     "test:fast": "python -m pytest --maxfail=3 -q",
     "tests:warning_as_error": "node ./scripts/venv.js test -- --maxfail=3 -v -W error",
     "tests": "npm test",
-    "ping": "node ./scripts/venv.js ping && node -e \"(async()=>{try{const axios=require('axios');const r=await axios.get('http://127.0.0.1:8000/',{timeout:3000});console.log('[OK] Local 8000',r.status);}catch(e){console.error('[FAIL] Local 8000',e && e.message);process.exit(2);} })()\"",
     "start": "node ./scripts/venv.js start",
     "start:foreground": "python -m uvicorn src.api.app:app --host 127.0.0.1 --port 8000",
     "start:ui": "node ./scripts/venv.js start-ui",

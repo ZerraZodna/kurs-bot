@@ -187,7 +187,6 @@ switch (cmd) {
       '  npm run status      # print DB counts for active users, lessons, embeddings, and messages',
       '  npm run config       # create .env from .env.template (if missing) and open it in your editor',
       "  npm run update       # run 'git pull' and, if changes were pulled, restart services (stop then start)",
-      '  npm run ping         # check Telegram API and Ollama endpoints based on .env',
       '  npm run list         # list running ngrok and uvicorn processes',
       '  npm run tail         # print last 50 lines of uvicorn/ngrok logs (non-follow)',
       '',
@@ -749,96 +748,6 @@ switch (cmd) {
   case 'exec':
     const py = whichPython();
     runCommand(py, cmdArgs);
-    break;
-  case 'ping':
-    (async function() {
-      // Lazy-load Node deps so other commands work without `npm install`
-      let axios;
-      try {
-        axios = require('axios');
-      } catch (e) {
-        console.error("Missing Node dependency 'axios'. Run 'npm install' in the project root to install runtime deps.");
-        process.exit(1);
-      }
-      try {
-        require('dotenv').config({ path: path.join(repoRoot, '.env') });
-      } catch (e) {
-        // ignore
-      }
-      // Check Telegram
-      async function checkTelegram() {
-        const token = process.env.TELEGRAM_BOT_TOKEN;
-        if (!token) return { ok: null, reason: 'TELEGRAM_BOT_TOKEN not configured' };
-        const url = `https://api.telegram.org/bot${token}/getMe`;
-        try {
-          const res = await axios.get(url, { timeout: 5000 });
-          if (res.status === 200 && res.data && res.data.ok) return { ok: true };
-          return { ok: false, reason: `unexpected response: ${res.status}` };
-        } catch (e) {
-          return { ok: false, reason: e.message };
-        }
-      }
-
-      // Check Ollama
-      async function checkOllama() {
-        const local = process.env.LOCAL_OLLAMA_URL;
-        const cloud = process.env.CLOUD_OLLAMA_URL;
-        const model = process.env.OLLAMA_MODEL || process.env.OLLAMA_CHAT_RAG_MODEL || null;
-        const localDefault = 'http://localhost:11434';
-
-        async function probeTags(base) {
-          try {
-            const res = await axios.get(`${base.replace(/\/$/, '')}/api/tags`, { timeout: 3000 });
-            return { ok: res.status === 200, data: res.data };
-          } catch (e) {
-            return { ok: false, reason: e.message };
-          }
-        }
-
-        async function probeGenerate(base, modelName) {
-          try {
-            const res = await axios.post(
-              `${base.replace(/\/$/, '')}/api/generate`,
-              { model: modelName || '', prompt: 'ping', stream: false },
-              { timeout: 5000 }
-            );
-            return { ok: res.status === 200 };
-          } catch (e) {
-            return { ok: false, reason: e.message };
-          }
-        }
-
-        if (cloud) {
-          const base = cloud.split('/api')[0];
-          const tags = await probeTags(base);
-          return { kind: 'cloud', base, result: tags };
-        }
-
-        const base = (local || localDefault).split('/api')[0];
-        if (model) {
-          const gen = await probeGenerate(base, model);
-          return { kind: 'local', base, model, result: gen };
-        }
-        const tags = await probeTags(base);
-        return { kind: 'local', base, result: tags };
-      }
-
-      console.log('Loading .env from project root if present');
-      const tg = await checkTelegram();
-      if (tg.ok === true) console.log('[OK] Telegram API reachable');
-      else if (tg.ok === false) console.error('[FAIL] Telegram:', tg.reason || 'no');
-      else console.warn('[SKIP] Telegram check:', tg.reason);
-
-      const ol = await checkOllama();
-      if (ol.result && ol.result.ok) {
-        console.log(`[OK] Ollama (${ol.kind}) reachable at ${ol.base}`);
-      } else {
-        console.error(`[FAIL] Ollama (${ol.kind}) at ${ol.base}:`, ol.result && ol.result.reason ? ol.result.reason : JSON.stringify(ol.result));
-      }
-
-      const exitCode = ((tg.ok === false) || !(ol.result && ol.result.ok)) ? 1 : 0;
-      process.exit(exitCode);
-    })();
     break;
   case 'config':
     // Ensure .env exists by copying .env.template and open in editor
