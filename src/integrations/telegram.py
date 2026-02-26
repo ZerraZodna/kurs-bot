@@ -106,6 +106,8 @@ async def send_message_streaming(
     message_id: Optional[int] = None
     last_edit_time: float = 0.0
     last_sent_text: str = ""
+    _tg_start = time.monotonic()
+    _first_send_t: Optional[float] = None
 
     # We use a typing indicator "⏳" as the initial placeholder
     PLACEHOLDER = "⏳"
@@ -115,16 +117,33 @@ async def send_message_streaming(
 
         now = time.monotonic()
         elapsed = now - last_edit_time
-        logger.info(f"[telegram_stream] accumulated length: {len(accumulated)}, elapsed: {elapsed:.2f}s")
+        # Log relative to stream start so timestamps align with [ollama_stream] logs
+        logger.info(
+            "[telegram_stream] token received at t=+%.3fs, accumulated=%d, elapsed_since_last_send=%.2fs",
+            now - _tg_start,
+            len(accumulated),
+            elapsed,
+        )
 
         if elapsed >= min_update_interval and accumulated != last_sent_text:
             if message_id is None:
                 # Send the first message
+                _first_send_t = time.monotonic() - _tg_start
+                logger.info(
+                    "[telegram_stream] FIRST sendMessage at t=+%.3fs with %d chars",
+                    _first_send_t,
+                    len(accumulated),
+                )
                 result = await send_message(chat_id, accumulated or PLACEHOLDER)
                 if result and result.get("ok") and result.get("result"):
                     message_id = result["result"].get("message_id")
                 last_sent_text = accumulated
             else:
+                logger.info(
+                    "[telegram_stream] editMessage at t=+%.3fs with %d chars",
+                    time.monotonic() - _tg_start,
+                    len(accumulated),
+                )
                 # Edit the existing message
                 await edit_message(chat_id, message_id, accumulated)
                 last_sent_text = accumulated

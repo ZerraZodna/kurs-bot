@@ -10,6 +10,7 @@ clear logging and fallbacks.
 
 import asyncio
 import logging
+import time as _time
 from typing import Any, Optional
 from urllib.parse import urlparse
 
@@ -193,6 +194,8 @@ async def stream_ollama(
             chosen_model,
             (prompt[:100] + "...") if len(prompt) > 100 else prompt,
         )
+        _stream_start = _time.monotonic()
+        _token_count = 0
         try:
             async with httpx.AsyncClient() as client:
                 async with client.stream(
@@ -208,8 +211,21 @@ async def stream_ollama(
                             continue
                         token = chunk.get("response", "")
                         if token:
+                            _token_count += 1
+                            logger.info(
+                                "[ollama_stream] token #%d at t=+%.3fs len=%d: %r",
+                                _token_count,
+                                _time.monotonic() - _stream_start,
+                                len(token),
+                                token[:30],
+                            )
                             yield token
                         if chunk.get("done", False):
+                            logger.info(
+                                "[ollama_stream] DONE after %d tokens, total elapsed=%.3fs",
+                                _token_count,
+                                _time.monotonic() - _stream_start,
+                            )
                             return
         except Exception as e:
             logger.exception("[stream_ollama cloud error] %s — falling back to non-streaming", e)
