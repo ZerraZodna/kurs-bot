@@ -278,6 +278,51 @@ switch (cmd) {
       runScript(argsForScript[0], argsForScript.slice(1));
     }
     break;
+  case 'ngrok':
+    // Start ngrok only (detached) - allows running uvicorn in foreground separately
+    {
+      const scriptsDir = path.join(repoRoot, 'scripts');
+      const ngrokOut = path.join(scriptsDir, 'ngrok.out.log');
+      const ngrokErr = path.join(scriptsDir, 'ngrok.err.log');
+
+      // Helper to start detached process with logs
+      function startDetached(bin, args, outPath, errPath, pidFile) {
+        try {
+          const out = fs.openSync(outPath, 'a');
+          const err = fs.openSync(errPath, 'a');
+          const child = spawn(bin, args, { cwd: repoRoot, detached: true, stdio: ['ignore', out, err] });
+          child.unref();
+          try {
+            if (pidFile) fs.writeFileSync(pidFile, String(child.pid));
+          } catch (e) {
+            // non-fatal if pid file cannot be written
+          }
+          return child.pid || null;
+        } catch (err) {
+          return null;
+        }
+      }
+
+      // Start ngrok if available
+      try {
+        const check = spawnSync('ngrok', ['version']);
+        if (check.status === 0) {
+          const pid = startDetached('ngrok', ['http', '8000'], ngrokOut, ngrokErr, path.join(scriptsDir, 'ngrok.pid'));
+          if (pid) {
+            console.log('Started ngrok detached (PID:', pid, ', logs:', ngrokOut, ngrokErr + ')');
+            console.log('\nNow you can run: npm run start:foreground');
+          } else {
+            console.error('Failed to start ngrok');
+            process.exit(1);
+          }
+        } else {
+          console.log('ngrok not found in PATH; skipping ngrok startup');
+        }
+      } catch (e) {
+        console.log('ngrok not available; skipping');
+      }
+    }
+    break;
   case 'start':
     // Start ngrok (detached) and uvicorn (detached) similar to start-linux.sh
     {

@@ -22,6 +22,7 @@
     "tests:warning_as_error": "node ./scripts/venv.js test -- --maxfail=3 -v -W error",
     "tests": "npm test",
     "start": "node ./scripts/venv.js start",
+    "start:ngrok": "node ./scripts/venv.js ngrok",
     "start:uvicorn": "node ./scripts/venv.js exec -m uvicorn src.api.app:app --host 127.0.0.1 --port 8000 --log-level debug",
     "start:foreground": "node ./scripts/venv.js exec -m uvicorn src.api.app:app --host 127.0.0.1 --port 8000 --log-level debug",
     "start:ui": "node ./scripts/venv.js start-ui",
