@@ -114,6 +114,7 @@ async def send_message_streaming(
 
         now = time.monotonic()
         elapsed = now - last_edit_time
+        logger.info(f"[telegram_stream] accumulated length: {len(accumulated)}, elapsed: {elapsed:.2f}s")
 
         if elapsed >= min_update_interval and accumulated != last_sent_text:
             if message_id is None:

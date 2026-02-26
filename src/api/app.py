@@ -274,6 +274,7 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
     await asyncio.sleep(1.0)
 
     stream_enabled = getattr(settings, "OLLAMA_STREAM_ENABLED", True)
+    logger.info(f"[batch] stream_enabled={stream_enabled} for user_id={user_id}")
 
     try:
         for _ in range(3):
@@ -328,6 +329,7 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
 
                 if result["type"] == "stream":
                     # Stream tokens to Telegram via progressive edits
+                    logger.info(f"[batch] Using STREAMING path for user_id={user_id}")
                     ai_response, _msg_id = await send_message_streaming(
                         chat_id, result["generator"]
                     )
@@ -340,10 +342,12 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                         print(f"[stream post_hook error] {e}")
                 else:
                     # Non-LLM response — send normally
+                    logger.info(f"[batch] Using NON-STREAMING (text) path for user_id={user_id}")
                     ai_response = result["text"]
                     await send_message(chat_id, ai_response)
             else:
                 # Streaming disabled — use original non-streaming path
+                logger.info(f"[batch] OLLAMA_STREAM_ENABLED=False, using NON-STREAMING path for user_id={user_id}")
                 db = SessionLocal()
                 dialogue = DialogueEngine(db)
                 ai_response = await dialogue.process_message(
