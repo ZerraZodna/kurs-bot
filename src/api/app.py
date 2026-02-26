@@ -9,7 +9,7 @@ from src.middleware.logging_redaction import apply_logging_redaction
 from src.services.security_checks import verify_secrets_config
 from src.models.database import SessionLocal, User, MessageLog, BatchLock
 from src.config import settings
-from src.integrations.telegram import TelegramHandler, send_message
+from src.integrations.telegram import TelegramHandler, send_message, send_message_streaming
 from src.services.dialogue_engine import DialogueEngine
 from src.services.admin_notifier import set_admin_chat_id, send_admin_notification
 from src.services.traffic_tracker import record_traffic_event
@@ -264,8 +264,16 @@ async def root():
 
 
 async def process_telegram_batch(user_id: int, external_id: str) -> None:
-    """Batch inbound messages for a user and send one AI response."""
+    """Batch inbound messages for a user and send one AI response.
+
+    When streaming is enabled (``OLLAMA_STREAM_ENABLED``), LLM-generated
+    responses are streamed token-by-token to Telegram via progressive
+    message edits.  Non-LLM responses (commands, onboarding, lessons, etc.)
+    are sent normally as a single message.
+    """
     await asyncio.sleep(1.0)
+
+    stream_enabled = getattr(settings, "OLLAMA_STREAM_ENABLED", True)
 
     try:
         for _ in range(3):
@@ -301,20 +309,53 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                 db.close()
                 break
 
-            # Generate AI response
-            db = SessionLocal()
-            dialogue = DialogueEngine(db)
-            ai_response = await dialogue.process_message(
-                user_id=user_id,
-                text=combined_text,
-                session=db,
-                include_history=True,
-                history_turns=4,
-            )
-            db.close()
+            # Generate AI response — streaming or non-streaming
+            chat_id = int(external_id)
+            ai_response: str
 
-            # Send response back to user
-            await send_message(int(external_id), ai_response)
+            if stream_enabled:
+                db = SessionLocal()
+                dialogue = DialogueEngine(db)
+                result = await dialogue.process_message_for_telegram(
+                    user_id=user_id,
+                    text=combined_text,
+                    session=db,
+                    chat_id=chat_id,
+                    include_history=True,
+                    history_turns=4,
+                )
+                db.close()
+
+                if result["type"] == "stream":
+                    # Stream tokens to Telegram via progressive edits
+                    ai_response, _msg_id = await send_message_streaming(
+                        chat_id, result["generator"]
+                    )
+                    if not ai_response:
+                        ai_response = "[No response from LLM]"
+                    # Run post-response hooks (trigger matching, etc.)
+                    try:
+                        await result["post_hook"](ai_response)
+                    except Exception as e:
+                        print(f"[stream post_hook error] {e}")
+                else:
+                    # Non-LLM response — send normally
+                    ai_response = result["text"]
+                    await send_message(chat_id, ai_response)
+            else:
+                # Streaming disabled — use original non-streaming path
+                db = SessionLocal()
+                dialogue = DialogueEngine(db)
+                ai_response = await dialogue.process_message(
+                    user_id=user_id,
+                    text=combined_text,
+                    session=db,
+                    include_history=True,
+                    history_turns=4,
+                )
+                db.close()
+                await send_message(chat_id, ai_response)
+
             record_traffic_event()
 
             # Log outbound and mark processed

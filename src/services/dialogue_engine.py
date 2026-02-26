@@ -10,6 +10,7 @@ from src.onboarding.flow import OnboardingFlow
 from src.scheduler import SchedulerService
 from src.services.dialogue import (
     call_ollama,
+    stream_ollama,
     detect_lesson_request,
     handle_lesson_request,
     format_lesson_message,
@@ -504,6 +505,177 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
         Return onboarding prompt sequence for new users.
         """
         return self.prompt_builder.build_onboarding_prompt(settings.SYSTEM_PROMPT)
+
+    async def process_message_for_telegram(
+        self,
+        user_id: int,
+        text: str,
+        session: Session,
+        chat_id: int,
+        include_history: bool = True,
+        history_turns: int = 4,
+        include_lesson: bool = True,
+    ):
+        """Process a user message and return either a plain string or a streaming context.
+
+        Returns a dict with:
+            - ``{"type": "text", "text": str}`` for non-LLM responses (commands,
+              onboarding, lessons, schedules, etc.) that should be sent normally.
+            - ``{"type": "stream", "generator": AsyncIterator[str], "post_hook": Callable}``
+              when the response should be streamed token-by-token.  After the
+              generator is exhausted the caller must invoke ``post_hook(full_text)``
+              to run trigger matching and any remaining bookkeeping.
+        """
+        user = session.query(User).filter_by(user_id=user_id).first()
+        if not user:
+            return {"type": "text", "text": "User not found."}
+
+        # 1. Restrictions and GDPR
+        restriction_response = await self._check_user_restrictions(user_id, text, user, session)
+        if restriction_response:
+            return {"type": "text", "text": restriction_response}
+
+        user_lang = await detect_and_store_language(self.memory_manager, user_id, text)
+
+        # 2. RAG and Language Setup
+        text, use_rag_for_this_message, rag_response = self._setup_rag_configuration(user_id, text)
+        if rag_response:
+            return {"type": "text", "text": rag_response}
+
+        # 3. Command Handling
+        command_response = await self._handle_commands(user_id, text, session, use_rag_for_this_message)
+        if command_response:
+            return {"type": "text", "text": command_response}
+
+        # 4. Memory Extraction and Onboarding
+        onboarding_response = await self._handle_onboarding_stage(user_id, text, session, use_rag_for_this_message)
+        if onboarding_response:
+            return {"type": "text", "text": onboarding_response}
+
+        # 5. Lesson and Schedule logic
+        lesson_schedule_response = await self._handle_lesson_and_schedule_stage(
+            user_id, text, session, user_lang, include_lesson, use_rag_for_this_message
+        )
+        if lesson_schedule_response:
+            return {"type": "text", "text": lesson_schedule_response}
+
+        # 6. Core LLM Response — this is the streaming path
+        return await self._generate_llm_response_streaming(
+            user_id, text, session, user_lang, use_rag_for_this_message,
+            include_history, history_turns, include_lesson,
+        )
+
+    async def _generate_llm_response_streaming(
+        self,
+        user_id: int,
+        text: str,
+        session: Session,
+        user_lang: str,
+        use_rag: bool,
+        include_history: bool,
+        history_turns: int,
+        include_lesson: bool,
+    ) -> dict:
+        """Build prompt and return a streaming context dict.
+
+        For English users the LLM response is streamed directly.
+        For non-English users the LLM response is fetched in full first,
+        then the *translation* call is streamed.
+        """
+        from src.services.embedding_service import get_embedding_service
+
+        user_text_embedding = await get_embedding_service().generate_embedding(text)
+        relevant_memories = await self._get_relevant_memories(user_id, text, session, user_text_embedding)
+
+        # Build prompt (same logic as _generate_llm_response)
+        if use_rag:
+            try:
+                system_prompt = self.prompt_registry.get_prompt_for_user(self.memory_manager, user_id)
+            except Exception:
+                system_prompt = settings.SYSTEM_PROMPT_RAG
+            prompt = self.prompt_builder.build_rag_prompt(
+                user_id=user_id,
+                user_input=text,
+                system_prompt=system_prompt,
+                relevant_memories=relevant_memories,
+                include_conversation_history=include_history,
+                history_turns=history_turns,
+            )
+        else:
+            system_prompt = settings.SYSTEM_PROMPT
+            prompt = self.prompt_builder.build_prompt(
+                user_id=user_id,
+                user_input=text,
+                system_prompt=system_prompt,
+                include_lesson=include_lesson,
+                include_conversation_history=include_history,
+                history_turns=history_turns,
+                relevant_memories=relevant_memories,
+            )
+
+        # Pre-LLM trigger short-circuit
+        from src.lessons.handler import pre_llm_lesson_short_circuit
+
+        pre = await pre_llm_lesson_short_circuit(
+            original_text=text,
+            precomputed_embedding=user_text_embedding,
+            user_id=user_id,
+            session=session,
+            prompt_builder=self.prompt_builder,
+            user_lang=user_lang,
+        )
+        if pre:
+            return {"type": "text", "text": pre}
+
+        is_english = not user_lang or user_lang.lower() == "en"
+
+        # Post-hook: runs trigger matching after the full text is available
+        async def _post_hook(full_response_text: str):
+            from src.triggers.triggering import handle_triggers
+            await handle_triggers(
+                response=full_response_text,
+                original_text=text,
+                session=session,
+                memory_manager=self.memory_manager,
+                user_id=user_id,
+                original_text_embedding=user_text_embedding,
+            )
+
+        if is_english:
+            # Stream the LLM response directly
+            gen = stream_ollama(
+                prompt,
+                model=settings.OLLAMA_CHAT_RAG_MODEL if use_rag else None,
+                language=user_lang,
+            )
+            return {"type": "stream", "generator": gen, "post_hook": _post_hook}
+        else:
+            # Non-English: get full LLM response first, then stream translation
+            response = await self.call_ollama(
+                prompt,
+                model=settings.OLLAMA_CHAT_RAG_MODEL if use_rag else None,
+                language=user_lang,
+            )
+            if response is None:
+                response = "[No response from LLM]"
+
+            # Build translation prompt (same as translate_text but we stream it)
+            translation_prompt = (
+                f"Translate the following text to {user_lang}. "
+                f"Return ONLY the translation, no explanations:\n\n{response}"
+            )
+            gen = stream_ollama(
+                translation_prompt,
+                model=None,
+                language=user_lang,
+            )
+
+            # Wrap post_hook to use the original (English) response for triggers
+            async def _post_hook_translated(full_translated_text: str):
+                await _post_hook(response)
+
+            return {"type": "stream", "generator": gen, "post_hook": _post_hook_translated}
+
 
 # Module-level wrapper so tests can monkeypatch `src.services.dialogue_engine.get_trigger_dispatcher`
 def get_trigger_dispatcher(db=None, memory_manager: MemoryManager = None) -> object:

@@ -1,6 +1,6 @@
 """Dialogue service subpackages and utilities."""
 
-from .ollama_client import call_ollama
+from .ollama_client import call_ollama, stream_ollama
 from src.lessons.handler import (
     detect_lesson_request,
     handle_lesson_request,
@@ -38,6 +38,7 @@ from .command_handlers import (
 
 __all__ = [
     "call_ollama",
+    "stream_ollama",
     "detect_lesson_request",
     "handle_lesson_request",
     "format_lesson_message",

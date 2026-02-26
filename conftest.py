@@ -52,7 +52,12 @@ if not _test_use_real or str(_test_use_real).strip().lower() not in ("1", "true"
             short = (prompt[:160] + "...") if prompt and len(prompt) > 160 else (prompt or "")
             return f"[MOCK_OLLAMA_REPLY] model={model or 'default'} lang={language or 'en'} text={short}"
 
+        async def _fake_stream_ollama(prompt: str, model: Optional[str] = None, language: Optional[str] = None, temperature=None):
+            short = (prompt[:160] + "...") if prompt and len(prompt) > 160 else (prompt or "")
+            yield f"[MOCK_OLLAMA_STREAM] model={model or 'default'} lang={language or 'en'} text={short}"
+
         setattr(_fake, "call_ollama", _fake_call_ollama)
+        setattr(_fake, "stream_ollama", _fake_stream_ollama)
         sys.modules[mod_name] = _fake
         # Ensure the package exposes attributes that tests may monkeypatch
         try:

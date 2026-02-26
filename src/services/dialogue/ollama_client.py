@@ -136,6 +136,92 @@ def _cloud_call_sync(host_base: str, api_key: Optional[str], model: str, prompt:
         return client.chat(str(model), messages=messages, stream=False)
 
 
+async def stream_ollama(
+    prompt: str,
+    model: Optional[str] = None,
+    language: Optional[str] = None,
+    temperature: Optional[float] = None,
+):
+    """Async generator that yields text chunks from Ollama streaming response.
+
+    Yields partial text tokens as they arrive from the LLM.  The caller is
+    responsible for concatenating them into the full response.
+
+    Falls back to a single-yield of the full response when:
+    - The model targets Ollama Cloud (official client doesn't expose a clean
+      async streaming interface we can wrap easily here).
+    - Any error occurs mid-stream.
+    """
+    import json as _json
+
+    chosen_model = model or OLLAMA_MODEL
+    if language and language.lower() != "en":
+        chosen_model = getattr(settings, "NON_ENGLISH_OLLAMA_MODEL", chosen_model)
+
+    # Safety short-circuit for tests
+    if _IS_TEST_ENV and not _TEST_USE_REAL_OLLAMA:
+        yield "[streaming disabled in test env]"
+        return
+
+    # Determine cloud vs local
+    raw_url = CLOUD_OLLAMA_URL
+    is_cloud = (
+        isinstance(chosen_model, str)
+        and str(chosen_model).lower().endswith("cloud")
+        and _is_cloud_url(raw_url)
+    )
+
+    if is_cloud:
+        # Cloud path: fall back to non-streaming call and yield the whole result
+        logger.info("stream_ollama: cloud model detected, falling back to non-streaming")
+        result = await call_ollama(prompt, model=model, language=language, temperature=temperature)
+        yield result
+        return
+
+    # Local HTTP streaming path
+    url = LOCAL_OLLAMA_URL
+    temp = OLLAMA_TEMPERATURE if temperature is None else temperature
+    payload = {
+        "model": chosen_model,
+        "prompt": prompt,
+        "stream": True,
+        "temperature": float(temp),
+    }
+    timeout = OLLAMA_LONG_TIMEOUT if "gpt-oss" in chosen_model.lower() else OLLAMA_TIMEOUT
+
+    logger.info(
+        "AI STREAM PROMPT (model=%s): %s",
+        chosen_model,
+        (prompt[:100] + "...") if len(prompt) > 100 else prompt,
+    )
+
+    try:
+        async with httpx.AsyncClient() as client:
+            async with client.stream("POST", url, json=payload, timeout=timeout) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if not line.strip():
+                        continue
+                    try:
+                        chunk = _json.loads(line)
+                    except Exception:
+                        continue
+                    token = chunk.get("response", "")
+                    if token:
+                        yield token
+                    # Ollama signals end of stream with "done": true
+                    if chunk.get("done", False):
+                        return
+    except Exception as e:
+        logger.exception("[stream_ollama error] %s — falling back to non-streaming", e)
+        # Fallback: yield full response from non-streaming call
+        try:
+            result = await call_ollama(prompt, model=model, language=language, temperature=temperature)
+            yield result
+        except Exception:
+            yield "[Sorry, I couldn't process your request right now.]"
+
+
 async def call_ollama(prompt: str, model: Optional[str] = None, language: Optional[str] = None, temperature: Optional[float] = None) -> str:
     """Top-level async method to call Ollama (cloud or local) and return text.
 

@@ -1,8 +1,13 @@
+import asyncio
 import httpx
+import logging
 import re
-from typing import Optional, Dict, Any
+import time
+from typing import Optional, Dict, Any, AsyncIterator
 from datetime import datetime, timezone
 from src.config import settings
+
+logger = logging.getLogger(__name__)
 
 TELEGRAM_BOT_TOKEN = settings.TELEGRAM_BOT_TOKEN
 API_BASE = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
@@ -29,6 +34,111 @@ class TelegramHandler:
             "chat_id": str(msg.get("chat", {}).get("id")),
             "timestamp": datetime.fromtimestamp(msg.get("date", 0), timezone.utc),
         }
+
+async def edit_message(chat_id: int, message_id: int, text: str) -> Optional[dict]:
+    """Edit an existing Telegram message with new text."""
+    if not TELEGRAM_BOT_TOKEN:
+        return None
+    url = f"{API_BASE}/editMessageText"
+    html_text = _markdown_to_html(text)
+    payload = {
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "text": html_text,
+        "parse_mode": "HTML",
+    }
+    async with httpx.AsyncClient() as client:
+        try:
+            r = await client.post(url, json=payload, timeout=10.0)
+            r.raise_for_status()
+            return r.json()
+        except httpx.HTTPStatusError as e:
+            resp = e.response
+            # Telegram returns 400 if the text hasn't actually changed — ignore
+            if resp is not None and resp.status_code == 400:
+                body = ""
+                try:
+                    body = resp.text
+                except Exception:
+                    pass
+                if "message is not modified" in body.lower():
+                    return None
+                # Fallback: send plain text without parse_mode
+                fallback = {
+                    "chat_id": chat_id,
+                    "message_id": message_id,
+                    "text": text,
+                }
+                try:
+                    r = await client.post(url, json=fallback, timeout=10.0)
+                    r.raise_for_status()
+                    return r.json()
+                except Exception:
+                    return None
+            logger.warning("[telegram] editMessageText error %s", e)
+            return None
+        except Exception as e:
+            logger.warning("[telegram] editMessageText exception: %s", e)
+            return None
+
+
+async def send_message_streaming(
+    chat_id: int,
+    token_generator: AsyncIterator[str],
+    min_update_interval: float = None,
+) -> tuple[str, Optional[int]]:
+    """Stream tokens to Telegram by sending an initial message then editing it.
+
+    Args:
+        chat_id: Telegram chat ID.
+        token_generator: Async iterator yielding text chunks from the LLM.
+        min_update_interval: Minimum seconds between edits (defaults to config).
+
+    Returns:
+        (full_text, message_id) — the complete accumulated text and the
+        Telegram message_id that was created/edited.
+    """
+    if min_update_interval is None:
+        min_update_interval = getattr(settings, "TELEGRAM_STREAM_UPDATE_INTERVAL", 1.0)
+
+    accumulated = ""
+    message_id: Optional[int] = None
+    last_edit_time: float = 0.0
+    last_sent_text: str = ""
+
+    # We use a typing indicator "⏳" as the initial placeholder
+    PLACEHOLDER = "⏳"
+
+    async for token in token_generator:
+        accumulated += token
+
+        now = time.monotonic()
+        elapsed = now - last_edit_time
+
+        if elapsed >= min_update_interval and accumulated != last_sent_text:
+            if message_id is None:
+                # Send the first message
+                result = await send_message(chat_id, accumulated or PLACEHOLDER)
+                if result and result.get("ok") and result.get("result"):
+                    message_id = result["result"].get("message_id")
+                last_sent_text = accumulated
+            else:
+                # Edit the existing message
+                await edit_message(chat_id, message_id, accumulated)
+                last_sent_text = accumulated
+            last_edit_time = time.monotonic()
+
+    # Final edit with the complete text (if it changed since last edit)
+    if accumulated and accumulated != last_sent_text:
+        if message_id is None:
+            result = await send_message(chat_id, accumulated)
+            if result and result.get("ok") and result.get("result"):
+                message_id = result["result"].get("message_id")
+        else:
+            await edit_message(chat_id, message_id, accumulated)
+
+    return accumulated, message_id
+
 
 async def send_message(chat_id: int, text: str) -> Optional[dict]:
     if not TELEGRAM_BOT_TOKEN:

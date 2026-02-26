@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     SYSTEM_PROMPT_RAG: str = "You are a helpful personal assistant. Use the provided memories and context to give clear, concise answers. Be conversational and practical. Avoid spiritual lectures unless asked."
     # Ollama temperature (0.0 = deterministic, 1.0 = creative). Lower reduces hallucination.
     OLLAMA_TEMPERATURE: float = 0.2
+    # Streaming: when True, Telegram responses are streamed token-by-token via
+    # progressive message edits instead of waiting for the full LLM response.
+    OLLAMA_STREAM_ENABLED: bool = True
+    # Minimum seconds between Telegram editMessageText calls during streaming.
+    TELEGRAM_STREAM_UPDATE_INTERVAL: float = 1.0
     # Enable the developer web UI when True (set in .env during local dev)
     DEV_WEB_CLIENT: bool = False
     # Add more config as needed
