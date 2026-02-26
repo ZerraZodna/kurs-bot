@@ -29,6 +29,35 @@ This document describes how text embeddings are produced, stored, seeded, and ma
   - If `ci_trigger_data.py` is absent, `ci_seed_triggers.py` falls back to a deterministic `hash_embedding()` (SHA256-based) which produces stable, dependency-free unit-length vectors from utterance text.
 - Tests seed triggers in `tests/conftest.py` (so CI and local test runs are reproducible without Ollama or sentence-transformers).
 
+**⚠️ CRITICAL: Keeping `ci_trigger_data.py` in sync with STARTER**
+
+The `STARTER` list in `trigger_matcher.py` is the canonical source of trigger
+definitions. `scripts/ci_trigger_data.py` must contain precomputed embeddings
+for ALL entries in STARTER. If STARTER is updated (new action types, new
+phrases) but `ci_trigger_data.py` is not regenerated:
+
+- Tests will be missing triggers (e.g., `confirm_yes`, `confirm_no`, `greeting`)
+- `_semantic_yes_no()` in `reminder_handler.py` will return `(False, False)` for
+  all inputs, silently breaking the lesson confirmation flow
+- The completeness test (`tests/unit/triggers/test_ci_trigger_data_completeness.py`)
+  will catch this and fail with regeneration instructions
+
+**Current STARTER action types** (as of 2025-06-26, 123 entries total):
+`confirm_no` (5), `confirm_yes` (6), `create_schedule`, `enter_rag`, `exit_rag`,
+`greeting` (11), `next_lesson`, `query_schedule`, `raw_lesson`, `set_timezone`,
+`update_schedule`
+
+**Regeneration command:**
+```bash
+ALLOW_EXPORT_PROD=1 .venv/bin/python scripts/export_trigger_embeddings.py \
+  --from-starter --out scripts/ci_trigger_data.py
+```
+
+**Production DB sync**: The prod DB `trigger_embeddings` table must also be
+updated when STARTER changes. Run `npm run seed_triggers` on the production
+host after deploying updated `ci_trigger_data.py`. See also TODO.md for a
+proposed startup failsafe that auto-detects stale trigger counts.
+
 **Local development vs CI**
 - Local dev: if you have `sentence-transformers` installed, set `EMBEDDING_BACKEND=local` (or leave default) and the local model will be used to compute runtime embeddings.
   - To produce CI-committed embeddings that match your local model, run an exporter locally (see suggested `scripts/export_trigger_embeddings.py`) to compute model embeddings for `STARTER` and write `scripts/ci_trigger_data.py`. Commit that file so CI imports exact float arrays.

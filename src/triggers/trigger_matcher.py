@@ -127,10 +127,12 @@ for p in greeting_phrases:
 
 # Confirmation intents for lesson completion prompts
 confirm_yes_phrases = [
+    "yes",
     "yes I completed it",
     "yes finished the lesson",
     "finished the lesson",
     "done with that lesson",
+    "ja",
     "jeg er ferdig",
     "ja ferdig",
 ]
@@ -138,9 +140,11 @@ for p in confirm_yes_phrases:
     STARTER.append({"name": "confirm_yes", "action_type": "confirm_yes", "utterance": p, "threshold": 0.55})
 
 confirm_no_phrases = [
+    "no",
     "not yet, still working on it",
     "no I haven't finished",
     "I need more time",
+    "nei",
     "nei ikke ferdig",
     "jeg er ikke ferdig ennå",
 ]

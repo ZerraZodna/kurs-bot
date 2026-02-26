@@ -152,6 +152,72 @@ async def lifespan(app: FastAPI):
         else:
             logging.error("Embedding backend is set to 'ollama' but LOCAL_OLLAMA_URL is not configured")
 
+    # --- Trigger embeddings sync failsafe ---
+    # Ensure trigger_embeddings table has the correct number of rows matching
+    # the canonical STARTER list. If the count is stale (e.g. STARTER grew
+    # after a code update), truncate and re-seed from ci_trigger_data.py.
+    if not getattr(settings, "IS_TEST_ENV", False):
+        try:
+            from src.triggers.trigger_matcher import STARTER
+            from src.models.database import TriggerEmbedding
+
+            db = SessionLocal()
+            try:
+                current_count = db.query(TriggerEmbedding).count()
+                expected_count = len(STARTER)
+                if current_count != expected_count:
+                    logging.warning(
+                        "Trigger embeddings stale: DB has %d rows but STARTER expects %d. "
+                        "Re-seeding from ci_trigger_data.py...",
+                        current_count,
+                        expected_count,
+                    )
+                    # Truncate existing rows
+                    db.query(TriggerEmbedding).delete()
+                    db.commit()
+
+                    # Re-seed from precomputed ci_trigger_data.py
+                    import importlib
+                    import numpy as np
+
+                    ci_mod = importlib.import_module("scripts.ci_trigger_data")
+                    triggers = getattr(ci_mod, "TRIGGERS", None)
+                    if isinstance(triggers, list) and len(triggers) == expected_count:
+                        for t in triggers:
+                            emb = t.get("embedding") or []
+                            try:
+                                arr = np.array(emb, dtype=np.float32)
+                                b = arr.tobytes()
+                            except Exception:
+                                b = b""
+                            te = TriggerEmbedding(
+                                name=t.get("name") or "",
+                                action_type=t.get("action_type") or "",
+                                embedding=b,
+                                threshold=float(t.get("threshold", 0.75)),
+                            )
+                            db.add(te)
+                        db.commit()
+                        logging.info(
+                            "Re-seeded %d trigger embeddings from ci_trigger_data.py",
+                            expected_count,
+                        )
+                    else:
+                        logging.error(
+                            "ci_trigger_data.py has %d entries but STARTER expects %d; "
+                            "skipping re-seed. Run: npm run seed",
+                            len(triggers) if triggers else 0,
+                            expected_count,
+                        )
+                else:
+                    logging.info(
+                        "Trigger embeddings OK: %d rows match STARTER", current_count
+                    )
+            finally:
+                db.close()
+        except Exception:
+            logging.exception("Trigger embeddings sync failsafe failed")
+
     yield
 
 

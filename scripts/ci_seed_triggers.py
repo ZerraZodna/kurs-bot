@@ -66,6 +66,11 @@ def main():
                 init_db()
                 db = SessionLocal()
                 try:
+                    # Clear existing rows to avoid duplicates on re-seed
+                    deleted = db.query(TriggerEmbedding).delete()
+                    if deleted:
+                        db.commit()
+                        print(f"Cleared {deleted} existing trigger_embeddings rows")
                     for t in triggers:
                         emb = t.get('embedding') or []
                         try:
