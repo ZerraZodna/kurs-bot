@@ -11,6 +11,8 @@ regenerated:
     .venv/bin/python scripts/export_trigger_embeddings.py --from-starter --out scripts/ci_trigger_data.py
 """
 
+import os
+
 import pytest
 
 from src.triggers.trigger_matcher import STARTER
@@ -69,6 +71,10 @@ class TestCiTriggerDataCompleteness:
             )
 
 
+@pytest.mark.skipif(
+    os.getenv("EMBEDDING_BACKEND", "local").lower() == "none",
+    reason="Embeddings disabled",
+)
 class TestSemanticYesNoWithRealTriggers:
     """Verify _semantic_yes_no works with real CI trigger embeddings.
 
