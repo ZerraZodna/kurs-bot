@@ -212,13 +212,15 @@ async def stream_ollama(
                         token = chunk.get("response", "")
                         if token:
                             _token_count += 1
-                            logger.info(
-                                "[ollama_stream] token #%d at t=+%.3fs len=%d: %r",
-                                _token_count,
-                                _time.monotonic() - _stream_start,
-                                len(token),
-                                token[:30],
-                            )
+                            # Log first token, every 20th, to keep logs manageable
+                            if _token_count == 1 or _token_count % 20 == 0:
+                                logger.info(
+                                    "[ollama_stream] token #%d at t=+%.3fs len=%d: %r",
+                                    _token_count,
+                                    _time.monotonic() - _stream_start,
+                                    len(token),
+                                    token[:30],
+                                )
                             yield token
                         if chunk.get("done", False):
                             logger.info(
