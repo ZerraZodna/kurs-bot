@@ -4,8 +4,9 @@ import logging
 import re
 import time
 from typing import Optional, Dict, Any, AsyncIterator
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from src.config import settings
+from src.models.database import SessionLocal, MessageLog, BatchLock
 
 logger = logging.getLogger(__name__)
 
@@ -359,3 +360,148 @@ def _is_table_separator_line(stripped: str) -> bool:
 
 def _contains_box_drawing_char(line: str) -> bool:
     return any(ch in line for ch in "┌┬┐├┼┤└┴┘│─═╔╗╚╝╠╣╦╩")
+
+
+async def process_telegram_batch(user_id: int, external_id: str) -> None:
+    """Batch inbound messages for a user and send one AI response.
+
+    When streaming is enabled (``OLLAMA_STREAM_ENABLED``), LLM-generated
+    responses are streamed token-by-token to Telegram via progressive
+    message edits.  Non-LLM responses (commands, onboarding, lessons, etc.)
+    are sent normally as a single message.
+    """
+    from src.services.dialogue_engine import DialogueEngine
+    from src.services.traffic_tracker import record_traffic_event
+    from src.services.dialogue import extract_and_store_memories
+
+    await asyncio.sleep(1.0)
+
+    stream_enabled = getattr(settings, "OLLAMA_STREAM_ENABLED", True)
+    logger.info(f"[batch] stream_enabled={stream_enabled} for user_id={user_id}")
+
+    try:
+        for _ in range(3):
+            message_ids = []
+            combined_text = ""
+
+            db = SessionLocal()
+            try:
+                unprocessed = db.query(MessageLog).filter(
+                    MessageLog.user_id == user_id,
+                    MessageLog.direction == "inbound",
+                    MessageLog.status == "delivered",
+                ).order_by(MessageLog.created_at).all()
+
+                if not unprocessed:
+                    db.close()
+                    break
+
+                if len(unprocessed) > 1:
+                    print(f"[batch] Combining {len(unprocessed)} messages from user {user_id}")
+
+                message_ids = [m.message_id for m in unprocessed]
+                combined_text = "\n".join([m.content for m in unprocessed if m.content])
+
+                # Claim messages
+                db.query(MessageLog).filter(
+                    MessageLog.message_id.in_(message_ids)
+                ).update({MessageLog.status: "processing"}, synchronize_session=False)
+                db.commit()
+                db.close()
+            except Exception as e:
+                print("[batch collection error]", e)
+                db.close()
+                break
+
+            # Generate AI response — streaming or non-streaming
+            chat_id = int(external_id)
+            ai_response: str
+
+            if stream_enabled:
+                db = SessionLocal()
+                dialogue = DialogueEngine(db)
+                result = await dialogue.process_message_for_telegram(
+                    user_id=user_id,
+                    text=combined_text,
+                    session=db,
+                    chat_id=chat_id,
+                    include_history=True,
+                    history_turns=4,
+                )
+                db.close()
+
+                if result["type"] == "stream":
+                    # Stream tokens to Telegram via progressive edits
+                    logger.info(f"[batch] Using STREAMING path for user_id={user_id}")
+                    ai_response, _msg_id = await send_message_streaming(
+                        chat_id, result["generator"]
+                    )
+                    if not ai_response:
+                        ai_response = "[No response from LLM]"
+                    # Run post-response hooks (trigger matching, etc.)
+                    try:
+                        await result["post_hook"](ai_response)
+                    except Exception as e:
+                        print(f"[stream post_hook error] {e}")
+                else:
+                    # Non-LLM response — send normally
+                    logger.info(f"[batch] Using NON-STREAMING (text) path for user_id={user_id}")
+                    ai_response = result["text"]
+                    await send_message(chat_id, ai_response)
+            else:
+                # Streaming disabled — use original non-streaming path
+                logger.info(f"[batch] OLLAMA_STREAM_ENABLED=False, using NON-STREAMING path for user_id={user_id}")
+                db = SessionLocal()
+                dialogue = DialogueEngine(db)
+                ai_response = await dialogue.process_message(
+                    user_id=user_id,
+                    text=combined_text,
+                    session=db,
+                    include_history=True,
+                    history_turns=4,
+                )
+                db.close()
+                await send_message(chat_id, ai_response)
+
+            record_traffic_event()
+
+            # Log outbound and mark processed
+            try:
+                db = SessionLocal()
+
+                # If onboarding is not required, extract and store memories from the combined text.
+                if 'dialogue' in locals() and dialogue.onboarding and not dialogue.onboarding.should_show_onboarding(user_id):
+                    await extract_and_store_memories(dialogue.memory_manager, dialogue.memory_extractor, user_id, combined_text, rag_mode=False)
+
+                log = MessageLog(
+                    user_id=user_id,
+                    direction="outbound",
+                    channel="telegram",
+                    external_message_id=None,
+                    content=ai_response,
+                    status="sent",
+                    error_message=None
+                )
+                log.message_role = "assistant"
+                db.add(log)
+                db.commit()
+
+                db.query(MessageLog).filter(
+                    MessageLog.message_id.in_(message_ids)
+                ).update({MessageLog.status: "processed"}, synchronize_session=False)
+                db.commit()
+                db.close()
+            except Exception as e:
+                print("[messagelog outbound error]", e)
+                break
+
+            await asyncio.sleep(0.5)
+    finally:
+        # Release batch lock by deleting from table
+        try:
+            db = SessionLocal()
+            db.query(BatchLock).filter_by(user_id=user_id).delete(synchronize_session=False)
+            db.commit()
+            db.close()
+        except Exception as e:
+            print("[batch lock release error]", e)
