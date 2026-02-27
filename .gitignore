@@ -156,3 +156,4 @@ package-lock.json
 yarn.lock
 .grok/settings.json
 .aider*
+.gitnexus
