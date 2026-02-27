@@ -15,7 +15,8 @@ from typing import Generator
 import pytest
 from sqlalchemy.orm import Session
 
-from src.models.database import Base, User, engine as _app_engine, SessionLocal
+from src.models.database import Base, engine as _app_engine, SessionLocal
+from src.models import User
 
 
 # Constants for test database
