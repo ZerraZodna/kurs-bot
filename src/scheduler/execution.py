@@ -168,7 +168,7 @@ def _build_schedule_message(
 
     language = get_user_language(memory_manager, schedule.user_id)
     pending = get_pending_confirmation(memory_manager, schedule.user_id)
-    if pending:
+    if pending and not pending.get("resolved"):
         lesson_id = pending.get("lesson_id")
         next_id = pending.get("next_lesson_id")
         return _confirmation_prompt(language, lesson_id)
@@ -403,7 +403,7 @@ def _execute_lesson_schedule(
     language = get_user_language(memory_manager, schedule.user_id)
 
     pending = get_pending_confirmation(memory_manager, schedule.user_id)
-    if pending:
+    if pending and not pending.get("resolved"):
         lesson_id = pending.get("lesson_id")
         next_id = pending.get("next_lesson_id")
         prompt = _confirmation_prompt(language, lesson_id)

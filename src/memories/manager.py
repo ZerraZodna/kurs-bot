@@ -14,6 +14,8 @@ class MemoryManager:
     def __init__(self, db: Optional[Session] = None, memory_store: Optional[MemoryStore] = None):
         self.db = db or SessionLocal()
         self.memory_handler: MemoryStore = memory_store or MemoryHandler(self.db)
+        # Lazy initialization of topic_manager
+        self._topic_manager = None
 
     # Note: embedding generation scheduling and persistence removed.
     # The private helpers that generated and stored embeddings were deleted
@@ -106,6 +108,14 @@ class MemoryManager:
         # Use consolidated lesson_state helper so state stays consistent.
         from src.lessons.state import set_last_sent_lesson_id
         set_last_sent_lesson_id(self, user_id, lesson_id, write_legacy=True)
+
+    @property
+    def topic_manager(self):
+        """Lazy initialization of TopicManager for topic-based memory access."""
+        if self._topic_manager is None:
+            from src.memories.topic_manager import TopicManager
+            self._topic_manager = TopicManager(self)
+        return self._topic_manager
 
 if __name__ == '__main__':
     # quick manual test

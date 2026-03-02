@@ -305,9 +305,10 @@ async def test_scheduler_full_two_day_flow_after_onboarding():
     last_sent_after_confirm = get_last_sent_lesson_id(mm, user_id)
     assert last_sent_after_confirm == 18, f"After Day 1 confirm: Expected last_sent=18, got {last_sent_after_confirm}"
 
-    # Verify pending confirmation is resolved
+    # Verify pending confirmation is resolved (returns resolved dict or None)
     pending_after_confirm = get_pending_confirmation(mm, user_id)
-    assert pending_after_confirm is None, "After Day 1 confirm: pending should be resolved"
+    assert pending_after_confirm is None or pending_after_confirm.get("resolved"), \
+        f"After Day 1 confirm: pending should be resolved, got {pending_after_confirm}"
 
     # ---- DAY 2: Scheduler fires again ----
     result_day2 = execute_scheduled_task(schedule.schedule_id, simulate=True, session=db)
@@ -382,5 +383,75 @@ async def test_auto_advance_preference_can_be_disabled_by_user_intent():
     assert response is not None
     assert "ask for confirmation" in response.lower()
     assert is_auto_advance_lessons_enabled(mm, user_id) is False
+
+    db.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.serial
+async def test_no_response_then_greeting_does_not_re_prompt():
+    """Given: A user who received a confirmation prompt and said 'no'
+    When: The user sends another greeting like 'hi'
+    Then: No new confirmation prompt should be sent (preventing the loop)
+    """
+    db = SessionLocal()
+    user_id = create_test_user(db, "test_no_then_hi_no_loop")
+
+    mm = MemoryManager(db)
+    # Simulate onboarding where the user reported they're on lesson 20
+    set_current_lesson(mm, user_id, 20)
+
+    async def _fake_translate(text: str, language: str):
+        return text
+
+    async def _fake_format_lesson(lesson, language: str):
+        return f"Lesson {lesson.lesson_id}: {lesson.title}\n\n{lesson.content}"
+
+    # First greeting triggers confirmation prompt
+    prompt_builder = PromptBuilder(db, mm)
+    result1 = await maybe_send_next_lesson(
+        user_id=user_id,
+        text="Hi",
+        session=db,
+        prompt_builder=prompt_builder,
+        memory_manager=mm,
+        call_ollama=lambda p, m=None, language=None: asyncio.sleep(0) or "",
+    )
+
+    assert result1 is not None, "First greeting should trigger confirmation prompt"
+    assert "gentle, loving" in result1.lower() or "mildt, kjærlig" in result1.lower()
+    assert "20" in result1, "Should mention lesson 20"
+
+    # Verify pending confirmation exists
+    pending = get_pending_confirmation(mm, user_id)
+    assert pending is not None, "Expected pending confirmation after first greeting"
+    assert int(pending.get("lesson_id")) == 20
+
+    # User says "no"
+    response_no = await handle_lesson_confirmation(
+        user_id=user_id,
+        text="no",
+        session=db,
+        memory_manager=mm,
+        onboarding_service=None,
+        translate_fn=_fake_translate,
+        get_language_fn=lambda uid: "en",
+        format_lesson_fn=_fake_format_lesson,
+    )
+
+    assert response_no is not None, "Should get response for 'no'"
+    assert "no problem" in response_no.lower() or "take your time" in response_no.lower()
+
+    # User says "hi" again - should NOT trigger another confirmation prompt
+    result2 = await maybe_send_next_lesson(
+        user_id=user_id,
+        text="hi",
+        session=db,
+        prompt_builder=prompt_builder,
+        memory_manager=mm,
+        call_ollama=lambda p, m=None, language=None: asyncio.sleep(0) or "",
+    )
+
+    assert result2 is None, "Second greeting after 'no' should NOT trigger another prompt"
 
     db.close()

@@ -246,6 +246,9 @@ async def handle_lesson_confirmation(
 
     if is_no:
         resolve_pending_confirmation(memory_manager, user_id)
+        # Set last_sent_lesson_id to prevent re-confirmation on next greeting
+        if lesson_id:
+            set_last_sent_lesson_id(memory_manager, user_id, int(lesson_id))
         message = "No problem. Take your time and reply 'yes' when you're ready to continue."
         language = get_language_fn(user_id)
         if language and isinstance(language, str) and language.lower() not in ["en"]:

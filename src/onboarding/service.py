@@ -56,20 +56,9 @@ class OnboardingService:
             for m in commitment_memories
         )
 
-        first_name_memories = self.memory_manager.get_memory(user_id, MemoryKey.FIRST_NAME)
-        name_memories = self.memory_manager.get_memory(user_id, MemoryKey.NAME)
-        has_name = bool(first_name_memories or name_memories)
-
-        # Migrate name if needed
-        if name_memories and not first_name_memories:
-                self.memory_manager.store_memory(
-                    user_id=user_id,
-                    key=MemoryKey.FIRST_NAME,
-                    value=name_memories[0].get("value"),
-                    confidence=name_memories[0].get("confidence", 1.0),
-                    source="onboarding_service_name_migration",
-                    category=MemoryCategory.PROFILE.value,
-                )
+        # Use topic-based name retrieval for temporal resolution
+        name = self.memory_manager.topic_manager.get_name(user_id)
+        has_name = name != "friend"
 
         consent_memories = self.memory_manager.get_memory(user_id, MemoryKey.DATA_CONSENT)
         has_consent = bool(consent_memories)
@@ -102,10 +91,8 @@ class OnboardingService:
         language = lang_memories[0]["value"] if lang_memories else "en"
 
         next_step = status["next_step"]
-        name_memories = self.memory_manager.get_memory(user_id, MemoryKey.FIRST_NAME)
-        if not name_memories:
-            name_memories = self.memory_manager.get_memory(user_id, MemoryKey.NAME)
-        name = name_memories[0]["value"] if name_memories else "friend"
+        # Use topic-based name retrieval for temporal resolution
+        name = self.memory_manager.topic_manager.get_name(user_id)
 
         if next_step == "name":
             self.memory_manager.store_memory(
@@ -194,10 +181,8 @@ class OnboardingService:
         Finalize onboarding side-effects (timezone, schedule) and return
         the onboarding completion message text for the user.
         """
-        name_memories = self.memory_manager.get_memory(user_id, MemoryKey.FIRST_NAME)
-        if not name_memories:
-            name_memories = self.memory_manager.get_memory(user_id, MemoryKey.NAME)
-        name = name_memories[0]["value"] if name_memories else "friend"
+        # Use topic-based name retrieval for temporal resolution
+        name = self.memory_manager.topic_manager.get_name(user_id)
 
         lang_memories = self.memory_manager.get_memory(user_id, MemoryKey.USER_LANGUAGE)
         language = lang_memories[0]["value"] if lang_memories else "en"
@@ -302,10 +287,8 @@ class OnboardingService:
 
     def get_lesson_1_welcome_message(self, user_id: int) -> str:
         """Welcome message for brand new users starting with Lesson 1."""
-        name_memories = self.memory_manager.get_memory(user_id, MemoryKey.FIRST_NAME)
-        if not name_memories:
-            name_memories = self.memory_manager.get_memory(user_id, MemoryKey.NAME)
-        name = name_memories[0]["value"] if name_memories else "friend"
+        # Use topic-based name retrieval for temporal resolution
+        name = self.memory_manager.topic_manager.get_name(user_id)
 
         lang_memories = self.memory_manager.get_memory(user_id, MemoryKey.USER_LANGUAGE)
         language = lang_memories[0]["value"] if lang_memories else "en"
@@ -314,10 +297,8 @@ class OnboardingService:
 
     def get_continuation_welcome_message(self, user_id: int, lesson_id: int) -> str:
         """Welcome message for users continuing from a specific lesson."""
-        name_memories = self.memory_manager.get_memory(user_id, MemoryKey.FIRST_NAME)
-        if not name_memories:
-            name_memories = self.memory_manager.get_memory(user_id, MemoryKey.NAME)
-        name = name_memories[0]["value"] if name_memories else "friend"
+        # Use topic-based name retrieval for temporal resolution
+        name = self.memory_manager.topic_manager.get_name(user_id)
 
         lang_memories = self.memory_manager.get_memory(user_id, MemoryKey.USER_LANGUAGE)
         language = lang_memories[0]["value"] if lang_memories else "en"

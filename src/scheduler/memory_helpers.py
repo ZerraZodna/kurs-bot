@@ -72,7 +72,9 @@ def get_pending_confirmation(memory_manager: MemoryManager, user_id: int) -> Opt
     def _normalize_dt(value: Optional[datetime]) -> datetime:
         if isinstance(value, datetime):
             return to_utc(value)
-        return to_utc(datetime.min)
+        # Use datetime module from outer scope - avoid local variable shadowing
+        from datetime import datetime as _dt
+        return to_utc(_dt.min)
 
     latest = max(memories, key=lambda m: _normalize_dt(m.get("created_at")))
     raw = latest.get("value", "")

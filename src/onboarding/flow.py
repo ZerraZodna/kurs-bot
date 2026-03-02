@@ -13,7 +13,7 @@ from src.lessons.handler import format_lesson_message, translate_text
 from src.memories.dialogue_helpers import delete_user_and_data, get_user_language
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.language import onboarding_prompts as prompts_module
-from src.lessons.state import set_current_lesson, get_current_lesson
+from src.lessons.state import set_current_lesson, get_current_lesson, set_last_sent_lesson_id
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +64,10 @@ class OnboardingFlow:
             source="dialogue_engine",
             allow_duplicates=False,
         )
+        # Also set last_sent_lesson_id to prevent next-day confirmation prompt
+        # from triggering immediately after onboarding
+        if lesson_id and lesson_id.isdigit():
+            set_last_sent_lesson_id(self.memory_manager, user_id, int(lesson_id))
 
     def _store_memory(
         self,
@@ -94,10 +98,8 @@ class OnboardingFlow:
         return prompts_module.get_onboarding_message(key, language)
 
     def _get_user_name(self, user_id: int) -> str:
-        name_memories = self.memory_manager.get_memory(user_id, MemoryKey.FIRST_NAME)
-        if not name_memories:
-            name_memories = self.memory_manager.get_memory(user_id, MemoryKey.NAME)
-        name = name_memories[0]["value"] if name_memories else "friend"
+        # Use topic-based retrieval for temporal resolution (newest name wins)
+        name = self.memory_manager.topic_manager.get_name(user_id)
         print(f"[ONBOARD DEBUG] _get_user_name - user_id={user_id} -> {name}")
         return name
 
@@ -299,6 +301,7 @@ class OnboardingFlow:
             ):
                 # Onboarding satisfied: persist lesson, create default
                 # schedule and return the onboarding completion message
+                self._resolve_pending_step(user_id)
                 try:
                     return self.onboarding.get_onboarding_complete_message(user_id)
                 except Exception:

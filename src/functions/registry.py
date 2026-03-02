@@ -307,7 +307,7 @@ class FunctionRegistry:
         
         self.register(FunctionMetadata(
             name="send_todays_lesson",
-            description="Send today's scheduled lesson",
+            description="Send today's scheduled lesson with full text. Use when user asks for 'today's lesson', 'the text', 'all the text', 'full text', or 'entire lesson'.",
             parameters=[],
             contexts=["general_chat", "morning_lesson_confirmation"],
         ))

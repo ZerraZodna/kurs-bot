@@ -47,11 +47,11 @@ class ResponseBuilder:
         "delete_schedule": "✓ Schedule removed",
         "query_schedule": "Here are your reminders:\n{details}",
         "create_one_time_reminder": "✓ One-time reminder set for {run_at}",
-        "send_lesson": "📖 **Lesson {lesson_id}**: {title}",
-        "send_next_lesson": "📖 **Lesson {lesson_id}**: {title}",
-        "send_todays_lesson": "📖 **Lesson {lesson_id}**: {title}",
+        "send_lesson": "📖 **Lesson {lesson_id}**: {title}\n\n{content}",
+        "send_next_lesson": "📖 **Lesson {lesson_id}**: {title}\n\n{content}",
+        "send_todays_lesson": "📖 **Lesson {lesson_id}**: {title}\n\n{content}",
         "mark_lesson_complete": "✓ Lesson marked complete",
-        "repeat_lesson": "📖 **Lesson {lesson_id}** (repeat): {title}",
+        "repeat_lesson": "📖 **Lesson {lesson_id}** (repeat): {title}\n\n{content}",
         "set_lesson_preference": "✓ Lesson preference set to {preference}",
         "set_timezone": "✓ Timezone set to {timezone}",
         "set_language": "✓ Language set to {language}",
@@ -192,6 +192,7 @@ class ResponseBuilder:
         elif result.function_name in ["send_lesson", "send_next_lesson", "send_todays_lesson", "repeat_lesson"]:
             kwargs["lesson_id"] = result_data.get("lesson_id", "")
             kwargs["title"] = result_data.get("title", "ACIM Lesson")
+            kwargs["content"] = result_data.get("content", "")
         elif result.function_name == "set_lesson_preference":
             kwargs["preference"] = result_data.get("preference", "custom")
         elif result.function_name == "set_timezone":

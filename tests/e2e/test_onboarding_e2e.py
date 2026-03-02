@@ -37,10 +37,9 @@ async def test_onboarding_reported_current_lesson_triggers_confirmation_on_sched
     # Expect at least one message (the confirmation prompt)
     assert messages is not None
     combined = "\n\n".join(messages) if isinstance(messages, list) else str(messages)
-    assert "quick check-in" in combined.lower() or "liten innsjekk" in combined.lower()
+    assert "mentioned lesson" in combined.lower() or "nevnte leksjon" in combined.lower()
 
     # Verify pending confirmation persisted
     pending = get_pending_confirmation(mm, user_id)
     assert pending is not None, "Expected a pending confirmation to be stored"
     assert int(pending.get("lesson_id")) == 8
-

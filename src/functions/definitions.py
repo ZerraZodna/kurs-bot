@@ -44,6 +44,36 @@ Rules:
     
     # Multi-function example
     MULTI_FUNCTION_EXAMPLE = """
+Example - User asks for today's lesson:
+User: "what is todays lesson?"
+
+{
+  "response": "Today's ACIM lesson is ready for you.",
+  "functions": [
+    {"name": "send_todays_lesson", "parameters": {}}
+  ]
+}
+
+Example - User asks for the full lesson text:
+User: "what is the text?"
+
+{
+  "response": "Here is the full text of today's lesson.",
+  "functions": [
+    {"name": "send_todays_lesson", "parameters": {}}
+  ]
+}
+
+Example - User asks for all the text:
+User: "all the text?"
+
+{
+  "response": "Here is the complete lesson text.",
+  "functions": [
+    {"name": "send_todays_lesson", "parameters": {}}
+  ]
+}
+
 Example - Multiple reminders + lesson:
 User: "Remind me about today's lesson every 30 minutes"
 
@@ -68,6 +98,8 @@ User: "give me two reminders next every 30 minute about todays lesson"
     {"name": "send_todays_lesson", "parameters": {}}
   ]
 }
+
+Important: When the user asks for "today's lesson", "the text", "all the text", "full text", or "entire lesson", ALWAYS call send_todays_lesson to retrieve the complete lesson content.
 
 Important: When creating multiple reminders:
 1. Calculate times starting from the current time (e.g., if current time is 14:15, first reminder at 14:30)

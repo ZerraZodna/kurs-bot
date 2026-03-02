@@ -11,6 +11,7 @@ from src.services.timezone_utils import get_user_timezone_name, format_dt_in_tim
 from src.models.database import MessageLog, User, Lesson
 from src.memories import MemoryManager
 from src.memories.constants import MemoryKey
+from src.memories.topics import MemoryTopic
 from src.functions.definitions import FunctionDefinitions, get_function_definitions
 import json
 
@@ -107,14 +108,23 @@ class PromptBuilder:
             context_parts.append(f"\n\n{output_rules}")
         
         # 1. Today's Lesson (optional)
-        if include_lesson:
+        # Skip injecting lesson into prompt when user explicitly asks for it -
+        # let the function calling system (send_todays_lesson) provide the full text instead.
+        is_direct_lesson_request = self._is_direct_lesson_text_request(user_input)
+        if include_lesson and not is_direct_lesson_request:
             lesson_context, progress_note = self._get_today_lesson(user_id)
             if lesson_context:
                 context_parts.append(f"\n### Today's ACIM Lesson\n{lesson_context}")
             if progress_note:
                 context_parts.append(f"\n### Lesson Progress Note\n{progress_note}")
-            if self._is_direct_lesson_text_request(user_input):
-                context_parts.append(f"\n{self.LESSON_TEXT_RETRIEVAL_RULES}")
+        elif is_direct_lesson_request:
+            # Add instruction to use function instead of summarizing
+            context_parts.append(
+                f"\n### Lesson Text Request\n"
+                f"The user is asking for the lesson text. "
+                f"DO NOT summarize or describe the lesson. "
+                f"Instead, call the send_todays_lesson function to return the full lesson text."
+            )
 
         # 2. User Profile Context
         profile_context = self._build_profile_context(user)
@@ -414,40 +424,40 @@ class PromptBuilder:
             return int(digits) if digits else None
     
     def _build_profile_context(self, user: Any) -> str:
-        """Extract user profile information from both database and stored memories."""
+        """Extract user profile information from topic-based memories."""
+        # Get consolidated profile from topic manager
+        profile = self.memory_manager.topic_manager.get_profile_context(user.user_id, user)
+        
+        # Format as prompt lines
         parts = []
+        for field_name, value in profile.items():
+            parts.append(f"{field_name.replace('_', ' ').title()}: {value}")
         
-        # Check for stored full_name memory first, fall back to database name
-        stored_name = self.memory_manager.get_memory(user.user_id, MemoryKey.FULL_NAME)
-        if stored_name:
-            parts.append(f"Name: {stored_name[0]['value']}")
-        elif user.first_name:
-            name = user.first_name
-            if user.last_name:
-                name += f" {user.last_name}"
-            parts.append(f"Name: {name}")
-        
-        # Add personal background if stored
-        personal_bg = self.memory_manager.get_memory(user.user_id, MemoryKey.PERSONAL_BACKGROUND)
-        if personal_bg:
-            parts.append(f"Background: {personal_bg[0]['value']}")
-        
-        if user.email:
-            parts.append(f"Email: {user.email}")
+        # Add channel info
         if user.phone_number:
             parts.append(f"Channel: {user.channel} ({user.phone_number})")
         else:
             parts.append(f"Channel: {user.channel}")
+        
+        # Add user tenure
         if user.created_at:
-            # Handle both naive and timezone-aware datetimes
             created = to_utc(user.created_at)
             days_active = (datetime.now(timezone.utc) - created).days
             parts.append(f"User since: {days_active} days ago")
-
-        # Add user's local current date/time when available to help the assistant
+        
+        # Add local time
         local_time = self._get_user_local_time_str(user)
         if local_time:
             parts.append(local_time)
+        
+        # Add structured AI context
+        ai_context = self.memory_manager.topic_manager.get_ai_context(
+            user.user_id, 
+            topics=[MemoryTopic.IDENTITY, MemoryTopic.GOALS, MemoryTopic.PREFERENCES]
+        )
+        if ai_context:
+            import json
+            parts.append(f"\n### Structured User Context\n```json\n{json.dumps(ai_context, indent=2, default=str)}\n```")
         
         return "\n".join(parts) if parts else ""
     
@@ -538,6 +548,7 @@ class PromptBuilder:
         """Detect context based on user state."""
         # Check for pending schedule request
         from src.memories.constants import MemoryKey
+        from src.memories.topics import MemoryTopic
         pending_schedule = self.memory_manager.get_memory(user_id, MemoryKey.SCHEDULE_REQUEST_PENDING)
         if pending_schedule:
             return "schedule_setup"
