@@ -153,6 +153,6 @@ def get_lesson_confirmation_prompt(language: str, lesson_id: int) -> str:
 
 # Confirmation prompt template for when a user reports a current lesson
 ONBOARD_MESSAGES["confirm_lesson"] = {
-    "en": "Quick check-in: would you like to stay with Lesson {lesson_id} today, or continue to the next one? Both are completely okay. Reply 'yes' to continue, or 'no' to repeat Lesson {lesson_id}.",
-    "no": "Liten innsjekk: vil du fortsette med Leksjon {lesson_id} i dag, eller gå videre til neste? Begge deler er helt fint. Svar 'ja' for å gå videre, eller 'nei' for å repetere Leksjon {lesson_id}.",
+    "en": "From a gentle, loving place: You mentioned Lesson {lesson_id} last time. Would you like to move to the next lesson, or continue where you left off? Reply 'yes' to move forward, or 'no' to stay with this lesson.",
+    "no": "Fra et mildt, kjærlig sted: Du nevnte Leksjon {lesson_id} sist. Vil du gå videre til neste leksjon, eller fortsette der du slapp? Svar 'ja' for å gå videre, eller 'nei' for å bli på denne leksjonen.",
 }

@@ -60,7 +60,7 @@ async def test_next_day_triggers_confirmation_prompt():
     )
 
     assert result is not None, "Expected a confirmation prompt but got None"
-    assert "quick check-in" in result.lower() or "liten innsjekk" in result.lower()
+    assert "gentle, loving" in result.lower() or "mildt, kjærlig" in result.lower()
 
     # Verify that a pending confirmation was persisted for the user
     pending = get_pending_confirmation(mm, user_id)
@@ -98,14 +98,16 @@ def test_confirmation_prompt_wording():
 
     prompt_en = get_lesson_confirmation_prompt("en", 9)
     assert "yesterday" not in prompt_en.lower()
-    assert "stay with lesson 9" in prompt_en.lower()
-    assert "no' to repeat lesson 9" in prompt_en.lower()
+    assert "lesson 9" in prompt_en.lower()
+    assert "move forward" in prompt_en.lower()
+    assert "stay with this lesson" in prompt_en.lower()
 
     prompt_no = get_lesson_confirmation_prompt("no", 12)
     # norwegian text should also avoid the literal word for "yesterday"
     assert "i går" not in prompt_no.lower()
-    assert "fortsette med leksjon 12 i dag" in prompt_no.lower()
-    assert "nei' for å repetere leksjon 12" in prompt_no.lower()
+    assert "leksjon 12" in prompt_no.lower()
+    assert "gå videre" in prompt_no.lower()
+    assert "bli på denne leksjonen" in prompt_no.lower()
 
 
 @pytest.mark.asyncio
@@ -252,7 +254,7 @@ async def test_scheduler_full_two_day_flow_after_onboarding():
     combined_day1 = "\n\n".join(result_day1) if isinstance(result_day1, list) else str(result_day1)
 
     # Should be a confirmation prompt for lesson 17
-    assert "quick check-in" in combined_day1.lower() or "liten innsjekk" in combined_day1.lower(), \
+    assert "gentle, loving" in combined_day1.lower() or "mildt, kjærlig" in combined_day1.lower(), \
         f"Day 1: Expected confirmation prompt, got: {combined_day1}"
     assert "17" in combined_day1, f"Day 1: Expected lesson 17 mentioned, got: {combined_day1}"
 
@@ -313,7 +315,7 @@ async def test_scheduler_full_two_day_flow_after_onboarding():
     combined_day2 = "\n\n".join(result_day2) if isinstance(result_day2, list) else str(result_day2)
 
     # Should be a confirmation prompt for lesson 18
-    assert "quick check-in" in combined_day2.lower() or "liten innsjekk" in combined_day2.lower(), \
+    assert "gentle, loving" in combined_day2.lower() or "mildt, kjærlig" in combined_day2.lower(), \
         f"Day 2: Expected confirmation prompt, got: {combined_day2}"
     assert "18" in combined_day2, f"Day 2: Expected lesson 18 mentioned, got: {combined_day2}"
 
@@ -382,4 +384,3 @@ async def test_auto_advance_preference_can_be_disabled_by_user_intent():
     assert is_auto_advance_lessons_enabled(mm, user_id) is False
 
     db.close()
-
