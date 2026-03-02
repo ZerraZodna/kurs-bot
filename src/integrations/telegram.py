@@ -255,8 +255,8 @@ def _markdown_to_html(text: str) -> str:
 def _escape_html(text: str) -> str:
     return (
         text.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
+        .replace("<", "<")
+        .replace(">", ">")
     )
 
 
@@ -443,18 +443,28 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                 if result["type"] == "stream":
                     # Stream tokens to Telegram via progressive edits
                     logger.info(f"[batch] Using STREAMING path for user_id={user_id}")
-                    ai_response, _msg_id = await send_message_streaming(
-                        chat_id, result["generator"]
-                    )
-                    if not ai_response:
+                    
+                    # Accumulate full response first to avoid sending JSON to user
+                    full_response = ""
+                    async for token in result["generator"]:
+                        full_response += token
+                    
+                    if not full_response:
                         ai_response = "[No response from LLM]"
-                    # Extract just the response text if the response contains JSON
-                    extract_text_fn = result.get("extract_text")
-                    if extract_text_fn:
-                        ai_response = extract_text_fn(ai_response)
+                    else:
+                        # Extract just the response text if the response contains JSON
+                        extract_text_fn = result.get("extract_text")
+                        if extract_text_fn:
+                            ai_response = extract_text_fn(full_response)
+                        else:
+                            ai_response = full_response
+                    
+                    # Send the clean text to Telegram
+                    await send_message(chat_id, ai_response)
+                    
                     # Run post-response hooks (trigger matching, etc.)
                     try:
-                        await result["post_hook"](ai_response)
+                        await result["post_hook"](full_response)
                     except Exception as e:
                         print(f"[stream post_hook error] {e}")
                 else:
