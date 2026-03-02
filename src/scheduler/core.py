@@ -198,5 +198,21 @@ class SchedulerService:
         )
 
     @staticmethod
+    def deactivate_user_schedules_by_type(
+        user_id: int,
+        schedule_type: str,
+        active_only: bool = True,
+        session: Optional[Session] = None,
+    ) -> int:
+        """Deactivate schedules filtered by type (one_time or daily)."""
+        from . import manager as schedule_manager
+        return schedule_manager.deactivate_user_schedules_by_type(
+            user_id=user_id,
+            schedule_type=schedule_type,
+            active_only=active_only,
+            session=session,
+        )
+
+    @staticmethod
     def deactivate_schedule(schedule_id: int):
         return scheduler_operations.deactivate_schedule(schedule_id)

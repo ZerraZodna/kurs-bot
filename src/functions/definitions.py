@@ -48,14 +48,32 @@ Example - Multiple reminders + lesson:
 User: "Remind me about today's lesson every 30 minutes"
 
 {
-  "response": "I'll remind you about today's lesson every 30 minutes. Here's the lesson text:",
+  "response": "I'll remind you about today's lesson every 30 minutes. Here are the reminders:",
   "functions": [
-    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T09:00:00", "message": "Lesson reminder"}},
-    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T09:30:00", "message": "Lesson reminder"}},
-    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T10:00:00", "message": "Lesson reminder"}},
+    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T14:30:00", "message": "Lesson reminder"}},
+    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T15:00:00", "message": "Lesson reminder"}},
+    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T15:30:00", "message": "Lesson reminder"}},
     {"name": "send_todays_lesson", "parameters": {}}
   ]
 }
+
+Example - Two reminders only:
+User: "give me two reminders next every 30 minute about todays lesson"
+
+{
+  "response": "I'll remind you about today's lesson twice, every 30 minutes. Here are the reminders:",
+  "functions": [
+    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T14:30:00", "message": "Lesson reminder"}},
+    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T15:00:00", "message": "Lesson reminder"}},
+    {"name": "send_todays_lesson", "parameters": {}}
+  ]
+}
+
+Important: When creating multiple reminders:
+1. Calculate times starting from the current time (e.g., if current time is 14:15, first reminder at 14:30)
+2. Space them exactly as requested (e.g., "every 30 minutes" means 30-minute intervals)
+3. Create ONLY the number of reminders requested (e.g., "two reminders" = exactly 2 reminders)
+4. Never create duplicate reminders at the same time - each reminder must have a unique timestamp
 """
     
     # Context-specific examples

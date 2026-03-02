@@ -64,13 +64,10 @@ def detect_lesson_request(text: str) -> Optional[Dict[str, Any]]:
     if num:
         return {"lesson_id": num}
 
-    # 2) "today's lesson" variants (English/Norwegian)
-    lesson_keywords = {"lesson", "leksjon", "lekse"}
-    today_keywords = {"today", "todays", "idag", "dagens"}
-    has_lesson_word = bool(tokens & lesson_keywords)
-    has_today_word = bool(tokens & today_keywords) or ("i dag" in text_normalized)
-    if has_lesson_word and has_today_word:
-        return {"today": True}
+    # Note: "today's lesson" keyword detection removed to prevent hijacking.
+    # The AI function calling system (send_todays_lesson) should handle this instead.
+    # This prevents issues where complex requests like "remind me about todays lesson"
+    # incorrectly return the lesson content instead of creating reminders.
 
     return None
 
@@ -195,19 +192,7 @@ async def pre_llm_lesson_short_circuit(
     if not lesson_request:
         return None
     
-    if lesson_request.get("today") and prompt_builder:
-        today_ctx = prompt_builder.get_today_lesson_context(user_id)
-        state = today_ctx.get("state", {})
-        lesson_id = state.get("lesson_id")
-        if lesson_id:
-            lesson = (
-                session.query(Lesson)
-                .filter(Lesson.lesson_id == lesson_id)
-                .first()
-            )
-            if lesson:
-                return await format_lesson_message(lesson, user_lang)
-    
+    # Note: "today" keyword detection removed - handled by AI function calling
     if lesson_request.get("lesson_id"):
         lesson_id = lesson_request.get("lesson_id")
         lesson = (
@@ -315,21 +300,7 @@ async def process_lesson_query(
                 if onboarding_resp:
                     return onboarding_resp
 
-        if lesson_request.get("today"):
-            if not prompt_builder:
-                return "I couldn't determine your current lesson. Tell me which lesson number you'd like, e.g. 'Lesson 7'."
-
-            today_ctx = prompt_builder.get_today_lesson_context(user_id)
-            state = today_ctx.get("state", {})
-            lesson_id = state.get("lesson_id")
-            if not lesson_id:
-                return "I couldn't determine your current lesson. Tell me which lesson number you'd like, e.g. 'Lesson 7'."
-
-            lesson = _find_lesson_by_id(session, int(lesson_id))
-            if lesson:
-                return await format_lesson_message(lesson, user_language)
-            return f"I couldn't find lesson {lesson_id} in my database. ACIM has 365 lessons - please ask for a lesson between 1 and 365."
-
+        # Note: "today" keyword detection removed - handled by AI function calling
         lesson_id = lesson_request.get("lesson_id")
         if lesson_id:
             lesson = _find_lesson_by_id(session, int(lesson_id))

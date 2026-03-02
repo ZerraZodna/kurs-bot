@@ -3,7 +3,7 @@ import logging
 from typing import Optional, Dict, Any
 
 from src.functions.intent_parser import get_intent_parser
-from src.functions.executor import get_function_executor
+from src.functions.executor import get_function_executor, BatchExecutionResult
 from src.triggers.trigger_dispatcher import get_trigger_dispatcher
 from src.config import settings
 
@@ -83,6 +83,9 @@ async def handle_triggers(
                 "total_execution_time_ms": execution_result.total_execution_time_ms,
                 "results": [r.to_dict() for r in execution_result.results]
             }
+            
+            # Store the full execution result for response building
+            diagnostics["execution_result"] = execution_result
             
             # For backward compatibility, also dispatch via the trigger system
             dispatcher = get_trigger_dispatcher(session, memory_manager)

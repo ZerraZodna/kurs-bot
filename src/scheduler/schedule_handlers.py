@@ -11,7 +11,7 @@ import re
 
 # One-time reminder keyword parsing removed — handled by assistant + triggers
 from src.services.dialogue.pause_handler import detect_pause_request
-from src.scheduler.schedule_query_handler import detect_schedule_status_request, build_schedule_status_response
+from src.scheduler.schedule_query_handler import build_schedule_status_response
 from src.memories.dialogue_helpers import get_user_language
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.lessons.handler import translate_text
@@ -28,25 +28,12 @@ async def handle_schedule_messages(
     call_ollama,
     use_rag_for_this_message: bool = False,
 ) -> Optional[str]:
-    # NOTE: We no longer pre-process one-time reminder keywords here.
-    # One-time reminders and schedule changes should be handled by the
+    # NOTE: We no longer pre-process schedule queries or one-time reminder keywords here.
+    # Schedule queries, one-time reminders, and schedule changes should be handled by the
     # assistant (LLM) first and then dispatched via the trigger system.
     # This avoids premature/incorrect handling of user phrases like
-    # "Add another reminder: Tell me 'I am loved!' in 5 minutes."
-
-    if await detect_schedule_status_request(text):
-        schedules = SchedulerService.get_user_schedules(user_id)
-        tz_name = ensure_user_timezone(
-            memory_manager,
-            user_id,
-            get_user_language(memory_manager, user_id),
-            source="dialogue_engine_schedule_status",
-        )
-        response = build_schedule_status_response(schedules, tz_name)
-        language = get_user_language(memory_manager, user_id)
-        if language.lower() not in ["en"]:
-            response = await translate_text(response, language, call_ollama)
-        return response
+    # "Add another reminder: Tell me 'I am loved!' in 5 minutes." or
+    # "remind me next two hours to read the daily lesson" being treated as status queries.
 
     # Note: don't short-circuit schedule handling for RAG messages here.
     # RAG-specific behavior is handled later by the caller and prompt builder.

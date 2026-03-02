@@ -19,7 +19,7 @@ from src.memories.dialogue_helpers import (
 )
 from src.language.language_service import detect_and_store_language
 from .pause_handler import detect_pause_request
-from src.scheduler.schedule_query_handler import detect_schedule_status_request, build_schedule_status_response
+from src.scheduler.schedule_query_handler import build_schedule_status_response
 from src.scheduler.schedule_handlers import handle_schedule_messages
 from src.lessons.advance import maybe_send_next_lesson
 from .command_handlers import (
@@ -49,7 +49,6 @@ __all__ = [
     "extract_and_store_memories",
     "delete_user_and_data",
     "detect_pause_request",
-    "detect_schedule_status_request",
     "build_schedule_status_response",
     "handle_rag_mode_toggle",
     "handle_rag_prompt_command",

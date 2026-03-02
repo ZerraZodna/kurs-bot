@@ -366,8 +366,11 @@ class FunctionExecutor:
     async def _handle_query_schedule(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle query_schedule function."""
         from src.scheduler import manager as schedule_manager
+        from src.scheduler.domain import is_one_time_schedule_type
+        from src.scheduler.memory_helpers import get_schedule_message
         
         user_id = context.get("user_id")
+        memory_manager = context.get("memory_manager")
         
         try:
             schedules = schedule_manager.get_user_schedules(
@@ -375,18 +378,27 @@ class FunctionExecutor:
                 session=context.get("session"),
             )
             
+            schedule_list = []
+            for s in schedules:
+                schedule_data = {
+                    "schedule_id": s.schedule_id,
+                    "schedule_type": s.schedule_type,
+                    "cron_expression": s.cron_expression,
+                    "next_send_time": s.next_send_time.isoformat() if s.next_send_time else None,
+                    "is_active": s.is_active,
+                }
+                
+                # For one-time reminders, fetch the message from memory
+                if is_one_time_schedule_type(s.schedule_type) and memory_manager:
+                    message = get_schedule_message(memory_manager, user_id, s.schedule_id)
+                    if message:
+                        schedule_data["message"] = message
+                
+                schedule_list.append(schedule_data)
+            
             return {
                 "ok": True,
-                "schedules": [
-                    {
-                        "schedule_id": s.schedule_id,
-                        "schedule_type": s.schedule_type,
-                        "cron_expression": s.cron_expression,
-                        "next_send_time": s.next_send_time.isoformat() if s.next_send_time else None,
-                        "is_active": s.is_active,
-                    }
-                    for s in schedules
-                ],
+                "schedules": schedule_list,
             }
         except Exception as e:
             return {"ok": False, "error": str(e)}

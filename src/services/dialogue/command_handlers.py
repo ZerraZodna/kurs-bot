@@ -106,7 +106,17 @@ async def handle_forget_commands(
     memory_manager,
     session: Session,
     user_id: int,
+    rag_mode_enabled: bool = False,
 ) -> Optional[str]:
+    """Handle forget/erase/delete commands for memories.
+    
+    Only active when RAG mode is enabled to avoid conflicts with
+    schedule deletion commands in normal ACIM study mode.
+    """
+    # Only process memory deletion commands when in RAG mode
+    if not rag_mode_enabled:
+        return None
+        
     text_lower = text.strip().lower()
     forget_prefixes = ("forget ", "erase ", "delete ", "remove ")
     if text_lower in {"forget", "erase", "delete", "remove"}:
@@ -147,13 +157,19 @@ async def handle_schedule_deletion_commands(
 
     Flow:
     - User: "Delete reminders" -> store a pending memory and ask for confirmation.
+    - User: "delete all single reminders" -> filter by one-time schedules.
+    - User: "delete all daily reminders" -> filter by daily schedules.
     - User: "Yes" / "Ja" -> if pending, deactivate schedules and confirm.
     """
+    from src.scheduler.domain import is_one_time_schedule_type, is_daily_schedule_type
+    
     text_lower = (text or "").strip().lower()
 
-    # Check for an outstanding pending confirmation
+    # Check for an outstanding pending confirmation with type filter
     pending = memory_manager.get_memory(user_id, MemoryKey.DELETE_SCHEDULES_PENDING)
+    pending_type = memory_manager.get_memory(user_id, MemoryKey.DELETE_SCHEDULES_TYPE_PENDING)
     affirmatives = {"yes", "y", "ja", "bekreft", "confirm", "ok", "okey", "sure"}
+    
     if pending and pending[0].get("value") == "true":
         if text_lower in affirmatives:
             # Perform deactivation
@@ -161,9 +177,22 @@ async def handle_schedule_deletion_commands(
                 SchedulerService = __import__("src.scheduler", fromlist=["SchedulerService"]).scheduler.SchedulerService
             except Exception:
                 from src.scheduler import SchedulerService
-            # Deactivate all schedules for user
-            SchedulerService.deactivate_user_schedules(user_id)
-            # Clear pending flag
+            
+            # Determine schedule type filter
+            schedule_type_filter = None
+            if pending_type and pending_type[0].get("value"):
+                schedule_type_filter = pending_type[0].get("value")
+            
+            # Deactivate schedules (all or filtered by type)
+            if schedule_type_filter:
+                SchedulerService.deactivate_user_schedules_by_type(user_id, schedule_type_filter)
+                type_name = "one-time" if schedule_type_filter == "one_time" else schedule_type_filter
+                response = f"Okay — I've deleted your {type_name} reminders."
+            else:
+                SchedulerService.deactivate_user_schedules(user_id)
+                response = "Okay — I've deleted all your reminders. You won't receive further scheduled messages unless you set new reminders."
+            
+            # Clear pending flags
             memory_manager.store_memory(
                 user_id=user_id,
                 key=MemoryKey.DELETE_SCHEDULES_PENDING,
@@ -172,7 +201,15 @@ async def handle_schedule_deletion_commands(
                 source="dialogue_engine",
                 category=MemoryCategory.CONVERSATION.value,
             )
-            return "Okay — I've deleted your reminders. You won't receive further scheduled messages unless you set new reminders."
+            memory_manager.store_memory(
+                user_id=user_id,
+                key=MemoryKey.DELETE_SCHEDULES_TYPE_PENDING,
+                value="",
+                confidence=1.0,
+                source="dialogue_engine",
+                category=MemoryCategory.CONVERSATION.value,
+            )
+            return response
 
         # If user responded something else, cancel pending
         memory_manager.store_memory(
@@ -183,25 +220,88 @@ async def handle_schedule_deletion_commands(
             source="dialogue_engine",
             category=MemoryCategory.CONVERSATION.value,
         )
+        memory_manager.store_memory(
+            user_id=user_id,
+            key=MemoryKey.DELETE_SCHEDULES_TYPE_PENDING,
+            value="",
+            confidence=1.0,
+            source="dialogue_engine",
+            category=MemoryCategory.CONVERSATION.value,
+        )
         return "Okay — I won't delete your reminders."
 
-    # No pending: detect delete/reminder phrases
-    delete_phrases = [
+    # No pending: detect delete/reminder phrases with type filtering
+    # Map of phrase patterns to schedule types
+    type_specific_patterns = {
+        "one_time": [
+            "delete all single reminders",
+            "delete single reminders",
+            "delete all one-time reminders",
+            "delete one-time reminders",
+            "delete all one time reminders",
+            "delete one time reminders",
+            "remove all single reminders",
+            "remove single reminders",
+            "slett alle enkelte påminnelser",
+            "slett enkelte påminnelser",
+        ],
+        "daily": [
+            "delete all daily reminders",
+            "delete daily reminders",
+            "remove all daily reminders",
+            "remove daily reminders",
+            "slett alle daglige påminnelser",
+            "slett daglige påminnelser",
+        ],
+    }
+    
+    # Check for type-specific deletion requests first
+    schedule_type_filter = None
+    for schedule_type, patterns in type_specific_patterns.items():
+        if any(p in text_lower for p in patterns):
+            schedule_type_filter = schedule_type
+            break
+    
+    # Generic delete phrases (no type filter)
+    generic_delete_phrases = [
         "delete reminders",
         "delete my reminders",
         "remove reminders",
         "remove my reminders",
-        "delete reminders",
+        "delete all reminders",
+        "remove all reminders",
         "slett påminnelser",
         "slett mine påminnelser",
         "fjern påminnelser",
+        "slett alle påminnelser",
     ]
-    if any(p in text_lower for p in delete_phrases):
+    
+    is_delete_request = schedule_type_filter is not None or any(p in text_lower for p in generic_delete_phrases)
+    
+    if is_delete_request:
         # If user has schedules, ask for confirmation
         from src.scheduler import SchedulerService
+        from src.models.database import Schedule
+        
         schedules = SchedulerService.get_user_schedules(user_id)
         if not schedules:
             return "You don't have any active reminders."
+        
+        # Filter schedules by type if specified
+        if schedule_type_filter:
+            if schedule_type_filter == "one_time":
+                filtered_schedules = [s for s in schedules if is_one_time_schedule_type(s.schedule_type)]
+                type_name = "one-time"
+            else:
+                filtered_schedules = [s for s in schedules if is_daily_schedule_type(s.schedule_type)]
+                type_name = schedule_type_filter
+            
+            if not filtered_schedules:
+                return f"You don't have any {type_name} reminders."
+            
+            confirmation_msg = f"Are you sure you want to delete all your {type_name} reminders? Reply 'yes' to confirm."
+        else:
+            confirmation_msg = "Are you sure you want to delete all your reminders? Reply 'yes' to confirm."
 
         memory_manager.store_memory(
             user_id=user_id,
@@ -211,7 +311,15 @@ async def handle_schedule_deletion_commands(
             source="dialogue_engine",
             category=MemoryCategory.CONVERSATION.value,
         )
-        return "Are you sure you want to delete all your reminders? Reply 'yes' to confirm."
+        memory_manager.store_memory(
+            user_id=user_id,
+            key=MemoryKey.DELETE_SCHEDULES_TYPE_PENDING,
+            value=schedule_type_filter or "",
+            confidence=1.0,
+            source="dialogue_engine",
+            category=MemoryCategory.CONVERSATION.value,
+        )
+        return confirmation_msg
 
     return None
 

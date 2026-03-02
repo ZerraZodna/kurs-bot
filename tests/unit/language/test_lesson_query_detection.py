@@ -41,14 +41,15 @@ class TestDetectLessonRequest:
             ("What is lesson 14", {"lesson_id": 14}),
             ("Give me lesson text 13", {"lesson_id": 13}),
             ("Gi meg lekse 13", {"lesson_id": 13}),
-            ("What is today's lesson?", {"today": True}),
-            ("Hva er dagens lekse i dag?", {"today": True}),
+            ("What is today's lesson?", None),  # Now handled by AI function calling
+            ("Hva er dagens lekse i dag?", None),  # Now handled by AI function calling
         ],
     )
     def test_detect_lesson_request_variants(self, text, expected):
         """Given: Various text inputs requesting lessons
         When: Calling detect_lesson_request
-        Then: Should correctly detect lesson ID or today request
+        Then: Should correctly detect lesson ID or return None for today requests
+        (today's lesson now handled by AI function calling system)
         """
         assert detect_lesson_request(text) == expected
 
@@ -96,20 +97,14 @@ class TestProcessLessonQuery:
         assert "Full lesson 13 text" in response
 
     @pytest.mark.asyncio
-    async def test_process_lesson_query_today_idag_uses_current_lesson_without_semantic(
+    async def test_process_lesson_query_today_returns_none_for_function_calling(
         self, monkeypatch, lessons_db_session
     ):
-        """Given: User requests today's lesson in Norwegian
+        """Given: User requests today's lesson
         When: Processing the query
-        Then: Should use current lesson without semantic short-circuit
+        Then: Should return None to let AI function calling handle it
+        (today's lesson now handled by send_todays_lesson function)
         """
-        async def _should_not_be_called(*args, **kwargs):
-            raise AssertionError("semantic short-circuit should not run for explicit today lesson requests")
-
-        monkeypatch.setattr(
-            "src.lessons.handler.pre_llm_lesson_short_circuit", _should_not_be_called
-        )
-
         response = await process_lesson_query(
             user_id=1,
             text="Hva er dagens lekse i dag?",
@@ -121,7 +116,5 @@ class TestProcessLessonQuery:
             user_language="en",
         )
 
-        assert response is not None
-        assert "Lesson 7" in response
-        assert "Full lesson 7 text" in response
-
+        # Should return None so AI function calling can handle "today's lesson"
+        assert response is None

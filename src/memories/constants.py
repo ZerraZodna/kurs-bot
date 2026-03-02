@@ -37,6 +37,7 @@ class MemoryKey:
     SCHEDULE_MESSAGE = "schedule_message"
     SCHEDULE_REQUEST_PENDING = "schedule_request_pending"
     DELETE_SCHEDULES_PENDING = "delete_schedules_pending"
+    DELETE_SCHEDULES_TYPE_PENDING = "delete_schedules_type_pending"
     TRIGGER_AUDIT = "trigger_audit"
 
     RAG_MODE_ENABLED = "rag_mode_enabled"

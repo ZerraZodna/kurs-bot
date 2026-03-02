@@ -10,6 +10,7 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 
 from .executor import BatchExecutionResult, ExecutionResult
+from src.core.timezone import format_datetime_for_display
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +188,7 @@ class ResponseBuilder:
         if result.function_name in ["create_schedule", "update_schedule", "set_preferred_time"]:
             kwargs["time"] = result_data.get("time", "the specified time")
         elif result.function_name == "create_one_time_reminder":
-            kwargs["run_at"] = result_data.get("run_at", "the specified time")
+            kwargs["run_at"] = format_datetime_for_display(result_data.get("run_at"))
         elif result.function_name in ["send_lesson", "send_next_lesson", "send_todays_lesson", "repeat_lesson"]:
             kwargs["lesson_id"] = result_data.get("lesson_id", "")
             kwargs["title"] = result_data.get("title", "ACIM Lesson")
@@ -207,8 +208,30 @@ class ResponseBuilder:
             if schedules:
                 details = []
                 for s in schedules:
-                    status = "active" if s.get("is_active") else "inactive"
-                    details.append(f"  - {s.get('schedule_type', 'reminder')} at {s.get('cron_expression', 'unknown')} ({status})")
+                    schedule_type = s.get('schedule_type', 'reminder')
+                    time_display = self._format_cron_expression(
+                        s.get('cron_expression', ''),
+                        s.get('next_send_time')
+                    )
+                    
+                    # Map schedule types to friendly display names
+                    type_display_map = {
+                        'one_time_reminder': 'Remind once',
+                        'daily': 'Daily reminder',
+                    }
+                    type_display = type_display_map.get(schedule_type, schedule_type.replace('_', ' '))
+                    
+                    # For one-time reminders, show the message if available
+                    if schedule_type == 'one_time_reminder':
+                        message = s.get('message', '')
+                        if message:
+                            details.append(f"  - {type_display} at {time_display} - \"{message}\"")
+                        else:
+                            details.append(f"  - {type_display} at {time_display}")
+                    else:
+                        status = "active" if s.get("is_active") else "inactive"
+                        details.append(f"  - {type_display} at {time_display} ({status})")
+                
                 kwargs["details"] = "\n".join(details)
             else:
                 kwargs["details"] = "No active reminders found."
@@ -232,6 +255,36 @@ class ResponseBuilder:
         except KeyError:
             return f"⚠ {result.function_name} failed: {result.error}"
     
+    def _format_cron_expression(self, cron_expr: str, next_send_time: Optional[str] = None) -> str:
+        """Format a cron expression or special time format into human-readable time.
+        
+        Args:
+            cron_expr: The cron expression (e.g., "0 7 * * *") or special format (e.g., "once:2024-01-15T07:00:00")
+            next_send_time: Optional ISO format datetime string for one-time reminders
+            
+        Returns:
+            Human-readable time string (e.g., "07:00", "2024-01-15 07:00")
+        """
+        if not cron_expr:
+            return "unknown"
+        
+        # Handle one-time reminder format: "once:ISO8601"
+        if cron_expr.startswith("once:"):
+            return format_datetime_for_display(next_send_time) if next_send_time else "one-time"
+        
+        # Parse standard cron expression: "M H * * *"
+        parts = cron_expr.split()
+        if len(parts) >= 2:
+            try:
+                minute = int(parts[0])
+                hour = int(parts[1])
+                return f"{hour:02d}:{minute:02d}"
+            except (ValueError, IndexError):
+                pass
+        
+        # Fallback: return the raw expression
+        return cron_expr
+
     def _determine_follow_up(
         self,
         successful: List[ExecutionResult],

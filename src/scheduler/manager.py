@@ -139,6 +139,57 @@ def find_active_daily_schedule(user_id: int, session=None) -> Optional[Schedule]
             session.close()
 
 
+def find_existing_one_time_reminder(
+    user_id: int, 
+    run_at: datetime, 
+    session=None,
+    tolerance_seconds: int = 60
+) -> Optional[Schedule]:
+    """Check if user already has an active one-time reminder at approximately the same time.
+    
+    Args:
+        user_id: The user ID
+        run_at: The target datetime to check
+        session: Optional DB session
+        tolerance_seconds: Time tolerance for matching (default 60 seconds)
+    
+    Returns:
+        Existing Schedule if found, None otherwise
+    """
+    close = False
+    if session is None:
+        session = SessionLocal()
+        close = True
+    
+    try:
+        from .domain import is_one_time_schedule_type
+        
+        # Get all active schedules for user
+        schedules = (
+            session.query(Schedule)
+            .filter_by(user_id=user_id, is_active=True)
+            .all()
+        )
+        
+        # Check for one-time reminders within tolerance
+        for schedule in schedules:
+            if not is_one_time_schedule_type(schedule.schedule_type):
+                continue
+            
+            if schedule.next_send_time is None:
+                continue
+            
+            # Calculate time difference
+            time_diff = abs((schedule.next_send_time - run_at).total_seconds())
+            if time_diff <= tolerance_seconds:
+                return schedule
+        
+        return None
+    finally:
+        if close:
+            session.close()
+
+
 def deactivate_user_schedules(user_id: int, active_only: bool = True, session=None) -> int:
     """Deactivate a user's schedules. Returns number deactivated."""
     close = False
@@ -152,6 +203,58 @@ def deactivate_user_schedules(user_id: int, active_only: bool = True, session=No
         schedules = query.all()
         if not schedules:
             return 0
+        for s in schedules:
+            s.is_active = False
+            session.add(s)
+        session.commit()
+        return len(schedules)
+    finally:
+        if close:
+            session.close()
+
+
+def deactivate_user_schedules_by_type(
+    user_id: int, 
+    schedule_type: str, 
+    active_only: bool = True, 
+    session=None
+) -> int:
+    """Deactivate a user's schedules filtered by type. Returns number deactivated.
+    
+    Args:
+        user_id: The user ID
+        schedule_type: Type filter - 'one_time' or 'daily'
+        active_only: If True, only deactivate active schedules
+        session: Optional DB session
+    
+    Returns:
+        Number of schedules deactivated
+    """
+    from .domain import is_one_time_schedule_type, is_daily_schedule_type
+    
+    close = False
+    if session is None:
+        session = SessionLocal()
+        close = True
+    try:
+        query = session.query(Schedule).filter_by(user_id=user_id)
+        if active_only:
+            query = query.filter_by(is_active=True)
+        
+        # Filter by schedule type
+        if schedule_type == "one_time":
+            # Get all schedules and filter by type
+            all_schedules = query.all()
+            schedules = [s for s in all_schedules if is_one_time_schedule_type(s.schedule_type)]
+        elif schedule_type == "daily":
+            all_schedules = query.all()
+            schedules = [s for s in all_schedules if is_daily_schedule_type(s.schedule_type)]
+        else:
+            schedules = []
+        
+        if not schedules:
+            return 0
+        
         for s in schedules:
             s.is_active = False
             session.add(s)

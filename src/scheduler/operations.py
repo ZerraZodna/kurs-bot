@@ -230,6 +230,22 @@ def create_one_time_schedule(
 
         run_at = to_utc(run_at)
 
+        # Check for existing reminder at the same time (deduplication)
+        existing = schedule_manager.find_existing_one_time_reminder(
+            user_id=user_id,
+            run_at=run_at,
+            session=session,
+            tolerance_seconds=60,
+        )
+        if existing:
+            logger.info(
+                "Duplicate one-time reminder detected for user %s at %s. Returning existing schedule %s.",
+                user_id,
+                run_at.isoformat(),
+                existing.schedule_id,
+            )
+            return existing
+
         # Persist via manager
         schedule = schedule_manager.create_schedule(
             user_id=user_id,

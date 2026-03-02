@@ -207,3 +207,30 @@ def resolve_timezone_name(tz_name: Optional[str]) -> Optional[str]:
         return mapping[key]
 
     return None
+
+
+def format_datetime_for_display(iso_string: Optional[str]) -> str:
+    """Format an ISO8601 datetime string for user display.
+    
+    Converts '2026-03-02T15:14:00' to '2026-03-02 15:14' format.
+    Handles timezone suffixes and returns a user-friendly string.
+    
+    Args:
+        iso_string: ISO8601 datetime string (e.g., '2026-03-02T15:14:00' or '2026-03-02T15:14:00+00:00')
+        
+    Returns:
+        Formatted string for display (e.g., '2026-03-02 15:14'), or original string if parsing fails
+    """
+    if not iso_string:
+        return "unknown"
+    
+    try:
+        # Parse the ISO string
+        dt = datetime.fromisoformat(iso_string.replace('Z', '+00:00'))
+        # Format as YYYY-MM-DD HH:MM (without seconds, with space instead of T)
+        return f"{dt:%Y-%m-%d %H:%M}"
+    except Exception:
+        # If parsing fails, just replace T with space as fallback
+        if 'T' in iso_string:
+            return iso_string.replace('T', ' ')[:16]  # Take up to minutes
+        return iso_string

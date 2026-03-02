@@ -163,9 +163,9 @@ class DialogueEngine:
         if deletion_response:
             return deletion_response
 
-        # Handle forget commands (semantic memory deletion)
+        # Handle forget commands (semantic memory deletion) - only in RAG mode
         forget_response = await handle_forget_commands(
-            text, self.memory_manager, session, user_id
+            text, self.memory_manager, session, user_id, use_rag
         )
         if forget_response:
             return forget_response
@@ -213,6 +213,9 @@ class DialogueEngine:
             return lesson_response
 
         # Handle lesson-related queries
+        # Note: process_lesson_query now only handles explicit numbered lessons (e.g., "lesson 15").
+        # "Today's lesson" requests are handled by the AI function calling system (send_todays_lesson)
+        # to prevent keyword hijacking of complex requests like "remind me about todays lesson".
         lesson_resp = await process_lesson_query(
             user_id=user_id,
             text=text,
@@ -315,7 +318,7 @@ class DialogueEngine:
         # Trigger matching and dispatch using function calling (always enabled)
         from src.triggers.triggering import handle_triggers
 
-        await handle_triggers(
+        trigger_diagnostics = await handle_triggers(
             response=response,
             original_text=text,
             session=session,
@@ -327,6 +330,20 @@ class DialogueEngine:
         from src.functions.intent_parser import get_intent_parser
         parser = get_intent_parser()
         parse_result = parser.parse(response)
+        
+        # Build final response combining AI text with function results
+        from src.functions.response_builder import get_response_builder
+        response_builder = get_response_builder()
+        
+        execution_result = trigger_diagnostics.get("execution_result")
+        if execution_result:
+            built_response = response_builder.build(
+                user_text=text,
+                ai_response_text=parse_result.response_text or response,
+                execution_result=execution_result,
+                include_function_results=True,
+            )
+            return built_response.text
         
         # Return only the natural language response, not the full JSON
         return parse_result.response_text or response

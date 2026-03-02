@@ -4,6 +4,7 @@ This test ensures that only the response_text is returned, not the full JSON.
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+from src.functions.executor import BatchExecutionResult, ExecutionResult
 
 
 class TestDialogueEngineResponseFix:
@@ -53,6 +54,24 @@ class TestDialogueEngineResponseFix:
 }'''
                             mock_call_ollama.return_value = raw_llm_response
                             
+                            # Mock handle_triggers to return proper diagnostics with execution_result
+                            mock_execution_result = BatchExecutionResult(
+                                results=[
+                                    ExecutionResult(
+                                        function_name="extract_memory",
+                                        success=True,
+                                        result={"key": "goal", "value": "spiritual growth", "ok": True},
+                                    )
+                                ],
+                                all_succeeded=True,
+                                total_execution_time_ms=10.0,
+                            )
+                            mock_triggers.return_value = {
+                                "structured_intent_used": True,
+                                "dispatched_actions": ["extract_memory"],
+                                "execution_result": mock_execution_result,
+                            }
+                            
                             # Create engine and call the method
                             engine = DialogueEngine(mock_session)
                             engine.memory_manager = mock_mm_instance
@@ -73,8 +92,8 @@ class TestDialogueEngineResponseFix:
                                 include_lesson=True,
                             )
                             
-                            # The result should be JUST the response text, not the full JSON
-                            expected_text = "Your goal, Dev, is to remember that your thoughts are images you've made."
+                            # The result should combine AI response with function results
+                            expected_text = "Your goal, Dev, is to remember that your thoughts are images you've made.\n\n✓ Remembered: goal"
                             assert result == expected_text, f"Expected: {expected_text}\nGot: {result}"
                             
                             # Verify handle_triggers was called with the raw response (for function processing)
@@ -101,7 +120,7 @@ class TestDialogueEngineResponseFix:
             with patch('src.services.dialogue_engine.PromptBuilder') as mock_pb:
                 with patch('src.services.dialogue_engine.get_semantic_search_service') as mock_ss:
                     with patch('src.services.dialogue_engine.call_ollama') as mock_call_ollama:
-                        with patch('src.triggers.triggering.handle_triggers'):
+                        with patch('src.triggers.triggering.handle_triggers') as mock_triggers:
                             # Setup mocks
                             mock_mm_instance = MagicMock()
                             mock_mm.return_value = mock_mm_instance
@@ -118,6 +137,12 @@ class TestDialogueEngineResponseFix:
                             # Plain text response (no JSON)
                             plain_response = "This is a plain text response without any JSON."
                             mock_call_ollama.return_value = plain_response
+                            
+                            # Mock handle_triggers to return empty execution result (no functions executed)
+                            mock_triggers.return_value = {
+                                "structured_intent_used": False,
+                                "dispatched_actions": [],
+                            }
                             
                             # Create engine
                             engine = DialogueEngine(mock_session)
@@ -159,7 +184,7 @@ class TestDialogueEngineResponseFix:
             with patch('src.services.dialogue_engine.PromptBuilder') as mock_pb:
                 with patch('src.services.dialogue_engine.get_semantic_search_service') as mock_ss:
                     with patch('src.services.dialogue_engine.call_ollama') as mock_call_ollama:
-                        with patch('src.triggers.triggering.handle_triggers'):
+                        with patch('src.triggers.triggering.handle_triggers') as mock_triggers:
                             # Setup mocks
                             mock_mm_instance = MagicMock()
                             mock_mm.return_value = mock_mm_instance
@@ -175,6 +200,12 @@ class TestDialogueEngineResponseFix:
                             
                             # None response from LLM
                             mock_call_ollama.return_value = None
+                            
+                            # Mock handle_triggers to return empty execution result
+                            mock_triggers.return_value = {
+                                "structured_intent_used": False,
+                                "dispatched_actions": [],
+                            }
                             
                             # Create engine
                             engine = DialogueEngine(mock_session)

@@ -631,6 +631,11 @@ _dispatcher: Optional[TriggerDispatcher] = None
 
 def get_trigger_dispatcher(db=None, memory_manager: Optional[MemoryManager] = None) -> TriggerDispatcher:
     global _dispatcher
+    # If a db session is explicitly provided, create a new dispatcher instance
+    # This is important for tests that need fresh sessions
+    if db is not None:
+        return TriggerDispatcher(db=db, memory_manager=memory_manager)
+    # Otherwise use the singleton pattern for production
     if _dispatcher is None:
         _dispatcher = TriggerDispatcher(db=db, memory_manager=memory_manager)
     return _dispatcher
