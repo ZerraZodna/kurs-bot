@@ -187,8 +187,8 @@ class TestPromptBuilder:
             include_conversation_history=False,
         )
 
-        assert "Lesson Text Retrieval Rules" in prompt
-        assert "return the lesson text exactly as provided" in prompt.lower()
+        assert "Lesson Text Request" in prompt
+        assert "do not summarize or describe the lesson" in prompt.lower()
 
     def test_build_prompt_omits_lesson_text_retrieval_rules_for_non_lesson_request(
         self, prompt_builder: PromptBuilder, test_user: User
@@ -203,7 +203,7 @@ class TestPromptBuilder:
             include_conversation_history=False,
         )
 
-        assert "Lesson Text Retrieval Rules" not in prompt
+        assert "Lesson Text Request" not in prompt
 
 
 class TestContextOptimizer:
@@ -407,4 +407,3 @@ class TestConversationHistory:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-
