@@ -331,14 +331,17 @@ class DialogueEngine:
         if execution_result:
             built_response = response_builder.build(
                 user_text=text,
-                ai_response_text=parse_result.response_text or response,
+                ai_response_text=parse_result.response_text if parse_result.response_text is not None else response,
                 execution_result=execution_result,
                 include_function_results=True,
             )
             return built_response.text
         
         # Return only the natural language response, not the full JSON
-        return parse_result.response_text or response
+        # Use parsed response text if available (even if empty string), otherwise fall back to raw response
+        if parse_result.success and parse_result.response_text is not None:
+            return parse_result.response_text
+        return response
 
     def _detect_context_type(self, user_id: int, text: str, use_rag: bool) -> str:
         """Detect the conversation context type for function availability."""
