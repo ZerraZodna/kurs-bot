@@ -22,8 +22,6 @@ from src.scheduler.memory_helpers import (
     is_auto_advance_lessons_enabled,
     set_auto_advance_lessons_preference,
 )
-from src.triggers.trigger_matcher import get_trigger_matcher
-
 logger = logging.getLogger(__name__)
 
 
@@ -75,27 +73,23 @@ def _is_progress_override_negative(text: str) -> bool:
 
 
 async def _semantic_yes_no(text: str, onboarding_service) -> (bool, bool):
-    """Classify yes/no using trigger embeddings; no keyword fallback."""
-    matcher = get_trigger_matcher()
-    matches = await matcher.match_triggers(text, top_k=3)
-    yes_score = max(
-        (m.get("score", 0) for m in matches if m.get("action_type") == "confirm_yes"),
-        default=0.0,
-    )
-    yes_thresh = max(
-        (m.get("threshold", 0.55) for m in matches if m.get("action_type") == "confirm_yes"),
-        default=0.55,
-    )
-    no_score = max(
-        (m.get("score", 0) for m in matches if m.get("action_type") == "confirm_no"),
-        default=0.0,
-    )
-    no_thresh = max(
-        (m.get("threshold", 0.55) for m in matches if m.get("action_type") == "confirm_no"),
-        default=0.55,
-    )
-    is_yes = yes_score >= yes_thresh and yes_score > no_score
-    is_no = no_score >= no_thresh and no_score > yes_score
+    """Classify yes/no using simple keyword matching."""
+    import re
+    normalized = re.sub(r"\s+", " ", (text or "").strip().lower())
+    
+    # Simple keyword-based classification
+    yes_patterns = [
+        r"\byes\b", r"\byeah\b", r"\byep\b", r"\bsure\b", r"\bok\b", r"\bokay\b",
+        r"\bdone\b", r"\bcompleted\b", r"\bfinished\b", r"\bdid it\b"
+    ]
+    no_patterns = [
+        r"\bno\b", r"\bnope\b", r"\bnot yet\b", r"\bdidn't\b", r"\bdid not\b",
+        r"\bnot done\b", r"\bnot finished\b", r"\bnot completed\b"
+    ]
+    
+    is_yes = any(re.search(p, normalized) for p in yes_patterns)
+    is_no = any(re.search(p, normalized) for p in no_patterns)
+    
     return is_yes, is_no
 
 

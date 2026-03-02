@@ -21,58 +21,49 @@ def db_session():
 
 
 @pytest.mark.asyncio
-async def test_semantic_raw_lesson_match_is_used_before_regex(monkeypatch, db_session, caplog):
-    class SemanticFirstMatcher:
-        async def match_triggers(self, user_text, top_k=3, precomputed_embedding=None):
-            return [
-                {
-                    "action_type": "raw_lesson",
-                    "score": 0.92,
-                    "threshold": 0.75,
-                    "match_source": "vector_index",
-                }
-            ]
-
-    monkeypatch.setattr(
-        "src.triggers.trigger_matcher.get_trigger_matcher",
-        lambda: SemanticFirstMatcher(),
-    )
-
+async def test_exact_text_keywords_return_raw_lesson(db_session, caplog):
+    """Given: User uses exact text keywords
+    When: Handling lesson request
+    Then: Raw lesson text is returned directly without LLM."""
     caplog.set_level(logging.INFO)
     response = await handle_lesson_request(
         lesson_id=1,
-        user_input="What is the exact text of this lesson?",
+        user_input="What exactly is the exact text of lesson 1?",
         session=db_session,
         user_language="en",
     )
     assert "Lesson 1" in response
-    assert '"fallback_path_used": false' in caplog.text
+    assert "Full lesson text" in response
+    # Verify keyword detection path was used
+    assert '"matched_action": "raw_lesson"' in caplog.text
+    assert '"match_source": "keyword_detection"' in caplog.text
 
 
 @pytest.mark.asyncio
-async def test_regex_fallback_runs_after_semantic_miss(monkeypatch, db_session, caplog):
-    class SemanticMissMatcher:
-        async def match_triggers(self, user_text, top_k=3, precomputed_embedding=None):
-            return [
-                {
-                    "action_type": "raw_lesson",
-                    "score": 0.20,
-                    "threshold": 0.75,
-                    "match_source": "vector_index",
-                }
-            ]
-
-    monkeypatch.setattr(
-        "src.triggers.trigger_matcher.get_trigger_matcher",
-        lambda: SemanticMissMatcher(),
-    )
-
+async def test_no_exact_text_keywords_uses_rag_path(db_session, caplog):
+    """Given: User asks about lesson without exact text keywords
+    When: Handling lesson request
+    Then: RAG/LLM path is used (not raw lesson)."""
     caplog.set_level(logging.INFO)
-    response = await handle_lesson_request(
-        lesson_id=1,
-        user_input="Please show me the exact words of the lesson.",
-        session=db_session,
-        user_language="en",
-    )
-    assert "Lesson 1" in response
-    assert '"fallback_path_used": true' in caplog.text
+    
+    # Mock the Ollama call to avoid actual LLM invocation
+    async def mock_ollama(prompt, memory_manager, user_language):
+        return "This is a thoughtful response about the lesson."
+    
+    import src.lessons.handler as handler_module
+    original_call_ollama = handler_module._get_ollama_client
+    handler_module._get_ollama_client = lambda: mock_ollama
+    
+    try:
+        response = await handle_lesson_request(
+            lesson_id=1,
+            user_input="Tell me about lesson 1",  # No exact text keywords
+            session=db_session,
+            user_language="en",
+        )
+        # Should get the RAG/LLM response, not raw lesson
+        assert "thoughtful response" in response
+        # Should NOT have raw lesson logging
+        assert '"matched_action": "raw_lesson"' not in caplog.text
+    finally:
+        handler_module._get_ollama_client = original_call_ollama

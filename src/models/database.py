@@ -18,7 +18,7 @@ from .consent import Unsubscribe, ConsentLog
 from .gdpr import GdprRequest, GdprAuditLog, GdprVerification
 from .jobs import BatchLock, JobState
 from .templates import PromptTemplate
-from .triggers import TriggerEmbedding
+# TriggerEmbedding removed in Phase 3 - embedding-based trigger matching replaced by function calling
 
 
 if __name__ == '__main__':

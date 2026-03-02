@@ -14,9 +14,6 @@ jobs:
       # Force-disable real Ollama calls in CI to avoid external network calls
       # while still allowing developers to opt-in locally via .env.
       TEST_USE_REAL_OLLAMA: '0'
-      # Disable native Faiss in CI to avoid binary wheel issues; tests use the
-      # numpy fallback unless explicitly enabled.
-      USE_REAL_FAISS: '0'
       # Mark CI as test environment so background threads stay off and test DB is enforced
       IS_TEST_ENV: '1'
       # Use the lightweight test embedding backend in CI to avoid pulling
@@ -25,6 +22,8 @@ jobs:
       EMBEDDING_BACKEND: 'none'
       # Set to 'true' to skip pre-downloading large SentenceTransformer model
       SKIP_MODEL_PRECACHE: 'true'
+      # Function calling migration complete - no trigger embeddings needed
+      FUNCTION_CALLING_ENABLED: 'true'
     
 
     steps:
@@ -65,8 +64,5 @@ jobs:
           else
             echo ".env.template not found, skipping copy"
           fi
-      - name: Seed deterministic trigger embeddings
-        run: python scripts/ci_seed_triggers.py
-
       - name: Run tests
         run: pytest -q

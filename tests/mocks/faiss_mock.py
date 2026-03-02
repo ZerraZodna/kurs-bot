@@ -1,19 +1,10 @@
 """FAISS mocking utilities."""
 
-import os
 import sys
 import types
 import importlib.machinery
 from typing import Optional, List
 import numpy as np
-
-
-def _env_is_truthy(name: str) -> bool:
-    """Return True for common truthy env values (1/true/yes/y)."""
-    v = os.getenv(name)
-    if not v:
-        return False
-    return str(v).strip().lower() in ("1", "true", "yes", "y")
 
 
 class FakeIndexFlatIP:
@@ -108,7 +99,7 @@ def register_fake_faiss() -> None:
     
     Call this at import time to prevent real faiss initialization.
     """
-    if "faiss" not in sys.modules and not _env_is_truthy("TEST_USE_REAL_FAISS"):
+    if "faiss" not in sys.modules:
         sys.modules["faiss"] = create_fake_faiss_module()
 
 

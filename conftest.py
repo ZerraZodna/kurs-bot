@@ -109,84 +109,76 @@ def setup_test_environment():
     try:
         # Prevent background threads (lifespan) from starting during tests
         os.environ.setdefault("IS_TEST_ENV", "1")
-        # Prevent native Faiss C-extension from being imported during tests
-        # unless explicitly requested. Some environments (Windows CI/dev)
-        # can crash when the faiss binary wheel isn't compatible; provide a
-        # lightweight Python stub instead.
-        def _env_is_truthy(name: str) -> bool:
-            v = os.getenv(name)
-            if not v:
-                return False
-            return str(v).strip().lower() in ("1", "true", "yes", "y")
+        # Always mock FAISS in tests - the codebase uses numpy-based similarity
+        # instead of native FAISS, so we provide a lightweight Python stub.
+        try:
+            import sys, types, numpy as _np
 
-        if not _env_is_truthy("TEST_USE_REAL_FAISS"):
-            try:
-                import sys, types, numpy as _np
+            if "faiss" not in sys.modules:
+                import importlib.machinery
+                fake_faiss = types.ModuleType("faiss")
+                fake_faiss.__spec__ = importlib.machinery.ModuleSpec("faiss", None, is_package=False)
 
-                if "faiss" not in sys.modules:
-                    import importlib.machinery
-                    fake_faiss = types.ModuleType("faiss")
-                    fake_faiss.__spec__ = importlib.machinery.ModuleSpec("faiss", None, is_package=False)
+                class _IndexFlatIP:
+                    def __init__(self, dim):
+                        self.d = dim
+                        self._mat = _np.zeros((0, dim), dtype=_np.float32)
+                        self._ids = _np.array([], dtype=_np.int64)
 
-                    class _IndexFlatIP:
-                        def __init__(self, dim):
-                            self.d = dim
-                            self._mat = _np.zeros((0, dim), dtype=_np.float32)
-                            self._ids = _np.array([], dtype=_np.int64)
-
-                        def add_with_ids(self, mat, ids):
-                            try:
-                                mat = _np.asarray(mat, dtype=_np.float32)
-                                ids = _np.asarray(ids, dtype=_np.int64)
-                                if self._mat.size == 0:
-                                    self._mat = mat.copy()
-                                    self._ids = ids.copy()
-                                else:
-                                    self._mat = _np.vstack([self._mat, mat])
-                                    self._ids = _np.concatenate([self._ids, ids])
-                            except Exception:
-                                pass
-
-                        def search(self, q, top_k):
-                            q = _np.asarray(q, dtype=_np.float32)
-                            if q.ndim == 1:
-                                q = q.reshape(1, -1)
+                    def add_with_ids(self, mat, ids):
+                        try:
+                            mat = _np.asarray(mat, dtype=_np.float32)
+                            ids = _np.asarray(ids, dtype=_np.int64)
                             if self._mat.size == 0:
-                                return _np.zeros((q.shape[0], 0)), _np.full((q.shape[0], 0), -1, dtype=_np.int64)
-                            norms = _np.linalg.norm(self._mat, axis=1)
-                            norms[norms == 0] = 1.0
-                            mat_norm = self._mat / norms[:, None]
-                            q_norm = q / (_np.linalg.norm(q, axis=1)[:, None] + 1e-12)
-                            scores = mat_norm.dot(q_norm.T)
-                            D = _np.zeros((q.shape[0], top_k), dtype=_np.float32)
-                            I = _np.full((q.shape[0], top_k), -1, dtype=_np.int64)
-                            for qi in range(q.shape[0]):
-                                row = scores[:, qi]
-                                order = _np.argsort(-row)[:top_k]
-                                D[qi, : len(order)] = row[order]
-                                I[qi, : len(order)] = self._ids[order]
-                            return D, I
+                                self._mat = mat.copy()
+                                self._ids = ids.copy()
+                            else:
+                                self._mat = _np.vstack([self._mat, mat])
+                                self._ids = _np.concatenate([self._ids, ids])
+                        except Exception:
+                            pass
 
-                    class _IndexIDMap:
-                        def __init__(self, index):
-                            self._inner = index
-                            try:
-                                self.d = getattr(index, "d", None)
-                            except Exception:
-                                self.d = None
+                    def search(self, q, top_k):
+                        q = _np.asarray(q, dtype=_np.float32)
+                        if q.ndim == 1:
+                            q = q.reshape(1, -1)
+                        if self._mat.size == 0:
+                            return _np.zeros((q.shape[0], 0)), _np.full((q.shape[0], 0), -1, dtype=_np.int64)
+                        norms = _np.linalg.norm(self._mat, axis=1)
+                        norms[norms == 0] = 1.0
+                        mat_norm = self._mat / norms[:, None]
+                        q_norm = q / (_np.linalg.norm(q, axis=1)[:, None] + 1e-12)
+                        scores = mat_norm.dot(q_norm.T)
+                        D = _np.zeros((q.shape[0], top_k), dtype=_np.float32)
+                        I = _np.full((q.shape[0], top_k), -1, dtype=_np.int64)
+                        for qi in range(q.shape[0]):
+                            row = scores[:, qi]
+                            order = _np.argsort(-row)[:top_k]
+                            D[qi, : len(order)] = row[order]
+                            I[qi, : len(order)] = self._ids[order]
+                        return D, I
 
-                        def add_with_ids(self, mat, ids):
-                            return self._inner.add_with_ids(mat, ids)
+                class _IndexIDMap:
+                    def __init__(self, index):
+                        self._inner = index
+                        try:
+                            self.d = getattr(index, "d", None)
+                        except Exception:
+                            self.d = None
 
-                        def search(self, q, top_k):
-                            return self._inner.search(q, top_k)
+                    def add_with_ids(self, mat, ids):
+                        return self._inner.add_with_ids(mat, ids)
 
-                    fake_faiss.IndexFlatIP = _IndexFlatIP
-                    fake_faiss.IndexIDMap = _IndexIDMap
-                    sys.modules["faiss"] = fake_faiss
-            except Exception:
-                pass
+                    def search(self, q, top_k):
+                        return self._inner.search(q, top_k)
+
+                fake_faiss.IndexFlatIP = _IndexFlatIP
+                fake_faiss.IndexIDMap = _IndexIDMap
+                sys.modules["faiss"] = fake_faiss
+        except Exception:
+            pass
         from src.models.database import init_db
+
         init_db()
     except Exception as e:
         print(f"⚠️  Could not initialize test DB schema: {e}")

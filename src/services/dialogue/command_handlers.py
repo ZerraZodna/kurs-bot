@@ -15,7 +15,6 @@ from src.memories.semantic_search import get_semantic_search_service
 from src.memories.memory_handler import MemoryHandler
 from src.scheduler import SchedulerService
 from src.scheduler.domain import SCHEDULE_TYPE_DAILY
-from src.triggers.trigger_matcher import get_trigger_matcher
 from src.models.database import Schedule
 from src.services.gdpr_service import (
     export_user_data,
@@ -400,58 +399,6 @@ def handle_debug_next_day(
             return "\n\n".join(messages)
         return "OK"
     return "OK"
-
-
-async def handle_debug_trigger_match(
-    text: str,
-    user_id: int,
-) -> Optional[str]:
-    """Explain trigger matching outcome for a provided message.
-
-    Command forms:
-    - `debug_trigger <message>`
-    - `trigger_debug <message>`
-    """
-    raw = (text or "").strip()
-    lower = raw.lower()
-    prefixes = ("debug_trigger", "trigger_debug")
-
-    matched_prefix = None
-    for prefix in prefixes:
-        if lower == prefix or lower.startswith(prefix + " "):
-            matched_prefix = prefix
-            break
-    if matched_prefix is None:
-        return None
-
-    query = raw[len(matched_prefix) :].strip()
-    if not query:
-        return "Usage: debug_trigger <message to inspect>"
-
-    matcher = get_trigger_matcher()
-    explanation = await matcher.explain_match(query, top_k=5)
-    top_matches = explanation.get("top_matches") or []
-
-    lines = [
-        f"Trigger debug for user={user_id}",
-        f"matched={str(bool(explanation.get('matched'))).lower()}",
-        f"matched_action={explanation.get('matched_action') or '-'}",
-        f"score={float(explanation.get('score', 0.0)):.3f}",
-        f"threshold={float(explanation.get('threshold', 0.0)):.3f}",
-        f"fallback_path_used={str(bool(explanation.get('fallback_path_used'))).lower()}",
-        f"match_source={explanation.get('match_source') or 'none'}",
-    ]
-
-    if top_matches:
-        lines.append("top_candidates:")
-        for idx, match in enumerate(top_matches[:3], start=1):
-            lines.append(
-                f"{idx}. action={match.get('action_type') or '-'} "
-                f"score={float(match.get('score', 0.0)):.3f} "
-                f"threshold={float(match.get('threshold', 0.0)):.3f}"
-            )
-
-    return "\n".join(lines)
 
 
 def handle_list_memories(text: str, memory_manager, session: Session, user_id: int) -> Optional[str]:

@@ -19,16 +19,13 @@ from src.services.dialogue import (
     handle_schedule_messages,
     get_user_language,
     detect_and_store_language,
-    extract_and_store_memories,
     handle_rag_mode_toggle,
     handle_rag_prompt_command,
     parse_rag_prefix,
     is_rag_mode_enabled,
     handle_forget_commands,
-    handle_trigger_admin_commands,
     handle_gdpr_commands,
     handle_debug_next_day,
-    handle_debug_trigger_match,
     maybe_send_next_lesson,
     handle_list_memories,
 )
@@ -173,14 +170,6 @@ class DialogueEngine:
         if forget_response:
             return forget_response
 
-        trigger_admin_response = await handle_trigger_admin_commands(
-            text=text,
-            session=session,
-            user_id=user_id,
-        )
-        if trigger_admin_response:
-            return trigger_admin_response
-
         # Debug magic command: simulate next day for lesson progression
         debug_response = handle_debug_next_day(
             text, self.memory_manager, session, user_id
@@ -188,22 +177,12 @@ class DialogueEngine:
         if debug_response:
             return debug_response
 
-        trigger_debug_response = await handle_debug_trigger_match(
-            text=text,
-            user_id=user_id,
-        )
-        if trigger_debug_response:
-            return trigger_debug_response
-        
         return None
 
     async def _handle_onboarding_stage(self, user_id: int, text: str, session: Session, use_rag: bool) -> Optional[str]:
-        """Handle memory extraction and onboarding flow."""
-        # Extract memories from user message
-        if self.onboarding_flow:
-            await extract_and_store_memories(
-                self.memory_manager, self.memory_extractor, user_id, text, rag_mode=use_rag
-            )
+        """Handle onboarding flow."""
+        # Note: Memory extraction now happens via extract_memory function in the function calling system
+        # The LLM will extract memories as part of its response, not as a separate call
 
         # Handle onboarding flow if needed
         if (
@@ -289,10 +268,11 @@ class DialogueEngine:
     ) -> str:
         """Build prompt, call LLM, and handle post-response triggers."""
         # Build context-aware prompt
-        from src.services.embedding_service import get_embedding_service
-        user_text_embedding = await get_embedding_service().generate_embedding(text)
+        # Note: No longer generating embeddings for trigger matching - using function calling instead
+        relevant_memories = await self._get_relevant_memories(user_id, text, session)
 
-        relevant_memories = await self._get_relevant_memories(user_id, text, session, user_text_embedding)
+        # Detect context type for function availability
+        context_type = self._detect_context_type(user_id, text, use_rag)
 
         # Use RAG prompt if RAG mode is active for this message
         if use_rag:
@@ -307,6 +287,7 @@ class DialogueEngine:
                 relevant_memories=relevant_memories,
                 include_conversation_history=include_history,
                 history_turns=history_turns,
+                context_type=context_type,
             )
         else:
             system_prompt = settings.SYSTEM_PROMPT
@@ -318,21 +299,11 @@ class DialogueEngine:
                 include_conversation_history=include_history,
                 history_turns=history_turns,
                 relevant_memories=relevant_memories,
+                context_type=context_type,
             )
         
-        # Run trigger matching on original user text before calling the LLM.
-        from src.lessons.handler import pre_llm_lesson_short_circuit
-
-        pre = await pre_llm_lesson_short_circuit(
-            original_text=text,
-            precomputed_embedding=user_text_embedding,
-            user_id=user_id,
-            session=session,
-            prompt_builder=self.prompt_builder,
-            user_lang=user_lang,
-        )
-        if pre:
-            return pre
+        # Note: Removed pre_llm_lesson_short_circuit with embedding parameter
+        # Lesson handling now happens via function calling
 
         response = await self.call_ollama(
             prompt, model=settings.OLLAMA_CHAT_RAG_MODEL if use_rag else None, language=user_lang
@@ -341,7 +312,7 @@ class DialogueEngine:
             logger.warning("LLM returned None; coercing to placeholder string")
             response = "[No response from LLM]"
 
-        # Trigger matching and dispatch (always enabled)
+        # Trigger matching and dispatch using function calling (always enabled)
         from src.triggers.triggering import handle_triggers
 
         await handle_triggers(
@@ -350,23 +321,48 @@ class DialogueEngine:
             session=session,
             memory_manager=self.memory_manager,
             user_id=user_id,
-            original_text_embedding=user_text_embedding,
         )
 
-        return response
+        # Parse the response to extract just the text (not the full JSON with functions)
+        from src.functions.intent_parser import get_intent_parser
+        parser = get_intent_parser()
+        parse_result = parser.parse(response)
+        
+        # Return only the natural language response, not the full JSON
+        return parse_result.response_text or response
 
-    async def _get_relevant_memories(self, user_id: int, text: str, session: Session, query_embedding) -> list:
+    def _detect_context_type(self, user_id: int, text: str, use_rag: bool) -> str:
+        """Detect the conversation context type for function availability."""
+        # Check for RAG mode
+        if use_rag:
+            return "rag"
+        
+        # Check if user is in onboarding
+        if self.onboarding and self.onboarding.should_show_onboarding(user_id):
+            return "onboarding"
+        
+        # Check for schedule-related keywords
+        schedule_keywords = ["schedule", "reminder", "time", "daily", "lesson time"]
+        text_lower = text.lower()
+        if any(kw in text_lower for kw in schedule_keywords):
+            return "scheduling"
+        
+        # Default to general chat
+        return "general_chat"
+
+    async def _get_relevant_memories(self, user_id: int, text: str, session: Session) -> list:
         """Retrieve relevant memories for the current context."""
         relevant_memories = []
         try:
             search_service = get_semantic_search_service()
             search_session = Session(bind=session.get_bind())
             try:
+                # Note: No longer requires pre-computed embedding
+                # The semantic search service will generate embedding internally if needed
                 results = await search_service.search_memories(
                     user_id=user_id,
                     query_text=text,
                     session=search_session,
-                    query_embedding=query_embedding,
                 )
                 relevant_memories = [
                     {
@@ -582,10 +578,11 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
         For non-English users the LLM response is fetched in full first,
         then the *translation* call is streamed.
         """
-        from src.services.embedding_service import get_embedding_service
+        # Note: No longer generating embeddings for trigger matching - using function calling instead
+        relevant_memories = await self._get_relevant_memories(user_id, text, session)
 
-        user_text_embedding = await get_embedding_service().generate_embedding(text)
-        relevant_memories = await self._get_relevant_memories(user_id, text, session, user_text_embedding)
+        # Detect context type for function availability
+        context_type = self._detect_context_type(user_id, text, use_rag)
 
         # Build prompt (same logic as _generate_llm_response)
         if use_rag:
@@ -600,6 +597,7 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
                 relevant_memories=relevant_memories,
                 include_conversation_history=include_history,
                 history_turns=history_turns,
+                context_type=context_type,
             )
         else:
             system_prompt = settings.SYSTEM_PROMPT
@@ -611,21 +609,11 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
                 include_conversation_history=include_history,
                 history_turns=history_turns,
                 relevant_memories=relevant_memories,
+                context_type=context_type,
             )
 
-        # Pre-LLM trigger short-circuit
-        from src.lessons.handler import pre_llm_lesson_short_circuit
-
-        pre = await pre_llm_lesson_short_circuit(
-            original_text=text,
-            precomputed_embedding=user_text_embedding,
-            user_id=user_id,
-            session=session,
-            prompt_builder=self.prompt_builder,
-            user_lang=user_lang,
-        )
-        if pre:
-            return {"type": "text", "text": pre}
+        # Note: Removed pre_llm_lesson_short_circuit with embedding parameter
+        # Lesson handling now happens via function calling
 
         is_english = not user_lang or user_lang.lower() == "en"
 
@@ -638,8 +626,14 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
                 session=session,
                 memory_manager=self.memory_manager,
                 user_id=user_id,
-                original_text_embedding=user_text_embedding,
             )
+
+        def _extract_response_text(full_response_text: str) -> str:
+            """Extract just the response text from potentially JSON-formatted response."""
+            from src.functions.intent_parser import get_intent_parser
+            parser = get_intent_parser()
+            parse_result = parser.parse(full_response_text)
+            return parse_result.response_text or full_response_text
 
         if is_english:
             # Stream the LLM response directly
@@ -648,7 +642,12 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
                 model=settings.OLLAMA_CHAT_RAG_MODEL if use_rag else None,
                 language=user_lang,
             )
-            return {"type": "stream", "generator": gen, "post_hook": _post_hook}
+            # Wrap generator to extract just the response text from JSON
+            async def _extracted_gen():
+                async for token in gen:
+                    yield token
+            
+            return {"type": "stream", "generator": _extracted_gen(), "post_hook": _post_hook, "extract_text": _extract_response_text}
         else:
             # Non-English: get full LLM response first, then stream translation
             response = await self.call_ollama(
@@ -659,10 +658,13 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
             if response is None:
                 response = "[No response from LLM]"
 
+            # Extract just the response text before translation
+            response_text = _extract_response_text(response)
+
             # Build translation prompt (same as translate_text but we stream it)
             translation_prompt = (
                 f"Translate the following text to {user_lang}. "
-                f"Return ONLY the translation, no explanations:\n\n{response}"
+                f"Return ONLY the translation, no explanations:\n\n{response_text}"
             )
             gen = stream_ollama(
                 translation_prompt,

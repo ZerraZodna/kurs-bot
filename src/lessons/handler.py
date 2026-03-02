@@ -112,55 +112,32 @@ async def handle_lesson_request(
             return f"I couldn't find lesson {lesson_id} in my database. ACIM has 365 lessons - please ask for a lesson between 1 and 365."
 
         # Detect if the user explicitly asks for the exact/raw lesson text.
-        # Prefer semantic trigger matching (raw_lesson) seeded in the triggers
-        # table so phrase variants are handled consistently. Fall back to a
-        # conservative regex if trigger matching isn't available.
+        # Use keyword-based detection for explicit requests.
         user_lower = user_input.lower()
-        from src.triggers.trigger_matcher import get_trigger_matcher
-
-        matcher = get_trigger_matcher()
-        matches = await matcher.match_triggers(user_input)
-        semantic_match = None
-        for m in matches:
-            if m.get("action_type") == "raw_lesson" and m.get("score", 0.0) >= m.get(
-                "threshold", settings.TRIGGER_SIMILARITY_THRESHOLD
-            ):
-                semantic_match = m
-                break
-        if semantic_match:
+        
+        # Check for explicit requests for exact lesson text
+        exact_text_indicators = [
+            r"\bwhat exactly is\b.*\blesson\b",
+            r"\b(exact|exactly|the text of|exact text|exact words)\b",
+            r"\b(raw|verbatim|full text|complete text)\b",
+            r"\btext of lesson\b",
+            r"\blesson text\b",
+        ]
+        
+        wants_exact_text = any(
+            re.search(pattern, user_lower) for pattern in exact_text_indicators
+        )
+        
+        if wants_exact_text:
             logger.info(
                 "lesson_trigger_decision payload=%s",
                 json.dumps(
                     {
                         "matched_action": "raw_lesson",
-                        "score": float(semantic_match.get("score", 0.0)),
-                        "threshold": float(
-                            semantic_match.get(
-                                "threshold", settings.TRIGGER_SIMILARITY_THRESHOLD
-                            )
-                        ),
+                        "score": 1.0,
+                        "threshold": 0.0,
                         "fallback_path_used": False,
-                        "match_source": semantic_match.get("match_source", "unknown"),
-                    },
-                    sort_keys=True,
-                ),
-            )
-            return await format_lesson_message(lesson, user_language or "en")
-
-        # Conservative regex fallback for explicit requests asking for the
-        # exact text/words of the lesson.
-        if re.search(r"\bwhat exactly is\b.*\blesson\b", user_lower) or re.search(
-            r"\b(exact|exactly|the text of|exact text|exact words)\b", user_lower
-        ):
-            logger.info(
-                "lesson_trigger_decision payload=%s",
-                json.dumps(
-                    {
-                        "matched_action": "raw_lesson",
-                        "score": 0.0,
-                        "threshold": float(settings.TRIGGER_SIMILARITY_THRESHOLD),
-                        "fallback_path_used": True,
-                        "match_source": "regex_fallback",
+                        "match_source": "keyword_detection",
                     },
                     sort_keys=True,
                 ),
@@ -198,43 +175,50 @@ async def handle_lesson_request(
 
 async def pre_llm_lesson_short_circuit(
     original_text: str,
-    precomputed_embedding,
+    precomputed_embedding,  # Kept for backward compatibility but no longer used
     user_id: int,
     session: Session,
     prompt_builder,
     user_lang: str,
 ) -> Optional[str]:
     """
-    Check triggers on the original user text before calling the LLM and
-    return a verbatim/formatted lesson message when a lesson-related trigger
-    (next_lesson/raw_lesson) matches.
+    Check for lesson requests using keyword detection before calling the LLM.
+    Returns a verbatim/formatted lesson message when a lesson request is detected.
 
-    This function intentionally avoids try/except so failures surface to the
-    caller for observability.
+    Note: Embedding-based trigger matching removed in favor of keyword detection
+    and function calling. This function is kept for backward compatibility
+    but no longer uses precomputed_embedding.
     """
-    from src.triggers.trigger_matcher import get_trigger_matcher
-
-    matcher = get_trigger_matcher()
-    matches = await matcher.match_triggers(
-        original_text, precomputed_embedding=precomputed_embedding
-    )
-    for m in matches:
-        if m.get("score", 0.0) >= m.get(
-            "threshold", settings.TRIGGER_SIMILARITY_THRESHOLD
-        ):
-            action = m.get("action_type")
-            if action in ("next_lesson", "raw_lesson") and prompt_builder:
-                today_ctx = prompt_builder.get_today_lesson_context(user_id)
-                state = today_ctx.get("state", {})
-                lesson_id = state.get("lesson_id")
-                if lesson_id:
-                    lesson = (
-                        session.query(Lesson)
-                        .filter(Lesson.lesson_id == lesson_id)
-                        .first()
-                    )
-                    if lesson:
-                        return await format_lesson_message(lesson, user_lang)
+    # Use keyword-based detection instead of embedding-based matching
+    lesson_request = detect_lesson_request(original_text)
+    
+    if not lesson_request:
+        return None
+    
+    if lesson_request.get("today") and prompt_builder:
+        today_ctx = prompt_builder.get_today_lesson_context(user_id)
+        state = today_ctx.get("state", {})
+        lesson_id = state.get("lesson_id")
+        if lesson_id:
+            lesson = (
+                session.query(Lesson)
+                .filter(Lesson.lesson_id == lesson_id)
+                .first()
+            )
+            if lesson:
+                return await format_lesson_message(lesson, user_lang)
+    
+    if lesson_request.get("lesson_id"):
+        lesson_id = lesson_request.get("lesson_id")
+        lesson = (
+            session.query(Lesson)
+            .filter(Lesson.lesson_id == lesson_id)
+            .first()
+        )
+        if lesson:
+            return await format_lesson_message(lesson, user_lang)
+    
+    return None
 
 
 async def format_lesson_message(
@@ -353,19 +337,11 @@ async def process_lesson_query(
                 return await format_lesson_message(lesson, user_language)
             return f"I couldn't find lesson {lesson_id} in my database. ACIM has 365 lessons - please ask for a lesson between 1 and 365."
 
-    # Compute embedding only when explicit detection didn't match.
-    precomputed_embedding = None
-    emb_svc = _get_embedding_service()
-    if emb_svc is not None:
-        try:
-            precomputed_embedding = await emb_svc.generate_embedding(text)
-        except Exception:
-            precomputed_embedding = None
-
+    # Try keyword-based short circuit before LLM call
     try:
         pre = await pre_llm_lesson_short_circuit(
             original_text=text,
-            precomputed_embedding=precomputed_embedding,
+            precomputed_embedding=None,  # No longer used
             user_id=user_id,
             session=session,
             prompt_builder=prompt_builder,
@@ -374,7 +350,7 @@ async def process_lesson_query(
         if pre:
             return pre
     except Exception:
-        # If trigger matching fails, continue and let the caller handle it.
+        # If short circuit fails, continue and let the caller handle it.
         pass
 
     return None

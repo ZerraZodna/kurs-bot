@@ -7,39 +7,43 @@ from typing import Iterable
 
 from src.models.database import Schedule
 from src.services.timezone_utils import format_dt_in_timezone
-import src.triggers.trigger_matcher as trigger_matcher
 from src.config import settings
 from .domain import is_one_time_schedule_type
 
 
 async def detect_schedule_status_request(text: str) -> bool:
-    """Detect whether `text` is a schedule-status query by delegating to
-    the central TriggerMatcher. Returns True when the top schedule-query
-    similarity exceeds the configured threshold and is not exceeded by
-    an update/create schedule trigger (avoid treating update requests as
-    status queries).
+    """Detect whether `text` is a schedule-status query using simple keyword matching.
+    
+    Returns True when the message contains schedule query keywords.
     """
-    message = (text or "").strip()
+    import re
+    message = (text or "").strip().lower()
     if not message:
         return False
 
-    # Delegate matching to the central TriggerMatcher
-
-    matcher = trigger_matcher.get_trigger_matcher()
-    matches = await matcher.match_triggers(message, top_k=3)
-    # If the matcher returned no results, do not fall back to simple
-    # keyword scanning here — tests should seed the trigger matcher via
-    # `conftest.setup_test_environment` and we want failures in that
-    # seeding to surface (fail-fast). Returning False when no matches
-    # were produced preserves the matcher-driven behavior.
-    if not matches:
-        return False
-
-    max_status = max((m["score"] for m in matches if m.get("action_type") == "query_schedule"), default=0.0)
-    max_change = max((m["score"] for m in matches if m.get("action_type") in ("update_schedule", "create_schedule")), default=0.0)
-
-    threshold = float(getattr(settings, "TRIGGER_SIMILARITY_THRESHOLD", 0.75))
-    return (max_status >= threshold) and (max_status >= max_change)
+    # Simple keyword-based detection for schedule status queries
+    query_patterns = [
+        r"\bwhen\b.*\b(reminder|schedule|lesson)\b",
+        r"\bwhat\b.*\btime\b.*\b(reminder|schedule|lesson)\b",
+        r"\bshow\b.*\b(reminder|schedule)\b",
+        r"\bcheck\b.*\b(reminder|schedule)\b",
+        r"\b(reminder|schedule)\b.*\bstatus\b",
+        r"\b(reminder|schedule)\b.*\btime\b",
+        r"\bmy\b.*\b(reminder|schedule)s?\b",
+        r"\blist\b.*\b(reminder|schedule)s?\b",
+    ]
+    
+    # Check if message matches any query pattern
+    is_query = any(re.search(p, message) for p in query_patterns)
+    
+    # Exclude update/create patterns to avoid treating them as queries
+    update_patterns = [
+        r"\b(set|change|update|modify|create|add|new)\b.*\b(reminder|schedule|time)\b",
+        r"\b(reminder|schedule)\b.*\b(set|change|update|modify|create|add)\b",
+    ]
+    is_update = any(re.search(p, message) for p in update_patterns)
+    
+    return is_query and not is_update
 
 
 def build_schedule_status_response(schedules: Iterable[Schedule], tz_name: str = "UTC") -> str:

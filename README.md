@@ -27,13 +27,9 @@ npm start                        # starts uvicorn + ngrok if present
 # Optional dev UI: set DEV_WEB_CLIENT=true in .env, then
 npm run start:ui
 npm stop                         # stops processes started by npm start
-
-# Trigger embedding workflows
-npm run seed                     # DEV/CI prep: regenerate scripts/ci_trigger_data.py and seed DB
-npm run seed_triggers            # Runtime reload (e.g., AWS): seed trigger_embeddings table from existing ci_trigger_data.py
 ```
 
-What `npm install` does: creates `.venv`, installs torch/sentence-transformers/faiss (when available) and project requirements. What it does **not** do: set any tokens/keys, install ngrok, or open firewall ports.
+What `npm install` does: creates `.venv`, installs project requirements. What it does **not** do: set any tokens/keys, install ngrok, or open firewall ports.
 
 ## Platform prerequisites
 Install these before running the unified quickstart above.
@@ -55,16 +51,7 @@ sudo apt install -y nodejs
 
 ### macOS (Apple Silicon)
 - Install Node.js 20+ (e.g., `brew install node`).
-- Faiss note: PyPI `faiss-cpu` can segfault on arm64. Prefer conda-forge if you need Faiss:
-  ```bash
-  /bin/bash -c "$(curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh)"
-  exec $SHELL
-  conda create -n kurs-bot python=3.10 faiss-cpu -c conda-forge
-  conda activate kurs-bot
-  pip install --no-cache-dir sentence-transformers hnswlib
-  pip install --no-cache-dir -r requirements.txt
-  ```
-- Runtime: `USE_REAL_FAISS=1 npm run start:api` to force Faiss (default off).
+- Runtime: `npm start` to start the application.
 
 ### Windows (npm helper)
 ```powershell
@@ -182,23 +169,11 @@ Contact your ops/backend team to finalize sizing, alerting, and other production
 - `SENDGRID_API_KEY` - SendGrid API key
 - Note: vector-index configuration and runtime toggle have been removed in this branch; vector indexing is disabled by design.
 
-### Local embeddings (optional)
+### Semantic Search (RAG mode)
 
-This project supports two embedding backends:
+The bot supports RAG (Retrieval Augmented Generation) mode for answering questions about ACIM lessons. This uses Ollama's embedding capabilities via the API - no local embedding models required.
 
-- **ollama**: uses a local Ollama HTTP API (`OLLAMA_EMBED_URL`) and models like `nomic-embed-text` (768-dim).
-- **local**: uses `sentence-transformers` (default `all-MiniLM-L6-v2`, 384-dim) and an optional `hnswlib` index for fast nearest-neighbor search.
-
-Toggle the backend in your `.env`:
-
-```
-EMBEDDING_BACKEND=local
-SENTENCE_TRANSFORMERS_MODEL=all-MiniLM-L6-v2
-EMBEDDING_DIMENSION=384
-HNSWLIB_INDEX_PATH=src/data/emb_index.bin
-```
-
-The index builder will read lessons from the configured `DATABASE_URL`, encode them with the specified sentence-transformers model, and save an `hnswlib` index plus a small metadata file. Set `HNSWLIB_INDEX_PATH` in `.env` so runtime code can find it.
+Enable RAG mode in chat by typing `rag on` or prefixing your message with `rag: `.
 
 ## Project Structure
 - `src/models/database.py` - SQLAlchemy ORM models

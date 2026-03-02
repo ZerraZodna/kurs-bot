@@ -13,7 +13,6 @@ pytest-xdist
 httpx
 apscheduler
 langdetect
-pytest-asyncio
 pypdf
 pdfplumber
 ollama
@@ -22,9 +21,5 @@ numpy
 pydantic-settings
 pymupdf
 
-#  local embedding backend (moved out of main install for CPU-only setups)
-# If you plan to run the local sentence-transformers + hnswlib index builder,
-# install them separately as needed (see INSTALL_CPU.txt step 4):
-#   python -m pip install --no-cache-dir sentence-transformers hnswlib 
-#   python -m pip install faiss-cpu
-
+# Note: sentence-transformers removed in Phase 3 - embedding infrastructure
+# now only used for semantic memory search (RAG mode) via Ollama API

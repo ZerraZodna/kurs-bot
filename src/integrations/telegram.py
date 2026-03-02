@@ -448,6 +448,10 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                     )
                     if not ai_response:
                         ai_response = "[No response from LLM]"
+                    # Extract just the response text if the response contains JSON
+                    extract_text_fn = result.get("extract_text")
+                    if extract_text_fn:
+                        ai_response = extract_text_fn(ai_response)
                     # Run post-response hooks (trigger matching, etc.)
                     try:
                         await result["post_hook"](ai_response)

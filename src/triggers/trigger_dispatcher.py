@@ -97,6 +97,31 @@ class TriggerDispatcher:
         spec = context.get("schedule_spec") or {}
         result: Dict[str, Any] = {"ok": False, "action": "create_schedule"}
 
+        # Check for function-style parameters
+        time_str = context.get("time")
+        if time_str:
+            # Store user's preferred local time
+            try:
+                self.memory_manager.store_memory(
+                    user_id,
+                    MemoryKey.PREFERRED_LESSON_TIME,
+                    time_str,
+                    category=MemoryCategory.PROFILE.value,
+                    source="trigger_dispatcher",
+                )
+            except Exception:
+                logger.exception("Could not store preferred_lesson_time memory for user %s", user_id)
+
+            # Create daily schedule with the provided time
+            schedule = _scheduler_pkg.SchedulerService.create_daily_schedule(
+                user_id=user_id,
+                lesson_id=context.get("lesson_id"),
+                time_str=time_str,
+                session=self.db,
+            )
+            result.update({"ok": True, "schedule_id": schedule.schedule_id})
+            return result
+
         # Idempotency: avoid creating duplicate schedule for same user/time
         cron = spec.get("cron_expression")
         if cron:
@@ -202,6 +227,19 @@ class TriggerDispatcher:
         updates = context.get("updates", {})
         result: Dict[str, Any] = {"ok": False, "action": "update_schedule"}
 
+        # Check for function-style parameters
+        time_str = context.get("time")
+        if time_str and schedule_id:
+            try:
+                updated = _scheduler_pkg.SchedulerService.update_daily_schedule(schedule_id, time_str, session=self.db)
+                if updated:
+                    result.update({"ok": True, "schedule_id": updated.schedule_id})
+                else:
+                    result.update({"ok": False, "error": "update_failed"})
+            except Exception as e:
+                result.update({"ok": False, "error": str(e)})
+            return result
+
         if not schedule_id:
             original_text = context.get("original_text", "") or ""
             assistant_response = context.get("assistant_response", "") or ""
@@ -222,7 +260,7 @@ class TriggerDispatcher:
                 result.update({"ok": False, "error": "missing_schedule_id"})
                 return result
 
-            time_str = updates.get("time_str")
+            time_str = updates.get("time_str") or time_str
             if not time_str:
                 import re
                 m = re.search(r"(\d{1,2}(?::\d{2})?)", original_text)
@@ -262,9 +300,9 @@ class TriggerDispatcher:
             result.update({"ok": False, "error": "not_found"})
             return result
 
-        if updates.get("time_str"):
+        if updates.get("time_str") or time_str:
             try:
-                updated = _scheduler_pkg.SchedulerService.update_daily_schedule(sched.schedule_id, updates.get("time_str"), session=self.db)
+                updated = _scheduler_pkg.SchedulerService.update_daily_schedule(sched.schedule_id, updates.get("time_str") or time_str, session=self.db)
                 if updated:
                     result.update({"ok": True, "schedule_id": updated.schedule_id})
                 else:
@@ -275,6 +313,123 @@ class TriggerDispatcher:
             result.update({"ok": False, "error": "no_supported_update_fields"})
 
         return result
+
+    def _handle_create_one_time_reminder(self, match: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle create_one_time_reminder function."""
+        user_id = context.get("user_id")
+        run_at = context.get("run_at")
+        message = context.get("message", "Reminder")
+        result: Dict[str, Any] = {"ok": False, "action": "create_one_time_reminder"}
+        
+        if not run_at:
+            result.update({"ok": False, "error": "missing_run_at"})
+            return result
+            
+        # Parse run_at
+        run_at_dt = self._parse_run_at(run_at)
+        if run_at_dt is None:
+            result.update({"ok": False, "error": "invalid_run_at_format"})
+            return result
+            
+        try:
+            schedule = _scheduler_pkg.SchedulerService.create_one_time_schedule(
+                user_id=user_id,
+                run_at=run_at_dt,
+                message=message,
+                session=self.db,
+            )
+            result.update({
+                "ok": True, 
+                "schedule_id": schedule.schedule_id,
+                "run_at": run_at_dt.isoformat()
+            })
+            return result
+        except Exception as e:
+            result.update({"ok": False, "error": str(e)})
+            return result
+
+    def _handle_repeat_lesson(self, match: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle repeat_lesson function."""
+        from src.memories.constants import MemoryKey
+        
+        user_id = context.get("user_id")
+        memory_manager = context.get("memory_manager") or self.memory_manager
+        result: Dict[str, Any] = {"ok": False, "action": "repeat_lesson"}
+        
+        try:
+            # Get last sent lesson
+            last_sent = memory_manager.get_memory(user_id, MemoryKey.LAST_SENT_LESSON_ID)
+            if not last_sent:
+                result.update({"ok": False, "error": "no_previous_lesson"})
+                return result
+            
+            lesson_id = int(last_sent[0]["value"])
+            
+            # Get lesson content
+            from src.models.database import Lesson
+            lesson = self.db.query(Lesson).filter_by(lesson_id=lesson_id).first()
+            
+            if not lesson:
+                result.update({"ok": False, "error": f"lesson_not_found"})
+                return result
+            
+            result.update({
+                "ok": True,
+                "lesson_id": lesson_id,
+                "title": lesson.title,
+                "content": lesson.content,
+                "is_repeat": True,
+            })
+            return result
+        except Exception as e:
+            result.update({"ok": False, "error": str(e)})
+            return result
+
+    def _handle_set_lesson_preference(self, match: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle set_lesson_preference function."""
+        from src.memories.constants import MemoryCategory
+        
+        user_id = context.get("user_id")
+        memory_manager = context.get("memory_manager") or self.memory_manager
+        preference = context.get("preference")
+        skip_confirmation = context.get("skip_confirmation", False)
+        result: Dict[str, Any] = {"ok": False, "action": "set_lesson_preference"}
+        
+        if not preference:
+            result.update({"ok": False, "error": "missing_preference"})
+            return result
+        
+        try:
+            # Store preference
+            memory_manager.store_memory(
+                user_id=user_id,
+                key="lesson_preference",
+                value=preference,
+                category=MemoryCategory.PREFERENCES.value,
+                source="trigger_dispatcher",
+                confidence=1.0,
+            )
+            
+            # Store skip confirmation setting
+            if skip_confirmation:
+                memory_manager.store_memory(
+                    user_id=user_id,
+                    key="skip_lesson_confirmation",
+                    value="true",
+                    category=MemoryCategory.PREFERENCES.value,
+                    source="trigger_dispatcher",
+                    confidence=1.0,
+                )
+            
+            result.update({
+                "ok": True,
+                "preference": preference,
+                "skip_confirmation": skip_confirmation,
+            })
+            return result
+        except Exception as e:
+            result.update({"ok": False, "error": str(e)})
+            return result
     def _handle_set_timezone(self, match: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         user_id = context.get("user_id")
         result: Dict[str, Any] = {"ok": False, "action": "set_timezone"}
@@ -451,6 +606,12 @@ class TriggerDispatcher:
                 result = self._handle_set_timezone(match, context)
             elif action == "query_schedule":
                 result = self._handle_query_schedule(match, context)
+            elif action == "create_one_time_reminder":
+                result = self._handle_create_one_time_reminder(match, context)
+            elif action == "repeat_lesson":
+                result = self._handle_repeat_lesson(match, context)
+            elif action == "set_lesson_preference":
+                result = self._handle_set_lesson_preference(match, context)
             else:
                 result.update({"ok": False, "error": "unknown_action"})
 

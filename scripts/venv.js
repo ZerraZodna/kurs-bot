@@ -84,26 +84,7 @@ function installDeps() {
   console.log('Installing CPU PyTorch wheel from official index...');
   runPip(['-m', 'pip', 'install', '--no-cache-dir', '--index-url', 'https://download.pytorch.org/whl/cpu', 'torch']);
 
-  // Install sentence-transformers and hnswlib
-  console.log('Installing sentence-transformers and hnswlib...');
-  runPip(['-m', 'pip', 'install', '--no-cache-dir', 'sentence-transformers', 'hnswlib']);
-
-  // Install faiss-cpu only here (not in requirements.txt) so CI does not install it.
-  if (isMac && isArm64) {
-    console.log('Skipping pip install of faiss-cpu on macOS arm64 (PyPI wheel often segfaults with libomp).');
-    console.log('Recommended: use conda-forge build instead: mamba/conda install -c conda-forge faiss-cpu');
-    console.log('Proceeding without Faiss; the app will fall back to the numpy index unless USE_REAL_FAISS=1 with a conda Faiss.');
-  } else {
-    console.log('Installing faiss-cpu (if available via pip); will advise conda on failure)');
-    const faissRes = runPip(['-m', 'pip', 'install', '--no-cache-dir', 'faiss-cpu']);
-    if (faissRes && faissRes.status !== 0) {
-      console.log('\nNote: pip install faiss-cpu failed. On some platforms Faiss is best installed via conda.');
-      console.log('Recommended (conda): conda install -c pytorch faiss-cpu');
-      console.log('Continuing without Faiss; the code will fall back to a numpy-based index.');
-    }
-  }
-
-  // Finally install project requirements (avoid pulling CUDA wheels)
+  // Finally install project requirements
   const req = path.join(repoRoot, 'requirements.txt');
   if (fs.existsSync(req)) {
     console.log('Installing project requirements from requirements.txt...');
@@ -182,9 +163,9 @@ switch (cmd) {
       '  npm stop             # stop ngrok and uvicorn processes started by `npm start`',
       '  npm restart          # stop then start services (equivalent to stop + start)',
       '  npm run start:ui     # serve the dev frontend (equivalent to serve_dev_ui.ps1) — opens browser by default; use `--no-open` or set BROWSER=none to disable',
-      '  npm run init_db     # initialize database (defaults to prod.db)',
-      '  npm run seed        # regenerate ci_trigger_data.py and seed trigger_embeddings',
-      '  npm run status      # print DB counts for active users, lessons, embeddings, and messages',
+  '  npm run init_db     # initialize database (defaults to prod.db)',
+  '  npm run status      # print DB counts for active users, lessons, and messages',
+
       '  npm run config       # create .env from .env.template (if missing) and open it in your editor',
       "  npm run update       # run 'git pull' and, if changes were pulled, restart services (stop then start)",
       '  npm run list         # list running ngrok and uvicorn processes',
@@ -204,8 +185,7 @@ switch (cmd) {
     console.log('  test [pytest-args]  Run pytest');
     console.log('  run <script> [args] Run a Python script');
     console.log('  exec <python-args>  Run arbitrary python with args');
-    console.log('  seed              Regenerate ci_trigger_data.py and seed trigger_embeddings');
-    console.log('  status            Print current DB counts for active users, lessons, embeddings, and messages');
+    console.log('  status            Print current DB counts for active users, lessons, and messages');
     process.exit(0);
     break;
   case 'ensure-venv':
@@ -786,14 +766,6 @@ switch (cmd) {
       // Print status counts from the currently configured DB
       if (!venvPython()) ensureVenv();
       runScript(path.join(repoRoot, 'scripts', 'inspect', 'inspect_status.py'));
-      break;
-    case 'seed':
-      // Regenerate ci_trigger_data.py from STARTER and seed trigger_embeddings
-      if (!venvPython()) ensureVenv();
-      // Generate ci_trigger_data.py using local model
-      runScript(path.join(repoRoot, 'scripts', 'export_trigger_embeddings.py'), ['--from-starter', '--out', 'scripts/ci_trigger_data.py']);
-      // Seed the DB with the generated ci_trigger_data.py
-      runScript(path.join(repoRoot, 'scripts', 'ci_seed_triggers.py'));
       break;
   case 'tail':
     // Print last N lines of service logs (non-follow)

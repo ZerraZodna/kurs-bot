@@ -7,7 +7,7 @@ from src.middleware.consent import ConsentMiddleware
 from src.middleware.api_key_auth import ApiKeyAuthMiddleware
 from src.middleware.logging_redaction import apply_logging_redaction
 from src.services.security_checks import verify_secrets_config
-from src.models.database import SessionLocal
+from src.models.database import SessionLocal, Lesson, Base, engine
 from src.config import settings
 from src.services.downtime_monitor import run_downtime_monitor
 from src.scheduler import SchedulerService
@@ -21,8 +21,48 @@ import logging
 import httpx
 from src.services.ollama_online_test import run_ollama_checks
 
+def ensure_lessons_imported():
+    """Auto-import lessons from PDF if database is empty."""
+    try:
+        # Ensure tables exist first
+        Base.metadata.create_all(bind=engine)
+        
+        with SessionLocal() as session:
+            count = session.query(Lesson).count()
+            if count > 0:
+                logging.info(f"Database already contains {count} lessons, skipping import")
+                return
+            
+            # No lessons found, run import
+            pdf_path = Path(__file__).resolve().parents[2] / "src" / "data" / "Sparkly ACIM lessons-extracted.pdf"
+            if not pdf_path.exists():
+                logging.warning(f"PDF not found at {pdf_path}, cannot auto-import lessons")
+                return
+            
+            logging.info(f"Auto-importing lessons from {pdf_path}...")
+            
+            # Import the importer module
+            from scripts.utils.import_acim_lessons import extract_formatted_text, parse_lessons_from_text, import_to_db
+            
+            text = extract_formatted_text(pdf_path)
+            lessons = parse_lessons_from_text(text)
+            
+            if not lessons:
+                logging.warning("No lessons found in PDF")
+                return
+            
+            added = import_to_db(lessons, clear=False, limit=None)
+            logging.info(f"✅ Auto-imported {added} lessons from PDF")
+            
+    except Exception as e:
+        logging.exception(f"Failed to auto-import lessons: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Auto-import lessons if database is empty
+    ensure_lessons_imported()
+    
     # Start background threads unless running in explicit test context
     if not getattr(settings, "IS_TEST_ENV", False):
         t = threading.Thread(target=nightly_memory_purge, daemon=True)
@@ -41,7 +81,18 @@ async def lifespan(app: FastAPI):
         logging.exception("Could not initialize scheduler at startup")
 
     # Startup info and health checks
-    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+    # Use DEBUG level when running with --log-level debug to see function extraction details
+    # Configure logging to output to console for debugging
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[logging.StreamHandler()]
+    )
+    # Ensure root logger also outputs DEBUG
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+    for handler in root_logger.handlers:
+        handler.setLevel(logging.DEBUG)
     apply_logging_redaction()
     verify_secrets_config()
     # Ensure embedding backend requirements in production: fail-fast if
@@ -143,72 +194,6 @@ async def lifespan(app: FastAPI):
                 logging.error(f"Local Ollama for embeddings not reachable at {b}: {e}")
         else:
             logging.error("Embedding backend is set to 'ollama' but LOCAL_OLLAMA_URL is not configured")
-
-    # --- Trigger embeddings sync failsafe ---
-    # Ensure trigger_embeddings table has the correct number of rows matching
-    # the canonical STARTER list. If the count is stale (e.g. STARTER grew
-    # after a code update), truncate and re-seed from ci_trigger_data.py.
-    if not getattr(settings, "IS_TEST_ENV", False):
-        try:
-            from src.triggers.trigger_matcher import STARTER
-            from src.models.database import TriggerEmbedding
-
-            db = SessionLocal()
-            try:
-                current_count = db.query(TriggerEmbedding).count()
-                expected_count = len(STARTER)
-                if current_count != expected_count:
-                    logging.warning(
-                        "Trigger embeddings stale: DB has %d rows but STARTER expects %d. "
-                        "Re-seeding from ci_trigger_data.py...",
-                        current_count,
-                        expected_count,
-                    )
-                    # Truncate existing rows
-                    db.query(TriggerEmbedding).delete()
-                    db.commit()
-
-                    # Re-seed from precomputed ci_trigger_data.py
-                    import importlib
-                    import numpy as np
-
-                    ci_mod = importlib.import_module("scripts.ci_trigger_data")
-                    triggers = getattr(ci_mod, "TRIGGERS", None)
-                    if isinstance(triggers, list) and len(triggers) == expected_count:
-                        for t in triggers:
-                            emb = t.get("embedding") or []
-                            try:
-                                arr = np.array(emb, dtype=np.float32)
-                                b = arr.tobytes()
-                            except Exception:
-                                b = b""
-                            te = TriggerEmbedding(
-                                name=t.get("name") or "",
-                                action_type=t.get("action_type") or "",
-                                embedding=b,
-                                threshold=float(t.get("threshold", 0.75)),
-                            )
-                            db.add(te)
-                        db.commit()
-                        logging.info(
-                            "Re-seeded %d trigger embeddings from ci_trigger_data.py",
-                            expected_count,
-                        )
-                    else:
-                        logging.error(
-                            "ci_trigger_data.py has %d entries but STARTER expects %d; "
-                            "skipping re-seed. Run: npm run seed",
-                            len(triggers) if triggers else 0,
-                            expected_count,
-                        )
-                else:
-                    logging.info(
-                        "Trigger embeddings OK: %d rows match STARTER", current_count
-                    )
-            finally:
-                db.close()
-        except Exception:
-            logging.exception("Trigger embeddings sync failsafe failed")
 
     yield
 

@@ -126,10 +126,10 @@ def _block_ollama_http_requests():
 
 @pytest.fixture(autouse=True)
 def ensure_test_db(db_engine, monkeypatch):
-    """Provide a fast per-test DB by recreating schema and seeding triggers.
+    """Provide a fast per-test DB by recreating schema.
 
-    Recreates DB schema for isolation and seeds triggers from precomputed CI
-    data. This avoids importing sentence-transformers during tests.
+    Recreates DB schema for isolation. Trigger seeding removed in Phase 3
+    as embedding-based trigger matching was replaced by function calling.
     
     Uses the worker-aware db_engine fixture to support pytest-xdist parallel
     execution. Also patches SessionLocal to use the worker-specific engine.
@@ -138,7 +138,6 @@ def ensure_test_db(db_engine, monkeypatch):
     from sqlalchemy.orm import sessionmaker
     TestSessionLocal = sessionmaker(bind=db_engine, autoflush=False, autocommit=False, future=True)
     monkeypatch.setattr("src.models.database.SessionLocal", TestSessionLocal)
-    monkeypatch.setattr("src.triggers.trigger_matcher.SessionLocal", TestSessionLocal)
     # Also patch the scheduler module's SessionLocal reference, since it imports its own copy
     monkeypatch.setattr("src.scheduler.SessionLocal", TestSessionLocal)
     

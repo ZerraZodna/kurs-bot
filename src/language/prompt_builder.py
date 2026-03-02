@@ -11,6 +11,7 @@ from src.services.timezone_utils import get_user_timezone_name, format_dt_in_tim
 from src.models.database import MessageLog, User, Lesson
 from src.memories import MemoryManager
 from src.memories.constants import MemoryKey
+from src.functions.definitions import FunctionDefinitions, get_function_definitions
 import json
 
 
@@ -57,12 +58,13 @@ class PromptBuilder:
         "### Lesson Text Retrieval Rules\n"
         "- If the user asks for today's lesson or a specific lesson number/text, return the lesson text exactly as provided.\n"
         "- Do not summarize, interpret, explain, or rewrite the lesson text.\n"
-        "- Return only the lesson header and lesson body."
+        "- Return only the lesson body."
     )
     
     def __init__(self, db: Session, memory_manager: Optional[MemoryManager] = None):
         self.db = db
         self.memory_manager = memory_manager or MemoryManager(db)
+        self.function_definitions = get_function_definitions()
     
     def build_prompt(
         self,
@@ -74,6 +76,8 @@ class PromptBuilder:
         history_turns: int = 4,
         max_context_tokens: int = 2000,
         relevant_memories: Optional[List[Dict[str, Any]]] = None,
+        context_type: str = "general_chat",
+        include_functions: bool = True,
     ) -> str:
         """
         Build a context-rich prompt for the LLM.
@@ -143,7 +147,13 @@ class PromptBuilder:
             if history_context:
                 context_parts.append(f"\n### Recent Conversation\n{history_context}")
         
-        # 7. Current Message
+        # 7. Function Definitions (if enabled)
+        if include_functions:
+            function_context = self._build_function_context(context_type)
+            if function_context:
+                context_parts.append(f"\n\n{function_context}")
+        
+        # 8. Current Message
         context_parts.append(f"\n### Current Message\nUser: {user_input}\n\nAssistant:")
         
         return "".join(context_parts)
@@ -182,6 +192,8 @@ class PromptBuilder:
         include_conversation_history: bool = True,
         history_turns: int = 2,
         max_memories: int = 5,
+        context_type: str = "general_chat",
+        include_functions: bool = True,
     ) -> str:
         """
         Build a RAG-focused prompt with minimal context.
@@ -232,7 +244,13 @@ class PromptBuilder:
             if history_context:
                 context_parts.append(f"\n### Recent Conversation\n{history_context}")
         
-        # 4. Current message
+        # 4. Function Definitions (if enabled)
+        if include_functions:
+            function_context = self._build_function_context(context_type)
+            if function_context:
+                context_parts.append(f"\n\n{function_context}")
+        
+        # 5. Current message
         context_parts.append(f"\n### Current Message\nUser: {user_input}\n\nAssistant:")
         
         return "".join(context_parts)
@@ -511,6 +529,84 @@ class PromptBuilder:
                 parts.append(f"Assistant: {msg.content}")
         
         return "\n".join(parts) if parts else ""
+    
+    def _build_function_context(self, context_type: str) -> str:
+        """Build function definitions context for the given context type."""
+        return self.function_definitions.for_context(context_type)
+    
+    def _detect_context_from_state(self, user_id: int) -> str:
+        """Detect context based on user state."""
+        # Check for pending schedule request
+        from src.memories.constants import MemoryKey
+        pending_schedule = self.memory_manager.get_memory(user_id, MemoryKey.SCHEDULE_REQUEST_PENDING)
+        if pending_schedule:
+            return "schedule_setup"
+        
+        # Check if user is new (onboarding)
+        user = self.db.query(User).filter_by(user_id=user_id).first()
+        if user and (datetime.now(timezone.utc) - to_utc(user.created_at)).days < 1:
+            return "onboarding"
+        
+        # Check for morning lesson confirmation
+        from src.lessons.state import compute_current_lesson_state
+        state = compute_current_lesson_state(self.memory_manager, user_id)
+        if state.get("needs_confirmation"):
+            return "morning_lesson_confirmation"
+        
+        return "general_chat"
+    
+    def _detect_context_from_memory(self, user_id: int) -> Optional[str]:
+        """Detect context based on recent memories."""
+        # Check for recent schedule-related memories
+        recent_memories = self.memory_manager.get_memory(user_id, "recent_context")
+        if recent_memories:
+            for mem in recent_memories:
+                value = str(mem.get("value", "")).lower()
+                if any(word in value for word in ["schedule", "reminder", "time"]):
+                    return "schedule_setup"
+                if any(word in value for word in ["lesson", "complete", "done"]):
+                    return "lesson_review"
+        
+        return None
+    
+    def _detect_context_from_message(self, user_input: str) -> Optional[str]:
+        """Detect context based on user message content."""
+        text_lower = user_input.lower()
+        
+        # Schedule-related
+        if any(word in text_lower for word in ["schedule", "remind", "time", "daily", "every day"]):
+            return "schedule_setup"
+        
+        # Lesson-related
+        if any(word in text_lower for word in ["lesson", "complete", "done", "finished"]):
+            return "lesson_review"
+        
+        # Morning confirmation
+        if any(word in text_lower for word in ["next lesson", "today's lesson", "send me"]):
+            return "morning_lesson_confirmation"
+        
+        # Onboarding indicators
+        if any(word in text_lower for word in ["my name is", "i am", "i'm from", "call me"]):
+            return "onboarding"
+        
+        return None
+    
+    def detect_context_type(self, user_id: int, user_input: str) -> str:
+        """Detect the appropriate context type for the conversation."""
+        # Priority: message content > memory state > user state
+        
+        # 1. Check message content first
+        msg_context = self._detect_context_from_message(user_input)
+        if msg_context:
+            return msg_context
+        
+        # 2. Check recent memory
+        memory_context = self._detect_context_from_memory(user_id)
+        if memory_context:
+            return memory_context
+        
+        # 3. Check user state
+        return self._detect_context_from_state(user_id)
     
     def build_onboarding_prompt(self, system_prompt: str) -> str:
         """Build initial onboarding prompt for new users."""

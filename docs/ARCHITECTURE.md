@@ -31,8 +31,8 @@
                     │ DialogueEngine    │
                     │ (orchestration)   │
                     └────────┬──────────┘
-                    │ Trigger Matcher & Dispatcher
-                    │ (embedding-driven trigger matching and idempotent action dispatch)
+                    │ Function Calling System
+                    │ (LLM-driven function calls and action dispatch)
                              │
         ┌────────────────────┼────────────────────┐
         │                    │                    │
@@ -128,24 +128,32 @@ User Input (Message)
              │
              ▼
 ┌─────────────────────────────┐
-│ 7. Log Messages             │
+│ 7. Parse Function Calls     │
+│    - Extract JSON from LLM  │
+│    - Validate functions     │
+│    - Parse parameters       │
+└────────────┬────────────────┘
+             │
+             ▼
+┌─────────────────────────────┐
+│ 8. Execute Functions        │
+│    - Dispatch actions       │
+│    - Store memories         │
+│    - Handle errors          │
+└────────────┬────────────────┘
+             │
+             ▼
+┌─────────────────────────────┐
+│ 9. Log Messages             │
 │    - User message (inbound) │
 │    - AI response (outbound) │
+│    - Function results       │
 │    - Thread ID & roles      │
-│    - Timestamps             │
 └────────────┬────────────────┘
              │
              ▼
 ┌─────────────────────────────┐
-│ 8. Update Memory            │
-│    - Store insights         │
-│    - Update progress        │
-│    - Conflict resolution    │
-└────────────┬────────────────┘
-             │
-             ▼
-┌─────────────────────────────┐
-│ 9. Send Response Back       │
+│ 10. Send Response Back      │
 │    - Channel-specific send  │
 │    - Status tracking        │
 │    - Error handling         │
@@ -586,4 +594,3 @@ Level 4: Async Processing (Future)
 ├─ Async Ollama calls
 └─ Non-blocking message logging
 ```
-

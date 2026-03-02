@@ -37,6 +37,7 @@
 - Test framework: `pytest` (`pytest.ini` uses `tests/`).
 - Naming: `test_*.py` files and `test_*` functions.
 - Add or update tests for behavior changes, bug fixes, and regressions.
+- Run tests in parallel with `pytest -n auto` (uses pytest-xdist) for faster execution.
 - Keep commits focused and imperative (for example: `refactor: split dialogue scheduler checks`).
 - PRs should include summary, rationale, test evidence, and migration/config impact.
 

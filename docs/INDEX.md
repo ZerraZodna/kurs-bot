@@ -24,20 +24,24 @@ A production-ready **User Memory & Context Prompt Building System** has been ful
 | [tests/test_prompt_builder.py](../tests/test_prompt_builder.py) | 450 | 20+ comprehensive tests |
 | [tests/test_integration_memory.py](../tests/test_integration_memory.py) | 500 | End-to-end integration tests |
 
-### Documentation (4 New)
+### Documentation (6 New)
 | File | Purpose | Audience |
 |------|---------|----------|
 | [LESSON_DELIVERY_FLOW.md](LESSON_DELIVERY_FLOW.md) | Lesson state machine, day-by-day flow, confirmation triggers | Developers, Agents |
 | [MEMORY_CONTEXT_SYSTEM.md](MEMORY_CONTEXT_SYSTEM.md) | Complete technical guide (400+ lines) | Developers |
 | [ARCHITECTURE.md](../ARCHITECTURE.md) | System design & diagrams (300+ lines) | Architects |
 | [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) | What was built & next steps | Project managers |
+| [FUNCTION_CALLING.md](FUNCTION_CALLING.md) | Function calling architecture & migration | Developers |
+| [FUNCTION_CALLING_MIGRATION_PLAN.md](FUNCTION_CALLING_MIGRATION_PLAN.md) | Complete migration plan (5 phases) | Developers, Architects |
 
-### Modified Files (2)
+### Modified Files (5)
 | File | Changes |
 |------|---------|
 | [src/services/dialogue_engine.py](../src/services/dialogue_engine.py) | Integrated PromptBuilder, added context logging |
 | [src/models/database.py](../src/models/database.py) | Added conversation_thread_id and message_role to MessageLog |
 | [src/api/app.py](../src/api/app.py) | Integrated dialogue_router, updated webhook |
+| [docs/ARCHITECTURE.md](../ARCHITECTURE.md) | Updated to reflect function calling system |
+| [docs/EMBEDDINGS_TRIGGERS.md](../EMBEDDINGS_TRIGGERS.md) | Marked as deprecated (replaced by function calling) |
 
 ### Migrations (1 New)
 | File | Purpose |
@@ -175,6 +179,7 @@ uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
 1. **Understanding** (15 min)
    - Read MEMORY_CONTEXT_SYSTEM.md
    - Skim ARCHITECTURE.md diagrams
+   - Review FUNCTION_CALLING.md for intent system
 
 2. **Installation** (10 min)
    - pip install requirements
@@ -184,6 +189,7 @@ uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
 3. **Testing** (20 min)
    - pytest tests/test_prompt_builder.py -v
    - pytest tests/test_integration_memory.py -v
+   - pytest tests/unit/functions/test_critical_path.py -v
 
 4. **Using** (30 min)
    - Read MEMORY_CONTEXT_SYSTEM.md examples
@@ -195,6 +201,7 @@ uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
    - Customize prompt structure
    - Configure token limits
    - Build onboarding flow
+   - Add custom function handlers (see FUNCTION_CALLING.md)
 
 ## ✨ Highlights
 

@@ -1,6 +1,22 @@
-# Embeddings & Trigger Matchers — Overview
+# ⚠️ DEPRECATED: Embeddings & Trigger Matchers
 
-This document describes how text embeddings are produced, stored, seeded, and matched to drive trigger-based behavior (e.g., "list reminders") in this repository.
+> **This document is deprecated and kept for historical reference only.**
+>
+> The embedding-based trigger matching system described here has been **replaced by function calling**.
+> 
+> **See the new documentation:**
+> - [FUNCTION_CALLING.md](./FUNCTION_CALLING.md) - Current function calling architecture
+> - [FUNCTION_CALLING_MIGRATION_PLAN.md](./FUNCTION_CALLING_MIGRATION_PLAN.md) - Migration details
+>
+> **Migration completed:** All 5 phases finished. The `sentence-transformers` dependency has been removed,
+> and the system now uses LLM-driven function calls for intent detection and action dispatch.
+
+---
+
+# Embeddings & Trigger Matchers — Overview (Historical)
+
+This document describes the **legacy** embedding-based system that was used for trigger matching.
+It is preserved for reference but no longer reflects the current architecture.
 
 **Where to look in code**
 - Embedding generation and utilities: `src/services/embedding_service.py`

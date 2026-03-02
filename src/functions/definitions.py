@@ -1,0 +1,299 @@
+"""
+Function Definitions for Prompt Generation.
+
+Generates prompt text describing available functions for the AI,
+including JSON format instructions and examples.
+"""
+
+from typing import Dict, List, Optional, Any
+import json
+import logging
+from .registry import FunctionRegistry, get_function_registry
+
+logger = logging.getLogger(__name__)
+
+
+class FunctionDefinitions:
+    """Generates function definitions for AI prompts."""
+    
+    # JSON format instructions template
+    JSON_FORMAT_INSTRUCTIONS = """
+You must ALWAYS respond with valid JSON in the following format:
+
+{
+  "response": "Your natural language response to the user (can be empty string if only functions needed)",
+  "functions": [
+    {
+      "name": "function_name",
+      "parameters": {
+        "param1": "value1",
+        "param2": "value2"
+      }
+    }
+  ]
+}
+
+Rules:
+1. The "response" field is required - it contains text the user will see
+2. The "functions" array contains actions to execute (can be empty [])
+3. Only use functions listed under "Available Functions" for the current context
+4. All required parameters must be included
+5. Use exact function names and parameter names as shown
+6. Return ONLY the JSON, no markdown formatting, no explanations outside the JSON
+"""
+    
+    # Multi-function example
+    MULTI_FUNCTION_EXAMPLE = """
+Example - Multiple reminders + lesson:
+User: "Remind me about today's lesson every 30 minutes"
+
+{
+  "response": "I'll remind you about today's lesson every 30 minutes. Here's the lesson text:",
+  "functions": [
+    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T09:00:00", "message": "Lesson reminder"}},
+    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T09:30:00", "message": "Lesson reminder"}},
+    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T10:00:00", "message": "Lesson reminder"}},
+    {"name": "send_todays_lesson", "parameters": {}}
+  ]
+}
+"""
+    
+    # Context-specific examples
+    CONTEXT_EXAMPLES = {
+        "morning_lesson_confirmation": """
+Example - Morning lesson confirmation:
+User: "I always want the next lesson without asking"
+
+{
+  "response": "Perfect! I'll send you the next lesson now and remember to always send the next lesson without asking in the future.",
+  "functions": [
+    {"name": "send_next_lesson", "parameters": {}},
+    {"name": "set_lesson_preference", "parameters": {"preference": "always_next", "skip_confirmation": true}}
+  ]
+}
+
+Example - User wants to review:
+User: "I'm not sure I understand yesterday's lesson fully"
+
+{
+  "response": "No problem! Let me send you yesterday's lesson again so you can review it. Take your time with it.",
+  "functions": [
+    {"name": "repeat_lesson", "parameters": {}}
+  ]
+}
+""",
+        "onboarding": """
+Example - Onboarding timezone:
+User: "I'm in Oslo"
+
+{
+  "response": "Great! I'll set your timezone to Europe/Oslo. This will ensure your lesson reminders come at the right time for you.",
+  "functions": [
+    {"name": "set_timezone", "parameters": {"timezone": "Europe/Oslo"}},
+    {"name": "extract_memory", "parameters": {"key": "timezone", "value": "Europe/Oslo", "confidence": 0.9}}
+  ]
+}
+
+Example - Remembering name:
+User: "Remember my name is Sarah"
+
+{
+  "response": "Nice to meet you, Sarah! I've noted your name.",
+  "functions": [
+    {"name": "extract_memory", "parameters": {"key": "name", "value": "Sarah", "confidence": 0.95}}
+  ]
+}
+""",
+        "schedule_setup": """
+Example - Creating schedule:
+User: "Remind me every day at 9am"
+
+{
+  "response": "Perfect! I've set up a daily reminder at 9:00 AM. You'll receive your ACIM lesson at this time every day.",
+  "functions": [
+    {"name": "create_schedule", "parameters": {"time": "09:00", "message": "Time for your daily ACIM lesson"}},
+    {"name": "set_preferred_time", "parameters": {"time": "09:00"}},
+    {"name": "extract_memory", "parameters": {"key": "preferred_time", "value": "09:00", "confidence": 0.9}}
+  ]
+}
+""",
+        "general_chat": """
+Example - Extracting current lesson:
+User: "I'm on lesson 25 now"
+
+{
+  "response": "Great progress! I've noted that you're on lesson 25.",
+  "functions": [
+    {"name": "extract_memory", "parameters": {"key": "current_lesson", "value": "25", "confidence": 0.85}}
+  ]
+}
+
+Example - Multiple extractions:
+User: "My name is John and I'm in Tokyo, studying lesson 30"
+
+{
+  "response": "Thanks John! I've noted your details.",
+  "functions": [
+    {"name": "extract_memory", "parameters": {"key": "name", "value": "John", "confidence": 0.9}},
+    {"name": "extract_memory", "parameters": {"key": "timezone", "value": "Asia/Tokyo", "confidence": 0.85}},
+    {"name": "extract_memory", "parameters": {"key": "current_lesson", "value": "30", "confidence": 0.8}}
+  ]
+}
+""",
+    }
+    
+    def __init__(self, registry: Optional[FunctionRegistry] = None):
+        self.registry = registry or get_function_registry()
+    
+    def for_context(self, context: str) -> str:
+        """Generate function definitions for a specific context."""
+        functions = self.registry.list_for_context(context)
+        
+        lines = [
+            "### Available Functions",
+            "",
+            "You can call these functions to perform actions:",
+            "",
+        ]
+        
+        for func in functions:
+            lines.append(func.to_prompt_text())
+            lines.append("")
+        
+        # Add JSON format instructions
+        lines.extend([
+            "",
+            self.JSON_FORMAT_INSTRUCTIONS,
+            "",
+        ])
+        
+        # Add context-specific example if available
+        if context in self.CONTEXT_EXAMPLES:
+            lines.append("### Examples for this context")
+            lines.append(self.CONTEXT_EXAMPLES[context])
+        else:
+            lines.append(self.MULTI_FUNCTION_EXAMPLE)
+        
+        return "\n".join(lines)
+    
+    def for_functions(self, function_names: List[str]) -> str:
+        """Generate definitions for specific functions."""
+        lines = [
+            "### Available Functions",
+            "",
+            "You can call these functions to perform actions:",
+            "",
+        ]
+        
+        for name in function_names:
+            func = self.registry.get(name)
+            if func:
+                lines.append(func.to_prompt_text())
+                lines.append("")
+        
+        lines.extend([
+            "",
+            self.JSON_FORMAT_INSTRUCTIONS,
+            "",
+            self.MULTI_FUNCTION_EXAMPLE,
+        ])
+        
+        return "\n".join(lines)
+    
+    def all_functions(self) -> str:
+        """Generate definitions for all functions."""
+        return self.for_context("general_chat")
+    
+    def build_system_prompt(
+        self,
+        base_prompt: str,
+        context: str = "general_chat",
+        include_functions: bool = True,
+    ) -> str:
+        """Build a complete system prompt with function definitions."""
+        if not include_functions:
+            return base_prompt
+        
+        function_defs = self.for_context(context)
+        
+        return f"""{base_prompt}
+
+{function_defs}
+
+Remember: Always return valid JSON with "response" and "functions" fields."""
+    
+    def get_function_example(self, function_name: str) -> Optional[Dict[str, Any]]:
+        """Get an example call for a specific function."""
+        func = self.registry.get(function_name)
+        if not func or not func.examples:
+            return None
+        
+        return {
+            "name": function_name,
+            "parameters": func.examples[0],
+        }
+    
+    def validate_response_format(self, response_text: str) -> tuple[bool, Optional[str]]:
+        """Validate that a response follows the expected JSON format."""
+        try:
+            data = json.loads(response_text)
+            
+            # Check required fields
+            if "response" not in data:
+                return False, "Missing 'response' field"
+            
+            if "functions" not in data:
+                return False, "Missing 'functions' field"
+            
+            if not isinstance(data["functions"], list):
+                return False, "'functions' must be an array"
+            
+            # Validate each function call
+            for i, func in enumerate(data["functions"]):
+                if not isinstance(func, dict):
+                    return False, f"Function {i} must be an object"
+                
+                if "name" not in func:
+                    return False, f"Function {i} missing 'name'"
+                
+                if "parameters" not in func:
+                    return False, f"Function {i} missing 'parameters'"
+                
+                if not isinstance(func["parameters"], dict):
+                    return False, f"Function {i} 'parameters' must be an object"
+                
+                # Validate function exists
+                if not self.registry.is_valid_function(func["name"]):
+                    return False, f"Unknown function: {func['name']}"
+                
+                # Validate parameters
+                is_valid, errors = self.registry.validate_call(
+                    func["name"], func["parameters"]
+                )
+                if not is_valid:
+                    return False, f"Function {func['name']}: {', '.join(errors)}"
+            
+            return True, None
+            
+        except json.JSONDecodeError as e:
+            return False, f"Invalid JSON: {str(e)}"
+        except Exception as e:
+            return False, f"Validation error: {str(e)}"
+
+
+# Global instance
+_definitions: Optional[FunctionDefinitions] = None
+
+
+def get_function_definitions(registry: Optional[FunctionRegistry] = None) -> FunctionDefinitions:
+    """Get the global function definitions instance."""
+    global _definitions
+    if _definitions is None:
+        _definitions = FunctionDefinitions(registry)
+    return _definitions
+
+
+def reset_definitions():
+    """Reset the global instance (useful for testing)."""
+    global _definitions
+    _definitions = None
