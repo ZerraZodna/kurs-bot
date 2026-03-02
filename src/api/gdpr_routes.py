@@ -89,7 +89,8 @@ class GdprWithdrawConsentRequest(BaseModel):
 
 
 def get_db():
-    db = SessionLocal()
+    from src.models.database import SessionLocal as _SessionLocal
+    db = _SessionLocal()
     try:
         yield db
         db.commit()

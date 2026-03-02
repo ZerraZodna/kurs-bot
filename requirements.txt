@@ -8,6 +8,8 @@ slack-sdk
 sendgrid
 pytest
 pytest-cov
+pytest-asyncio
+pytest-xdist
 httpx
 apscheduler
 langdetect

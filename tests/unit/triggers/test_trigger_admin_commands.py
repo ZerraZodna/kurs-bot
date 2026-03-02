@@ -82,6 +82,18 @@ class TestTriggerAdminCommands:
         db_session.add(admin_user)
         db_session.commit()
 
+        # Seed an initial trigger with action_type "create_schedule" so that
+        # the action_type validation in handle_trigger_admin_commands passes
+        db_session.add(
+            TriggerEmbedding(
+                name="initial_create_schedule",
+                action_type="create_schedule",
+                embedding=DummyEmbedSvc().embedding_to_bytes([1.0, 0.0, 0.0, 0.0]),
+                threshold=0.75,
+            )
+        )
+        db_session.commit()
+
         import unittest.mock as mock
         with mock.patch("src.services.dialogue.admin_handler.get_admin_chat_id", return_value="111"):
             with mock.patch("src.services.dialogue.admin_handler.get_embedding_service", return_value=DummyEmbedSvc()):
@@ -100,6 +112,18 @@ class TestTriggerAdminCommands:
         # Create admin user with external_id 111
         admin_user = User(external_id="111", channel="telegram", opted_in=True)
         db_session.add(admin_user)
+        db_session.commit()
+
+        # Seed an initial trigger with action_type "create_schedule" so that
+        # the action_type validation in handle_trigger_admin_commands passes
+        db_session.add(
+            TriggerEmbedding(
+                name="initial_create_schedule",
+                action_type="create_schedule",
+                embedding=DummyEmbedSvc().embedding_to_bytes([1.0, 0.0, 0.0, 0.0]),
+                threshold=0.75,
+            )
+        )
         db_session.commit()
 
         import unittest.mock as mock

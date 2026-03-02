@@ -47,6 +47,7 @@ class TestPromptBuilder:
         assert "User:" in prompt
         assert "Assistant:" in prompt
 
+    @pytest.mark.serial
     def test_build_prompt_with_profile(self, prompt_builder: PromptBuilder, test_user: User):
         """Given: A test user with profile information
         When: Building a prompt
@@ -65,6 +66,7 @@ class TestPromptBuilder:
         assert test_user.first_name in prompt
         assert test_user.channel in prompt
 
+    @pytest.mark.serial
     def test_build_prompt_with_goals(self, db_session: Session, prompt_builder: PromptBuilder,
                                     test_user: User, memory_manager: MemoryManager):
         """Given: A user with learning goals stored
@@ -89,6 +91,7 @@ class TestPromptBuilder:
         assert "Learning Goals" in prompt
         assert "Python" in prompt
 
+    @pytest.mark.serial
     def test_build_prompt_with_conversation_history(self, db_session: Session,
                                                    prompt_builder: PromptBuilder,
                                                    test_user: User):

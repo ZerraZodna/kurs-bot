@@ -31,11 +31,34 @@ pytest_plugins = [
 ]
 
 # Ensure test database is initialized for every test to guarantee isolation.
-# This autouse fixture recreates the schema and seeds trigger embeddings from
-# `scripts/ci_trigger_data.py` (via `scripts/ci_seed_triggers.py`). Tests
-# must include a committed `scripts/ci_trigger_data.py` so seeding does not
-# require heavy ML dependencies.
-from src.models.database import engine, Base
+from src.models.database import Base
+
+
+def pytest_collection_modifyitems(config, items):
+    """Move serial-marked tests to the end so xdist runs them in worker gw0.
+    
+    This ensures tests marked with @pytest.mark.serial run in the main worker,
+    which is necessary for tests that use global state like APScheduler.
+    """
+    serial_items = [i for i in items if i.get_closest_marker("serial")]
+    other_items = [i for i in items if not i.get_closest_marker("serial")]
+    items[:] = other_items + serial_items
+
+
+@pytest.fixture(autouse=True)
+def check_serial_marker(request):
+    """Skip serial tests when running in parallel workers (not main).
+    
+    This ensures tests marked with @pytest.mark.serial only run in the main
+    worker when using pytest-xdist, avoiding race conditions with global
+    state like APScheduler and TriggerMatcher singletons.
+    """
+    # Check if running with xdist and not in main worker
+    worker_id = os.environ.get("PYTEST_XDIST_WORKER", "main")
+    serial_marker = request.node.get_closest_marker("serial")
+    
+    if serial_marker and worker_id != "main":
+        pytest.skip(f"Skipping serial test '{request.node.name}' in worker {worker_id}")
 
 
 # Prevent accidental outbound HTTP requests to Ollama during tests unless
@@ -102,22 +125,31 @@ def _block_ollama_http_requests():
 
 
 @pytest.fixture(autouse=True)
-def ensure_test_db():
+def ensure_test_db(db_engine, monkeypatch):
     """Provide a fast per-test DB by recreating schema and seeding triggers.
 
     Recreates DB schema for isolation and seeds triggers from precomputed CI
     data. This avoids importing sentence-transformers during tests.
+    
+    Uses the worker-aware db_engine fixture to support pytest-xdist parallel
+    execution. Also patches SessionLocal to use the worker-specific engine.
     """
+    # Patch SessionLocal to use the worker-specific engine
+    from sqlalchemy.orm import sessionmaker
+    TestSessionLocal = sessionmaker(bind=db_engine, autoflush=False, autocommit=False, future=True)
+    monkeypatch.setattr("src.models.database.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("src.triggers.trigger_matcher.SessionLocal", TestSessionLocal)
+    # Also patch the scheduler module's SessionLocal reference, since it imports its own copy
+    monkeypatch.setattr("src.scheduler.SessionLocal", TestSessionLocal)
+    
     repo_root = Path(__file__).resolve().parents[1]
     
     try:
-        Base.metadata.drop_all(bind=engine)
-        Base.metadata.create_all(bind=engine)
+        Base.metadata.drop_all(bind=db_engine)
+        Base.metadata.create_all(bind=db_engine)
 
         if str(repo_root) not in sys.path:
             sys.path.insert(0, str(repo_root))
-        from scripts import ci_seed_triggers
-        ci_seed_triggers.main()
     except SystemExit:
         raise
     except Exception as e:

@@ -47,6 +47,24 @@ class DummyEmbedSvc:
 class TestTriggerEmbeddingsSeed:
     """Test suite for trigger embedding seeding."""
 
+    @pytest.fixture(autouse=True)
+    def seed_triggers_for_test(self, db_engine, monkeypatch):
+        """Seed triggers before each test using the test database engine.
+        
+        This explicitly seeds triggers in the test class rather than
+        relying solely on conftest.py's autouse fixture, ensuring the
+        test has the correct trigger data available.
+        """
+        from sqlalchemy.orm import sessionmaker
+        
+        # Create a session maker bound to the test engine
+        TestSessionLocal = sessionmaker(bind=db_engine, autoflush=False, autocommit=False, future=True)
+        
+        # Patch SessionLocal in trigger_matcher module so it uses the test DB
+        # The module imports SessionLocal at load time, so we need to patch it there too
+        monkeypatch.setattr("src.triggers.trigger_matcher.SessionLocal", TestSessionLocal)
+
+    @pytest.mark.serial
     @pytest.mark.asyncio
     async def test_seed_triggers_and_match(self, db_session, monkeypatch):
         """Given: A monkeypatched embedding service

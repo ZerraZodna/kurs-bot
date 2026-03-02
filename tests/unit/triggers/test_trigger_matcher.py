@@ -45,12 +45,30 @@ class DummyEmbedSvc:
         return float((a / (np.linalg.norm(a))) @ (b / (np.linalg.norm(b))))
 
 
+#@pytest.mark.serial
 class TestTriggerMatcher:
     """Test suite for TriggerMatcher."""
+
+    @pytest.fixture(autouse=True)
+    def seed_triggers_for_test(self, db_engine, monkeypatch):
+        """Patch SessionLocal in trigger_matcher to use test DB.
+        
+        The TriggerMatcher module imports SessionLocal at load time, so we
+        need to patch it there to ensure it uses the test database.
+        """
+        from sqlalchemy.orm import sessionmaker
+        
+        # Create a session maker bound to the test engine
+        TestSessionLocal = sessionmaker(bind=db_engine, autoflush=False, autocommit=False, future=True)
+        
+        # Patch SessionLocal in trigger_matcher module so it uses the test DB
+        monkeypatch.setattr("src.triggers.trigger_matcher.SessionLocal", TestSessionLocal)
 
     @pytest.mark.asyncio
     async def test_matcher_prefers_closest(self, db_session: Session):
         """Should match closest trigger based on embedding similarity."""
+        from src.triggers.trigger_matcher import refresh_trigger_matcher_cache
+        
         # Given: A mock embedding service and two seed triggers
         svc = DummyEmbedSvc()
         
@@ -79,6 +97,8 @@ class TestTriggerMatcher:
         matcher.embedding_service = svc
         # force reload
         matcher._loaded_at = 0
+        # Also refresh the module-level cache to pick up the patched SessionLocal
+        refresh_trigger_matcher_cache()
 
         # When: Matching triggers for a reminder query
         matches = await matcher.match_triggers(

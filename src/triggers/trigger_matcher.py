@@ -160,6 +160,7 @@ SCHEDULE_STATUS_EXAMPLES = [
     "what is my schedule",
     "show my reminders",
     "list my reminders",
+    "list reminders",
     "which schedules do i have",
     # Norwegian variants
     "har jeg noen påminnelser",
@@ -455,3 +456,5 @@ def refresh_trigger_matcher_cache() -> None:
     _matcher._triggers = []
     _matcher._vector_index = None
     _matcher._id_to_trigger = {}
+    # Also reset the singleton itself to force recreation with new SessionLocal
+    _matcher = None

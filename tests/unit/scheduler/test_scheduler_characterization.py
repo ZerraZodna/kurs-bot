@@ -58,6 +58,7 @@ class TestSchedulerCharacterization:
         )
         assert outbound_count >= 1
 
+    @pytest.mark.serial
     def test_recovery_execution_keeps_pending_confirmation_unset(self, db_session, monkeypatch):
         """Given: A ready user with overdue schedule
         When: Running recovery check

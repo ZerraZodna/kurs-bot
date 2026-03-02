@@ -18,8 +18,12 @@ class FakeSchedule:
         self.next_send_time = next_send_time
 
 
+@pytest.mark.serial
 class TestSchedulerJobs:
-    """Tests for scheduler job management."""
+    """Tests for scheduler job management.
+    
+    These tests initialize the global APScheduler and must run serially.
+    """
 
     def test_init_scheduler(self):
         """Should initialize the scheduler."""

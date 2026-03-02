@@ -64,6 +64,7 @@ class TestTriggerObservability:
     """Test suite for trigger observability."""
 
     @pytest.mark.asyncio
+    @pytest.mark.serial
     async def test_paraphrases_map_to_same_schedule_action(self, db_session):
         """Given: Seeded triggers for schedule creation
         When: Testing paraphrases that should match create_schedule
@@ -87,6 +88,7 @@ class TestTriggerObservability:
             assert matches[0]["score"] >= matches[0]["threshold"]
 
     @pytest.mark.asyncio
+    @pytest.mark.serial
     async def test_explain_match_has_structured_diagnostics(self, db_session):
         """Given: Seeded triggers
         When: Calling explain_match
@@ -107,6 +109,7 @@ class TestTriggerObservability:
         assert explanation["top_matches"]
 
     @pytest.mark.asyncio
+    @pytest.mark.serial
     async def test_handle_triggers_reports_fallback_path(self, monkeypatch):
         """Given: Fake matcher and dispatcher
         When: Calling handle_triggers
@@ -165,6 +168,7 @@ class TestTriggerObservability:
         assert "update_schedule" in diagnostics["dispatched_actions"]
 
     @pytest.mark.asyncio
+    @pytest.mark.serial
     async def test_debug_trigger_command_returns_explanation(self, monkeypatch):
         """Given: Fake matcher for debug trigger command
         When: Calling debug trigger command

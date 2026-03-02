@@ -53,7 +53,13 @@ def hash_embedding(text: str, dim: int):
     return (arr / norm).astype(np.float32)
 
 
-def main():
+def main(engine=None):
+    """Seed deterministic trigger embeddings for CI.
+
+    Args:
+        engine: Optional SQLAlchemy engine to use. If not provided, uses the
+                default SessionLocal from src.models.database.
+    """
     dim = getattr(settings, "EMBEDDING_DIMENSION", 384) or 384
     # If a precomputed trigger data file exists, load and insert those values
     repo_root = Path(__file__).resolve().parents[1]
@@ -63,8 +69,17 @@ def main():
             spec = importlib.import_module('scripts.ci_trigger_data')
             triggers = getattr(spec, 'TRIGGERS', None)
             if isinstance(triggers, list):
-                init_db()
-                db = SessionLocal()
+                # Use provided engine or default
+                if engine is not None:
+                    from sqlalchemy.orm import sessionmaker
+                    Session = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+                    db = Session()
+                    # Create tables using the provided engine
+                    from src.models.database import Base
+                    Base.metadata.create_all(bind=engine)
+                else:
+                    init_db()
+                    db = SessionLocal()
                 try:
                     # Clear existing rows to avoid duplicates on re-seed
                     deleted = db.query(TriggerEmbedding).delete()

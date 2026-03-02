@@ -28,6 +28,7 @@ def db_session():
 
 
 @pytest.mark.asyncio
+@pytest.mark.serial
 async def test_birthdate_memory_stored_with_real_ollama(db_session):
     """Given: A user sends a message containing their birthdate
     When: The dialogue engine processes the message through the full production path with real Ollama

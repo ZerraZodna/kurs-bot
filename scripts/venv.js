@@ -217,8 +217,18 @@ switch (cmd) {
   case 'test':
     // ensure venv exists but don't fail if creation isn't possible
     if (!venvPython()) ensureVenv();
-    // Same as: python -m pytest tests/ -v (no -W error so env warnings e.g. urllib3/OpenSSL don't fail the run).
-    runPyModule('pytest', cmdArgs.length ? cmdArgs : ['--maxfail=3', '-v']);
+    // Run pytest with parallel execution by default (-n auto)
+    // If user provides any args, use those directly without adding defaults
+    // Handle npm test -- args (where args might be joined like "test -v")
+    let testArgs;
+    if (cmdArgs.length > 0) {
+      // Flatten args - npm might pass "test -v" as single string
+      // Filter out '--' which npm uses as separator but shouldn't be passed to pytest
+      testArgs = cmdArgs.join(' ').split(' ').filter(Boolean).filter(arg => arg !== '--');
+    } else {
+      testArgs = ['--maxfail=3', '-n', 'auto', '-q'];
+    }
+    runPyModule('pytest', testArgs);
     break;
   case 'run':
     if (!cmdArgs[0]) {

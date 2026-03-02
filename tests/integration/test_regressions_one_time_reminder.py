@@ -15,6 +15,7 @@ from src.scheduler.core import SchedulerService
 
 
 @pytest.mark.asyncio
+@pytest.mark.serial
 async def test_process_message_creates_one_time_reminder_with_tomorrow(monkeypatch):
     """Given: A user requests a one-time reminder with 'tomorrow at 12:00'
     When: The dialogue engine processes the message

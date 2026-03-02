@@ -75,6 +75,7 @@ class TestCiTriggerDataCompleteness:
     os.getenv("EMBEDDING_BACKEND", "local").lower() == "none",
     reason="Embeddings disabled",
 )
+
 class TestSemanticYesNoWithRealTriggers:
     """Verify _semantic_yes_no works with real CI trigger embeddings.
 
@@ -82,6 +83,27 @@ class TestSemanticYesNoWithRealTriggers:
     the freshly-seeded test DB triggers, then call _semantic_yes_no
     with real embeddings to confirm the lesson confirmation flow works.
     """
+
+    @pytest.fixture(autouse=True)
+    def seed_triggers_for_test(self, db_engine, monkeypatch):
+        """Seed triggers before each test using the test database engine.
+        
+        This explicitly seeds triggers in the test class rather than
+        relying solely on conftest.py's autouse fixture, ensuring the
+        test has the correct trigger data available.
+        """
+        from scripts.ci_seed_triggers import main as seed_triggers_main
+        from sqlalchemy.orm import sessionmaker
+        
+        # Create a session maker bound to the test engine
+        TestSessionLocal = sessionmaker(bind=db_engine, autoflush=False, autocommit=False, future=True)
+        
+        # Patch SessionLocal in trigger_matcher module so it uses the test DB
+        # The module imports SessionLocal at load time, so we need to patch it there too
+        monkeypatch.setattr("src.triggers.trigger_matcher.SessionLocal", TestSessionLocal)
+        
+        # Seed triggers using the test database engine
+        seed_triggers_main(engine=db_engine)
 
     @pytest.mark.asyncio
     async def test_semantic_yes_no_classifies_yes(self, db_session):

@@ -8,6 +8,7 @@ from src.lessons.handler import process_lesson_query
 
 @pytest.mark.skipif(os.getenv("EMBEDDING_BACKEND", "local").lower() == "none", reason="Embeddings disabled")
 @pytest.mark.asyncio
+@pytest.mark.serial
 async def test_pre_llm_lesson_short_circuit(monkeypatch):
     # Setup DB objects and mark onboarding complete so extractor/LLM isn't called
     session = SessionLocal()

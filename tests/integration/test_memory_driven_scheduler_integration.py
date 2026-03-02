@@ -14,6 +14,7 @@ from src.triggers.trigger_dispatcher import get_trigger_dispatcher
 
 
 @pytest.mark.asyncio
+#@pytest.mark.serial
 async def test_memory_driven_schedule_creation(db_session, test_user):
     """Given: A user with commitment and preferred time stored as memories
     When: Triggering schedule creation via dialogue
@@ -28,7 +29,7 @@ async def test_memory_driven_schedule_creation(db_session, test_user):
     dialogue = DialogueEngine(db_session, mm)
 
     # Prevent the memory extractor from overwriting our preferred time
-    async def _fake_extract(user_message, user_context=None, model_override=None):
+    async def _fake_extract(user_message, user_context=None, model_override=None, language=None):
         return []
 
     dialogue.memory_extractor.extract_memories = _fake_extract
@@ -53,15 +54,22 @@ async def test_memory_driven_schedule_creation(db_session, test_user):
     resp = await dialogue.process_message(user_id, "Set up reminders", db_session)
     assert resp is not None
 
+    # Reset the global dispatcher singleton so it uses the current test db_session
+    import src.triggers.trigger_dispatcher as _td_mod
+    _td_mod._dispatcher = None
+
     # Simulate trigger execution: structured intent would produce a create_schedule trigger
     dispatcher = get_trigger_dispatcher(db=db_session, memory_manager=mm)
     match = {"trigger_id": None, "name": "create_schedule", "action_type": "create_schedule", "score": 1.0, "threshold": 0.5}
     ctx = {"user_id": user_id, "schedule_spec": {"schedule_type": "daily", "time_str": "10:15"}}
     dispatcher.dispatch(match, ctx)
 
-    # Verify schedule created at 10:15 (UTC stored as next_send_time or cron)
-    schedules = SchedulerService.get_user_schedules(user_id)
-    active = [s for s in schedules if s.is_active]
+    # Verify schedule created at 10:15 — query via db_session to avoid
+    # the unpatched module-level SessionLocal in scheduler.manager
+    from src.models.database import Schedule as _Schedule
+    db_session.expire_all()
+    all_schedules = db_session.query(_Schedule).filter_by(user_id=user_id).all()
+    active = [s for s in all_schedules if s.is_active]
     assert len(active) == 1
     sched = active[0]
     # Compute expected next_send using user's timezone and compare stored UTC value
