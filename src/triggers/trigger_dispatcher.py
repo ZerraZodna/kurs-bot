@@ -187,16 +187,35 @@ class TriggerDispatcher:
 
         import re
         from datetime import timedelta
+        from zoneinfo import ZoneInfo
 
         m_min = re.search(r"in\s+(\d+)\s+minutes?", text_to_search, re.IGNORECASE)
         m_hour = re.search(r"in\s+(\d+)\s+hours?", text_to_search, re.IGNORECASE)
         run_at_dt = None
         if m_min:
             minutes = int(m_min.group(1))
-            run_at_dt = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+            # Get user's timezone and calculate from local time
+            tz_name = ensure_user_timezone(self.memory_manager, user_id, None, source="trigger_dispatcher")
+            try:
+                user_tz = ZoneInfo(tz_name)
+            except Exception:
+                user_tz = timezone.utc
+            # Calculate from user's local time, then convert to UTC
+            local_now = datetime.now(timezone.utc).astimezone(user_tz)
+            run_at_local = local_now + timedelta(minutes=minutes)
+            run_at_dt = run_at_local.astimezone(timezone.utc)
         elif m_hour:
             hours = int(m_hour.group(1))
-            run_at_dt = datetime.now(timezone.utc) + timedelta(hours=hours)
+            # Get user's timezone and calculate from local time
+            tz_name = ensure_user_timezone(self.memory_manager, user_id, None, source="trigger_dispatcher")
+            try:
+                user_tz = ZoneInfo(tz_name)
+            except Exception:
+                user_tz = timezone.utc
+            # Calculate from user's local time, then convert to UTC
+            local_now = datetime.now(timezone.utc).astimezone(user_tz)
+            run_at_local = local_now + timedelta(hours=hours)
+            run_at_dt = run_at_local.astimezone(timezone.utc)
 
         if run_at_dt:
             # Try to extract a quoted message to use as the reminder message

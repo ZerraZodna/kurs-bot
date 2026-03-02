@@ -76,6 +76,10 @@ class FunctionExecutor:
         self._handlers["delete_schedule"] = self._handle_delete_schedule
         self._handlers["query_schedule"] = self._handle_query_schedule
         self._handlers["create_one_time_reminder"] = self._handle_create_one_time_reminder
+        self._handlers["delete_one_time_reminder"] = self._handle_delete_one_time_reminder
+        self._handlers["delete_all_one_time_reminders"] = self._handle_delete_all_one_time_reminders
+        self._handlers["delete_all_daily_reminders"] = self._handle_delete_all_daily_reminders
+        self._handlers["delete_all_reminders"] = self._handle_delete_all_reminders
         
         # Lesson handlers
         self._handlers["send_lesson"] = self._handle_send_lesson
@@ -418,17 +422,118 @@ class FunctionExecutor:
             return {"ok": False, "error": error}
         
         try:
+            # Convert to UTC for storage
+            run_at_utc = to_utc(dt_obj)
             schedule = SchedulerService.create_one_time_schedule(
                 user_id=user_id,
-                run_at=to_utc(dt_obj),
+                run_at=run_at_utc,
                 message=message,
                 session=context.get("session"),
             )
             return {
                 "ok": True,
                 "schedule_id": schedule.schedule_id,
-                "run_at": dt_obj.isoformat(),
+                "run_at": run_at_utc.isoformat(),  # Return UTC time for proper display
                 "message": message,
+            }
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+    
+    async def _handle_delete_one_time_reminder(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle delete_one_time_reminder function."""
+        from src.scheduler import manager as schedule_manager
+        from src.scheduler.domain import is_one_time_schedule_type
+        
+        user_id = context.get("user_id")
+        schedule_id = params.get("schedule_id")
+        session = context.get("session")
+        
+        try:
+            # Get the schedule to verify it exists and belongs to the user
+            from src.models.database import Schedule
+            schedule = session.query(Schedule).filter_by(
+                schedule_id=schedule_id, 
+                user_id=user_id
+            ).first()
+            
+            if not schedule:
+                return {"ok": False, "error": "Schedule not found"}
+            
+            # Verify it's a one-time reminder
+            if not is_one_time_schedule_type(schedule.schedule_type):
+                return {"ok": False, "error": "This is not a one-time reminder"}
+            
+            # Deactivate the schedule
+            schedule.is_active = False
+            session.add(schedule)
+            session.commit()
+            
+            return {
+                "ok": True,
+                "schedule_id": schedule_id,
+                "deleted": True,
+            }
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+    
+    async def _handle_delete_all_one_time_reminders(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle delete_all_one_time_reminders function."""
+        from src.scheduler import SchedulerService
+        
+        user_id = context.get("user_id")
+        
+        try:
+            count = SchedulerService.deactivate_user_schedules_by_type(
+                user_id=user_id,
+                schedule_type="one_time",
+                session=context.get("session"),
+            )
+            
+            return {
+                "ok": True,
+                "deleted_count": count,
+                "type": "one_time",
+            }
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+    
+    async def _handle_delete_all_daily_reminders(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle delete_all_daily_reminders function."""
+        from src.scheduler import SchedulerService
+        
+        user_id = context.get("user_id")
+        
+        try:
+            count = SchedulerService.deactivate_user_schedules_by_type(
+                user_id=user_id,
+                schedule_type="daily",
+                session=context.get("session"),
+            )
+            
+            return {
+                "ok": True,
+                "deleted_count": count,
+                "type": "daily",
+            }
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+    
+    async def _handle_delete_all_reminders(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle delete_all_reminders function."""
+        from src.scheduler import SchedulerService
+        
+        user_id = context.get("user_id")
+        
+        try:
+            count = SchedulerService.deactivate_user_schedules(
+                user_id=user_id,
+                session=context.get("session"),
+            )
+            
+            return {
+                "ok": True,
+                "deleted_count": count,
+                "type": "all",
             }
         except Exception as e:
             return {"ok": False, "error": str(e)}

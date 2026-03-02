@@ -134,6 +134,54 @@ User: "Remind me every day at 9am"
     {"name": "extract_memory", "parameters": {"key": "preferred_time", "value": "09:00", "confidence": 0.9}}
   ]
 }
+
+Example - Deleting one-time reminder:
+User: "Delete my one time reminder"
+
+{
+  "response": "I'll help you delete your one-time reminder. Let me first check what reminders you have.",
+  "functions": [
+    {"name": "query_schedule", "parameters": {}}
+  ]
+}
+
+Then after seeing the schedule list with schedule_id, the AI should call:
+{
+  "response": "One-time reminder deleted.",
+  "functions": [
+    {"name": "delete_one_time_reminder", "parameters": {"schedule_id": 123}}
+  ]
+}
+
+Example - Deleting all one-time reminders:
+User: "Delete all my one time reminders"
+
+{
+  "response": "All one-time reminders have been deleted.",
+  "functions": [
+    {"name": "delete_all_one_time_reminders", "parameters": {}}
+  ]
+}
+
+Example - Deleting all daily reminders:
+User: "Delete my daily reminders"
+
+{
+  "response": "All daily reminders have been deleted.",
+  "functions": [
+    {"name": "delete_all_daily_reminders", "parameters": {}}
+  ]
+}
+
+Example - Deleting all reminders:
+User: "Delete all my reminders"
+
+{
+  "response": "All reminders have been deleted. You won't receive any more scheduled messages unless you set new reminders.",
+  "functions": [
+    {"name": "delete_all_reminders", "parameters": {}}
+  ]
+}
 """,
         "general_chat": """
 Example - Extracting current lesson:

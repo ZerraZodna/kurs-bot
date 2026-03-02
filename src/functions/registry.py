@@ -247,6 +247,41 @@ class FunctionRegistry:
             contexts=["general_chat", "schedule_setup"],
         ))
         
+        self.register(FunctionMetadata(
+            name="delete_one_time_reminder",
+            description="Delete a specific one-time reminder by its schedule ID",
+            parameters=[
+                ParameterSchema(
+                    name="schedule_id",
+                    description="ID of the one-time reminder schedule to delete",
+                    type=ParameterType.INTEGER,
+                    required=True,
+                ),
+            ],
+            contexts=["general_chat", "schedule_setup"],
+        ))
+        
+        self.register(FunctionMetadata(
+            name="delete_all_one_time_reminders",
+            description="Delete all one-time reminders for the user",
+            parameters=[],
+            contexts=["general_chat", "schedule_setup"],
+        ))
+        
+        self.register(FunctionMetadata(
+            name="delete_all_daily_reminders",
+            description="Delete all daily recurring reminders for the user",
+            parameters=[],
+            contexts=["general_chat", "schedule_setup"],
+        ))
+        
+        self.register(FunctionMetadata(
+            name="delete_all_reminders",
+            description="Delete all reminders (both daily and one-time) for the user",
+            parameters=[],
+            contexts=["general_chat", "schedule_setup"],
+        ))
+        
         # Lesson functions
         self.register(FunctionMetadata(
             name="send_lesson",

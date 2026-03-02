@@ -155,14 +155,6 @@ class DialogueEngine:
             if prompt_cmd_response:
                 return prompt_cmd_response
 
-        # Handle schedule deletion confirmation/commands
-        from src.services.dialogue import handle_schedule_deletion_commands
-        deletion_response = await handle_schedule_deletion_commands(
-            text, self.memory_manager, session, user_id
-        )
-        if deletion_response:
-            return deletion_response
-
         # Handle forget commands (semantic memory deletion) - only in RAG mode
         forget_response = await handle_forget_commands(
             text, self.memory_manager, session, user_id, use_rag
@@ -335,7 +327,7 @@ class DialogueEngine:
         from src.functions.response_builder import get_response_builder
         response_builder = get_response_builder()
         
-        execution_result = trigger_diagnostics.get("execution_result")
+        execution_result = trigger_diagnostics.get("execution_result") if trigger_diagnostics else None
         if execution_result:
             built_response = response_builder.build(
                 user_text=text,
