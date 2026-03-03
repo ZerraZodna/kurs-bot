@@ -33,7 +33,7 @@ from src.lessons.api import process_lesson_query
 from src.config import settings
 from src.models.database import User, Lesson
 from src.memories.constants import MemoryCategory, MemoryKey
-from src.core.timezone import ensure_user_timezone, format_dt_in_timezone
+from src.core.timezone import get_user_timezone_from_db, format_dt_in_timezone
 from src.language.prompt_registry import get_prompt_registry
 
 logger = logging.getLogger(__name__)
@@ -406,11 +406,9 @@ class DialogueEngine:
             # Use the schedule query response builder to list all active reminders
             from src.scheduler.schedule_query_handler import build_schedule_status_response
 
-            tz_name = ensure_user_timezone(
-                self.memory_manager,
+            tz_name = get_user_timezone_from_db(self.db.object_session,
                 user_id,
-                get_user_language(self.memory_manager, user_id),
-                source="dialogue_engine_schedule_status",
+                get_user_language(self.memory_manager, user_id)
             )
 
             resp_text = build_schedule_status_response(schedules, tz_name)
@@ -465,11 +463,9 @@ When would you like to receive them? (e.g., "9:00 AM", "morning", "evening", "8:
                 session=session,
             )
 
-            tz_name = ensure_user_timezone(
-                self.memory_manager,
+            tz_name = get_user_timezone_from_db(self.db.object_session,
                 user_id,
-                get_user_language(self.memory_manager, user_id),
-                source="dialogue_engine_schedule_create",
+                get_user_language(self.memory_manager, user_id)
             )
             if schedule.next_send_time:
                 local_dt, _ = format_dt_in_timezone(schedule.next_send_time, tz_name)

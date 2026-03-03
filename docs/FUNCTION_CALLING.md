@@ -188,7 +188,7 @@ The LLM can execute multiple functions in a single response:
   "response": "Perfect! I've set up your daily reminder at 9:00 AM and will remember that you're in Tokyo!",
   "functions": [
     {"name": "create_schedule", "parameters": {"time": "09:00", "message": "Daily ACIM lesson"}},
-    {"name": "extract_memory", "parameters": {"key": "timezone", "value": "Asia/Tokyo", "confidence": 0.95}},
+    {"name": "set_timezone", "parameters": {"key": "timezone", "value": "Asia/Tokyo", "confidence": 0.95}},
     {"name": "extract_memory", "parameters": {"key": "preferred_lesson_time", "value": "09:00", "confidence": 0.90}}
   ]
 }
@@ -222,7 +222,7 @@ The LLM can execute multiple functions in a single response:
 Memory extraction is now integrated into the function calling flow. The LLM can extract facts and store them via the `extract_memory` function.
 
 **Parameters:**
-- `key`: Memory key (e.g., "name", "timezone", "current_lesson")
+- `key`: Memory key (e.g., "name", "current_lesson")
 - `value`: The value to store
 - `confidence`: 0.0-1.0 (default 0.8, minimum 0.7)
 - `ttl_hours`: Optional time-to-live for temporary memories

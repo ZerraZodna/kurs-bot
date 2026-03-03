@@ -25,6 +25,7 @@ from .domain import (
     job_id_for_schedule,
 )
 from .time_utils import parse_time_string
+from src.core.timezone import get_user_timezone_from_db
 
 logger = logging.getLogger(__name__)
 
@@ -51,11 +52,7 @@ def create_daily_schedule(
             f"time_str={time_str} ts={datetime.now(timezone.utc).isoformat()}"
         )
         # Compute next send time and cron expression for the user's timezone
-        try:
-            user = session.query(User).filter_by(user_id=user_id).first()
-            tz_name = getattr(user, "timezone", "UTC") if user else "UTC"
-        except Exception:
-            tz_name = "UTC"
+        tz_name = get_user_timezone_from_db(session, user_id)
 
         from .time_utils import compute_next_send_and_cron
 
@@ -153,11 +150,7 @@ def update_daily_schedule(
         # Compute new next_send and cron_expression using helper
         from .time_utils import compute_next_send_and_cron
 
-        try:
-            user = session.query(User).filter_by(user_id=sched.user_id).first()
-            tz_name = getattr(user, "timezone", "UTC") if user else "UTC"
-        except Exception:
-            tz_name = "UTC"
+        tz_name = get_user_timezone_from_db(session, sched.user_id)
 
         next_send, cron_expression = compute_next_send_and_cron(time_str, tz_name)
 

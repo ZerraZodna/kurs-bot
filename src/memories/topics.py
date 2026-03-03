@@ -49,7 +49,6 @@ CANONICAL_KEY_MAP: Dict[str, tuple[MemoryTopic, str]] = {
     "preferred_lesson_time": (MemoryTopic.SCHEDULE, "preferred_time"),
     "lesson_time": (MemoryTopic.SCHEDULE, "preferred_time"),
     "reminder_time": (MemoryTopic.SCHEDULE, "preferred_time"),
-    "timezone": (MemoryTopic.SCHEDULE, "timezone"),
     "preferred_time": (MemoryTopic.SCHEDULE, "preferred_time"),
     
     # Goals topic
@@ -80,7 +79,7 @@ TOPIC_SCHEMAS: Dict[MemoryTopic, Set[str]] = {
         "current_lesson", "completed_lessons", "last_sent_lesson_id", "state"
     },
     MemoryTopic.SCHEDULE: {
-        "preferred_time", "timezone"
+        "preferred_time"
     },
     MemoryTopic.GOALS: {
         "learning_goal", "acim_commitment", "milestones"

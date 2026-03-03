@@ -6,8 +6,6 @@ top-level services (scheduler, onboarding, triggers, dialogue, etc.).
 
 from .timezone import (
     infer_timezone_from_language,
-    ensure_user_timezone,
-    get_user_timezone_name,
     format_dt_in_timezone,
     to_utc,
     from_utc,
@@ -18,8 +16,6 @@ from .timezone import (
 
 __all__ = [
     "infer_timezone_from_language",
-    "ensure_user_timezone",
-    "get_user_timezone_name",
     "format_dt_in_timezone",
     "to_utc",
     "from_utc",

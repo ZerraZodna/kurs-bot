@@ -1,0 +1,57 @@
+"""Unit tests for UserFactory test utility."""
+
+import pytest
+from sqlalchemy.orm import Session
+
+from src.models.database import User
+from src.memories import MemoryManager
+from src.onboarding.service import OnboardingService
+
+
+class TestUserFactory:
+    """Tests for UserFactory test utility."""
+
+    def test_factory_creates_user(self, db_session: Session, user_factory):
+        """UserFactory should create user with custom attributes."""
+        user = user_factory.create(
+            external_id="custom_123",
+            first_name="Custom",
+            language="es"
+        )
+
+        assert user.external_id == "custom_123"
+        assert user.first_name == "Custom"
+
+        # Check language memory was created
+        mm = MemoryManager(db_session)
+        lang = mm.get_memory(user.user_id, "user_language")
+        assert lang[0]["value"] == "es"
+
+    def test_factory_create_does_not_set_timezone(self, user_factory):
+        """Regular create() should NOT set timezone - it should remain None."""
+        user = user_factory.create(
+            external_id="no_tz_user",
+            first_name="NoTimezone"
+        )
+
+        # Timezone should be None for regular create
+        assert user.timezone is None
+
+    def test_factory_creates_ready_user(self, db_session: Session, user_factory):
+        """UserFactory should create ready user with onboarding complete."""
+        user = user_factory.create_ready_user(
+            external_id="ready_123",
+            first_name="Ready"
+        )
+
+        # Verify user has expected attributes
+        assert user.external_id == "ready_123"
+        assert user.first_name == "Ready"
+        assert user.timezone == None # Ready users do not have timezone set
+
+        # Verify memories were created
+        mm = MemoryManager(db_session)
+        consent = mm.get_memory(user.user_id, "data_consent")
+        assert consent
+        commitment = mm.get_memory(user.user_id, "acim_commitment")
+        assert commitment

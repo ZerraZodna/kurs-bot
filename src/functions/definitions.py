@@ -145,8 +145,7 @@ User: "I'm in Oslo"
 {
   "response": "Great! I'll set your timezone to Europe/Oslo. This will ensure your lesson reminders come at the right time for you.",
   "functions": [
-    {"name": "set_timezone", "parameters": {"timezone": "Europe/Oslo"}},
-    {"name": "extract_memory", "parameters": {"key": "timezone", "value": "Europe/Oslo", "confidence": 0.9}}
+    {"name": "set_timezone", "parameters": {"timezone": "Europe/Oslo"}}
   ]
 }
 
@@ -232,14 +231,14 @@ User: "I'm on lesson 25 now"
   ]
 }
 
-Example - Multiple extractions:
+Example - Multiple extractions with timezone:
 User: "My name is John and I'm in Tokyo, studying lesson 30"
 
 {
-  "response": "Thanks John! I've noted your details.",
+  "response": "Thanks John! I've noted your details and set your timezone.",
   "functions": [
     {"name": "extract_memory", "parameters": {"key": "name", "value": "John", "confidence": 0.9}},
-    {"name": "extract_memory", "parameters": {"key": "timezone", "value": "Asia/Tokyo", "confidence": 0.85}},
+    {"name": "set_timezone", "parameters": {"timezone": "Asia/Tokyo"}},
     {"name": "extract_memory", "parameters": {"key": "current_lesson", "value": "30", "confidence": 0.8}}
   ]
 }

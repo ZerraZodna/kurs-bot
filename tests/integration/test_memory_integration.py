@@ -252,7 +252,6 @@ class TestCompleteWorkflow:
             ("full_name", "John Doe", "profile"),
             ("learning_goal", "Master Python", "goals"),
             ("contact_frequency", "Daily", "preferences"),
-            ("timezone", "EST", "profile"),
         ]
 
         # Store in batch
@@ -276,7 +275,7 @@ class TestCompleteWorkflow:
             Memory.is_active == True,
         ).all()
 
-        assert len(profile_memories) == 2  # full_name and timezone
+        assert len(profile_memories) == 1  # full_name only (timezone is stored in User.timezone DB column)
 
     def test_ttl_memory_filtering(self, db_session: Session, test_user: User):
         """Given: Memories with and without TTL
@@ -353,4 +352,3 @@ class TestErrorHandling:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
-

@@ -22,18 +22,8 @@ class TestOnboardingFlow:
         When: Completing onboarding with consent and commitment
         Then: Should create a daily schedule
         """
-        # Given: A new user (create directly to avoid fixture conflicts)
-        user = User(
-            external_id="test_onboarding_flow_new_user",
-            channel="telegram",
-            first_name="Alice",
-            opted_in=True,
-            created_at=datetime.now(timezone.utc),
-        )
-        db_session.add(user)
-        db_session.commit()
-        
-        user_id = user.user_id
+        # Given: A new user (use create_test_user to start fresh without timezone)
+        user_id = create_test_user(db_session, external_id="test_onboarding_flow_new_user", first_name="Alice")
         dialogue = DialogueEngine(db_session)
         
         # When: Starting onboarding with greeting
@@ -47,7 +37,11 @@ class TestOnboardingFlow:
 
         # And: Granting consent
         resp2 = await dialogue.process_message(user_id, "Yes", db_session)
-        assert resp2 is not None  # bot asks for commitment
+        assert resp2 is not None  # bot asks for timezone
+
+        # And: Confirming timezone
+        resp_tz = await dialogue.process_message(user_id, "Yes", db_session)
+        assert resp_tz is not None  # bot asks for commitment
 
         # And: Committing to lessons
         resp3 = await dialogue.process_message(user_id, "Yes", db_session)
@@ -99,7 +93,11 @@ class TestOnboardingFlow:
 
         # And: Confirming name
         resp_name = await dialogue.process_message(user.user_id, "Yes", db_session)
-        assert resp_name is not None  # bot asks about lesson status
+        assert resp_name is not None  # bot asks for timezone
+
+        # And: Confirming timezone
+        resp_tz = await dialogue.process_message(user.user_id, "Yes", db_session)
+        assert resp_tz is not None  # bot asks about lesson status
 
         # And: Stating current lesson
         resp2 = await dialogue.process_message(user.user_id, "I am on lesson 10", db_session)
@@ -142,9 +140,10 @@ class TestOnboardingFlow:
         dialogue = DialogueEngine(db_session)
         
         # When: Going through onboarding
-        # Flow: Hi → name confirmation → consent → commitment → lesson status → intro offer
+        # Flow: Hi → name confirmation → consent → timezone → commitment → lesson status → intro offer
         assert await dialogue.process_message(user_id, "Hi", db_session) is not None   # name confirmation
         assert await dialogue.process_message(user_id, "Yes", db_session) is not None  # consent
+        assert await dialogue.process_message(user_id, "Yes", db_session) is not None  # timezone
         assert await dialogue.process_message(user_id, "Yes", db_session) is not None  # commitment
         assert await dialogue.process_message(user_id, "Yes", db_session) is not None  # lesson status
 
@@ -183,7 +182,7 @@ class TestOnboardingFlow:
         dialogue = DialogueEngine(db_session)
         
         # When: Sending Norwegian greeting
-        # Flow: Hei → name confirmation → consent → commitment → lesson status → intro offer
+        # Flow: Hei → name confirmation → consent → timezone → commitment → lesson status → intro offer
         resp1 = await dialogue.process_message(user.user_id, "Hei", db_session)
         assert resp1 is not None  # bot asks to confirm name ("Er det greit at jeg kaller deg Ola?")
 
@@ -194,7 +193,11 @@ class TestOnboardingFlow:
 
         # And: Responding yes to consent
         resp2 = await dialogue.process_message(user.user_id, "Ja", db_session)
-        assert resp2 is not None  # bot asks for commitment
+        assert resp2 is not None  # bot asks for timezone
+
+        # And: Confirming timezone
+        resp_tz = await dialogue.process_message(user.user_id, "Ja", db_session)
+        assert resp_tz is not None  # bot asks for commitment
 
         # And: Responding yes to commitment
         resp3 = await dialogue.process_message(user.user_id, "Ja", db_session)
@@ -211,4 +214,3 @@ class TestOnboardingFlow:
         resp5 = await dialogue.process_message(user.user_id, "Ja", db_session)
         assert resp5 is not None
         assert "introduksjon" in resp5.lower() or "introduction" in resp5.lower()
-

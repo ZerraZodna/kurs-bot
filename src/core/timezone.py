@@ -49,40 +49,28 @@ def infer_timezone_from_language(language: Optional[str]) -> str:
     return _get_local_timezone_name()
 
 
-def get_user_timezone_name(
-    memory_manager: MemoryManager,
-    user_id: int,
-    fallback_language: Optional[str] = None,
-) -> str:
-    # First check DB user column (preferred)
-    user = memory_manager.db.query(User).filter_by(user_id=user_id).first()
-    if user and getattr(user, "timezone", None):
-        return str(user.timezone)
-
-    # Do NOT use memory-stored timezone. Only use DB user timezone (preferred),
-    # otherwise infer from language or return UTC.
-    if fallback_language:
-        return infer_timezone_from_language(fallback_language)
-    return "Europe/Oslo"
-
-
-def ensure_user_timezone(
-    memory_manager: MemoryManager,
-    user_id: int,
-    language: Optional[str],
-    source: str = "onboarding_service",
-) -> str:
-    tz_name = infer_timezone_from_language(language)
-    user = memory_manager.db.query(User).filter_by(user_id=user_id).first()
-    if user:
-        if getattr(user, "timezone", None):
-            return str(user.timezone)
-        user.timezone = tz_name
-        memory_manager.db.add(user)
-        memory_manager.db.commit()
-        return tz_name
-
-    return tz_name
+def get_user_timezone_from_db(session, user_id: int, default: str = "UTC") -> str:
+    """Get user's timezone from DB, inferring from language if needed.
+    
+    Order of resolution:
+    1. User.timezone if explicitly set
+    2. Inferred from User.language if available
+    3. Default (UTC)
+    """
+    try:
+        user = session.query(User).filter_by(user_id=user_id).first()
+        if user:
+            # First check if timezone is explicitly set
+            tz = getattr(user, "timezone", None)
+            if tz:
+                return str(tz)
+            # Otherwise infer from language
+            language = getattr(user, "language", None)
+            if language:
+                return infer_timezone_from_language(language)
+    except Exception:
+        pass
+    return default
 
 
 def format_dt_in_timezone(dt: datetime, tz_name: Optional[str]) -> Tuple[datetime, str]:

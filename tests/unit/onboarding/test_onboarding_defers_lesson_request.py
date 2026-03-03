@@ -31,9 +31,17 @@ class TestOnboardingDefersLessonRequest:
         
         dialogue = DialogueEngine(db_session)
         
-        # When: Starting onboarding (bot will ask lesson status)
+        # When: Starting onboarding (bot will ask for name, then timezone, then lesson status)
         resp = await dialogue.process_message(user_id, "Hi", db_session)
-        assert resp is not None
+        assert resp is not None  # bot asks to confirm name
+        
+        # And: Confirming name
+        resp_name = await dialogue.process_message(user_id, "Yes", db_session)
+        assert resp_name is not None  # bot asks for timezone
+        
+        # And: Confirming timezone
+        resp_tz = await dialogue.process_message(user_id, "Yes", db_session)
+        assert resp_tz is not None  # bot asks about lesson status
         
         # And: User replies with an explicit lesson number
         resp2 = await dialogue.process_message(user_id, "I am on lesson 8", db_session)
@@ -52,4 +60,3 @@ class TestOnboardingDefersLessonRequest:
         schedules = db_session.query(Schedule).filter_by(user_id=user_id).all()
         assert any(s.schedule_type.startswith("daily") and s.is_active for s in schedules), \
             f"Expected active daily schedule, got {schedules}"
-

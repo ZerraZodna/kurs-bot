@@ -117,6 +117,10 @@ ONBOARD_MESSAGES = {
 		"en": "Thank you, {name}. As a gentle first step, would you like me to send the Introduction now? It is a short introduction to the course. 🌿 (yes/no)",
 		"no": "Takk, {name}. Som et mykt første steg: vil du at jeg sender Introduksjonen nå? Det er en kort introduksjon til kurset. 🌿 (ja/nei)",
 	},
+	"timezone_prompt": {
+		"en": "Based on your language, I assume you're in {timezone}. Is this correct? (yes/no)",
+		"no": "Basert på språket ditt, antar jeg at du er i {timezone}. Er dette riktig? (ja/nei)",
+	},
 }
 
 

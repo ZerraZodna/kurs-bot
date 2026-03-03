@@ -49,7 +49,6 @@ class MemoryKey:
     PENDING_LESSON_DELIVERY = "pending_lesson_delivery"
 
     FULL_NAME = "full_name"
-    TIMEZONE = "timezone"
     LANGUAGE = "language"
     ACCESSIBILITY_NEEDS = "accessibility_needs"
     PERSONAL_BACKGROUND = "personal_background"

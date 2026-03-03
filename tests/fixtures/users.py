@@ -192,7 +192,7 @@ def create_test_user(db: Session, external_id: str, first_name: Optional[str] = 
     return user.user_id
 
 
-def make_ready_user(db: Session, external_id: str, first_name: str = "Test") -> int:
+def make_ready_user(db: Session, external_id: str, first_name: str = "Test", timezone: Optional[str] = "UTC") -> int:
     """Legacy helper: Create a fresh user and mark onboarding complete for tests.
     
     This helper calls `create_test_user` then stores the minimum memories
@@ -202,6 +202,14 @@ def make_ready_user(db: Session, external_id: str, first_name: str = "Test") -> 
     Note: Prefer using UserFactory.create_ready_user() for new tests.
     """
     user_id = create_test_user(db, external_id, first_name)
+    
+    # Set timezone on user if provided (pass None to skip)
+    if timezone is not None:
+        user = db.query(User).filter_by(user_id=user_id).first()
+        if user:
+            user.timezone = timezone
+            db.commit()
+    
     mm = MemoryManager(db)
     mm.store_memory(user_id, "acim_commitment", "yes", category="profile", source="test")
     mm.store_memory(user_id, "data_consent", "yes", category="profile", source="test")

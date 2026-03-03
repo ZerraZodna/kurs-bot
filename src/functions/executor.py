@@ -1023,7 +1023,7 @@ class FunctionExecutor:
         profile_keys = [
             MemoryKey.FULL_NAME, MemoryKey.FIRST_NAME, MemoryKey.NAME,
             MemoryKey.USER_LANGUAGE, MemoryKey.PREFERRED_LESSON_TIME,
-            MemoryKey.PERSONAL_BACKGROUND, MemoryKey.TIMEZONE,
+            MemoryKey.PERSONAL_BACKGROUND,
         ]
         preference_keys = [
             "learning_style", "preferred_tone",

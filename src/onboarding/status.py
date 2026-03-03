@@ -10,6 +10,7 @@ def get_onboarding_status_dict(
     has_consent: bool,
     has_commitment: bool,
     has_lesson_status: bool,
+    has_timezone: bool = False,
     declined_commitment: bool = False,
     declined_consent: bool = False,
 ) -> Dict[str, Any]:
@@ -21,6 +22,7 @@ def get_onboarding_status_dict(
         has_consent: User gave data consent
         has_commitment: User committed to ACIM
         has_lesson_status: User stated their lesson status
+        has_timezone: User has timezone set (optional, defaults to False for backward compatibility)
         declined_commitment: User declined ACIM
         declined_consent: User declined consent
     
@@ -32,6 +34,8 @@ def get_onboarding_status_dict(
         steps_completed.append("name")
     if has_consent:
         steps_completed.append("consent")
+    if has_timezone:
+        steps_completed.append("timezone")
     if has_commitment:
         steps_completed.append("commitment")
     if has_lesson_status:
@@ -42,17 +46,20 @@ def get_onboarding_status_dict(
         next_step = "name"
     elif not has_consent:
         next_step = "consent"
+    elif not has_timezone:
+        next_step = "timezone"
     elif not has_commitment:
         next_step = "commitment"
     elif not has_lesson_status:
         next_step = "lesson_status"
 
     onboarding_complete = (
-        has_name and has_consent and has_commitment and has_lesson_status
+        has_name and has_timezone and has_consent and has_commitment and has_lesson_status
     )
 
     return {
         "has_name": has_name,
+        "has_timezone": has_timezone,
         "has_consent": has_consent,
         "has_commitment": has_commitment,
         "has_lesson_status": has_lesson_status,

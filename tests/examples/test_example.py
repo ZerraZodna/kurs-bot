@@ -271,40 +271,6 @@ class TestWithUserFixture:
         assert lang[0]["value"] == "no"
 
 
-class TestUserFactory:
-    """Example tests using UserFactory."""
-    
-    def test_factory_creates_user(self, db_session: Session, user_factory):
-        """UserFactory should create user with custom attributes."""
-        user = user_factory.create(
-            external_id="custom_123",
-            first_name="Custom",
-            language="es"
-        )
-        
-        assert user.external_id == "custom_123"
-        assert user.first_name == "Custom"
-        
-        # Check language memory was created
-        mm = MemoryManager(db_session)
-        lang = mm.get_memory(user.user_id, "user_language")
-        assert lang[0]["value"] == "es"
-    
-    def test_factory_creates_ready_user(self, db_session: Session, user_factory):
-        """UserFactory should create ready user with onboarding complete."""
-        user = user_factory.create_ready_user(
-            external_id="ready_123",
-            first_name="Ready"
-        )
-        
-        # Verify onboarding is complete
-        from src.onboarding.service import OnboardingService
-        onboarding = OnboardingService(db_session)
-        status = onboarding.get_onboarding_status(user.user_id)
-        
-        assert status["onboarding_complete"]
-
-
 # Example of a test class with setup method (for more complex scenarios)
 class TestWithSetup:
     """Example tests using setup method for complex initialization."""

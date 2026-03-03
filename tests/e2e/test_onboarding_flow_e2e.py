@@ -82,7 +82,16 @@ async def test_onboarding_new_user_end_to_end_creates_daily_schedule(db_session)
     print("consent memories:", [m.value for m in consent_mems])
     assert any(m.value.lower() in ("granted", "yes") for m in consent_mems), f"Expected consent granted, got {[m.value for m in consent_mems]}"
 
-    # 3. Commitment
+    # 3. Timezone confirmation
+    resp_tz = await dialogue.process_message(user_id, "Yes", db_session)
+    print("tz_resp:", resp_tz)
+    assert resp_tz is not None
+
+    # Verify timezone stored
+    user = db_session.query(User).filter_by(user_id=user_id).first()
+    assert user.timezone is not None, f"Expected timezone set, got {user.timezone}"
+
+    # 4. Commitment
     resp3 = await dialogue.process_message(user_id, "Yes", db_session)
     print("resp3:", resp3)
     assert resp3 is not None
@@ -92,13 +101,13 @@ async def test_onboarding_new_user_end_to_end_creates_daily_schedule(db_session)
     print("commitment memories:", [m.value for m in commit_mems])
     assert any("commit" in (m.value or "").lower() or m.value.lower() in ("committed to acim lessons", "committed to 365 acim lessons") for m in commit_mems), f"Expected acim_commitment stored, got {[m.value for m in commit_mems]}"
 
-    # 4. Indicate new -> bot should offer optional introduction
+    # 5. Indicate new -> bot should offer optional introduction
     resp4 = await dialogue.process_message(user_id, "new", db_session)
     print("resp4:", resp4)
     assert resp4 is not None
     assert "introduction" in resp4.lower() or "introduksjon" in resp4.lower()
 
-    # 5. Accept introduction now
+    # 6. Accept introduction now
     resp5 = await dialogue.process_message(user_id, "yes", db_session)
     print("resp5:", resp5)
     assert resp5 is not None
@@ -164,4 +173,3 @@ async def test_onboarding_continuing_user_end_to_end_lesson10_sets_memory_and_sc
     schedules = db_session.query(Schedule).filter_by(user_id=user_id).all()
     print("schedules:", schedules)
     assert any(s.schedule_type.startswith("daily") and s.is_active for s in schedules), f"Expected active daily schedule, got {schedules}"
-

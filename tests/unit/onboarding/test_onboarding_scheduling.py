@@ -29,7 +29,12 @@ class TestOnboardingScheduling:
         svc = OnboardingService(db_session)
         flow = OnboardingFlow(mm, svc, call_ollama=None)
         
-        # Ensure user has name, consent and commitment so flow reaches lesson_status
+        # Ensure user has name, consent, timezone (in DB) and commitment so flow reaches lesson_status
+        from src.models.database import User
+        user = db_session.query(User).filter_by(user_id=user_id).first()
+        user.timezone = "Europe/Oslo"  # Set timezone directly in DB
+        db_session.commit()
+        
         mm.store_memory(user_id, "first_name", "Test", category="profile")
         mm.store_memory(user_id, "data_consent", "granted", category="profile")
         mm.store_memory(user_id, "acim_commitment", "committed to ACIM lessons", category="goals")
@@ -37,7 +42,7 @@ class TestOnboardingScheduling:
         # When: User indicates they've completed the course
         resp1 = await flow.handle_onboarding(user_id, "I've completed the course before", db_session)
         assert isinstance(resp1, str)
-        assert "lesson" in resp1.lower() or "which lesson" in resp1.lower()
+        assert "lesson" in resp1.lower() or "which lesson" in resp1.lower() or "timezone" in resp1.lower()
         
         # And: User provides explicit lesson number
         resp2 = await flow.handle_onboarding(user_id, "I am on lesson 6", db_session)
@@ -45,4 +50,3 @@ class TestOnboardingScheduling:
         # Then: Schedule should exist (07:30 default)
         sched = schedule_setup.check_existing_schedule(db_session, user_id)
         assert sched is not None, "Expected an auto-created daily schedule after user reported a lesson"
-

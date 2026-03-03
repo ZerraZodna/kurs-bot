@@ -87,7 +87,6 @@ from src.services.context_utils import MemoryKey
 
 # Profile
 MemoryKey.FULL_NAME
-MemoryKey.TIMEZONE
 MemoryKey.LANGUAGE
 
 # Goals

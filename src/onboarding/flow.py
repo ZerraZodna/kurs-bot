@@ -20,11 +20,12 @@ logger = logging.getLogger(__name__)
 
 
 class OnboardingStep(Enum):
+    NAME = "name"
+    TIMEZONE = "timezone"
     CONSENT = "consent"
     COMMITMENT = "commitment"
     LESSON_STATUS = "lesson_status"
     INTRO_OFFER = "intro_offer"
-    NAME = "name"
 
 
 
@@ -122,14 +123,16 @@ class OnboardingFlow:
     async def _handle_pending_step(self, user_id: int, text: str, session: Session, step: str) -> Optional[str]:
         if step == OnboardingStep.CONSENT.value:
             return self._handle_consent_pending(user_id, text, session)
+        elif step ==  OnboardingStep.NAME.value:
+            return await self._handle_name_pending(user_id, text, session)
+        elif step ==  OnboardingStep.TIMEZONE.value:
+            return await self._handle_timezone_pending(user_id, text, session)
         elif step == OnboardingStep.COMMITMENT.value:
             return self._handle_commitment_pending(user_id, text)
         elif step == OnboardingStep.LESSON_STATUS.value:
             return await self._handle_lesson_status_pending(user_id, text, session)
         elif step == OnboardingStep.INTRO_OFFER.value:
             return await self._handle_intro_offer_pending(user_id, text, session)
-        elif step == "name":
-            return await self._handle_name_pending(user_id, text, session)
         return None
 
     async def _handle_name_pending(self, user_id: int, text: str, session: Session) -> Optional[str]:
@@ -181,6 +184,40 @@ class OnboardingFlow:
             self._resolve_pending_step(user_id)
             return self.onboarding.get_onboarding_prompt(user_id)
 
+        return None
+
+    async def _handle_timezone_pending(self, user_id: int, text: str, session: Session) -> Optional[str]:
+        """Handle the pending 'timezone' step."""
+        print(f"[ONBOARD DEBUG] _handle_timezone_pending - user_id={user_id} text={text}")
+        
+        # Use existing consent detection for yes/no responses
+        from src.onboarding.detectors import detect_consent_keywords
+        
+        consent = detect_consent_keywords(text)
+        
+        # Infer timezone from language for the default
+        from src.core.timezone import infer_timezone_from_language
+        language = get_user_language(self.memory_manager, user_id)
+        inferred_tz = infer_timezone_from_language(language)
+        
+        if consent is True:
+            # User confirmed - save inferred timezone
+            user = session.query(User).filter_by(user_id=user_id).first()
+            if user:
+                user.timezone = inferred_tz
+                session.add(user)
+                session.commit()
+                logger.info(f"Set timezone to {inferred_tz} for user {user_id}")
+                        
+            self._resolve_pending_step(user_id)
+            return self.onboarding.get_onboarding_prompt(user_id)
+
+        
+        if consent is False:
+            # User said no - let AI handle the correction via function calling
+            return None  # Return None to let dialogue engine process with AI
+        
+        # For any other response (unclear), let AI handle it
         return None
 
     def _handle_consent_pending(self, user_id: int, text: str, session: Session) -> Optional[str]:
@@ -452,6 +489,14 @@ class OnboardingFlow:
             self._store_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING, "consent", ttl_hours=2)
             print(f"[ONBOARD DEBUG] asking for consent (no consent) user_id={user_id} language={language}")
             return self._get_message("consent_prompt", language)
+
+        # If no timezone, ask for timezone confirmation
+        if not status.get("has_timezone"):
+            language = get_user_language(self.memory_manager, user_id)
+            self._store_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING, "timezone", ttl_hours=2)
+            from src.core.timezone import infer_timezone_from_language
+            inferred_tz = infer_timezone_from_language(language)
+            return self._get_message("timezone_prompt", language).format(timezone=inferred_tz)
 
         # If no commitment, ask for commitment
         if not status.get("has_commitment"):
