@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from src.models.database import SessionLocal, JobState, init_db
-from src.services.timezone_utils import to_utc
+from src.core.timezone import to_utc
 
 
 def _utc_now() -> datetime:

@@ -100,7 +100,7 @@ class MemoryHandler(MemoryStore):
         ttl = ttl_expires_at
         if ttl.tzinfo is None:
             # Lazy import to avoid import cycles with timezone utilities.
-            from src.services.timezone_utils import to_utc
+            from src.core.timezone import to_utc
 
             ttl = to_utc(ttl)
         return ttl < now_utc

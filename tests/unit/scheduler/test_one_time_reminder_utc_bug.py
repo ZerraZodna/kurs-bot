@@ -23,7 +23,7 @@ class TestOneTimeReminderUTCConversion:
         call should not change it, but if there's any issue with the 
         timezone handling, it could shift the time incorrectly.
         """
-        from src.services.timezone_utils import to_utc
+        from src.core.timezone import to_utc
         
         # Simulate a user in Europe/Oslo (UTC+1 or UTC+2 depending on DST)
         local_tz = "Europe/Oslo"
@@ -199,7 +199,7 @@ class TestDateTriggerBehavior:
         then manager.py converts again (which should be idempotent).
         """
         from apscheduler.triggers.date import DateTrigger
-        from src.services.timezone_utils import to_utc
+        from src.core.timezone import to_utc
         
         # Start with local time (Oslo 15:14)
         local_time = datetime(2026, 3, 2, 15, 14, 0, tzinfo=ZoneInfo("Europe/Oslo"))
@@ -262,7 +262,7 @@ class TestSchedulerJobTimezoneHandling:
         This is the core of the bug: if to_utc is called on an already-UTC datetime,
         it should return the same datetime unchanged.
         """
-        from src.services.timezone_utils import to_utc
+        from src.core.timezone import to_utc
         
         # Start with a naive datetime (no timezone)
         naive_dt = datetime(2026, 3, 2, 15, 14, 0)

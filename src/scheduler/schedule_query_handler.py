@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Iterable
 
 from src.models.database import Schedule
-from src.services.timezone_utils import format_dt_in_timezone
+from src.core.timezone import format_dt_in_timezone
 from src.config import settings
 from .domain import is_one_time_schedule_type
 

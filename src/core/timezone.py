@@ -1,4 +1,4 @@
-"""Timezone utilities moved from `src.services.timezone_utils`.
+"""Timezone utilities for user-aware scheduling.
 
 This module centralizes timezone helpers for reuse across packages.
 """
@@ -63,7 +63,7 @@ def get_user_timezone_name(
     # otherwise infer from language or return UTC.
     if fallback_language:
         return infer_timezone_from_language(fallback_language)
-    return "UTC"
+    return "Europe/Oslo"
 
 
 def ensure_user_timezone(
@@ -100,12 +100,20 @@ def format_dt_in_timezone(dt: datetime, tz_name: Optional[str]) -> Tuple[datetim
 
 
 def to_utc(dt: datetime, tz_name: Optional[str] = None) -> datetime:
+    """Return an aware UTC datetime.
+
+    - If ``dt`` has tzinfo, convert it to UTC.
+    - If ``dt`` is naive and ``tz_name`` is provided, interpret it as local
+      time in that timezone and convert to UTC.
+    - If ``dt`` is naive and no ``tz_name`` provided, assume UTC.
+    """
     if dt is None:
         raise ValueError("dt must be a datetime")
 
     if dt.tzinfo is not None:
         return dt.astimezone(timezone.utc)
 
+    # naive
     if tz_name:
         try:
             tz = ZoneInfo(tz_name)
@@ -114,10 +122,15 @@ def to_utc(dt: datetime, tz_name: Optional[str] = None) -> datetime:
         local = dt.replace(tzinfo=tz)
         return local.astimezone(timezone.utc)
 
+    # assume UTC
     return dt.replace(tzinfo=timezone.utc)
 
 
 def from_utc(dt: datetime, tz_name: Optional[str]) -> datetime:
+    """Convert an aware UTC datetime to the given timezone.
+
+    If dt is naive it is assumed to be UTC.
+    """
     if dt is None:
         raise ValueError("dt must be a datetime")
 
@@ -134,10 +147,17 @@ def from_utc(dt: datetime, tz_name: Optional[str]) -> datetime:
 
 
 def parse_local_time_to_utc(time_str: str, tz_name: str, now_utc: Optional[datetime] = None) -> datetime:
+    """Parse a user-local time string and return the next occurrence in UTC.
+
+    Uses the scheduler's simple parser to interpret strings like "9:00", "10:15 AM",
+    or named times (morning/evening). The returned datetime is timezone-aware UTC.
+    """
     from datetime import timedelta
+    # import parser from scheduler to reuse parsing rules
     try:
         from src.scheduler.time_utils import parse_time_string
     except Exception:
+        # fallback simple parser
         def parse_time_string(ts: str):
             parts = ts.split(":")
             if len(parts) == 2:
@@ -148,6 +168,7 @@ def parse_local_time_to_utc(time_str: str, tz_name: str, now_utc: Optional[datet
 
     if now_utc is None:
         from datetime import datetime as _dt
+
         now_utc = _dt.now(timezone.utc)
 
     try:
@@ -164,9 +185,11 @@ def parse_local_time_to_utc(time_str: str, tz_name: str, now_utc: Optional[datet
 
 
 def validate_timezone_name(tz_name: Optional[str]) -> bool:
+    """Return True if tz_name is a valid IANA timezone (or UTC), False otherwise."""
     if not tz_name:
         return False
     try:
+        # Try resolving with ZoneInfo; if it fails an exception will be raised
         ZoneInfo(str(tz_name))
         return True
     except Exception:
@@ -174,16 +197,26 @@ def validate_timezone_name(tz_name: Optional[str]) -> bool:
 
 
 def resolve_timezone_name(tz_name: Optional[str]) -> Optional[str]:
+    """Try to resolve a user-provided timezone to a canonical IANA name.
+
+    Strategy:
+    - If tz_name is already a valid IANA name, return it.
+    - Try some normalization (replace dots/spaces with underscores) and retry.
+    - Check a small mapping for common Windows timezone names -> IANA.
+    - Return None if no resolution found.
+    """
     if not tz_name:
         return None
 
     candidate = tz_name.strip()
+    # Try as-is
     try:
         ZoneInfo(candidate)
         return candidate
     except Exception:
         pass
 
+    # Normalize common punctuation/spacing
     cand2 = candidate.replace(" ", "_").replace(".", "")
     try:
         ZoneInfo(cand2)
@@ -191,6 +224,7 @@ def resolve_timezone_name(tz_name: Optional[str]) -> Optional[str]:
     except Exception:
         pass
 
+    # Small mapping for common non-IANA names (including Windows tz names observed in the wild)
     mapping = {
         "w. europe standard time": "Europe/Berlin",
         "w europe standard time": "Europe/Berlin",
@@ -206,6 +240,7 @@ def resolve_timezone_name(tz_name: Optional[str]) -> Optional[str]:
     if key in mapping:
         return mapping[key]
 
+    # Not resolved
     return None
 
 

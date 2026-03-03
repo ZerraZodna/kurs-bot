@@ -10,7 +10,7 @@ from src.lessons.state import (
     get_last_sent_lesson_id as _get_last_sent_lesson_id,
     set_last_sent_lesson_id as _set_last_sent_lesson_id,
 )
-from src.services.timezone_utils import to_utc
+from src.core.timezone import to_utc
 
 
 def get_schedule_message(memory_manager: MemoryManager, user_id: int, schedule_id: int) -> Optional[str]:

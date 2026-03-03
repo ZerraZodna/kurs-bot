@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from src.scheduler import SchedulerService
 from src.scheduler.domain import is_daily_schedule_family
-from src.services.timezone_utils import ensure_user_timezone
+from src.core.timezone import ensure_user_timezone
 import re
 
 # One-time reminder keyword parsing removed — handled by assistant + triggers

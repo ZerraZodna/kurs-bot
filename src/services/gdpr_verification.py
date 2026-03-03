@@ -16,7 +16,7 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-from src.services.timezone_utils import to_utc
+from src.core.timezone import to_utc
 
 
 def _ensure_utc_aware(dt: datetime) -> datetime:

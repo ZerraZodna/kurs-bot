@@ -27,7 +27,7 @@ from src.language.onboarding_prompts import (
 from src.models.database import User
 from src.onboarding.status import get_onboarding_status_dict
 from src.onboarding.schedule_setup import create_auto_schedule
-from src.services.timezone_utils import ensure_user_timezone
+from src.core.timezone import ensure_user_timezone
 from src.onboarding.user_management import delete_user_and_data, is_user_new
 from src.lessons.state import set_current_lesson, get_lesson_state, has_lesson_status
 from src.memories.constants import MemoryCategory, MemoryKey

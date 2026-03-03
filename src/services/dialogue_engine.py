@@ -33,7 +33,7 @@ from src.lessons.handler import process_lesson_query
 from src.config import settings
 from src.models.database import User, Lesson
 from src.memories.constants import MemoryCategory, MemoryKey
-from src.services.timezone_utils import ensure_user_timezone, format_dt_in_timezone
+from src.core.timezone import ensure_user_timezone, format_dt_in_timezone
 from src.language.prompt_registry import get_prompt_registry
 
 logger = logging.getLogger(__name__)

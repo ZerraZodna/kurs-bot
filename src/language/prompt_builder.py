@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Any, Tuple
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
 import re
-from src.services.timezone_utils import get_user_timezone_name, format_dt_in_timezone, to_utc
+from src.core.timezone import get_user_timezone_name, format_dt_in_timezone, to_utc
 from src.models.database import MessageLog, User, Lesson
 from src.memories import MemoryManager
 from src.memories.constants import MemoryKey

@@ -68,7 +68,7 @@ def is_user_new(db: Session, user_id: int, threshold_minutes: int = 10) -> bool:
     """
     from datetime import datetime, timezone
     from src.models.database import User
-    from src.services.timezone_utils import to_utc
+    from src.core.timezone import to_utc
 
     user = db.query(User).filter_by(user_id=user_id).first()
     if not user:

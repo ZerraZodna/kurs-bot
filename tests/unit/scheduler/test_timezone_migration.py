@@ -5,7 +5,7 @@ from src.models.database import SessionLocal, User, Schedule, init_db
 from src.memories import MemoryManager
 from src.scheduler import SchedulerService
 from src.scheduler import manager as schedule_manager
-from src.services.timezone_utils import format_dt_in_timezone, to_utc, parse_local_time_to_utc
+from src.core.timezone import format_dt_in_timezone, to_utc, parse_local_time_to_utc
 
 
 def _create_test_user(db, timezone_name=None):

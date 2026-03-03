@@ -226,7 +226,7 @@ def create_one_time_schedule(
 
     try:
         now = datetime.now(timezone.utc)
-        from src.services.timezone_utils import to_utc
+        from src.core.timezone import to_utc
 
         run_at = to_utc(run_at)
 

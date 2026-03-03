@@ -410,7 +410,7 @@ class FunctionExecutor:
     async def _handle_create_one_time_reminder(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle create_one_time_reminder function."""
         from src.scheduler import SchedulerService
-        from src.services.timezone_utils import to_utc
+        from src.core.timezone import to_utc
         
         user_id = context.get("user_id")
         run_at = params.get("run_at")
@@ -699,7 +699,7 @@ class FunctionExecutor:
     
     async def _handle_set_timezone(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle set_timezone function."""
-        from src.services.timezone_utils import resolve_timezone_name, to_utc
+        from src.core.timezone import resolve_timezone_name, to_utc
         from src.memories.constants import MemoryKey
         from src.scheduler import SchedulerService
         

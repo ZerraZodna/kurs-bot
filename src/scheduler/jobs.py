@@ -56,7 +56,7 @@ def sync_job_for_schedule(schedule: Any) -> None:
                 logger.warning("one_time schedule %s has no next_send_time", job_id)
                 return
             # Ensure run_at is an aware UTC datetime
-            from src.services.timezone_utils import to_utc
+            from src.core.timezone import to_utc
 
             run_at = to_utc(run_at)
             trigger = DateTrigger(run_date=run_at, timezone=timezone.utc)

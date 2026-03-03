@@ -8,7 +8,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 
 from src.models.database import SessionLocal, Schedule
-from src.services.timezone_utils import to_utc
+from src.core.timezone import to_utc
 from .domain import SCHEDULE_TYPE_DAILY
 
 

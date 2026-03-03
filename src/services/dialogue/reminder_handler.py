@@ -7,7 +7,7 @@ import logging
 import re
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
-from src.services.timezone_utils import to_utc
+from src.core.timezone import to_utc
 from sqlalchemy.orm import Session
 from src.models.database import Lesson
 from src.memories import MemoryManager

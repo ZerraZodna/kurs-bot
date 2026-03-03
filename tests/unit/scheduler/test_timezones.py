@@ -7,7 +7,7 @@ import pytest
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
-from src.services.timezone_utils import parse_local_time_to_utc, format_dt_in_timezone
+from src.core.timezone import parse_local_time_to_utc, format_dt_in_timezone
 from src.scheduler import SchedulerService
 
 
@@ -86,4 +86,3 @@ class TestScheduleTimezoneStorage:
             # Display should show 10:15 in Europe/Oslo
             local_dt, _ = format_dt_in_timezone(ns, "Europe/Oslo")
             assert f"{local_dt:%H:%M}" == "10:15"
-
