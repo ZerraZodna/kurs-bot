@@ -228,6 +228,16 @@ async def handle_gdpr_commands(
     if action not in {"export", "erase", "clear", "restrict", "object", "withdraw"}:
         return "Unsupported GDPR action. Try: export, erase, clear, restrict, object, withdraw."
 
+    # Descriptions of what each GDPR action does
+    action_descriptions = {
+        "export": "📥 **Export Data**: You will receive a JSON copy of all your stored data including memories, schedules, and message history.",
+        "erase": "⚠️ **Erase Data**: This will **permanently delete all your personal data** including memories, schedules, and messages. This action cannot be undone and you will need to onboard again to use the service.",
+        "clear": "⚠️ **Clear Data**: This will delete your personal information but keep your user ID active. Your memories, schedules, and messages will be removed. This is mainly used for testing purposes.",
+        "restrict": "⚠️ **Restrict Processing**: This will limit how your data is used and **block you from onboarding** until the restriction is lifted. You will not be able to use the service while processing is restricted.",
+        "object": "⚠️ **Object to Processing**: This will restrict all data processing and **block you from using the service** (onboarding will be disabled). A legal record will be created for GDPR compliance.",
+        "withdraw": "⚠️ **Withdraw Consent**: This will withdraw your consent for data storage and **disable your access** to the service. You will be opted out and blocked from onboarding until you provide consent again.",
+    }
+
     payload = {}
     if action in {"restrict", "object", "erase", "clear"} and reason:
         payload["reason"] = reason
@@ -241,9 +251,12 @@ async def handle_gdpr_commands(
         request_type=action,
         payload=payload,
     )
+
+    description = action_descriptions.get(action, "")
     return (
-        f"Verification code: {code}. Reply with 'verify {code}' within "
-        "10 minutes to proceed."
+        f"{description}\n\n"
+        f"To proceed, reply with: verify {code}\n"
+        f"(Code expires in 10 minutes)"
     )
 
 
