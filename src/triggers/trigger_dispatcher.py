@@ -449,6 +449,53 @@ class TriggerDispatcher:
         except Exception as e:
             result.update({"ok": False, "error": str(e)})
             return result
+
+    def _handle_send_todays_lesson(self, match: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle send_todays_lesson function - sends lesson content to user."""
+        from src.lessons.state import compute_current_lesson_state
+        from src.models.database import Lesson
+        
+        user_id = context.get("user_id")
+        result: Dict[str, Any] = {"ok": False, "action": "send_todays_lesson"}
+        
+        try:
+            # Get current lesson state
+            state = compute_current_lesson_state(
+                memory_manager=self.memory_manager,
+                user_id=user_id,
+            )
+            lesson_id = state.get("lesson_id")
+            
+            if not lesson_id:
+                result.update({"ok": False, "error": "Could not determine today's lesson"})
+                return result
+            
+            # Get lesson content
+            lesson = self.db.query(Lesson).filter_by(lesson_id=lesson_id).first()
+            if not lesson:
+                result.update({"ok": False, "error": f"Lesson {lesson_id} not found"})
+                return result
+            
+            # Format lesson message
+            lesson_text = f"📖 **Lesson {lesson_id}**: {lesson.title}\n\n{lesson.content}"
+            
+            # Send to user via Telegram
+            user = self.db.query(User).filter_by(user_id=user_id).first()
+            if user and getattr(user, 'external_id', None):
+                import asyncio
+                chat_id = int(user.external_id)
+                asyncio.run(_scheduler_pkg.send_message(chat_id, lesson_text))
+            
+            result.update({
+                "ok": True,
+                "lesson_id": lesson_id,
+                "title": lesson.title,
+                "content": lesson.content,
+            })
+            return result
+        except Exception as e:
+            result.update({"ok": False, "error": str(e)})
+            return result
     def _handle_set_timezone(self, match: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         user_id = context.get("user_id")
         result: Dict[str, Any] = {"ok": False, "action": "set_timezone"}
@@ -631,6 +678,8 @@ class TriggerDispatcher:
                 result = self._handle_repeat_lesson(match, context)
             elif action == "set_lesson_preference":
                 result = self._handle_set_lesson_preference(match, context)
+            elif action == "send_todays_lesson":
+                result = self._handle_send_todays_lesson(match, context)
             else:
                 result.update({"ok": False, "error": "unknown_action"})
 
