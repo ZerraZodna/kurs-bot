@@ -15,7 +15,6 @@ from .reminder_handler import (
 from src.memories.dialogue_helpers import (
     get_user_language,
     extract_and_store_memories,
-    delete_user_and_data,
 )
 from src.language.language_service import detect_and_store_language
 from .pause_handler import detect_pause_request
@@ -46,7 +45,6 @@ __all__ = [
     "get_user_language",
     "detect_and_store_language",
     "extract_and_store_memories",
-    "delete_user_and_data",
     "detect_pause_request",
     "build_schedule_status_response",
     "handle_rag_mode_toggle",

@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from src.memories.manager import MemoryManager
 from src.memories.memory_extractor import MemoryExtractor
 from src.memories.constants import MemoryCategory, MemoryKey
-from src.memories.user_data_service import delete_user_content_rows
 from src.config import settings
 from src.lessons.state import set_current_lesson
 
@@ -148,22 +147,3 @@ async def extract_and_store_memories(
 
     except Exception as e:
         logger.error(f"Error in memory extraction: {e}")
-
-
-def delete_user_and_data(db: Session, user_id: int) -> None:
-    """
-    Delete a user and all associated data.
-
-    Called when user declines consent during onboarding.
-    """
-    try:
-        from src.models.database import User
-
-        delete_user_content_rows(db, user_id)
-        db.query(User).filter_by(user_id=user_id).delete(synchronize_session=False)
-
-        db.commit()
-        logger.info(f"[User deleted] User {user_id} deleted due to declined consent")
-    except Exception as e:
-        logger.error(f"[User deletion error] Failed to delete user {user_id}: {e}")
-        db.rollback()
