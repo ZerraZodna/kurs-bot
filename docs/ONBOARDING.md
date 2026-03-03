@@ -2,6 +2,44 @@
 
 This document describes the actual onboarding sequence and the exact texts used in the current Kurs Bot implementation. The process is language-aware (English/Norwegian) and branches based on user responses.
 
+## Architecture Note: Domain API Usage
+
+The onboarding module uses domain APIs for all schedule and lesson operations. Do not import internal implementation modules directly.
+
+### Import Patterns
+
+**✅ DO:**
+```python
+from src.scheduler import api as scheduler_api
+from src.lessons import api as lessons_api
+from src.core import timezone
+
+# Create schedule via API
+schedule = scheduler_api.create_daily_schedule(user_id, lesson_id, time_str)
+
+# Get lesson via API
+lesson = lessons_api.get_lesson(lesson_id, session)
+
+# Format lesson message
+message = lessons_api.format_lesson_message(lesson, language)
+```
+
+**❌ DON'T:**
+```python
+# Don't import internal implementations
+from src.scheduler import manager as schedule_manager
+from src.scheduler import operations as scheduler_operations
+from src.lessons import handler as lesson_handler
+```
+
+### API Documentation
+- [Scheduler API](../SCHEDULER.md) - All schedule operations
+- [Lessons API](../LESSONS.md) - All lesson operations
+- [Architecture](../ARCHITECTURE.md) - Module boundaries and import guidelines
+
+---
+
+
 ---
 
 ## 1. Name Collection

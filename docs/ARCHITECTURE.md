@@ -1,5 +1,73 @@
 # Architecture & Design Reference
 
+## Module Boundaries & Public APIs
+
+This codebase follows a **domain API facade pattern** where all cross-module communication goes through public APIs rather than internal implementations.
+
+### Public API Facades
+
+| Module | Public API | Purpose | Import Pattern |
+|--------|-----------|---------|----------------|
+| `scheduler` | `src/scheduler/api.py` | All schedule operations | `from src.scheduler import api as scheduler_api` |
+| `lessons` | `src/lessons/api.py` | All lesson operations | `from src.lessons import api as lessons_api` |
+| `core` | `src/core/timezone.py` | All timezone utilities | `from src.core import timezone` |
+
+### Import Guidelines
+
+**✅ DO:**
+```python
+# Use domain APIs
+from src.scheduler import api as scheduler_api
+from src.lessons import api as lessons_api
+from src.core import timezone
+
+# Create schedule via API
+schedule = scheduler_api.create_daily_schedule(user_id, lesson_id, time_str)
+
+# Get lesson via API
+lesson = lessons_api.get_lesson(lesson_id, session)
+
+# Format timezone via core
+local_time = timezone.format_dt_in_timezone(utc_time, tz_name)
+```
+
+**❌ DON'T:**
+```python
+# Don't import internal implementations
+from src.scheduler import manager as schedule_manager
+from src.scheduler import operations as scheduler_operations
+from src.scheduler import SchedulerService
+from src.lessons import handler as lesson_handler
+from src.services import timezone_utils  # DELETED - use core.timezone instead
+```
+
+### Dependency Graph
+
+```
+core.timezone
+    ↑
+    ├── scheduler.api
+    │       ↑
+    │       ├── onboarding.schedule_setup
+    │       ├── onboarding.service
+    │       ├── onboarding.flow
+    │       ├── functions.executor
+    │       └── services.dialogue_engine
+    │
+    ├── lessons.api
+    │       ↑
+    │       ├── onboarding.flow
+    │       ├── onboarding.service
+    │       ├── functions.executor
+    │       └── services.dialogue_engine
+    │
+    └── functions.parameters
+            ↑
+            └── functions.executor
+```
+
+---
+
 ## System Architecture Overview
 
 ```
