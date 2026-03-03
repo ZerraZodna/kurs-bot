@@ -449,6 +449,8 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                     async for token in result["generator"]:
                         full_response += token
                     
+                    logger.info(f"[batch] Accumulated full_response: {full_response[:200]}...")
+                    
                     if not full_response:
                         ai_response = "[No response from LLM]"
                     else:
@@ -459,10 +461,17 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                         else:
                             ai_response = full_response
                     
-                    # Send the clean text to Telegram
-                    await send_message(chat_id, ai_response)
+                    logger.info(f"[batch] Final ai_response to send: {ai_response[:200] if ai_response else 'EMPTY'}...")
+                    
+                    # Only send message if there's actual content (not empty/whitespace)
+                    # When response is empty (e.g., function call only), skip sending
+                    # and let the function execution handle the response
+                    if ai_response and ai_response.strip():
+                        await send_message(chat_id, ai_response)
                     
                     # Run post-response hooks (trigger matching, etc.)
+                    # This executes functions like send_todays_lesson which will send
+                    # the lesson content as a separate message
                     try:
                         await result["post_hook"](full_response)
                     except Exception as e:

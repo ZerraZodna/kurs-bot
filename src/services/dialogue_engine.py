@@ -645,7 +645,9 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
             from src.functions.intent_parser import get_intent_parser
             parser = get_intent_parser()
             parse_result = parser.parse(full_response_text)
-            return parse_result.response_text or full_response_text
+            # Use explicit None check because empty string "" is a valid response
+            # (e.g., when AI only returns function calls like send_todays_lesson)
+            return parse_result.response_text if parse_result.response_text is not None else full_response_text
 
         if is_english:
             # Stream the LLM response directly

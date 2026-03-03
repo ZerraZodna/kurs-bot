@@ -215,16 +215,16 @@ class IntentParser:
             if not self.registry.is_valid_function(name):
                 errors.append(f"Unknown function: {name}")
         
-        if "parameters" not in func:
-            errors.append(f"Function {index} missing 'parameters'")
-        elif not isinstance(func["parameters"], dict):
+        # Parameters is optional - default to empty dict if not provided
+        parameters = func.get("parameters", {})
+        if not isinstance(parameters, dict):
             errors.append(f"Function {index} 'parameters' must be an object")
         else:
             # Validate parameters against schema
             name = func.get("name")
             if name:
                 is_valid, param_errors = self.registry.validate_call(
-                    name, func["parameters"]
+                    name, parameters
                 )
                 if not is_valid:
                     errors.extend([f"Function {index}: {e}" for e in param_errors])
