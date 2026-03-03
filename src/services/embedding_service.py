@@ -100,7 +100,7 @@ class EmbeddingService:
                     if self._local_model is None:
                         raise RuntimeError("Failed to load local sentence-transformers model for local backend")
 
-                logger.info("DEBUG: generate_embedding calling local encode for single text (chars=%d)", len(normalized))
+                logger.debug("generate_embedding calling local encode for single text (chars=%d)", len(normalized))
                 vec = await asyncio.to_thread(self._local_model.encode, normalized, convert_to_numpy=True)
                 if isinstance(vec, np.ndarray):
                     emb = vec.tolist()
@@ -255,7 +255,7 @@ class EmbeddingService:
           creating the model via SentenceTransformer(model_name) once and then
           saving it to the cache dir for subsequent cold starts.
         """
-        print(f"[DEBUG] _ensure_local_model_loaded called for model: {model_name}")
+        logger.debug(f"_ensure_local_model_loaded called for model: {model_name}")
         try:
             from sentence_transformers import SentenceTransformer
         except Exception:
@@ -324,7 +324,7 @@ class EmbeddingService:
         if self.backend == 'local' and self._local_model is not None:
             # run encoding in thread pool (batch if supported)
             try:
-                logger.info("DEBUG: batch_embed invoking local encode for %d texts (show_progress_bar=False)", len(texts))
+                logger.debug("batch_embed invoking local encode for %d texts (show_progress_bar=False)", len(texts))
                 vecs = await asyncio.to_thread(self._local_model.encode, texts, convert_to_numpy=True, show_progress_bar=False)
                 out = []
                 for vec in vecs:

@@ -38,7 +38,7 @@ class OnboardingFlow:
     def _get_pending_step(self, user_id: int) -> Optional[str]:
         pending_step = self.memory_manager.get_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING)
         # Debug trace
-        print(f"[ONBOARD DEBUG] _get_pending_step - user_id={user_id} -> {pending_step}")
+        logger.debug(f"_get_pending_step - user_id={user_id} -> {pending_step}")
         if pending_step:
             return str(pending_step[0].get("value", "")).lower()
         return None
@@ -53,7 +53,7 @@ class OnboardingFlow:
             source="dialogue_engine",
             allow_duplicates=False,
         )
-        print(f"[ONBOARD DEBUG] _resolve_pending_step - user_id={user_id}")
+        logger.debug(f"_resolve_pending_step - user_id={user_id}")
 
     def _set_pending_lesson_delivery(self, user_id: int, lesson_id: str = ""):
         ttl_hours = 0.1 if lesson_id == "" else 1
@@ -91,7 +91,7 @@ class OnboardingFlow:
             ttl_hours=ttl_hours,
             allow_duplicates=False,
         )
-        print(f"[ONBOARD DEBUG] _store_memory - user_id={user_id} key={key} value={value} category={category} ttl={ttl_hours}")
+        logger.debug(f"_store_memory - user_id={user_id} key={key} value={value} category={category} ttl={ttl_hours}")
 
     def _get_message(self, key: str, language: str = "en") -> str:
         # Delegate prompt retrieval to prompts.py (centralized prompts)
@@ -102,7 +102,7 @@ class OnboardingFlow:
     def _get_user_name(self, user_id: int) -> str:
         # Use topic-based retrieval for temporal resolution (newest name wins)
         name = self.memory_manager.topic_manager.get_name(user_id)
-        print(f"[ONBOARD DEBUG] _get_user_name - user_id={user_id} -> {name}")
+        logger.debug(f"_get_user_name - user_id={user_id} -> {name}")
         return name
 
     def _get_commitment_prompt(self, language: str, name: str) -> str:
@@ -144,7 +144,7 @@ class OnboardingFlow:
         - If user explicitly declines, ask what they prefer to be called.
         After storing the preferred name, continue onboarding (next prompt from service).
         """
-        print(f"[ONBOARD DEBUG] _handle_name_pending - user_id={user_id} text={text}")
+        logger.debug(f"_handle_name_pending - user_id={user_id} text={text}")
         t = (text or "").strip()
         lname = t.lower()
 
@@ -188,7 +188,7 @@ class OnboardingFlow:
 
     async def _handle_timezone_pending(self, user_id: int, text: str, session: Session) -> Optional[str]:
         """Handle the pending 'timezone' step."""
-        print(f"[ONBOARD DEBUG] _handle_timezone_pending - user_id={user_id} text={text}")
+        logger.debug(f"_handle_timezone_pending - user_id={user_id} text={text}")
         
         # Use existing consent detection for yes/no responses
         from src.onboarding.detectors import detect_consent_keywords
@@ -221,7 +221,7 @@ class OnboardingFlow:
         return None
 
     def _handle_consent_pending(self, user_id: int, text: str, session: Session) -> Optional[str]:
-        print(f"[ONBOARD DEBUG] _handle_consent_pending - user_id={user_id} text={text}")
+        logger.debug(f"_handle_consent_pending - user_id={user_id} text={text}")
         consent = self.onboarding.detect_consent_keywords(text)
         if consent is True:
             self._store_memory(user_id, MemoryKey.DATA_CONSENT, "granted", category=MemoryCategory.PROFILE.value)
@@ -229,7 +229,7 @@ class OnboardingFlow:
             self._resolve_pending_step(user_id)
             # Return a localized thank-you and continue onboarding flow
             language = get_user_language(self.memory_manager, user_id)
-            print(f"[ONBOARD DEBUG] consent granted - user_id={user_id} language={language}")
+            logger.debug(f"consent granted - user_id={user_id} language={language}")
             thank_you = self._get_message("consent_granted", language)
             # If the user already satisfies the remaining onboarding steps
             # (e.g., name, commitment, lesson status), finalize onboarding
@@ -465,13 +465,13 @@ class OnboardingFlow:
             Onboarding response or None if not in onboarding flow
         """
         status = self.onboarding.get_onboarding_status(user_id)
-        print(f"[ONBOARD DEBUG] handle_onboarding - user_id={user_id} text={text} status={status}")
+        logger.debug(f"handle_onboarding - user_id={user_id} text={text} status={status}")
 
         # If there is a pending onboarding step, handle it first so replies
         # to prompts (e.g. consent "yes") are processed instead of re-asking.
         pending_step = self._get_pending_step(user_id)
         if pending_step:
-            print(f"[ONBOARD DEBUG] pending_step detected: {pending_step} for user {user_id}")
+            logger.debug(f"pending_step detected: {pending_step} for user {user_id}")
             response = await self._handle_pending_step(user_id, text, session, pending_step)
             if response:
                 return response
@@ -480,14 +480,14 @@ class OnboardingFlow:
         # If no name info exists, delegate to the onboarding service which
         # may prefer to ask permission to use an existing Telegram `first_name`.
         if not status.get("has_name"):
-            print(f"[ONBOARD DEBUG] asking for name (no name) delegating to service user_id={user_id}")
+            logger.debug(f"asking for name (no name) delegating to service user_id={user_id}")
             return self.onboarding.get_onboarding_prompt(user_id)
 
         # If no consent, ask for consent
         if not status.get("has_consent"):
             language = get_user_language(self.memory_manager, user_id)
             self._store_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING, "consent", ttl_hours=2)
-            print(f"[ONBOARD DEBUG] asking for consent (no consent) user_id={user_id} language={language}")
+            logger.debug(f"asking for consent (no consent) user_id={user_id} language={language}")
             return self._get_message("consent_prompt", language)
 
         # If no timezone, ask for timezone confirmation

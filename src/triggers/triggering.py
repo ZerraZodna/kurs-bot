@@ -34,14 +34,12 @@ async def handle_triggers(
             return diagnostics
 
         logger.debug(f"Handling triggers for response: {response[:200]}...")
-        print(f"[DEBUG] Handling triggers for response: {response[:200]}...")
         
         # Parse the response using IntentParser
         parser = get_intent_parser()
         parse_result = parser.parse(response)
         
         logger.debug(f"Parse result: success={parse_result.success}, functions={len(parse_result.functions)}, is_fallback={parse_result.is_fallback}")
-        print(f"[DEBUG] Parse result: success={parse_result.success}, functions={len(parse_result.functions)}, is_fallback={parse_result.is_fallback}")
         
         # Track dispatched action_types per dialogue turn to avoid duplicate handling
         dispatched_actions: set = set()
@@ -53,13 +51,11 @@ async def handle_triggers(
         # If we have functions to execute, process them
         if parse_result.functions:
             logger.info(f"Processing {len(parse_result.functions)} functions for user={user_id}")
-            print(f"[INFO] Processing {len(parse_result.functions)} functions for user={user_id}")
             diagnostics["structured_intent_used"] = True
             
             # Log each function being processed
             for func in parse_result.functions:
                 logger.debug(f"Function to execute: {func.get('name')} with params: {func.get('parameters')}")
-                print(f"[DEBUG] Function to execute: {func.get('name')} with params: {func.get('parameters')}")
             
             # Execute all functions
             executor = get_function_executor()
@@ -92,16 +88,15 @@ async def handle_triggers(
                     dispatched_actions.add(result.function_name)
                     
             diagnostics["dispatched_actions"] = sorted(dispatched_actions)
-            print(f"[INFO] Dispatched actions: {sorted(dispatched_actions)}")
+            logger.info(f"Dispatched actions: {sorted(dispatched_actions)}")
         
         # If no functions were found but we have JSON-like content, log it
         elif "{" in response and "}" in response:
             logger.debug(f"Response contains JSON-like content but no functions were parsed: {response[:100]}...")
             logger.debug(f"Response text extracted: {parse_result.response_text[:100]}...")
-            print(f"[DEBUG] Response contains JSON-like content but no functions were parsed")
+            logger.debug(f"Response contains JSON-like content but no functions were parsed")
             if parse_result.errors:
                 logger.warning(f"Parse errors: {parse_result.errors}")
-                print(f"[WARNING] Parse errors: {parse_result.errors}")
                 diagnostics["parse_errors"] = parse_result.errors
 
     except Exception as e:

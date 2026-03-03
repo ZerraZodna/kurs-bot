@@ -47,8 +47,8 @@ def create_daily_schedule(
 
     try:
         # Debug: trace schedule creation attempts
-        print(
-            f"[DEBUG scheduler] create_daily_schedule called user={user_id} "
+        logger.debug(
+            f"create_daily_schedule called user={user_id} "
             f"time_str={time_str} ts={datetime.now(timezone.utc).isoformat()}"
         )
         # Compute next send time and cron expression for the user's timezone
@@ -75,8 +75,8 @@ def create_daily_schedule(
             if created_at is not None
             else __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
         )
-        print(
-            f"[DEBUG scheduler] persisted schedule id=<{getattr(schedule, 'schedule_id', None)}> "
+        logger.debug(
+            f"persisted schedule id=<{getattr(schedule, 'schedule_id', None)}> "
             f"user={user_id} next_send_local_input={next_send.isoformat()} "
             f"cron='{cron_expression}' created_at={created_str}"
         )

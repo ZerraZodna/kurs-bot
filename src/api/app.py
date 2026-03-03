@@ -81,18 +81,25 @@ async def lifespan(app: FastAPI):
         logging.exception("Could not initialize scheduler at startup")
 
     # Startup info and health checks
-    # Use DEBUG level when running with --log-level debug to see function extraction details
-    # Configure logging to output to console for debugging
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[logging.StreamHandler()]
-    )
-    # Ensure root logger also outputs DEBUG
+    # Configure logging - respect uvicorn's log level if set
+    # Uvicorn sets its error logger to DEBUG when --log-level debug is used
+    uvicorn_error = logging.getLogger("uvicorn.error")
+    is_debug = uvicorn_error.level == logging.DEBUG or uvicorn_error.getEffectiveLevel() == logging.DEBUG
+    
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)
-    for handler in root_logger.handlers:
-        handler.setLevel(logging.DEBUG)
+    if root_logger.handlers:
+        # Uvicorn has configured logging, set appropriate level
+        target_level = logging.DEBUG if is_debug else logging.INFO
+        root_logger.setLevel(target_level)
+        for handler in root_logger.handlers:
+            handler.setLevel(target_level)
+    else:
+        # No handlers configured yet, set up basic logging
+        logging.basicConfig(
+            level=logging.DEBUG if is_debug else logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            handlers=[logging.StreamHandler()]
+        )
     apply_logging_redaction()
     verify_secrets_config()
     # Ensure embedding backend requirements in production: fail-fast if
@@ -223,11 +230,11 @@ DEV_WEB = getattr(settings, "DEV_WEB_CLIENT", False)
 
 # Compute project-relative static path for visibility in logs/debugging
 static_path = Path(__file__).resolve().parents[2] / "static" / "dev_web_client"
-print(f"DEBUG: settings.DEV_WEB_CLIENT={getattr(settings, 'DEV_WEB_CLIENT', None)}")
-print(f"DEBUG: computed static_path={static_path} exists={static_path.exists()}")
+logging.debug(f"settings.DEV_WEB_CLIENT={getattr(settings, 'DEV_WEB_CLIENT', None)}")
+logging.debug(f"computed static_path={static_path} exists={static_path.exists()}")
 
 if DEV_WEB:
-    print("DEBUG: DEV_WEB is True — mounting dev static and router")
+    logging.debug("DEV_WEB is True — mounting dev static and router")
     from fastapi.staticfiles import StaticFiles
     from src.api.dev_web_client import router as dev_router
 

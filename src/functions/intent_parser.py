@@ -53,7 +53,6 @@ class IntentParser:
             ParseResult with extracted functions or error info
         """
         logger.debug(f"Parsing AI response: {response_text[:200]}...")
-        print(f"[DEBUG] Parsing AI response: {response_text[:200]}...")
         
         if not response_text or not response_text.strip():
             return ParseResult(
@@ -162,7 +161,6 @@ class IntentParser:
                 errors.append("'functions' must be an array")
             else:
                 logger.debug(f"Found {len(data['functions'])} functions in response")
-                print(f"[DEBUG] Found {len(data['functions'])} functions in response")
                 for i, func in enumerate(data["functions"]):
                     func_errors = self._validate_function_call(func, i)
                     if func_errors:
@@ -170,7 +168,6 @@ class IntentParser:
                     else:
                         functions.append(func)
                         logger.debug(f"Extracted function: {func.get('name')} with params: {func.get('parameters')}")
-                        print(f"[DEBUG] Extracted function: {func.get('name')} with params: {func.get('parameters')}")
         # Also support legacy "intent" field for backward compatibility
         elif "intent" in data:
             intent = data["intent"]
@@ -188,9 +185,8 @@ class IntentParser:
         success = len(errors) == 0 or len(functions) > 0
         
         logger.debug(f"Parse result: success={success}, functions={len(functions)}, errors={errors}")
-        print(f"[DEBUG] Parse result: success={success}, functions={len(functions)}, errors={errors}")
         if functions:
-            print(f"[DEBUG] Functions returned to agent: {functions}")
+            logger.debug(f"Functions returned to agent: {functions}")
         
         return ParseResult(
             success=success,

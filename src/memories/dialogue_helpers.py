@@ -96,7 +96,7 @@ async def extract_and_store_memories(
             user_message, user_context, model_override=model_override, language=user_lang
         )
 
-        print(f"[EXTRACT DEBUG] user_id={user_id} user_message={user_message!r} extracted={extracted_memories}")
+        logger.debug(f"user_id={user_id} user_message={user_message!r} extracted={extracted_memories}")
 
         for memory in extracted_memories:
             try:
@@ -138,7 +138,7 @@ async def extract_and_store_memories(
                         ttl_hours=memory.get("ttl_hours"),
                         source="dialogue_engine_extractor",
                     )
-                print(f"[EXTRACT DEBUG] stored memory for user {user_id}: {memory.get('key')}={memory.get('value')}")
+                logger.debug(f"stored memory for user {user_id}: {memory.get('key')}={memory.get('value')}")
                 val = memory.get('value')
                 sval = str(val) if val is not None else ''
                 logger.info(f"Stored memory for user {user_id}: {memory.get('key')}={sval[:50]}")
