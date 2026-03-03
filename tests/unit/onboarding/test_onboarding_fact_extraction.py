@@ -4,7 +4,7 @@ Migrated from tests/test_onboarding_fact_extraction.py to use new test fixtures.
 """
 
 import pytest
-from src.onboarding.detectors import handle_lesson_status_response
+from src.lessons.detection import handle_lesson_status_response
 
 
 class TestOnboardingFactExtraction:
@@ -33,4 +33,3 @@ class TestOnboardingFactExtraction:
         assert out["action"] == expected["action"]
         if "lesson_id" in expected:
             assert out.get("lesson_id") == expected["lesson_id"]
-

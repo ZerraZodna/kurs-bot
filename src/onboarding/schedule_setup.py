@@ -6,6 +6,10 @@ from typing import Optional
 from sqlalchemy.orm import Session
 import logging
 
+from src.scheduler import api as scheduler_api
+from src.scheduler import manager as schedule_manager
+from src.scheduler.domain import SCHEDULE_TYPE_DAILY
+
 logger = logging.getLogger(__name__)
 
 
@@ -16,8 +20,6 @@ def check_existing_schedule(db: Session, user_id: int) -> Optional[tuple]:
     Returns:
         (hour, minute) tuple if schedule exists, None otherwise
     """
-    from src.scheduler import manager as schedule_manager
-
     sched = schedule_manager.find_active_daily_schedule(user_id, session=db)
     if sched and sched.next_send_time:
         return (sched.next_send_time.hour, sched.next_send_time.minute)
@@ -31,10 +33,6 @@ def create_auto_schedule(db: Session, user_id: int) -> bool:
     Returns:
         True if schedule created, False if already exists or error
     """
-    from src.scheduler import SchedulerService
-    from src.scheduler import manager as schedule_manager
-    from src.scheduler.domain import SCHEDULE_TYPE_DAILY
-
     try:
         existing = schedule_manager.find_active_daily_schedule(user_id, session=db)
         if existing:
@@ -59,7 +57,7 @@ def create_auto_schedule(db: Session, user_id: int) -> bool:
         except Exception:
             lesson_id = None
 
-        SchedulerService.create_daily_schedule(
+        scheduler_api.create_daily_schedule(
             user_id=user_id,
             lesson_id=lesson_id,
             time_str="07:30",

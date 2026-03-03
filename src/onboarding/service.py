@@ -15,9 +15,8 @@ from src.onboarding.detectors import (
     detect_commitment_keywords,
     detect_consent_keywords,
     detect_decline_keywords,
-    detect_schedule_request,
-    handle_lesson_status_response,
 )
+from src.lessons.detection import handle_lesson_status_response
 from src.language.onboarding_prompts import (
     get_continuation_welcome_message,
     get_lesson_1_welcome_message,
@@ -29,7 +28,7 @@ from src.onboarding.status import get_onboarding_status_dict
 from src.onboarding.schedule_setup import create_auto_schedule
 from src.core.timezone import ensure_user_timezone
 from src.onboarding.user_management import delete_user_and_data, is_user_new
-from src.lessons.state import set_current_lesson, get_lesson_state, has_lesson_status
+from src.lessons.api import set_current_lesson, has_lesson_status
 from src.memories.constants import MemoryCategory, MemoryKey
 
 logger = logging.getLogger(__name__)
@@ -241,18 +240,6 @@ class OnboardingService:
         """Return True if consent given, False if declined, None if unclear."""
         return detect_consent_keywords(message)
     
-    def detect_schedule_request(self, message: str) -> bool:
-        """
-        Detect if user is asking for reminders/scheduling.
-        
-        Args:
-            message: Users message text
-        
-        Returns:
-            True if scheduling keywords detected
-        """
-        return detect_schedule_request(message)
-
     def handle_lesson_status_response(self, user_id: int, text: str) -> Dict[str, Any]:
         """
         Handle user's response about whether they're new or continuing.

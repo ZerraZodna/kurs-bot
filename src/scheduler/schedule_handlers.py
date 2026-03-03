@@ -4,7 +4,8 @@ from typing import Optional, Callable
 
 from sqlalchemy.orm import Session
 
-from src.scheduler import SchedulerService
+from src.scheduler import api as scheduler_api
+from src.scheduler.detection import detect_schedule_request
 from src.scheduler.domain import is_daily_schedule_family
 from src.core.timezone import ensure_user_timezone
 import re
@@ -38,7 +39,7 @@ async def handle_schedule_messages(
     # Note: don't short-circuit schedule handling for RAG messages here.
     # RAG-specific behavior is handled later by the caller and prompt builder.
     if detect_pause_request(text):
-        deactivated = SchedulerService.deactivate_user_schedules(user_id, session=session)
+        deactivated = scheduler_api.deactivate_user_schedules(user_id, session=session)
         if memory_manager:
             memory_manager.store_memory(
                 user_id=user_id,
@@ -77,7 +78,7 @@ async def handle_schedule_messages(
 
     if any(ind in lower for ind in daily_indicators) and found_time and any(v in lower for v in verb_indicators):
         try:
-            h, m = SchedulerService.parse_time_string(found_time)
+            h, m = scheduler_api.parse_time_string(found_time)
             normalized = f"{h:02d}:{m:02d}"
         except Exception:
             normalized = found_time
@@ -95,13 +96,13 @@ async def handle_schedule_messages(
         except Exception:
             pass
 
-        existing = SchedulerService.get_user_schedules(user_id)
+        existing = scheduler_api.get_user_schedules(user_id, session=session)
         daily_existing = next((s for s in existing if is_daily_schedule_family(s.schedule_type)), None)
         if daily_existing:
-            SchedulerService.update_daily_schedule(daily_existing.schedule_id, normalized, session=session)
+            scheduler_api.update_daily_schedule(daily_existing.schedule_id, normalized, session=session)
             resp = f"Okay — I updated your daily reminder to {normalized}."
         else:
-            SchedulerService.create_daily_schedule(user_id=user_id, lesson_id=None, time_str=normalized, session=session)
+            scheduler_api.create_daily_schedule(user_id=user_id, lesson_id=None, time_str=normalized, session=session)
             resp = f"Perfect — I've scheduled your daily lessons for {normalized}."
 
         lang = None
@@ -121,7 +122,7 @@ async def handle_schedule_messages(
             if schedule_response:
                 return schedule_response
 
-    if onboarding_service and onboarding_service.detect_schedule_request(text):
+    if detect_schedule_request(text):
         # Only treat explicit "daily" style requests as pre-LLM daily schedule flows.
         # One-time reminders (e.g., "Remind me tomorrow at 12:00") should be handled
         # by the assistant and dispatched via triggers, not blocked by an existing

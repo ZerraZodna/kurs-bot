@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.memories import MemoryManager
 from src.lessons.state import set_current_lesson
 from src.scheduler.core import SchedulerService
-from src.memories.scheduler_helpers import get_pending_confirmation
+from src.scheduler.memory_helpers import get_pending_confirmation
 
 
 @pytest.mark.asyncio

@@ -7,7 +7,7 @@ from src.memories.semantic_search import get_semantic_search_service
 from src.memories import MemoryExtractor
 from src.onboarding.service import OnboardingService
 from src.onboarding.flow import OnboardingFlow
-from src.scheduler import SchedulerService
+from src.scheduler import api as scheduler_api
 from src.services.dialogue import (
     call_ollama,
     stream_ollama,
@@ -29,7 +29,7 @@ from src.services.dialogue import (
     maybe_send_next_lesson,
     handle_list_memories,
 )
-from src.lessons.handler import process_lesson_query
+from src.lessons.api import process_lesson_query
 from src.config import settings
 from src.models.database import User, Lesson
 from src.memories.constants import MemoryCategory, MemoryKey
@@ -401,7 +401,7 @@ class DialogueEngine:
             return self.onboarding.get_onboarding_prompt(user_id)
         
         # Check if they already have a schedule
-        schedules = SchedulerService.get_user_schedules(user_id)
+        schedules = scheduler_api.get_user_schedules(user_id, session=session)
         if schedules:
             # Use the schedule query response builder to list all active reminders
             from src.scheduler.schedule_query_handler import build_schedule_status_response
@@ -458,7 +458,7 @@ When would you like to receive them? (e.g., "9:00 AM", "morning", "evening", "8:
         # scheduler or timezone resolution return a helpful message to the
         # user instead of raising an uncaught exception.
         try:
-            schedule = SchedulerService.create_daily_schedule(
+            schedule = scheduler_api.create_daily_schedule(
                 user_id=user_id,
                 lesson_id=None,
                 time_str=time_str,
@@ -475,7 +475,7 @@ When would you like to receive them? (e.g., "9:00 AM", "morning", "evening", "8:
                 local_dt, _ = format_dt_in_timezone(schedule.next_send_time, tz_name)
                 time_display = f"{local_dt:%H:%M}"
             else:
-                hour, minute = SchedulerService.parse_time_string(time_str)
+                hour, minute = scheduler_api.parse_time_string(time_str)
                 time_display = f"{hour:02d}:{minute:02d}"
 
             name_memories = self.memory_manager.get_memory(user_id, MemoryKey.FIRST_NAME)

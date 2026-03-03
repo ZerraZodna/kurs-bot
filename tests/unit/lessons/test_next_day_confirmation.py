@@ -22,7 +22,7 @@ from src.services.dialogue.command_handlers import handle_debug_next_day
 from src.lessons.advance import maybe_send_next_lesson
 from src.services.dialogue.reminder_handler import handle_lesson_confirmation
 from src.language.prompt_builder import PromptBuilder
-from src.memories.scheduler_helpers import (
+from src.scheduler.memory_helpers import (
     get_pending_confirmation,
     is_auto_advance_lessons_enabled,
     set_auto_advance_lessons_preference,

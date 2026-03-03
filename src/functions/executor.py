@@ -287,7 +287,7 @@ class FunctionExecutor:
     
     async def _handle_create_schedule(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle create_schedule function."""
-        from src.scheduler import SchedulerService
+        from src.scheduler import api as scheduler_api
         
         user_id = context.get("user_id")
         time = params.get("time")
@@ -300,7 +300,7 @@ class FunctionExecutor:
             return {"ok": False, "error": error}
         
         try:
-            schedule = SchedulerService.create_daily_schedule(
+            schedule = scheduler_api.create_daily_schedule(
                 user_id=user_id,
                 lesson_id=lesson_id,
                 time_str=normalized_time,
@@ -317,7 +317,7 @@ class FunctionExecutor:
     
     async def _handle_update_schedule(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle update_schedule function."""
-        from src.scheduler import SchedulerService
+        from src.scheduler import api as scheduler_api
         
         schedule_id = params.get("schedule_id")
         time = params.get("time")
@@ -328,7 +328,7 @@ class FunctionExecutor:
             return {"ok": False, "error": error}
         
         try:
-            updated = SchedulerService.update_daily_schedule(
+            updated = scheduler_api.update_daily_schedule(
                 schedule_id=schedule_id,
                 time_str=normalized_time,
                 session=context.get("session"),
@@ -345,31 +345,24 @@ class FunctionExecutor:
     
     async def _handle_delete_schedule(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle delete_schedule function."""
-        from src.scheduler import SchedulerService
+        from src.scheduler import api as scheduler_api
         
         schedule_id = params.get("schedule_id")
         
         try:
-            # Get the schedule first to verify it exists
-            from src.models.database import Schedule
-            session = context.get("session")
-            schedule = session.query(Schedule).filter_by(schedule_id=schedule_id).first()
-            
-            if not schedule:
-                return {"ok": False, "error": "Schedule not found"}
-            
-            # Deactivate the schedule
-            schedule.is_active = False
-            session.add(schedule)
-            session.commit()
-            
-            return {"ok": True, "schedule_id": schedule_id}
+            result = scheduler_api.deactivate_schedule(
+                schedule_id=schedule_id,
+                session=context.get("session"),
+            )
+            if result:
+                return {"ok": True, "schedule_id": schedule_id}
+            return {"ok": False, "error": "Schedule not found or already inactive"}
         except Exception as e:
             return {"ok": False, "error": str(e)}
     
     async def _handle_query_schedule(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle query_schedule function."""
-        from src.scheduler import manager as schedule_manager
+        from src.scheduler import api as scheduler_api
         from src.scheduler.domain import is_one_time_schedule_type
         from src.scheduler.memory_helpers import get_schedule_message
         
@@ -377,8 +370,9 @@ class FunctionExecutor:
         memory_manager = context.get("memory_manager")
         
         try:
-            schedules = schedule_manager.get_user_schedules(
+            schedules = scheduler_api.get_user_schedules(
                 user_id=user_id,
+                active_only=True,
                 session=context.get("session"),
             )
             
@@ -409,7 +403,7 @@ class FunctionExecutor:
     
     async def _handle_create_one_time_reminder(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle create_one_time_reminder function."""
-        from src.scheduler import SchedulerService
+        from src.scheduler import api as scheduler_api
         from src.core.timezone import to_utc
         
         user_id = context.get("user_id")
@@ -424,7 +418,7 @@ class FunctionExecutor:
         try:
             # Convert to UTC for storage
             run_at_utc = to_utc(dt_obj)
-            schedule = SchedulerService.create_one_time_schedule(
+            schedule = scheduler_api.create_one_time_schedule(
                 user_id=user_id,
                 run_at=run_at_utc,
                 message=message,
@@ -478,12 +472,12 @@ class FunctionExecutor:
     
     async def _handle_delete_all_one_time_reminders(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle delete_all_one_time_reminders function."""
-        from src.scheduler import SchedulerService
+        from src.scheduler import api as scheduler_api
         
         user_id = context.get("user_id")
         
         try:
-            count = SchedulerService.deactivate_user_schedules_by_type(
+            count = scheduler_api.deactivate_user_schedules_by_type(
                 user_id=user_id,
                 schedule_type="one_time",
                 session=context.get("session"),
@@ -499,12 +493,12 @@ class FunctionExecutor:
     
     async def _handle_delete_all_daily_reminders(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle delete_all_daily_reminders function."""
-        from src.scheduler import SchedulerService
+        from src.scheduler import api as scheduler_api
         
         user_id = context.get("user_id")
         
         try:
-            count = SchedulerService.deactivate_user_schedules_by_type(
+            count = scheduler_api.deactivate_user_schedules_by_type(
                 user_id=user_id,
                 schedule_type="daily",
                 session=context.get("session"),
@@ -520,12 +514,12 @@ class FunctionExecutor:
     
     async def _handle_delete_all_reminders(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle delete_all_reminders function."""
-        from src.scheduler import SchedulerService
+        from src.scheduler import api as scheduler_api
         
         user_id = context.get("user_id")
         
         try:
-            count = SchedulerService.deactivate_user_schedules(
+            count = scheduler_api.deactivate_user_schedules(
                 user_id=user_id,
                 session=context.get("session"),
             )
@@ -561,7 +555,7 @@ class FunctionExecutor:
     
     async def _handle_send_next_lesson(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle send_next_lesson function."""
-        from src.lessons.state import compute_current_lesson_state
+        from src.lessons.api import compute_current_lesson_state
         
         user_id = context.get("user_id")
         memory_manager = context.get("memory_manager")
@@ -701,7 +695,7 @@ class FunctionExecutor:
         """Handle set_timezone function."""
         from src.core.timezone import resolve_timezone_name, to_utc
         from src.memories.constants import MemoryKey
-        from src.scheduler import SchedulerService
+        from src.scheduler import api as scheduler_api
         
         user_id = context.get("user_id")
         timezone_str = params.get("timezone")
@@ -757,7 +751,7 @@ class FunctionExecutor:
                     updated_count = 0
                     for schedule in schedules:
                         if schedule.is_active and is_daily_schedule_family(schedule.schedule_type):
-                            updated = SchedulerService.update_daily_schedule(
+                            updated = scheduler_api.update_daily_schedule(
                                 schedule_id=schedule.schedule_id,
                                 time_str=preferred_time,
                                 session=session,
