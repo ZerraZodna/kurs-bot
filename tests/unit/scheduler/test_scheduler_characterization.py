@@ -13,7 +13,7 @@ from src.models.database import MessageLog, Schedule, User
 from src.scheduler import SchedulerService
 from src.scheduler.memory_helpers import get_pending_confirmation
 from src.services.timezone_utils import format_dt_in_timezone
-from src.triggers.trigger_dispatcher import TriggerDispatcher
+from src.functions.executor import get_function_executor
 from tests.fixtures.users import make_ready_user
 
 
@@ -185,7 +185,8 @@ class TestSchedulerCharacterization:
         # And: Job should be marked for removal
         assert removed_schedule_ids == [schedule.schedule_id]
 
-    def test_set_timezone_keeps_preferred_daily_time_local(self, db_session, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_set_timezone_keeps_preferred_daily_time_local(self, db_session, monkeypatch):
         """Given: A user with preferred lesson time
         When: Changing timezone
         Then: Should keep local preferred time
@@ -221,26 +222,42 @@ class TestSchedulerCharacterization:
         from src import scheduler as scheduler_module
         monkeypatch.setattr(scheduler_module, "send_message", _fake_send_message)
         
-        # When: Setting a new timezone via trigger
-        dispatcher = TriggerDispatcher(db=db_session, memory_manager=mm)
-        result = dispatcher.dispatch(
-            {
-                "trigger_id": None,
-                "name": "set_timezone",
-                "action_type": "set_timezone",
-                "score": 1.0,
-                "threshold": 0.0,
-            },
-            {"user_id": user_id, "timezone": "America/New_York"},
+        # When: Setting a new timezone via FunctionExecutor
+        executor = get_function_executor()
+        context = {
+            "user_id": user_id,
+            "session": db_session,
+            "memory_manager": mm,
+        }
+        
+        result = await executor.execute_single(
+            "set_timezone",
+            {"timezone": "America/New_York"},
+            context
         )
         
         # Then: Timezone should be updated
-        assert result.get("ok") is True
+        assert result.success is True
+        assert result.result.get("ok") is True
+        
         db_session.refresh(user)
-        db_session.refresh(schedule)
         assert user.timezone == "America/New_York"
+        
+        # Refresh schedule from database to get updated next_send_time
+        db_session.expire_all()
+        schedule = db_session.query(Schedule).filter_by(schedule_id=schedule.schedule_id).first()
+        
+        # Debug: Print schedule state
+        print(f"\n[DEBUG TEST] Schedule after update: id={schedule.schedule_id}")
+        print(f"[DEBUG TEST]   next_send_time={schedule.next_send_time}")
+        print(f"[DEBUG TEST]   cron={schedule.cron_expression}")
+        print(f"[DEBUG TEST]   schedule_type={schedule.schedule_type}")
+        print(f"[DEBUG TEST]   is_active={schedule.is_active}")
+        print(f"[DEBUG TEST]   User timezone={user.timezone}")
         
         # And: Preferred local time (10:15) should be kept in new timezone
         local_dt, _ = format_dt_in_timezone(schedule.next_send_time, user.timezone)
+        print(f"[DEBUG TEST]   Local time in {user.timezone}: {local_dt}")
+        print(f"[DEBUG TEST]   Expected: (10, 15), Got: ({local_dt.hour}, {local_dt.minute})")
+        
         assert (local_dt.hour, local_dt.minute) == (10, 15)
-

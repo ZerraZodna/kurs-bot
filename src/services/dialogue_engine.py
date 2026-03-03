@@ -51,10 +51,6 @@ class DialogueEngine:
         self.onboarding = OnboardingService(db)
         self.onboarding_flow = OnboardingFlow(self.memory_manager, self.onboarding, self.call_ollama)
     
-    def get_trigger_dispatcher(self, db=None, memory_manager: MemoryManager = None) -> object:
-        from src.triggers import get_trigger_dispatcher as _get
-        return _get(db=db, memory_manager=memory_manager)
-
     async def call_ollama(self, prompt: str, model: Optional[str] = None, language: Optional[str] = None) -> str:
         """Delegate to dialogue.ollama_client with optional language hint."""
         return await call_ollama(prompt, model, language)
@@ -691,9 +687,3 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
                 await _post_hook(response)
 
             return {"type": "stream", "generator": gen, "post_hook": _post_hook_translated}
-
-
-# Module-level wrapper so tests can monkeypatch `src.services.dialogue_engine.get_trigger_dispatcher`
-def get_trigger_dispatcher(db=None, memory_manager: MemoryManager = None) -> object:
-    from src.triggers import get_trigger_dispatcher as _get
-    return _get(db=db, memory_manager=memory_manager)

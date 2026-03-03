@@ -1,9 +1,9 @@
 """Triggers package - trigger definitions and dispatching logic.
 
 Public API:
-- `TriggerDispatcher` / `get_trigger_dispatcher`
+- `handle_triggers` - Process function calls from AI responses
 """
 
-from .trigger_dispatcher import TriggerDispatcher, get_trigger_dispatcher
+from .triggering import handle_triggers
 
-__all__ = ["TriggerDispatcher", "get_trigger_dispatcher"]
+__all__ = ["handle_triggers"]

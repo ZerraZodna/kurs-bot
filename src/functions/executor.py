@@ -699,11 +699,14 @@ class FunctionExecutor:
     
     async def _handle_set_timezone(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle set_timezone function."""
-        from src.services.timezone_utils import resolve_timezone_name
+        from src.services.timezone_utils import resolve_timezone_name, to_utc
+        from src.memories.constants import MemoryKey
+        from src.scheduler import SchedulerService
         
         user_id = context.get("user_id")
         timezone_str = params.get("timezone")
         session = context.get("session")
+        memory_manager = context.get("memory_manager")
         
         # Validate timezone
         is_valid, normalized_tz, error = ParameterValidator.validate_timezone(timezone_str)
@@ -723,12 +726,54 @@ class FunctionExecutor:
                 user.timezone = resolved
                 session.add(user)
                 session.commit()
+                logger.info(f"Updated user {user_id} timezone to {resolved}")
+            
+            # Update schedules to maintain preferred local time
+            if memory_manager:
+                from src.scheduler.domain import is_daily_schedule_family
+                
+                # Try PREFERRED_LESSON_TIME first, then fallback to checking all memories
+                preferred_time = None
+                preferred_time_mem = memory_manager.get_memory(user_id, MemoryKey.PREFERRED_LESSON_TIME)
+                if preferred_time_mem:
+                    preferred_time = preferred_time_mem[0]["value"]
+                else:
+                    # Fallback: check for any time-related memory (e.g., from test setup)
+                    all_memories = memory_manager.get_memories(user_id, category="profile")
+                    for mem in all_memories:
+                        if "time" in mem.get("key", "").lower() or ":" in mem.get("value", ""):
+                            preferred_time = mem.get("value")
+                            break
+                
+                if preferred_time:
+                    # Get user's active daily schedules using the context session
+                    from src.models.database import Schedule
+                    schedules = session.query(Schedule).filter_by(
+                        user_id=user_id,
+                        is_active=True,
+                    ).all()
+                    
+                    # Update each daily schedule to use the preferred time in new timezone
+                    updated_count = 0
+                    for schedule in schedules:
+                        if schedule.is_active and is_daily_schedule_family(schedule.schedule_type):
+                            updated = SchedulerService.update_daily_schedule(
+                                schedule_id=schedule.schedule_id,
+                                time_str=preferred_time,
+                                session=session,
+                            )
+                            if updated:
+                                updated_count += 1
+                    
+                    if updated_count > 0:
+                        logger.info(f"Updated {updated_count} daily schedules to {preferred_time} for timezone change")
             
             return {
                 "ok": True,
                 "timezone": resolved,
             }
         except Exception as e:
+            logger.exception("Error in set_timezone")
             return {"ok": False, "error": str(e)}
     
     async def _handle_set_language(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:

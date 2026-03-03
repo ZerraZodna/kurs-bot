@@ -10,7 +10,7 @@ from datetime import datetime, timezone, timedelta
 from src.models.database import SessionLocal, User, init_db, Memory, Schedule
 from src.memories import MemoryManager
 from src.services.dialogue_engine import DialogueEngine
-from src.triggers.trigger_dispatcher import get_trigger_dispatcher
+from src.functions.executor import get_function_executor
 from src.scheduler.core import SchedulerService
 
 
@@ -33,7 +33,7 @@ async def test_process_message_creates_one_time_reminder(monkeypatch):
         # (mirrors real-life state so the dialogue flow that depends on an existing daily schedule is exercised)
         SchedulerService.create_daily_schedule(user_id, lesson_id=None, time_str="12:00", session=db)
 
-        # Given: Monkeypatch the trigger handler to dispatch a create_schedule with schedule_spec
+        # Given: Monkeypatch the trigger handler to use FunctionExecutor
         async def fake_handle_triggers(*args, **kwargs):
             # Accept both positional and keyword args
             response = kwargs.get("response") if kwargs.get("response") is not None else (args[0] if len(args) > 0 else None)
@@ -42,17 +42,27 @@ async def test_process_message_creates_one_time_reminder(monkeypatch):
             memory_manager = kwargs.get("memory_manager") if kwargs.get("memory_manager") is not None else (args[3] if len(args) > 3 else None)
             user_id_arg = kwargs.get("user_id") if kwargs.get("user_id") is not None else (args[4] if len(args) > 4 else None)
 
-            dispatcher = get_trigger_dispatcher(session_arg, memory_manager)
+            # Use FunctionExecutor instead of legacy TriggerDispatcher
+            executor = get_function_executor()
+            context = {
+                "user_id": user_id_arg,
+                "session": session_arg,
+                "memory_manager": memory_manager,
+                "original_text": original_text,
+            }
+            
             # Build a one-time schedule spec inferred from user's text
             run_at = (datetime.now(timezone.utc) + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
-            spec = {
-                "schedule_type": "one_time_reminder",
-                "run_at": run_at.isoformat(),
-                "message": "Remind me to go out with the garbage at 12:00",
-            }
-            match = {"trigger_id": None, "name": "create_schedule", "action_type": "create_schedule", "score": 1.0, "threshold": 0.0}
-            # Dispatch with schedule_spec in context
-            dispatcher.dispatch(match, {"user_id": user_id_arg, "schedule_spec": spec, "original_text": original_text})
+            
+            # Execute create_one_time_reminder function
+            await executor.execute_single(
+                "create_one_time_reminder",
+                {
+                    "run_at": run_at.isoformat(),
+                    "message": "Remind me to go out with the garbage at 12:00",
+                },
+                context
+            )
 
         monkeypatch.setattr("src.triggers.triggering.handle_triggers", fake_handle_triggers)
 
@@ -83,4 +93,3 @@ async def test_process_message_creates_one_time_reminder(monkeypatch):
 
     finally:
         db.close()
-

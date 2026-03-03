@@ -4,7 +4,6 @@ from typing import Optional, Dict, Any
 
 from src.functions.intent_parser import get_intent_parser
 from src.functions.executor import get_function_executor, BatchExecutionResult
-from src.triggers.trigger_dispatcher import get_trigger_dispatcher
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -87,39 +86,10 @@ async def handle_triggers(
             # Store the full execution result for response building
             diagnostics["execution_result"] = execution_result
             
-            # For backward compatibility, also dispatch via the trigger system
-            dispatcher = get_trigger_dispatcher(session, memory_manager)
-            
-            for func in parse_result.functions:
-                action = func.get("name")
-                if action in dispatched_actions:
-                    logger.debug(f"Skipping duplicate action={action} for user={user_id}")
-                    continue
-                
-                logger.info(f"Dispatching function via trigger system: {action} for user={user_id}")
-                print(f"[INFO] Dispatching function via trigger system: {action} for user={user_id}")
-                logger.debug(f"Function parameters: {func.get('parameters')}")
-                print(f"[DEBUG] Function parameters: {func.get('parameters')}")
-                
-                # Create a match object compatible with the trigger dispatcher
-                match = {
-                    "trigger_id": None,
-                    "name": action,
-                    "action_type": action,
-                    "score": 1.0,
-                    "threshold": settings.TRIGGER_SIMILARITY_THRESHOLD,
-                }
-                
-                # Dispatch with parameters from the function call
-                dispatch_context = {
-                    "user_id": user_id,
-                    "original_text": original_text,
-                    **func.get("parameters", {})
-                }
-                
-                result = await dispatcher.dispatch(match, dispatch_context)
-                if result and result.get("ok"):
-                    dispatched_actions.add(action)
+            # Record which functions were successfully executed
+            for result in execution_result.results:
+                if result.success:
+                    dispatched_actions.add(result.function_name)
                     
             diagnostics["dispatched_actions"] = sorted(dispatched_actions)
             print(f"[INFO] Dispatched actions: {sorted(dispatched_actions)}")

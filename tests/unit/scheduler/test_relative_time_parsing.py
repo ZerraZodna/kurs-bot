@@ -177,11 +177,11 @@ class TestRelativeTimeParsing:
         # This confirms the bug: the code treated the local time as UTC
 
 
-class TestTriggerDispatcherTimeHandling:
-    """Test the trigger dispatcher's time handling for one-time reminders."""
+class TestFunctionExecutorTimeHandling:
+    """Test the function executor's time handling for one-time reminders."""
     
     def test_handle_create_schedule_infers_timezone(self):
-        """Test that _handle_create_schedule uses user's timezone for 'in X minutes'."""
+        """Test that create_schedule handler uses user's timezone for 'in X minutes'."""
         # This test will verify the fix works correctly
         pass  # Will implement after fix
 

@@ -85,6 +85,19 @@ import pytest
 TEST_DB_PATH = Path('src/data/test.db')
 TEST_DB_URL = f'sqlite:///{TEST_DB_PATH}'
 
+# Safety check: warn if DATABASE_URL points to prod.db before we override it
+# This ensures the warning appears at test startup, not after tests run
+_original_db_url = os.environ.get('DATABASE_URL', '')
+if 'prod.db' in _original_db_url:
+    # Use stderr and flush to ensure immediate output (not buffered by pytest -q)
+    import sys
+    sys.stderr.write("\n⚠️  WARNING: Detected test run with DATABASE_URL pointing to prod.db - overriding to test.db to avoid data loss.\n")
+    sys.stderr.flush()
+    import logging
+    logging.getLogger(__name__).warning(
+        "Detected test run with DATABASE_URL pointing to prod.db - overriding to test.db to avoid data loss."
+    )
+
 # Export DATABASE_URL so code using settings picks up the test DB
 os.environ['DATABASE_URL'] = TEST_DB_URL
 

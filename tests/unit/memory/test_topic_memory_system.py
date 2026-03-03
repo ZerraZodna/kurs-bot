@@ -1,6 +1,7 @@
 """Comprehensive test suite for topic-based memory system."""
 
 import pytest
+import random
 from datetime import datetime, timezone, timedelta
 
 from src.models.database import init_db, SessionLocal, Memory
@@ -13,7 +14,7 @@ from src.memories.constants import MemoryCategory
 @pytest.fixture
 def test_user_id():
     """Return a unique test user ID."""
-    return 999998
+    return random.randint(900000, 999999)
 
 
 @pytest.fixture

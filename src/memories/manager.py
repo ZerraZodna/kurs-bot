@@ -62,7 +62,7 @@ class MemoryManager:
         # Generate embedding if needed — removed in this branch.
         # If this memory indicates a preferred lesson time, do NOT modify schedules here.
         # Creating schedules is the responsibility of the schedule/triggering codepath
-        # (e.g. TriggerDispatcher) to avoid unexpected side-effects from memory writes.
+        # (e.g. FunctionExecutor) to avoid unexpected side-effects from memory writes.
         if key == MemoryKey.PREFERRED_LESSON_TIME:
             logger.info(f"Stored preferred_lesson_time for user {user_id} (no auto-schedule created)")
 

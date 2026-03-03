@@ -5,7 +5,6 @@ from src.models.database import SessionLocal, User, Schedule, init_db
 from src.memories import MemoryManager
 from src.scheduler import SchedulerService
 from src.scheduler import manager as schedule_manager
-from src.triggers.trigger_dispatcher import TriggerDispatcher
 from src.services.timezone_utils import format_dt_in_timezone, to_utc, parse_local_time_to_utc
 
 
@@ -60,22 +59,35 @@ def test_create_schedule_europe_oslo_0900():
         db.close()
 
 
+def _parse_run_at(run_at_val) -> datetime:
+    """Parse run_at values from multiple formats (moved from TriggerDispatcher)."""
+    if run_at_val is None:
+        return None
+    if isinstance(run_at_val, str):
+        try:
+            dt = datetime.fromisoformat(run_at_val)
+        except Exception:
+            from dateutil import parser as _dp
+            dt = _dp.parse(run_at_val)
+        return to_utc(dt)
+    if isinstance(run_at_val, (int, float)):
+        return to_utc(datetime.fromtimestamp(run_at_val, timezone.utc))
+    return None
+
+
 def test_parse_run_at_iso_and_epoch():
     db = SessionLocal()
     try:
-        mm = MemoryManager(db)
-        dispatcher = TriggerDispatcher(db=db, memory_manager=mm)
-
         now = datetime.now(timezone.utc).replace(microsecond=0)
         iso = now.isoformat()
-        parsed_iso = dispatcher._parse_run_at(iso)
+        parsed_iso = _parse_run_at(iso)
         assert parsed_iso is not None
         assert parsed_iso.tzinfo is not None
         # parsed_iso should be equal to to_utc(now)
         assert to_utc(parsed_iso) == to_utc(now)
 
         epoch = int(now.timestamp())
-        parsed_epoch = dispatcher._parse_run_at(epoch)
+        parsed_epoch = _parse_run_at(epoch)
         assert parsed_epoch is not None
         assert parsed_epoch.tzinfo is not None
         assert to_utc(parsed_epoch) == to_utc(datetime.fromtimestamp(epoch, timezone.utc))
