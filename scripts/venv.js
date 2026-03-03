@@ -208,7 +208,24 @@ switch (cmd) {
     } else {
       testArgs = ['--maxfail=3', '-n', 'auto', '-q'];
     }
-    runPyModule('pytest', testArgs);
+    // Extract -W flags (Python warning options) to place before -m pytest
+    const pythonFlags = [];
+    const pytestArgs = [];
+    for (let i = 0; i < testArgs.length; i++) {
+      if (testArgs[i] === '-W' && i + 1 < testArgs.length) {
+        pythonFlags.push('-W', testArgs[i + 1]);
+        i++; // skip the next arg as it's part of -W
+      } else if (testArgs[i].startsWith('-W')) {
+        pythonFlags.push(testArgs[i]);
+      } else {
+        pytestArgs.push(testArgs[i]);
+      }
+    }
+    const testPy = whichPython();
+    const finalArgs = [...pythonFlags, '-m', 'pytest', ...pytestArgs];
+    console.log('Using Python:', testPy);
+    console.log('Running:', testPy + ' ' + finalArgs.join(' '));
+    runCommand(testPy, finalArgs);
     break;
   case 'run':
     if (!cmdArgs[0]) {
