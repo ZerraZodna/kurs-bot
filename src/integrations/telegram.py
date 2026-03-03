@@ -472,10 +472,31 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                     # Run post-response hooks (trigger matching, etc.)
                     # This executes functions like send_todays_lesson which will send
                     # the lesson content as a separate message
+                    function_response_text = None
                     try:
-                        await result["post_hook"](full_response)
+                        diagnostics = await result["post_hook"](full_response)
+                        # Check if there are function execution results to send
+                        if diagnostics and diagnostics.get("execution_result"):
+                            from src.functions.response_builder import get_response_builder
+                            from src.functions.intent_parser import get_intent_parser
+                            
+                            response_builder = get_response_builder()
+                            parser = get_intent_parser()
+                            parse_result = parser.parse(full_response)
+                            
+                            built_response = response_builder.build(
+                                user_text=combined_text,
+                                ai_response_text=parse_result.response_text if parse_result.response_text is not None else full_response,
+                                execution_result=diagnostics["execution_result"],
+                                include_function_results=True,
+                            )
+                            function_response_text = built_response.text
                     except Exception as e:
                         print(f"[stream post_hook error] {e}")
+                    
+                    # Send function results if we have them (e.g., lesson content from send_todays_lesson)
+                    if function_response_text and function_response_text.strip():
+                        await send_message(chat_id, function_response_text)
                 else:
                     # Non-LLM response — send normally
                     logger.info(f"[batch] Using NON-STREAMING (text) path for user_id={user_id}")

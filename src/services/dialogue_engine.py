@@ -626,15 +626,17 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
         is_english = not user_lang or user_lang.lower() == "en"
 
         # Post-hook: runs trigger matching after the full text is available
+        # Returns diagnostics dict with execution_result for response building
         async def _post_hook(full_response_text: str):
             from src.triggers.triggering import handle_triggers
-            await handle_triggers(
+            diagnostics = await handle_triggers(
                 response=full_response_text,
                 original_text=text,
                 session=session,
                 memory_manager=self.memory_manager,
                 user_id=user_id,
             )
+            return diagnostics
 
         def _extract_response_text(full_response_text: str) -> str:
             """Extract just the response text from potentially JSON-formatted response."""
