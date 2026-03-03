@@ -13,9 +13,8 @@ from datetime import datetime, timezone, timedelta
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.memories.semantic_search import get_semantic_search_service
 from src.memories.memory_handler import MemoryHandler
-from src.scheduler import SchedulerService
+from src.scheduler import api as scheduler_api
 from src.scheduler.domain import SCHEDULE_TYPE_DAILY
-from src.models.database import Schedule
 from src.services.gdpr_service import (
     export_user_data,
     restrict_processing,
@@ -256,10 +255,7 @@ def handle_debug_next_day(
 ) -> Optional[str]:
     """Advance the debug day offset and execute daily schedules once.
 
-    This command intentionally exercises production scheduling logic by calling
-    `SchedulerService.execute_scheduled_task(..., simulate=True)`. In this codebase,
-    `simulate=True` means "simulate a new day trigger" for flow testing, not a
-    dry run; outbound messages can still be sent.
+    This command uses scheduler.api to find and execute daily schedules.
     """
     if text.strip().lower() != "next_day":
         return None
@@ -298,25 +294,25 @@ def handle_debug_next_day(
                 ttl_hours=1,
                 category=MemoryCategory.CONVERSATION.value,
             )
-    schedules = []
-    if session:
-        schedules = (
-            session.query(Schedule)
-            .filter(
-                Schedule.user_id == user_id,
-                Schedule.is_active == True,
-                Schedule.schedule_type == SCHEDULE_TYPE_DAILY,
-            )
-            .all()
-        )
-    if schedules:
+    
+    # Use scheduler.api to get user's daily schedules
+    schedules = scheduler_api.get_user_schedules(
+        user_id=user_id,
+        active_only=True,
+        session=session,
+    )
+    
+    # Filter for daily schedules only
+    daily_schedules = [s for s in schedules if s.schedule_type == SCHEDULE_TYPE_DAILY]
+    
+    if daily_schedules:
         # Use the production scheduler simulation path so we exercise
         # the same code paths used in production. Collect returned
         # simulated messages (if any) and return them to the caller.
         messages = []
-        for schedule in schedules:
+        for schedule in daily_schedules:
             try:
-                result = SchedulerService.execute_scheduled_task(schedule.schedule_id, simulate=True, session=session)
+                result = scheduler_api.execute_scheduled_task(schedule.schedule_id, simulate=True, session=session)
                 if result:
                     # result is expected to be a list of messages when simulate=True
                     if isinstance(result, list):

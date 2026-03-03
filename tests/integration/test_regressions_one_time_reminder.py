@@ -65,7 +65,8 @@ async def test_process_message_creates_one_time_reminder_with_tomorrow(monkeypat
         monkeypatch.setattr("src.triggers.triggering.handle_triggers", fake_handle_triggers)
 
         # Given: Prevent pre-LLM schedule detection so the flow reaches the LLM + trigger path
-        monkeypatch.setattr(dialogue.onboarding, "detect_schedule_request", lambda text: False)
+        from src.scheduler import detection as scheduler_detection
+        monkeypatch.setattr(scheduler_detection, "detect_schedule_request", lambda text: False)
 
         # When: Call process_message which will invoke the fake trigger handler
         resp = await dialogue.process_message(user_id, "Remind me tomorrow at 12:00 to take out the garbage", db)

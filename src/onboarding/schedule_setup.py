@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 import logging
 
 from src.scheduler import api as scheduler_api
-from src.scheduler import manager as schedule_manager
 from src.scheduler.domain import SCHEDULE_TYPE_DAILY
 
 logger = logging.getLogger(__name__)
@@ -20,7 +19,7 @@ def check_existing_schedule(db: Session, user_id: int) -> Optional[tuple]:
     Returns:
         (hour, minute) tuple if schedule exists, None otherwise
     """
-    sched = schedule_manager.find_active_daily_schedule(user_id, session=db)
+    sched = scheduler_api.find_active_daily_schedule(user_id, session=db)
     if sched and sched.next_send_time:
         return (sched.next_send_time.hour, sched.next_send_time.minute)
     return None
@@ -34,7 +33,7 @@ def create_auto_schedule(db: Session, user_id: int) -> bool:
         True if schedule created, False if already exists or error
     """
     try:
-        existing = schedule_manager.find_active_daily_schedule(user_id, session=db)
+        existing = scheduler_api.find_active_daily_schedule(user_id, session=db)
         if existing:
             logger.info(f"Schedule already exists for user {user_id}")
             return False

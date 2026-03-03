@@ -291,3 +291,28 @@ def parse_time_string(time_str: str) -> tuple[int, int]:
     from .time_utils import parse_time_string as _parse_time
     
     return _parse_time(time_str)
+
+
+def execute_scheduled_task(
+    schedule_id: int,
+    simulate: bool = False,
+    session: Optional[Session] = None,
+) -> Any:
+    """
+    Execute a scheduled task immediately.
+    
+    Args:
+        schedule_id: The schedule ID to execute
+        simulate: If True, simulate execution without sending messages
+        session: Optional database session
+        
+    Returns:
+        Execution result (list of messages or None)
+    """
+    from . import execution as scheduler_execution
+    
+    return scheduler_execution.execute_scheduled_task(
+        schedule_id=schedule_id,
+        simulate=simulate,
+        session=session,
+    )
