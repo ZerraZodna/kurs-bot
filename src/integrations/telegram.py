@@ -453,6 +453,7 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                     
                     if not full_response:
                         ai_response = "[No response from LLM]"
+                        await send_message(chat_id, ai_response)
                     else:
                         # Extract just the response text if the response contains JSON
                         extract_text_fn = result.get("extract_text")
@@ -460,43 +461,41 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                             ai_response = extract_text_fn(full_response)
                         else:
                             ai_response = full_response
-                    
-                    logger.info(f"[batch] Final ai_response to send: {ai_response[:200] if ai_response else 'EMPTY'}...")
-                    
-                    # Only send message if there's actual content (not empty/whitespace)
-                    # When response is empty (e.g., function call only), skip sending
-                    # and let the function execution handle the response
-                    if ai_response and ai_response.strip():
-                        await send_message(chat_id, ai_response)
-                    
-                    # Run post-response hooks (trigger matching, etc.)
-                    # This executes functions like send_todays_lesson which will send
-                    # the lesson content as a separate message
-                    function_response_text = None
-                    try:
-                        diagnostics = await result["post_hook"](full_response)
-                        # Check if there are function execution results to send
-                        if diagnostics and diagnostics.get("execution_result"):
-                            from src.functions.response_builder import get_response_builder
-                            from src.functions.intent_parser import get_intent_parser
-                            
-                            response_builder = get_response_builder()
-                            parser = get_intent_parser()
-                            parse_result = parser.parse(full_response)
-                            
-                            built_response = response_builder.build(
-                                user_text=combined_text,
-                                ai_response_text=parse_result.response_text if parse_result.response_text is not None else full_response,
-                                execution_result=diagnostics["execution_result"],
-                                include_function_results=True,
-                            )
-                            function_response_text = built_response.text
-                    except Exception as e:
-                        print(f"[stream post_hook error] {e}")
-                    
-                    # Send function results if we have them (e.g., lesson content from send_todays_lesson)
-                    if function_response_text and function_response_text.strip():
-                        await send_message(chat_id, function_response_text)
+                        
+                        logger.info(f"[batch] Extracted ai_response: {ai_response[:200] if ai_response else 'EMPTY'}...")
+                        
+                        # Run post-response hooks FIRST to check for function calls
+                        # This prevents duplicate messages when functions are executed
+                        function_response_text = None
+                        has_function_results = False
+                        try:
+                            diagnostics = await result["post_hook"](full_response)
+                            # Check if there are function execution results to send
+                            if diagnostics and diagnostics.get("execution_result"):
+                                from src.functions.response_builder import get_response_builder
+                                from src.functions.intent_parser import get_intent_parser
+                                
+                                response_builder = get_response_builder()
+                                parser = get_intent_parser()
+                                parse_result = parser.parse(full_response)
+                                
+                                built_response = response_builder.build(
+                                    user_text=combined_text,
+                                    ai_response_text=parse_result.response_text if parse_result.response_text is not None else full_response,
+                                    execution_result=diagnostics["execution_result"],
+                                    include_function_results=True,
+                                )
+                                function_response_text = built_response.text
+                                has_function_results = True
+                        except Exception as e:
+                            print(f"[stream post_hook error] {e}")
+                        
+                        # If we have function results, send the combined response once
+                        # Otherwise, send just the AI text (to avoid duplication)
+                        if has_function_results and function_response_text and function_response_text.strip():
+                            await send_message(chat_id, function_response_text)
+                        elif ai_response and ai_response.strip():
+                            await send_message(chat_id, ai_response)
                 else:
                     # Non-LLM response — send normally
                     logger.info(f"[batch] Using NON-STREAMING (text) path for user_id={user_id}")
