@@ -451,7 +451,7 @@ class TriggerDispatcher:
             return result
 
     def _handle_send_todays_lesson(self, match: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle send_todays_lesson function - sends lesson content to user."""
+        """Handle send_todays_lesson function - returns lesson content to be sent via response builder."""
         from src.lessons.state import compute_current_lesson_state
         from src.models.database import Lesson
         
@@ -476,16 +476,8 @@ class TriggerDispatcher:
                 result.update({"ok": False, "error": f"Lesson {lesson_id} not found"})
                 return result
             
-            # Format lesson message
-            lesson_text = f"📖 **Lesson {lesson_id}**: {lesson.title}\n\n{lesson.content}"
-            
-            # Send to user via Telegram
-            user = self.db.query(User).filter_by(user_id=user_id).first()
-            if user and getattr(user, 'external_id', None):
-                import asyncio
-                chat_id = int(user.external_id)
-                asyncio.run(_scheduler_pkg.send_message(chat_id, lesson_text))
-            
+            # Return lesson data - response builder will format and send it
+            # Do NOT send directly to Telegram to avoid recursive message handling
             result.update({
                 "ok": True,
                 "lesson_id": lesson_id,
@@ -497,6 +489,7 @@ class TriggerDispatcher:
             result.update({"ok": False, "error": str(e)})
             return result
     def _handle_set_timezone(self, match: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle set_timezone function - returns confirmation to be sent via response builder."""
         user_id = context.get("user_id")
         result: Dict[str, Any] = {"ok": False, "action": "set_timezone"}
 
@@ -576,20 +569,9 @@ class TriggerDispatcher:
                 if not updated and time_str:
                     SchedulerService.create_daily_schedule(user_id=user_id, lesson_id=sched.lesson_id, time_str=time_str, session=self.db)
             
-
+            # Return success - response builder will format and send confirmation
+            # Do NOT send directly to Telegram to avoid recursive message handling
             result.update({"ok": True, "timezone": tz_name})
-
-            conf_text = f"Okay — timezone set to {tz_name}. I'll use local time for your reminders."
-            user_lang = get_user_language(self.memory_manager, user_id)
-            if user_lang and user_lang.lower() not in ("en",):
-                conf_text = translate_text_sync(conf_text, user_lang)
-
-            user = self.db.query(User).filter_by(user_id=user_id).first()
-            if user and getattr(user, 'external_id', None):
-                import asyncio
-                chat_id = int(user.external_id)
-                asyncio.run(_scheduler_pkg.send_message(chat_id, conf_text))
-
             return result
         except Exception as e:
             self.db.rollback()
@@ -597,6 +579,7 @@ class TriggerDispatcher:
             return result
 
     def _handle_query_schedule(self, match: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle query_schedule function - returns schedule data to be sent via response builder."""
         user_id = context.get("user_id")
         result: Dict[str, Any] = {"ok": False, "action": "query_schedule"}
         try:
@@ -614,19 +597,29 @@ class TriggerDispatcher:
             if user_lang and user_lang.lower() not in ("en",):
                 resp_text = translate_text_sync(resp_text, user_lang)
 
-            user = self.db.query(User).filter_by(user_id=user_id).first()
-            if user and getattr(user, 'external_id', None):
-                import asyncio
-                chat_id = int(user.external_id)
-                asyncio.run(_scheduler_pkg.send_message(chat_id, resp_text))
-
-            result.update({"ok": True, "note": "sent"})
+            # Return schedule data - response builder will format and send it
+            # Do NOT send directly to Telegram to avoid recursive message handling
+            result.update({
+                "ok": True, 
+                "note": "schedules_retrieved",
+                "schedules": [
+                    {
+                        "schedule_id": s.schedule_id,
+                        "schedule_type": s.schedule_type,
+                        "cron_expression": s.cron_expression,
+                        "next_send_time": s.next_send_time.isoformat() if s.next_send_time else None,
+                        "is_active": s.is_active,
+                        "message": getattr(s, 'message', None),
+                    } for s in schedules
+                ],
+                "response_text": resp_text,
+            })
             return result
         except Exception as e:
             result.update({"ok": False, "error": str(e)})
             return result
 
-    def dispatch(self, match: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    async def dispatch(self, match: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Dispatch a single match.
 
         match: {trigger_id, name, action_type, score, threshold}

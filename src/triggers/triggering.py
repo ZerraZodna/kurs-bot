@@ -117,7 +117,7 @@ async def handle_triggers(
                     **func.get("parameters", {})
                 }
                 
-                result = dispatcher.dispatch(match, dispatch_context)
+                result = await dispatcher.dispatch(match, dispatch_context)
                 if result and result.get("ok"):
                     dispatched_actions.add(action)
                     
