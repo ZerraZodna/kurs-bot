@@ -377,22 +377,21 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
     try:
         def _format_mem_lines(mems: list) -> list:
             out = []
+            out.append("Memory")
             for mem in mems:
                 date = getattr(mem, "created_at", None)
-                date_short = date.strftime("%Y-%m-%d %H:%M") if date is not None else "-"
+                date_short = date.strftime("%m-%d %H:%M") if date is not None else "-"
                 key = getattr(mem, "key", "")
-                key_part = f" {key}" if key else ""
+                key_part = f"{key}" if key else ""
                 val = mem.value or ""
-                # Escape underscores in category as well
                 category = getattr(mem, "category", "")
-                if len(val) > 400:
-                    val = val[:397] + "..."
+                if len(val) > 300:
+                    val = val[:297] + "..."
                 category = (category or "")
-                # Replace ASCII underscore with a visually identical fullwidth
-                # underscore (U+FF3F) which is preserved by most renderers
-                # including Telegram and web UIs that strip markdown.
-                line = f"{date_short}: {category}{key_part}: \"{val}\""
-                line = line.replace("_", "＿")
+                                
+                # Wrap label in backticks to prevent Markdown italics from underscores
+                # Format: date `label` "value"
+                line = f'{date_short} {category}.{key_part}={val}'
                 out.append(line)
             return out
 
@@ -421,7 +420,7 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
             if not rows:
                 return "You have no memories stored."
             lines = _format_mem_lines(rows)
-            return "\n".join(lines)
+            return "```\n" + "\n".join(lines) + "\n```"
 
         # Otherwise run a semantic search for the provided query tail and list matching memories
         def _run_coro_sync(coro):
@@ -475,7 +474,7 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
                 return "No results for query"
             mems = [m for (m, s) in results]
             lines = _format_mem_lines(mems)
-            return "\n".join(lines)
+            return "```\n" + "\n".join(lines) + "\n```"
         except Exception as e:
             logger.exception("Semantic search failed for list memories: %s", e)
             # Include exception text to help debugging in dev environments

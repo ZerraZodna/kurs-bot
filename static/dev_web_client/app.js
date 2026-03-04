@@ -3,59 +3,48 @@ const userIdInput = document.getElementById('user_id')
 const textInput = document.getElementById('text')
 const sendBtn = document.getElementById('send')
 
-// Minimal Markdown -> HTML renderer for the dev web UI.
-// Handles headings, bold (**text**), italic (*text*), bold-italic (***text***),
-// inline code, paragraphs, line breaks, and simple unordered lists (- or *).
-function escapeHtml(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
-function markdownToHtml(md) {
+// Use server-side markdown rendering for DRY principle
+// All markdown processing is now done by the unified Python module
+async function renderMarkdown(md) {
   if (!md) return ''
-
-  // Normalize line endings
-  md = md.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-
-  // Escape first to avoid accidental raw HTML; DOMPurify will still sanitize.
-  md = escapeHtml(md)
-
-  // Bold-italic ***text*** -> <strong><em>text</em></strong>
-  md = md.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
-  // Bold **text** or __text__
-  md = md.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  md = md.replace(/__(.+?)__/g, '<strong>$1</strong>')
-  // Italic *text* or _text_
-  md = md.replace(/\*(.+?)\*/g, '<em>$1</em>')
-  md = md.replace(/_(.+?)_/g, '<em>$1</em>')
-  // Inline code `code`
-  md = md.replace(/`([^`]+?)`/g, '<code>$1</code>')
-
-  // Headings: # .. ######
-  md = md.replace(/^######\s*(.+)$/gm, '<h6>$1</h6>')
-  md = md.replace(/^#####\s*(.+)$/gm, '<h5>$1</h5>')
-  md = md.replace(/^####\s*(.+)$/gm, '<h4>$1</h4>')
-  md = md.replace(/^###\s*(.+)$/gm, '<h3>$1</h3>')
-  md = md.replace(/^##\s*(.+)$/gm, '<h2>$1</h2>')
-  md = md.replace(/^#\s*(.+)$/gm, '<h1>$1</h1>')
-
-  // Lists: group consecutive lines starting with - or * into <ul>
-  md = md.replace(/(^|\n)([ \t]*([-\*])\s+.+(?:\n[ \t]*[-\*]\s+.+)*)/g, function(_, pre, block) {
-    const items = block.split(/\n/).map(l => l.replace(/^\s*[-\*]\s+/, ''))
-    return pre + '<ul>' + items.map(i => '<li>' + i + '</li>').join('') + '</ul>'
-  })
-
-  // Paragraphs: split on double newlines
-  const parts = md.split(/\n{2,}/g)
-  const htmlParts = parts.map(p => {
-    // If already a block element, leave as-is
-    if (/^<h[1-6]>/.test(p) || /^<ul>/.test(p) ) return p.replace(/\n/g, '<br>')
-    return '<p>' + p.replace(/\n/g, '<br>') + '</p>'
-  })
-
-  return htmlParts.join('\n')
+  
+  try {
+    const apiBaseRaw = (window.__DEV_API_BASE || '').trim()
+    const apiBase = apiBaseRaw.endsWith('/') ? apiBaseRaw.slice(0, -1) : apiBaseRaw
+    const url = apiBase ? `${apiBase}/api/render-markdown` : '/api/render-markdown'
+    
+    console.log('[renderMarkdown] Calling API:', url)
+    console.log('[renderMarkdown] Input markdown length:', md.length)
+    
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: md, for_telegram: false }),
+    })
+    
+    console.log('[renderMarkdown] Response status:', resp.status)
+    
+    if (!resp.ok) {
+      const errorText = await resp.text()
+      console.error('[renderMarkdown] API error:', resp.status, errorText)
+      throw new Error(`HTTP ${resp.status}: ${errorText}`)
+    }
+    
+    const data = await resp.json()
+    console.log('[renderMarkdown] Response data:', data)
+    return data.html || ''
+  } catch (e) {
+    console.error('[renderMarkdown] Failed:', e)
+    // Fallback: return plain text with HTML escaping
+    return escapeHtml(md)
+  }
 }
 
-function appendMessage(role, text) {
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '<').replace(/>/g, '>')
+}
+
+async function appendMessage(role, text) {
   const el = document.createElement('div')
   el.className = 'msg ' + role
 
@@ -65,11 +54,11 @@ function appendMessage(role, text) {
     // keep user input as plain text to avoid injection
     el.textContent = prefix + text
   } else {
-    // render bot output as sanitized HTML when available
+    // Use server-side markdown rendering for consistent output with Telegram
+    const html = await renderMarkdown(text)
     if (window.DOMPurify && typeof DOMPurify.sanitize === 'function') {
-      // Convert basic Markdown to HTML, then sanitize.
-      const html = markdownToHtml(text)
-      el.innerHTML = prefix + DOMPurify.sanitize(html)
+      // Wrap prefix in a span to separate it from block-level HTML elements
+      el.innerHTML = '<span class="msg-prefix">' + prefix + '</span>' + DOMPurify.sanitize(html)
     } else {
       // fallback: plain text
       el.textContent = prefix + text
@@ -84,7 +73,14 @@ async function send() {
   const user_id = parseInt(userIdInput.value || '1')
   const text = textInput.value || ''
   if (!text) return
-  appendMessage('user', text)
+  
+  // Add user message immediately
+  const userEl = document.createElement('div')
+  userEl.className = 'msg user'
+  userEl.textContent = 'You: ' + text
+  chat.appendChild(userEl)
+  chat.scrollTop = chat.scrollHeight
+  
   textInput.value = ''
 
   try {
@@ -103,9 +99,11 @@ async function send() {
     const body = data && typeof data === 'object'
       ? (data.response || raw)
       : raw
-    appendMessage('bot', body || '(empty response)')
+    
+    // Use async appendMessage for bot response
+    await appendMessage('bot', body || '(empty response)')
   } catch (e) {
-    appendMessage('bot', `Request failed: ${e.message} (url=${window.__DEV_API_BASE || '/'}dev/message)`)
+    await appendMessage('bot', `Request failed: ${e.message} (url=${window.__DEV_API_BASE || '/'}dev/message)`)
     console.error('DEV UI fetch error', e)
   }
 }

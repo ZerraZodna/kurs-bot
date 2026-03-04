@@ -1,12 +1,12 @@
 import asyncio
 import httpx
 import logging
-import re
 import time
 from typing import Optional, Dict, Any, AsyncIterator
 from datetime import datetime, timedelta, timezone
 from src.config import settings
 from src.models.database import SessionLocal, MessageLog, BatchLock
+from src.core.markdown_processor import markdown_to_telegram_html
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ async def edit_message(chat_id: int, message_id: int, text: str) -> Optional[dic
     if not TELEGRAM_BOT_TOKEN:
         return None
     url = f"{API_BASE}/editMessageText"
-    html_text = _markdown_to_html(text)
+    html_text = markdown_to_telegram_html(text)
     payload = {
         "chat_id": chat_id,
         "message_id": message_id,
@@ -163,7 +163,7 @@ async def send_message(chat_id: int, text: str) -> Optional[dict]:
         chunks = _split_text(text, max_len) or [""]
         last_response = None
         for chunk in chunks:
-            html_chunk = _markdown_to_html(chunk)
+            html_chunk = markdown_to_telegram_html(chunk)
             payload = {
                 "chat_id": chat_id,
                 "text": html_chunk,
@@ -197,80 +197,6 @@ async def send_message(chat_id: int, text: str) -> Optional[dict]:
         return last_response
 
 
-def _markdown_to_html(text: str) -> str:
-    """
-    Convert markdown formatting to HTML for Telegram.
-    
-    Converts:
-    - # Heading 1 -> <b>Heading 1</b> (bold with newlines)
-    - ## Heading 2 -> <b>Heading 2</b> (bold with newlines)
-    - ### Heading 3 -> <b>Heading 3</b> (bold with newlines)
-    - **text** -> <b>text</b> (bold)
-    - *text* -> <i>text</i> (italic)
-    - ***text*** -> <b><i>text</i></b> (bold italic)
-    - `text` -> <code>text</code> (code)
-    - [text](url) -> <a href="url">text</a> (links)
-    """
-    # Repair PDF/import artifacts like: a****** ******meaningless -> a meaningless
-    text = _repair_asterisk_artifacts(text)
-
-    # Promote table-like plain text into fenced blocks so Telegram renders them
-    # in a monospaced <pre> block instead of proportional body text.
-    text = _promote_table_blocks_to_fenced_code(text)
-
-    # Escape HTML-sensitive characters first to avoid invalid HTML
-    text = _escape_html(text)
-
-    # Convert fenced code blocks first to avoid further markdown substitutions.
-    text = _fenced_code_to_pre(text)
-
-    # Order matters: process longest patterns first to avoid conflicts
-    
-    # 0. Headings (must be done FIRST before bold processing)
-    # ### Heading -> <b>Heading</b> with newlines
-    text = re.sub(r'^### (.+?)$', r'\n<b>\1</b>', text, flags=re.MULTILINE)
-    text = re.sub(r'^## (.+?)$', r'\n<b>\1</b>', text, flags=re.MULTILINE)
-    text = re.sub(r'^# (.+?)$', r'\n<b>\1</b>', text, flags=re.MULTILINE)
-    
-    # 1. Bold italic: ***text*** -> <b><i>text</i></b>
-    # Guard with lookarounds so literal asterisk runs (e.g. "a******")
-    # are not interpreted as nested formatting.
-    text = re.sub(r'(?<!\*)\*\*\*([^*\n]+?)\*\*\*(?!\*)', r'<b><i>\1</i></b>', text)
-    
-    # 2. Bold: **text** -> <b>text</b>
-    text = re.sub(r'(?<!\*)\*\*(?!\*)([^*\n]+?)(?<!\*)\*\*(?!\*)', r'<b>\1</b>', text)
-    
-    # 3. Italic: *text* -> <i>text</i>
-    text = re.sub(r'(?<!\*)\*(?!\*)([^*\n]+?)(?<!\*)\*(?!\*)', r'<i>\1</i>', text)
-    
-    # 4. Code: `text` -> <code>text</code>
-    text = re.sub(r'`(.+?)`', r'<code>\1</code>', text)
-    
-    # 5. Links: [text](url) -> <a href="url">text</a>
-    text = re.sub(r'\[(.+?)\]\((.+?)\)', r'<a href="\2">\1</a>', text)
-    
-    return text
-
-
-def _escape_html(text: str) -> str:
-    return (
-        text.replace("&", "&amp;")
-        .replace("<", "<")
-        .replace(">", ">")
-    )
-
-
-def _repair_asterisk_artifacts(text: str) -> str:
-    # Common importer/PDF artifact in some lessons:
-    #   "a****** ******meaningless" -> "a meaningless"
-    #   "a**** ****meaningless" -> "a meaningless"
-    # Only strip multi-asterisk runs between word characters so legitimate
-    # markdown markers like *italic* / **bold** are unaffected.
-    text = re.sub(r'(?<=\w)\*{2,}(?:\s+\*{2,})+(?=\w)', ' ', text)
-    text = re.sub(r'(?<=\w)\*{2,}(?=\w)', '', text)
-    return text
-
-
 def _split_text(text: str, max_len: int) -> list[str]:
     if len(text) <= max_len:
         return [text]
@@ -285,91 +211,6 @@ def _split_text(text: str, max_len: int) -> list[str]:
     if remaining:
         chunks.append(remaining)
     return chunks
-
-
-def _fenced_code_to_pre(text: str) -> str:
-    pattern = re.compile(r"```(?:[A-Za-z0-9_+-]+)?\n?(.*?)```", re.DOTALL)
-
-    def _replace(match: re.Match) -> str:
-        content = match.group(1).strip("\n")
-        return f"<pre>{content}</pre>"
-
-    return pattern.sub(_replace, text)
-
-
-def _promote_table_blocks_to_fenced_code(text: str) -> str:
-    lines = text.splitlines()
-    if not lines:
-        return text
-
-    out: list[str] = []
-    i = 0
-    while i < len(lines):
-        if not _is_table_candidate_line(lines[i]):
-            out.append(lines[i])
-            i += 1
-            continue
-
-        j = i
-        block: list[str] = []
-        while j < len(lines) and _is_table_candidate_line(lines[j]):
-            block.append(lines[j])
-            j += 1
-
-        if _should_wrap_table_block(block):
-            out.append("```")
-            out.extend(block)
-            out.append("```")
-        else:
-            out.extend(block)
-
-        i = j
-
-    return "\n".join(out)
-
-
-def _is_table_candidate_line(line: str) -> bool:
-    stripped = line.strip()
-    if not stripped:
-        return False
-    if _contains_box_drawing_char(stripped):
-        return True
-    if re.match(r"^\+[-=:+\s]+(?:\+[-=:+\s]+)+\+?$", stripped):
-        return True
-    if stripped.startswith("|") and stripped.endswith("|") and stripped.count("|") >= 2:
-        return True
-    if "|" in stripped:
-        cells = [c.strip() for c in stripped.strip("|").split("|")]
-        if len(cells) >= 2 and any(cells):
-            return True
-    return False
-
-
-def _should_wrap_table_block(block: list[str]) -> bool:
-    if len(block) < 2:
-        return False
-
-    has_strong_separator = any(_is_table_separator_line(line.strip()) for line in block)
-    has_box = any(_contains_box_drawing_char(line) for line in block)
-    if has_box or has_strong_separator:
-        return True
-
-    # Fallback for simple pipe-based tables without explicit separators.
-    return len(block) >= 3 and any("|" in line for line in block)
-
-
-def _is_table_separator_line(stripped: str) -> bool:
-    if not stripped:
-        return False
-    if re.match(r"^\+[-=:+\s]+(?:\+[-=:+\s]+)+\+?$", stripped):
-        return True
-    if re.match(r"^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$", stripped):
-        return True
-    return False
-
-
-def _contains_box_drawing_char(line: str) -> bool:
-    return any(ch in line for ch in "┌┬┐├┼┤└┴┘│─═╔╗╚╝╠╣╦╩")
 
 
 async def process_telegram_batch(user_id: int, external_id: str) -> None:

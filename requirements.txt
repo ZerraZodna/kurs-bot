@@ -20,6 +20,7 @@ pydantic_core==2.41.5
 numpy
 pydantic-settings
 pymupdf
+markdown
 
 # Note: sentence-transformers removed in Phase 3 - embedding infrastructure
 # now only used for semantic memory search (RAG mode) via Ollama API

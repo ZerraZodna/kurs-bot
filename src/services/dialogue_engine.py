@@ -328,7 +328,6 @@ class DialogueEngine:
             built_response = response_builder.build(
                 user_text=text,
                 ai_response_text=parse_result.response_text if parse_result.response_text is not None else response,
-                execution_result=execution_result,
                 include_function_results=True,
             )
             return built_response.text

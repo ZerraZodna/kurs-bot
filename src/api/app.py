@@ -243,9 +243,38 @@ if DEV_WEB:
     app.mount("/dev/static", StaticFiles(directory=static_dir), name="dev_static")
     app.include_router(dev_router)
 
+from pydantic import BaseModel
+from src.core.markdown_processor import markdown_to_html, markdown_to_telegram_html
+
+
+class MarkdownRequest(BaseModel):
+    text: str
+    for_telegram: bool = False
+
+
+class MarkdownResponse(BaseModel):
+    html: str
+
+
 @app.get("/")
 async def root():
     return {"status": "ok", "service": "kurs-bot prototype"}
+
+
+@app.post("/api/render-markdown", response_model=MarkdownResponse)
+async def render_markdown(request: MarkdownRequest):
+    """
+    Convert markdown text to HTML.
+    
+    This endpoint provides a single source of truth for markdown processing
+    across all platforms (WebUI, Telegram, etc.).
+    """
+    if request.for_telegram:
+        html = markdown_to_telegram_html(request.text)
+    else:
+        html = markdown_to_html(request.text)
+    
+    return MarkdownResponse(html=html)
 
 
 # `nightly_memory_purge` moved to `src/services/maintenance.py`.
