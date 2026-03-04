@@ -136,10 +136,8 @@ async def extract_and_store_memories(
                         ttl_hours=memory.get("ttl_hours"),
                         source="dialogue_engine_extractor",
                     )
-                logger.debug(f"stored memory for user {user_id}: {memory.get('key')}={memory.get('value')}")
-                val = memory.get('value')
                 sval = str(val) if val is not None else ''
-                logger.info(f"Stored memory for user {user_id}: {memory.get('key')}={sval[:50]}")
+                logger.debug(f"Memory saved: user={user_id} key={memory.get('key')} value={sval[:50]}")
             except Exception as e:
                 logger.error(f"Error storing memory: {e}")
 

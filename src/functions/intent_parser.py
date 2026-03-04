@@ -167,7 +167,7 @@ class IntentParser:
                         errors.extend(func_errors)
                     else:
                         functions.append(func)
-                        logger.debug(f"Extracted function: {func.get('name')} with params: {func.get('parameters')}")
+                        logger.debug(f"Function extracted: {func.get('name')} with params: {func.get('parameters')}")
         # Also support legacy "intent" field for backward compatibility
         elif "intent" in data:
             intent = data["intent"]
