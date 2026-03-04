@@ -276,7 +276,7 @@ This section documents where personal data is stored, logged, and transmitted th
         - Stored in: Users (external_id/channel), MessageLog (content/status)
 
 2. **Processing & Memory Extraction**
-        - DialogueEngine and MemoryExtractor derive structured memories from message content
+        - DialogueEngine and MemoryJudge derive structured memories from message content
         - Stored in: Memory (key/value/category/metadata)
 
 3. **Scheduling**

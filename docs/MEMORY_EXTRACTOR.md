@@ -1,8 +1,10 @@
-# Memory Extractor Service
+# Memory Judge Service
 
 ## Overview
 
-The **Memory Extractor Service** automatically extracts meaningful user facts, preferences, and goals from conversation messages using an offline Ollama LLM. It works with any language (English, Norwegian, etc.) and intelligently decides what's worth storing.
+The **Memory Judge Service** automatically extracts and validates meaningful user facts, preferences, and goals from conversation messages using an offline Ollama LLM. It works with any language (English, Norwegian, etc.) and intelligently decides what's worth storing.
+
+**Note:** This replaces the old `MemoryExtractor` with a combined extraction + validation system in a single Ollama call.
 
 ## How It Works
 
@@ -14,10 +16,11 @@ User Message → Ollama LLM → JSON Decision → MemoryManager → Database
 
 1. **User sends message** to the bot
 2. **DialogueEngine.process_message()** automatically calls the extractor
-3. **MemoryExtractor** sends the message to Ollama with a classification prompt
-4. **Ollama** returns JSON: `{store: bool, key, value, confidence, ttl_hours}`
-5. **MemoryManager** stores the extracted memory with conflict resolution
-6. **Dialogue** continues and bot responds
+3. **MemoryJudge** sends the message to Ollama with a combined extraction + validation prompt
+4. **Ollama** returns JSON with memories including `quality_score` and `cleaned_value`
+5. **MemoryJudge** filters for high-quality memories (quality_score >= 0.7)
+6. **MemoryManager** stores the extracted memory with conflict resolution
+7. **Dialogue** continues and bot responds
 
 **Recommended Models for Memory Extraction:**
 - `qwen2.5-coder:7b` ⭐ (best balance, 4.7 GB)
@@ -49,6 +52,8 @@ Each extracted memory is a JSON object:
   "key": "learning_goal",
   "value": "Learn Python programming",
   "confidence": 0.95,
+  "quality_score": 0.85,
+  "cleaned_value": "Learn Python programming",
   "ttl_hours": null
 }
 ```
@@ -61,6 +66,8 @@ Each extracted memory is a JSON object:
 | `key` | `str` | Memory key (e.g., `learning_goal`, `preferred_time`) |
 | `value` | `str` | Memory value |
 | `confidence` | `float` | 0.0–1.0 confidence score (1.0 = explicit, 0.5 = inferred) |
+| `quality_score` | `float` | 0.0–1.0 quality score (>= 0.7 required for storage) |
+| `cleaned_value` | `str` | AI-extracted clean value (e.g., "Johannes" from "spelled backwards sennahoJ") |
 | `ttl_hours` | `int\|null` | Expire after N hours (null = permanent) |
 
 ## Example Conversations
@@ -123,9 +130,10 @@ response = await dialogue.process_message(
 ### Manual (Direct)
 
 ```python
-from src.memories.memory_extractor import MemoryExtractor
+from src.memories.ai_judge import MemoryJudge
 
-memories = await MemoryExtractor.extract_memories(
+judge = MemoryJudge()
+memories = await judge.extract_and_judge_memories(
     user_message="I want to improve my coding skills",
     user_context={"existing_memories": {"learning_goal": "Python"}}
 )
@@ -159,14 +167,9 @@ mm.store_memory(user_id=1, key="learning_goal", value="Machine Learning")
 
 ## Testing
 
-Run manual test:
-```bash
-python tests/test_memory_extractor.py
-```
-
 Run with pytest:
 ```bash
-pytest tests/test_memory_extractor.py -v
+pytest tests/unit/memories/test_memory_extractor.py -v
 ```
 
 ## Performance Notes
@@ -190,7 +193,7 @@ pytest tests/test_memory_extractor.py -v
 
 ### Ollama timeout
 
-- Increase timeout in `memory_extractor.py`: `timeout=30.0`
+- Increase timeout in `ollama_client.py`: `timeout=30.0`
 - Or use a faster model: `qwen2.5-coder:1.5b-base`
 
 ### Wrong language detected
@@ -210,4 +213,5 @@ pytest tests/test_memory_extractor.py -v
 ---
 
 **Implementation**: Feb 2, 2026
-**Status**: Beta (production-ready)
+**Updated**: Mar 4, 2026 (Migrated to MemoryJudge)
+**Status**: Production-ready

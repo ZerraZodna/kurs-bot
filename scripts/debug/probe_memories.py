@@ -1,5 +1,5 @@
 import asyncio
-from src.memories.memory_extractor import MemoryExtractor
+from src.memories.ai_judge import MemoryJudge
 from src.config import settings
 
 
@@ -12,11 +12,13 @@ async def main():
         "I was born on May 23, 1966",
     ]
 
+    judge = MemoryJudge()
+    print("Using RAG model:", settings.OLLAMA_CHAT_RAG_MODEL)
+    
     for msg in messages:
         print("\n=== MESSAGE ===")
         print(msg)
-        print("Using RAG model:", settings.OLLAMA_CHAT_RAG_MODEL)
-        res = await MemoryExtractor.extract_memories(msg, model_override=settings.OLLAMA_CHAT_RAG_MODEL)
+        res = await judge.extract_and_judge_memories(msg)
         print("=== EXTRACTED ===")
         print(res)
 

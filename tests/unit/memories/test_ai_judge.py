@@ -142,6 +142,7 @@ async def test_low_quality_rejection(judge):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(os.getenv("TEST_USE_REAL_OLLAMA", "false").lower() != "true", reason="Only runs with real Ollama")
 async def test_caching(judge):
     """Test that decisions are cached."""
     # First call

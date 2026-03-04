@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from src.memories import MemoryManager
 from src.language.prompt_builder import PromptBuilder
 from src.memories.semantic_search import get_semantic_search_service
-from src.memories import MemoryExtractor
 from src.onboarding.service import OnboardingService
 from src.onboarding.flow import OnboardingFlow
 from src.scheduler import api as scheduler_api
@@ -47,7 +46,6 @@ class DialogueEngine:
         self.memory_manager = memory_manager or MemoryManager(db)
         self.prompt_registry = get_prompt_registry()
         self.prompt_builder = PromptBuilder(db, self.memory_manager)
-        self.memory_extractor = MemoryExtractor()
         self.onboarding = OnboardingService(db)
         self.onboarding_flow = OnboardingFlow(self.memory_manager, self.onboarding, self.call_ollama)
     

@@ -12,7 +12,6 @@ from .memory_handler import MemoryHandler
 from .store import MemoryStore
 from .types import MemoryEntity, MemoryRecord
 from .constants import MemoryCategory, MemoryKey
-from .memory_extractor import MemoryExtractor
 from .memory_classifier import MemoryDecision, decide_memory_store
 from .ai_judge import MemoryJudge
 from .user_data_service import delete_user_content_rows
@@ -28,7 +27,6 @@ __all__ = [
     "MemoryKey",
     "delete_user_content_rows",
     "manager",
-    "MemoryExtractor",
     "MemoryDecision",
     "decide_memory_store",
     "MemoryJudge",
