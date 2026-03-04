@@ -5,7 +5,6 @@ from typing import Optional, Callable
 from sqlalchemy.orm import Session
 
 from src.scheduler import api as scheduler_api
-from src.scheduler.detection import detect_schedule_request
 from src.scheduler.domain import is_daily_schedule_family
 from src.core.timezone import get_user_timezone_from_db
 import re
@@ -118,31 +117,6 @@ async def handle_schedule_messages(
     if memory_manager:
         pending = memory_manager.get_memory(user_id, MemoryKey.SCHEDULE_REQUEST_PENDING)
         if pending and pending[0].get("value") == "true":
-            schedule_response = await schedule_request_handler(user_id, text, session)
-            if schedule_response:
-                return schedule_response
-
-    if detect_schedule_request(text):
-        # Only treat explicit "daily" style requests as pre-LLM daily schedule flows.
-        # One-time reminders (e.g., "Remind me tomorrow at 12:00") should be handled
-        # by the assistant and dispatched via triggers, not blocked by an existing
-        # daily schedule. We therefore require a clear daily indicator before
-        # invoking the schedule_request_handler here.
-        lower = (text or "").lower()
-        daily_indicators = ["daily", "every day", "each day", "every morning", "every evening", "hver dag", "daglig"]
-
-        # Fallback: when daily indicator is present but not deterministic, fall back to the prior behavior
-        if any(ind in lower for ind in daily_indicators):
-            if memory_manager:
-                memory_manager.store_memory(
-                    user_id=user_id,
-                    key=MemoryKey.SCHEDULE_REQUEST_PENDING,
-                    value="true",
-                    confidence=1.0,
-                    source="dialogue_engine",
-                    ttl_hours=1,
-                    category=MemoryCategory.CONVERSATION.value,
-                )
             schedule_response = await schedule_request_handler(user_id, text, session)
             if schedule_response:
                 return schedule_response

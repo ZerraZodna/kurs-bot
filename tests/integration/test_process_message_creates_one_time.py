@@ -66,10 +66,6 @@ async def test_process_message_creates_one_time_reminder(monkeypatch):
 
         monkeypatch.setattr("src.triggers.triggering.handle_triggers", fake_handle_triggers)
 
-        # Given: Prevent pre-LLM schedule detection so the flow reaches the LLM + trigger path
-        from src.scheduler import detection as scheduler_detection
-        monkeypatch.setattr(scheduler_detection, "detect_schedule_request", lambda text: False)
-
         # When: Call process_message which will invoke the real Ollama client and our fake trigger handler
         resp = await dialogue.process_message(user_id, "Remind me to go out with the garbage at 12:00", db)
         

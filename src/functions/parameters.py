@@ -19,9 +19,10 @@ class ParameterValidator:
     COERCERS = {
         "string": lambda x: str(x) if x is not None else None,
         "integer": lambda x: int(x) if x is not None else None,
-        "boolean": lambda x: bool(x) if x is not None else None,
+        "boolean": lambda x: _coerce_boolean(x) if x is not None else None,
         "float": lambda x: float(x) if x is not None else None,
     }
+
     
     @staticmethod
     def coerce_value(value: Any, target_type: str) -> Tuple[bool, Any, Optional[str]]:
@@ -339,6 +340,34 @@ class ParameterValidator:
                     errors.append(f"Parameter '{param_name}': {error}")
         
         return len(errors) == 0, coerced, errors
+
+
+def _coerce_boolean(value):
+    """Coerce a value to boolean, handling string representations."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lower = value.lower().strip()
+        if lower in ("true", "yes", "1", "on"):
+            return True
+        if lower in ("false", "no", "0", "off"):
+            return False
+    # Fallback to Python's bool() for other types (numbers, etc.)
+    return bool(value)
+
+
+def _coerce_boolean(value):
+    """Coerce a value to boolean, handling string representations."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lower = value.lower().strip()
+        if lower in ("true", "yes", "1", "on"):
+            return True
+        if lower in ("false", "no", "0", "off"):
+            return False
+    # Fallback to Python's bool() for other types (numbers, etc.)
+    return bool(value)
 
 
 def get_common_timezones() -> set:

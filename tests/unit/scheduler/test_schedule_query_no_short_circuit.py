@@ -32,29 +32,27 @@ async def test_remind_me_next_two_hours_does_not_short_circuit():
     # The problematic message that was being short-circuited
     text = "remind me next two hours to read the daily lesson"
     
-    # Mock detect_schedule_request to return False (no schedule request detected)
-    with patch('src.scheduler.schedule_handlers.detect_schedule_request', return_value=False):
-        # Call the function
-        result = await handle_schedule_messages(
-            user_id=1,
-            text=text,
-            session=mock_session,
-            memory_manager=mock_memory_manager,
-            onboarding_service=mock_onboarding_service,
-            schedule_request_handler=mock_schedule_request_handler,
-            call_ollama=mock_call_ollama,
-            use_rag_for_this_message=False,
-        )
-        
-        # The function should return None, allowing the message to flow through
-        # to the LLM and function calling system
-        assert result is None, (
-            f"Expected None to allow function calling, but got: {result}. "
-            f"The message '{text}' should not be short-circuited."
-        )
-        
-        # Verify schedule_request_handler was not called (no short-circuit)
-        mock_schedule_request_handler.assert_not_called()
+    # Call the function
+    result = await handle_schedule_messages(
+        user_id=1,
+        text=text,
+        session=mock_session,
+        memory_manager=mock_memory_manager,
+        onboarding_service=mock_onboarding_service,
+        schedule_request_handler=mock_schedule_request_handler,
+        call_ollama=mock_call_ollama,
+        use_rag_for_this_message=False,
+    )
+    
+    # The function should return None, allowing the message to flow through
+    # to the LLM and function calling system
+    assert result is None, (
+        f"Expected None to allow function calling, but got: {result}. "
+        f"The message '{text}' should not be short-circuited."
+    )
+    
+    # Verify schedule_request_handler was not called (no short-circuit)
+    mock_schedule_request_handler.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -76,23 +74,21 @@ async def test_remind_me_in_duration_does_not_short_circuit():
         "can you remind me in 5 minutes to take a break",
     ]
     
-    # Mock detect_schedule_request to return False (no schedule request detected)
-    with patch('src.scheduler.schedule_handlers.detect_schedule_request', return_value=False):
-        for text in test_messages:
-            result = await handle_schedule_messages(
-                user_id=1,
-                text=text,
-                session=mock_session,
-                memory_manager=mock_memory_manager,
-                onboarding_service=mock_onboarding_service,
-                schedule_request_handler=mock_schedule_request_handler,
-                call_ollama=mock_call_ollama,
-                use_rag_for_this_message=False,
-            )
-            
-            assert result is None, (
-                f"Message '{text}' should not be short-circuited, but got: {result}"
-            )
+    for text in test_messages:
+        result = await handle_schedule_messages(
+            user_id=1,
+            text=text,
+            session=mock_session,
+            memory_manager=mock_memory_manager,
+            onboarding_service=mock_onboarding_service,
+            schedule_request_handler=mock_schedule_request_handler,
+            call_ollama=mock_call_ollama,
+            use_rag_for_this_message=False,
+        )
+        
+        assert result is None, (
+            f"Message '{text}' should not be short-circuited, but got: {result}"
+        )
 
 
 @pytest.mark.asyncio
