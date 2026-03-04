@@ -116,27 +116,6 @@ Executes a scheduled task (used for testing/debugging).
 
 **Returns:** `dict` with execution results
 
-### Detection Functions
-
-Schedule intent detection is available through `src/scheduler/detection.py`:
-
-#### `detect_schedule_request(message)`
-Detects if a message contains a schedule-related request.
-
-**Parameters:**
-- `message` (str): The user message to analyze
-
-**Returns:** `dict` or `None`
-- If detected: `{"type": "schedule_request", "time": "...", "action": "..."}`
-- If not detected: `None`
-
-**Example:**
-```python
-from src.scheduler import detection as scheduler_detection
-
-result = scheduler_detection.detect_schedule_request("Remind me at 3pm")
-# Returns: {"type": "schedule_request", "time": "15:00", "action": "create"}
-```
 
 ## Internal Modules (Do Not Import Directly)
 
