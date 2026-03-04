@@ -8,6 +8,8 @@ import logging
 
 from src.scheduler import api as scheduler_api
 from src.scheduler.domain import SCHEDULE_TYPE_DAILY
+from src.memories import MemoryManager
+from src.memories.constants import MemoryCategory, MemoryKey
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +42,10 @@ def create_auto_schedule(db: Session, user_id: int) -> bool:
 
         # Pick the user's current lesson (if known) so the first automated
         # delivery does not always default to Lesson 1 for continuing users.
+        memory_manager = MemoryManager(db)
         try:
-            from src.memories import MemoryManager
             from src.lessons.state import get_current_lesson
 
-            memory_manager = MemoryManager(db)
             cur = get_current_lesson(memory_manager, user_id)
             # Accept numeric or numeric-string lesson ids
             lesson_id = None
@@ -56,13 +57,25 @@ def create_auto_schedule(db: Session, user_id: int) -> bool:
         except Exception:
             lesson_id = None
 
-        scheduler_api.create_daily_schedule(
+        schedule = scheduler_api.create_daily_schedule(
             user_id=user_id,
             lesson_id=lesson_id,
             time_str="07:30",
             schedule_type=SCHEDULE_TYPE_DAILY,
             session=db,
         )
+        
+        # Store memory about the auto-created schedule so AI knows about it
+        memory_manager.store_memory(
+            user_id=user_id,
+            key=MemoryKey.PREFERRED_LESSON_TIME,
+            value="07:30",
+            category=MemoryCategory.PREFERENCE.value,
+            confidence=1.0,
+            source="onboarding_auto_schedule",
+            allow_duplicates=False,
+        )
+        
         logger.info(f"✓ Auto-created daily schedule at 07:30 AM for user {user_id}")
         return True
 
