@@ -8,11 +8,36 @@ import pytest
 
 
 def _get_embedding_dim() -> int:
-    """Get embedding dimension from environment or default."""
+    """Get embedding dimension from config or environment.
+    
+    Automatically detects dimension based on EMBEDDING_BACKEND:
+    - local: 384 (all-MiniLM-L6-v2)
+    - ollama: 768 (embeddinggemma)
+    """
     try:
-        return int(os.getenv("EMBEDDING_DIMENSION", "384") or 384)
+        # Import here to avoid circular imports
+        from src.config import settings
+        
+        # Check if there's an explicit override
+        explicit_dim = getattr(settings, "EMBEDDING_DIMENSION", None)
+        if explicit_dim:
+            return int(explicit_dim)
+        
+        # Auto-detect based on backend
+        backend = getattr(settings, "EMBEDDING_BACKEND", "local").lower()
+        if backend == "local":
+            return 384
+        elif backend == "ollama":
+            return 768
+        else:
+            # Fallback to environment or default
+            return int(os.getenv("EMBEDDING_DIMENSION", "384") or 384)
     except Exception:
-        return 384
+        # Fallback to environment or default if settings can't be imported
+        try:
+            return int(os.getenv("EMBEDDING_DIMENSION", "384") or 384)
+        except Exception:
+            return 384
 
 
 def create_mock_embedding_service(dim: Optional[int] = None) -> MagicMock:
@@ -117,19 +142,25 @@ class EmbeddingMock:
         return self
 
 
-# Predefined test embeddings for common texts
-TEST_EMBEDDINGS = {
-    "hello": [0.1] * 384,
-    "goodbye": [0.2] * 384,
-    "yes": [0.3] * 384,
-    "no": [0.4] * 384,
-    "learn python": [0.5] * 384,
-    "daily lesson": [0.6] * 384,
-    "reminder": [0.7] * 384,
-}
+def _get_test_embeddings() -> dict:
+    """Get test embeddings with dynamically sized vectors."""
+    dim = _get_embedding_dim()
+    return {
+        "hello": [0.1] * dim,
+        "goodbye": [0.2] * dim,
+        "yes": [0.3] * dim,
+        "no": [0.4] * dim,
+        "learn python": [0.5] * dim,
+        "daily lesson": [0.6] * dim,
+        "reminder": [0.7] * dim,
+    }
+
+
+# Predefined test embeddings for common texts (dynamically sized)
+TEST_EMBEDDINGS = _get_test_embeddings()
 
 
 @pytest.fixture(scope="session")
 def test_embeddings():
     """Session-scoped fixture with cached test embeddings."""
-    return TEST_EMBEDDINGS.copy()
+    return _get_test_embeddings()

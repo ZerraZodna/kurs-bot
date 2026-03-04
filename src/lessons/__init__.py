@@ -13,12 +13,10 @@ from .importer import ensure_lessons_available
 from .state import (
     compute_current_lesson_state,
     get_current_lesson,
-    get_last_sent_lesson_id,
     get_lesson_state,
     has_lesson_status,
     set_current_lesson,
-    set_last_sent_lesson_id,
-    set_lesson_state,
+    set_next_lesson,
 )
 from .state_flow import apply_reported_progress, determine_lesson_action
 
@@ -34,12 +32,10 @@ __all__ = [
     "ensure_lessons_available",
     "compute_current_lesson_state",
     "get_current_lesson",
-    "get_last_sent_lesson_id",
     "get_lesson_state",
     "has_lesson_status",
     "set_current_lesson",
-    "set_last_sent_lesson_id",
-    "set_lesson_state",
+    "set_next_lesson",
     "apply_reported_progress",
     "determine_lesson_action",
 ]

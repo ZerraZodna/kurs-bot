@@ -594,30 +594,31 @@ class FunctionExecutor:
     
     async def _handle_mark_lesson_complete(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle mark_lesson_complete function."""
-        from src.memories.constants import MemoryCategory, MemoryKey
+        from src.lessons.state import record_lesson_completed
         
         user_id = context.get("user_id")
         lesson_id = params.get("lesson_id")
         memory_manager = context.get("memory_manager")
         
-        try:
-            # Store completion in memory
-            memory_manager.store_memory(
-                user_id=user_id,
-                key=MemoryKey.LESSON_COMPLETED,
-                value=str(lesson_id) if lesson_id else "completed",
-                category=MemoryCategory.PROGRESS.value,
-                source="function_executor",
-                confidence=1.0,
+        # Use centralized helper for DRY
+        if lesson_id:
+            result = record_lesson_completed(
+                memory_manager,
+                user_id,
+                lesson_id,
+                source="function_executor"
             )
-            
             return {
                 "ok": True,
                 "lesson_id": lesson_id,
                 "marked_complete": True,
+                "result": result,
             }
-        except Exception as e:
-            return {"ok": False, "error": str(e)}
+        else:
+            return {
+                "ok": False,
+                "error": "lesson_id is required",
+            }
     
     async def _handle_repeat_lesson(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle repeat_lesson function."""
@@ -971,7 +972,8 @@ class FunctionExecutor:
     
     async def _handle_extract_memory(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle extract_memory function."""
-        from src.memories.constants import MemoryCategory
+        from src.memories.constants import MemoryCategory, MemoryKey
+        from src.lessons.state import set_current_lesson, record_lesson_completed
         
         user_id = context.get("user_id")
         key = params.get("key")
@@ -988,6 +990,47 @@ class FunctionExecutor:
                 "key": key,
             }
         
+        # Route lesson state writes through the centralized helpers
+        # This ensures DRY - all lesson progress goes through lesson_state
+        if key == MemoryKey.LESSON_CURRENT:
+            # Normalize numeric lesson values to int, keep strings like 'continuing'
+            parsed = None
+            try:
+                parsed = int(value)
+            except Exception:
+                parsed = value
+            set_current_lesson(memory_manager, user_id, parsed)
+            return {
+                "ok": True,
+                "key": key,
+                "value": value,
+                "confidence": confidence,
+                "category": MemoryCategory.PROGRESS.value,
+                "updated": True,
+            }
+        elif key == MemoryKey.LESSON_COMPLETED:
+            # Route through centralized helper for DRY
+            try:
+                lesson_id = int(value)
+                result = record_lesson_completed(
+                    memory_manager, 
+                    user_id, 
+                    lesson_id,
+                    source="function_executor"
+                )
+                return {
+                    "ok": True,
+                    "key": key,
+                    "value": value,
+                    "confidence": confidence,
+                    "category": MemoryCategory.PROGRESS.value,
+                    "updated": True,
+                    "result": result,
+                }
+            except (ValueError, TypeError):
+                return {"ok": False, "error": f"Invalid lesson_id: {value}"}
+        
+        # For non-lesson memories, continue with existing logic
         # Determine category from key
         category = self._infer_memory_category(key)
         
@@ -1030,7 +1073,7 @@ class FunctionExecutor:
             "contact_frequency", "lesson_preference",
         ]
         progress_keys = [
-            MemoryKey.LESSON_COMPLETED, MemoryKey.CURRENT_LESSON,
+            MemoryKey.LESSON_COMPLETED, MemoryKey.LESSON_CURRENT,
             "milestone", "insight",
         ]
         

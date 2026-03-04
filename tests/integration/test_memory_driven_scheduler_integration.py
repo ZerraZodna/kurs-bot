@@ -7,6 +7,7 @@ Migrated from tests/test_memory_driven_scheduler_integration.py to use new test 
 import pytest
 from src.models.database import User, Schedule
 from src.memories import MemoryManager
+from src.memories.constants import MemoryKey
 from src.services.dialogue_engine import DialogueEngine
 from src.scheduler import SchedulerService
 from src.functions.executor import get_function_executor
@@ -21,8 +22,8 @@ async def test_memory_driven_schedule_creation(db_session, test_user):
 
     # Store commitment and preferred time as memories
     mm = MemoryManager(db_session)
-    mm.store_memory(user_id=user_id, key="acim_commitment", value="yes")
-    mm.store_memory(user_id=user_id, key="preferred_lesson_time", value="10:15")
+    mm.store_memory(user_id=user_id, key=MemoryKey.ACIM_COMMITMENT, value="yes")
+    mm.store_memory(user_id=user_id, key=MemoryKey.PREFERRED_LESSON_TIME, value="10:15")
 
     # Use FunctionExecutor to create schedule directly
     executor = get_function_executor()

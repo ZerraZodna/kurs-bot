@@ -13,9 +13,8 @@ from src.models.database import Lesson
 from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.lessons.state import (
-    get_last_sent_lesson_id,
+    get_current_lesson,
     set_current_lesson,
-    set_last_sent_lesson_id,
 )
 from src.lessons.state_flow import apply_reported_progress
 from src.scheduler.memory_helpers import (
@@ -72,7 +71,7 @@ def _is_progress_override_negative(text: str) -> bool:
     return any(re.search(pattern, normalized) for pattern in patterns)
 
 
-async def _semantic_yes_no(text: str, onboarding_service) -> (bool, bool):
+async def _semantic_yes_no(text: str, onboarding_service) -> tuple[bool, bool]:
     """Classify yes/no using simple keyword matching."""
     import re
     normalized = re.sub(r"\s+", " ", (text or "").strip().lower())
@@ -122,14 +121,15 @@ def get_pending_confirmation(
     return None
 
 
-def resolve_pending_confirmation(memory_manager: MemoryManager, user_id: int) -> None:
+def resolve_pending_confirmation(memory_manager: MemoryManager, user_id: int, lesson_id: Optional[int] = None) -> None:
     """Mark lesson confirmation as resolved."""
+    data = {"resolved": True, "timestamp": datetime.now(timezone.utc).isoformat()}
+    if lesson_id is not None:
+        data["lesson_id"] = lesson_id
     memory_manager.store_memory(
         user_id=user_id,
         key=MemoryKey.LESSON_CONFIRMATION_PENDING,
-        value=json.dumps(
-            {"resolved": True, "timestamp": datetime.now(timezone.utc).isoformat()}
-        ),
+        value=json.dumps(data),
         category=MemoryCategory.CONVERSATION.value,
         ttl_hours=12,
         source="dialogue_engine",
@@ -184,13 +184,12 @@ async def handle_lesson_confirmation(
             return "Okay, I will ask for confirmation before moving to the next lesson."
 
         if auto_advance_enabled and _is_progress_override_negative(message_lower):
-            last_sent = get_last_sent_lesson_id(memory_manager, user_id)
-            if last_sent is None:
+            current = get_current_lesson(memory_manager, user_id)
+            if current is None:
                 return "No problem. I can pause progression whenever you tell me."
 
-            repeat_lesson = max(int(last_sent) - 1, 1)
+            repeat_lesson = max(int(current) - 1, 1)
             set_current_lesson(memory_manager, user_id, repeat_lesson)
-            set_last_sent_lesson_id(memory_manager, user_id, repeat_lesson)
             return (
                 f"No problem. I'll pause progression and keep you on Lesson {repeat_lesson}. "
                 "Tell me when you're ready to continue."
@@ -225,9 +224,6 @@ async def handle_lesson_confirmation(
         language = get_language_fn(user_id)
         message = await format_lesson_fn(lesson, language)
 
-        # Track last delivered lesson for scheduling/advancement logic
-        set_last_sent_lesson_id(memory_manager, user_id, lesson.lesson_id)
-
         return message
 
     if pref_update is True:
@@ -245,10 +241,7 @@ async def handle_lesson_confirmation(
     next_id = pending.get("next_lesson_id")
 
     if is_no:
-        resolve_pending_confirmation(memory_manager, user_id)
-        # Set last_sent_lesson_id to prevent re-confirmation on next greeting
-        if lesson_id:
-            set_last_sent_lesson_id(memory_manager, user_id, int(lesson_id))
+        resolve_pending_confirmation(memory_manager, user_id, lesson_id)
         message = "No problem. Take your time and reply 'yes' when you're ready to continue."
         language = get_language_fn(user_id)
         if language and isinstance(language, str) and language.lower() not in ["en"]:
@@ -256,20 +249,15 @@ async def handle_lesson_confirmation(
         return message
 
     # Yes: mark completed and send next lesson
-    if lesson_id:
-            memory_manager.store_memory(
-                user_id=user_id,
-                key=MemoryKey.LESSON_COMPLETED,
-                value=str(lesson_id),
-                category=MemoryCategory.PROGRESS.value,
-                confidence=1.0,
-                source="dialogue_engine_lesson_confirmation",
-            )
-
-    # Update explicit current_lesson state to the next lesson (if known).
-    if lesson_id:
-        next_id = lesson_id + 1 if lesson_id < 365 else 365
-        set_current_lesson(memory_manager, user_id, next_id)
+    if lesson_id and next_id:
+        from src.lessons.state import record_lesson_completed
+        record_lesson_completed(
+            memory_manager,
+            user_id,
+            lesson_id,
+            source="dialogue_engine_lesson_confirmation",
+            next_lesson=next_id,
+        )
 
     lesson = (
         session.query(Lesson).filter(Lesson.lesson_id == next_id).first()
@@ -288,14 +276,11 @@ async def handle_lesson_confirmation(
             lesson = None
 
     if not lesson:
-        resolve_pending_confirmation(memory_manager, user_id)
+        resolve_pending_confirmation(memory_manager, user_id, lesson_id)
         return "Thanks! I couldn't find the next lesson right now."
 
     language = get_language_fn(user_id)
     message = await format_lesson_fn(lesson, language)
 
-    # Persist the last lesson we sent using consolidated lesson_state helper
-    set_last_sent_lesson_id(memory_manager, user_id, lesson.lesson_id)
-
-    resolve_pending_confirmation(memory_manager, user_id)
+    resolve_pending_confirmation(memory_manager, user_id, lesson_id)
     return message

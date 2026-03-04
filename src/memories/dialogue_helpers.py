@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 from src.memories.manager import MemoryManager
-from src.memories.memory_extractor import MemoryExtractor
+from src.memories.ai_judge import MemoryJudge
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.config import settings
 from src.lessons.state import set_current_lesson
@@ -55,7 +55,7 @@ def get_user_language(memory_manager: MemoryManager, user_id: int) -> str:
 
 async def extract_and_store_memories(
     memory_manager: MemoryManager,
-    memory_extractor: MemoryExtractor,
+    memory_judge: MemoryJudge,
     user_id: int,
     user_message: str,
     rag_mode: bool = False,
@@ -65,7 +65,7 @@ async def extract_and_store_memories(
 
     Args:
         memory_manager: Memory manager instance
-        memory_extractor: Memory extractor instance
+        memory_judge: Memory judge instance
         user_id: User ID
         user_message: The user's message
     """
@@ -86,14 +86,12 @@ async def extract_and_store_memories(
             else None
         )
 
-        # Use the RAG chat model for memory extraction by default because it
-        # produces more reliable classification for factual extractions
-        model_override = settings.OLLAMA_CHAT_RAG_MODEL
         # Determine user language from stored preference (fallback to English)
         user_lang = get_user_language(memory_manager, user_id)
 
-        extracted_memories = await memory_extractor.extract_memories(
-            user_message, user_context, model_override=model_override, language=user_lang
+        # Use MemoryJudge to extract memories
+        extracted_memories = await memory_judge.extract_and_judge_memories(
+            user_message, user_context, language=user_lang
         )
 
         logger.debug(f"user_id={user_id} user_message={user_message!r} extracted={extracted_memories}")
@@ -120,16 +118,16 @@ async def extract_and_store_memories(
                             val,
                         )
                         continue
-                    memory_manager.store_memory(
-                        user_id=user_id,
-                        key=key,
-                        value=normalized,
-                        confidence=memory.get("confidence", 1.0),
-                        ttl_hours=memory.get("ttl_hours"),
+                    # Use centralized helper for DRY
+                    from src.lessons.state import record_lesson_completed
+                    record_lesson_completed(
+                        memory_manager,
+                        user_id,
+                        int(normalized),
                         source="dialogue_engine_extractor",
-                        category=MemoryCategory.PROGRESS.value,
                     )
                 else:
+                    # Store the memory
                     memory_manager.store_memory(
                         user_id=user_id,
                         key=key,

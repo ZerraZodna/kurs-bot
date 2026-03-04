@@ -14,6 +14,7 @@ from .types import MemoryEntity, MemoryRecord
 from .constants import MemoryCategory, MemoryKey
 from .memory_extractor import MemoryExtractor
 from .memory_classifier import MemoryDecision, decide_memory_store
+from .ai_judge import MemoryJudge
 from .user_data_service import delete_user_content_rows
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "MemoryExtractor",
     "MemoryDecision",
     "decide_memory_store",
+    "MemoryJudge",
 ]

@@ -7,6 +7,7 @@ import pytest
 
 from src.memories import MemoryManager
 from src.lessons.state import get_lesson_state, get_current_lesson
+from src.memories.constants import MemoryKey
 
 from tests.fixtures.users import create_test_user
 
@@ -25,8 +26,8 @@ class TestOnboardingLessonState:
         
         mm = MemoryManager(db_session)
         
-        # When: Onboarding stores current_lesson value
-        mm.store_memory(user_id=user_id, key="current_lesson", value="8", category="progress")
+        # When: Onboarding stores current_lesson value using LESSON_CURRENT key
+        mm.store_memory(user_id=user_id, key=MemoryKey.LESSON_CURRENT, value="8", category="progress")
         
         # Then: get_current_lesson should return the stored value
         cur = get_current_lesson(mm, user_id)
@@ -35,4 +36,3 @@ class TestOnboardingLessonState:
         # And: get_lesson_state should reflect current_lesson = 8
         state = get_lesson_state(mm, user_id)
         assert state.get("current_lesson") == "8" or state.get("current_lesson") == 8
-

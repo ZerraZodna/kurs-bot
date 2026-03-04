@@ -15,7 +15,6 @@ from src.lessons.state import (
     compute_current_lesson_state,
     get_lesson_state,
     set_current_lesson,
-    set_last_sent_lesson_id,
 )
 from src.memories.manager import MemoryManager
 
@@ -126,21 +125,22 @@ def apply_reported_progress(
 
     Returns a dict with keys: current_lesson, completed_lesson.
     """
+    from src.lessons.state import record_lesson_completed
+    
     if not reported_current_lesson or reported_current_lesson < 1:
         return {"current_lesson": None, "completed_lesson": None}
 
     current = min(int(reported_current_lesson), 365)
     completed = max(current - 1, 1)
 
-    memory_manager.store_memory(
-        user_id=user_id,
-        key=MemoryKey.LESSON_COMPLETED,
-        value=str(completed),
-        category=MemoryCategory.PROGRESS.value,
-        confidence=1.0,
+    # Use centralized helper for DRY - record completion and set next lesson
+    # Pass current as next_lesson since that's what the user reported
+    record_lesson_completed(
+        memory_manager,
+        user_id,
+        completed,
         source="lesson_state_flow",
+        next_lesson=current,
     )
-    set_current_lesson(memory_manager, user_id, current)
-    set_last_sent_lesson_id(memory_manager, user_id, current)
 
     return {"current_lesson": current, "completed_lesson": completed}

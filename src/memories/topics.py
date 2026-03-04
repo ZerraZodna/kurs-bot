@@ -38,6 +38,7 @@ CANONICAL_KEY_MAP: Dict[str, tuple[MemoryTopic, str]] = {
     
     # Lessons topic
     "current_lesson": (MemoryTopic.LESSONS, "current_lesson"),
+    "lesson_current": (MemoryTopic.LESSONS, "current_lesson"),
     "lesson": (MemoryTopic.LESSONS, "current_lesson"),
     "lesson_number": (MemoryTopic.LESSONS, "current_lesson"),
     "lesson_completed": (MemoryTopic.LESSONS, "completed_lessons"),

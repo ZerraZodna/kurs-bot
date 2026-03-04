@@ -25,12 +25,10 @@ class MemoryKey:
     LEARNING_GOAL = "learning_goal"
     ACIM_COMMITMENT = "acim_commitment"
     DATA_CONSENT = "data_consent"
-    PREFERRED_LESSON_TIME = "preferred_lesson_time"
 
-    CURRENT_LESSON = "current_lesson"
+    PREFERRED_LESSON_TIME = "preferred_lesson_time"
+    LESSON_CURRENT = "lesson_current"
     LESSON_COMPLETED = "lesson_completed"
-    LESSON_STATE = "lesson_state"
-    LAST_SENT_LESSON_ID = "last_sent_lesson_id"
     LESSON_CONFIRMATION_PENDING = "lesson_confirmation_pending"
     AUTO_ADVANCE_LESSONS = "auto_advance_lessons"
 

@@ -24,6 +24,7 @@ from src.services.gdpr_service import (
 )
 from src.services.gdpr_verification import create_verification, verify_code
 from src.models.database import PromptTemplate, SessionLocal
+from src.models.schedule import Schedule
 from src.language.prompt_registry import get_prompt_registry
 
 logger = logging.getLogger(__name__)
@@ -358,21 +359,6 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
         "list memory",
     }
     # Accept trigger optionally followed by extra query text (handled below)
-
-    try:
-        rows = (
-            session.query(Schedule).session.bind._engine.table_names and []
-        )
-    except Exception:
-        # We'll not rely on Schedule import here; perform the query directly
-        pass
-
-    try:
-        q = (
-            session.query()
-        )
-    except Exception:
-        pass
 
     try:
         def _format_mem_lines(mems: list) -> list:

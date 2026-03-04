@@ -11,12 +11,10 @@ from src.models.database import Lesson
 from .handler import format_lesson_message, translate_text
 from src.memories.dialogue_helpers import get_user_language
 from src.language.onboarding_prompts import get_lesson_confirmation_prompt
-from src.lessons.state import set_last_sent_lesson_id
 
 
 def _get_set_pending_confirmation():
     from src.scheduler.memory_helpers import set_pending_confirmation
-
     return set_pending_confirmation
 
 
@@ -99,15 +97,14 @@ async def maybe_send_next_lesson(
             if (language or "").lower() not in ["en"]:
                 message = await translate_text(message, language, call_ollama)
 
-            memory_manager.store_memory(
-                user_id=user_id,
-                key=MemoryKey.LESSON_COMPLETED,
-                value=str(int(lesson_id)),
-                category=MemoryCategory.PROGRESS.value,
-                confidence=1.0,
+            from src.lessons.state import record_lesson_completed
+            record_lesson_completed(
+                memory_manager,
+                user_id,
+                int(lesson_id),
                 source="dialogue_auto_advance",
+                next_lesson=next_id,
             )
-            set_last_sent_lesson_id(memory_manager, user_id, lesson.lesson_id)
             return message
 
         # Persist a pending confirmation so dialogue handlers can resolve it
@@ -140,7 +137,8 @@ async def maybe_send_next_lesson(
     if (language or "").lower() not in ["en"]:
         message = await translate_text(message, language, call_ollama)
 
-    # Persist via consolidated lesson_state helper
-    set_last_sent_lesson_id(memory_manager, user_id, lesson.lesson_id)
+    # Persist current lesson
+    from src.lessons.state import set_lesson_current
+    set_lesson_current(memory_manager, user_id, lesson.lesson_id)
 
     return message

@@ -12,6 +12,7 @@ from src.services.dialogue_engine import DialogueEngine
 from src.scheduler import SchedulerService
 from src.services.embedding_service import EmbeddingService
 from src.models.database import Lesson
+from tests.mocks.embedding_mock import _get_embedding_dim
 
 
 @pytest.fixture
@@ -55,9 +56,10 @@ def mock_embedding_service(monkeypatch) -> MagicMock:
     """Mocked EmbeddingService that returns zero vectors.
     
     Use this to avoid heavy ML dependencies in tests.
+    Automatically detects dimension based on EMBEDDING_BACKEND config.
     """
     mock_service = MagicMock(spec=EmbeddingService)
-    mock_service.embedding_dimension = 384
+    mock_service.embedding_dimension = _get_embedding_dim()
     
     # Mock async methods
     async def mock_generate_embedding(text: str) -> Optional[list]:

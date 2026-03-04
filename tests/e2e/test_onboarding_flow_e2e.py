@@ -18,6 +18,7 @@ from src.models.database import User, Memory, Schedule
 from src.services.dialogue_engine import DialogueEngine
 from src.memories import MemoryManager
 from src.memories.memory_handler import MemoryHandler
+from src.memories.constants import MemoryKey
 from src.lessons.state import get_current_lesson
 
 
@@ -66,9 +67,9 @@ async def test_onboarding_new_user_end_to_end_creates_daily_schedule(db_session)
     assert resp_name is not None
 
     # Verify name stored
-    name_mems = db_session.query(Memory).filter_by(user_id=user_id, key="first_name").all()
+    name_mems = db_session.query(Memory).filter_by(user_id=user_id, key=MemoryKey.FIRST_NAME).all()
     if not name_mems:
-        name_mems = db_session.query(Memory).filter_by(user_id=user_id, key="name").all()
+        name_mems = db_session.query(Memory).filter_by(user_id=user_id, key=MemoryKey.NAME).all()
     print("name memories:", [m.value for m in name_mems])
     assert any(m.value.lower() == "live" for m in name_mems), f"Expected first_name 'Live', got {[m.value for m in name_mems]}"
 
@@ -78,7 +79,7 @@ async def test_onboarding_new_user_end_to_end_creates_daily_schedule(db_session)
     assert resp2 is not None
 
     # Verify consent stored
-    consent_mems = db_session.query(Memory).filter_by(user_id=user_id, key="data_consent").all()
+    consent_mems = db_session.query(Memory).filter_by(user_id=user_id, key=MemoryKey.DATA_CONSENT).all()
     print("consent memories:", [m.value for m in consent_mems])
     assert any(m.value.lower() in ("granted", "yes") for m in consent_mems), f"Expected consent granted, got {[m.value for m in consent_mems]}"
 
@@ -97,7 +98,7 @@ async def test_onboarding_new_user_end_to_end_creates_daily_schedule(db_session)
     assert resp3 is not None
 
     # Verify commitment stored
-    commit_mems = db_session.query(Memory).filter_by(user_id=user_id, key="acim_commitment").all()
+    commit_mems = db_session.query(Memory).filter_by(user_id=user_id, key=MemoryKey.ACIM_COMMITMENT).all()
     print("commitment memories:", [m.value for m in commit_mems])
     assert any("commit" in (m.value or "").lower() or m.value.lower() in ("committed to acim lessons", "committed to 365 acim lessons") for m in commit_mems), f"Expected acim_commitment stored, got {[m.value for m in commit_mems]}"
 
@@ -127,8 +128,8 @@ async def test_onboarding_continuing_user_end_to_end_lesson10_sets_memory_and_sc
 
     # Pre-store consent and commitment so onboarding asks about lesson status
     mm = MemoryManager(db_session)
-    mm.store_memory(user_id, "data_consent", "granted", category="profile", source="test")
-    mm.store_memory(user_id, "acim_commitment", "committed to ACIM lessons", category="goals", source="test")
+    mm.store_memory(user_id, MemoryKey.DATA_CONSENT, "granted", category="profile", source="test")
+    mm.store_memory(user_id, MemoryKey.ACIM_COMMITMENT, "committed to ACIM lessons", category="goals", source="test")
 
     dialogue = DialogueEngine(db_session)
 

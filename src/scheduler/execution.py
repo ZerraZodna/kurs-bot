@@ -17,12 +17,10 @@ from src.models.database import Lesson, Schedule, User
 
 from .domain import is_one_time_schedule_type, job_id_for_schedule
 from .memory_helpers import (
-    get_last_sent_lesson_id,
     is_auto_advance_lessons_enabled,
     get_pending_confirmation,
     get_schedule_message,
     get_user_language,
-    set_last_sent_lesson_id,
     set_pending_confirmation,
 )
 from .message_utils import format_lesson_message, send_outbound_message
@@ -127,15 +125,14 @@ def _handle_no_last_sent_execution(
                     send_outbound_message(db, user, message)
                     if simulate:
                         messages.append(message)
-                    memory_manager.store_memory(
-                        user_id=schedule.user_id,
-                        key=MemoryKey.LESSON_COMPLETED,
-                        value=str(lesson_id),
-                        category=MemoryCategory.PROGRESS.value,
-                        confidence=1.0,
+                    from src.lessons.state import record_lesson_completed
+                    record_lesson_completed(
+                        memory_manager,
+                        schedule.user_id,
+                        lesson_id,
                         source="scheduler_auto_advance",
+                        next_lesson=next_id,
                     )
-                    set_last_sent_lesson_id(memory_manager, schedule.user_id, next_id)
                     return
             set_pending_confirmation(memory_manager, schedule.user_id, lesson_id, next_id)
             prompt = _confirmation_prompt(language, lesson_id)
@@ -153,7 +150,8 @@ def _handle_no_last_sent_execution(
         send_outbound_message(db, user, message)
         if simulate:
             messages.append(message)
-        set_last_sent_lesson_id(memory_manager, schedule.user_id, preferred)
+        from src.lessons.state import set_current_lesson
+        set_current_lesson(memory_manager, schedule.user_id, preferred)
 
 
 def _build_schedule_message(
@@ -173,7 +171,9 @@ def _build_schedule_message(
         next_id = pending.get("next_lesson_id")
         return _confirmation_prompt(language, lesson_id)
 
-    last_sent = get_last_sent_lesson_id(memory_manager, schedule.user_id)
+    from src.lessons.state import get_current_lesson
+    
+    last_sent = get_current_lesson(memory_manager, schedule.user_id)
     if not last_sent:
         return _preview_build_for_no_last_sent(db, memory_manager, schedule.user_id, language)
 
@@ -412,7 +412,9 @@ def _execute_lesson_schedule(
             messages.append(prompt)
         return messages
 
-    last_sent = get_last_sent_lesson_id(memory_manager, schedule.user_id)
+    from src.lessons.state import get_current_lesson
+    
+    last_sent = get_current_lesson(memory_manager, schedule.user_id)
     if not last_sent:
         _handle_no_last_sent_execution(db, memory_manager, schedule, user, language, simulate, messages)
         return messages
@@ -425,15 +427,14 @@ def _execute_lesson_schedule(
             send_outbound_message(db, user, message)
             if simulate:
                 messages.append(message)
-            memory_manager.store_memory(
-                user_id=schedule.user_id,
-                key=MemoryKey.LESSON_COMPLETED,
-                value=str(last_sent),
-                category=MemoryCategory.PROGRESS.value,
-                confidence=1.0,
+            from src.lessons.state import record_lesson_completed
+            record_lesson_completed(
+                memory_manager,
+                schedule.user_id,
+                last_sent,
                 source="scheduler_auto_advance",
+                next_lesson=next_id,
             )
-            set_last_sent_lesson_id(memory_manager, schedule.user_id, next_id)
             return messages
 
     # Ask if previous lesson was completed before proceeding

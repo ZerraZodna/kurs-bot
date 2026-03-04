@@ -1,6 +1,8 @@
 import pytest
-from src.integrations.telegram import TelegramHandler, _markdown_to_html
 from datetime import datetime
+
+from src.integrations.telegram import TelegramHandler
+from src.core.markdown_processor import markdown_to_telegram_html as _markdown_to_html
 
 def test_parse_webhook_valid_message():
     payload = {

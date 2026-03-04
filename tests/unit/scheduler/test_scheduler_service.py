@@ -8,6 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.models.database import Base, User, Lesson, Schedule, Memory, MessageLog
+from src.memories.constants import MemoryKey
 from src import scheduler as scheduler_module
 
 
@@ -101,11 +102,11 @@ class TestSchedulerService:
 
         # Verify last sent was persisted
         from src.memories import MemoryManager
-        from src.lessons.state import get_last_sent_lesson_id
+        from src.lessons.state import get_current_lesson
 
         mm = MemoryManager(db_session)
-        last_sent = get_last_sent_lesson_id(mm, user.user_id)
-        assert last_sent == 1
+        current = get_current_lesson(mm, user.user_id)
+        assert current == 1
 
         # Verify message log was created
         log = db_session.query(MessageLog).filter_by(direction="outbound").first()
@@ -142,10 +143,10 @@ class TestSchedulerService:
 
         # Given: Last sent lesson is 1
         from src.memories import MemoryManager
-        from src.lessons.state import set_last_sent_lesson_id
+        from src.lessons.state import set_next_lesson
 
         mm = MemoryManager(db_session)
-        set_last_sent_lesson_id(mm, user.user_id, 1)
+        set_next_lesson(mm, user.user_id, 1)
 
         # When: Executing scheduled task
         scheduler_module.SchedulerService.execute_scheduled_task(schedule.schedule_id)
@@ -154,7 +155,7 @@ class TestSchedulerService:
         assert sent, "Expected confirmation prompt to be sent"
         assert "Lesson 1" in sent[0][1]
 
-        pending = db_session.query(Memory).filter_by(key="lesson_confirmation_pending").first()
+        pending = db_session.query(Memory).filter_by(key=MemoryKey.LESSON_CONFIRMATION_PENDING).first()
         assert pending is not None
 
     def test_execute_scheduled_task_auto_advance_skips_confirmation_when_preference_enabled(
@@ -187,11 +188,11 @@ class TestSchedulerService:
 
         # Given: Last sent is lesson 1 and auto-advance is enabled
         from src.memories import MemoryManager
-        from src.lessons.state import set_last_sent_lesson_id, get_last_sent_lesson_id
+        from src.lessons.state import set_next_lesson, get_current_lesson
         from src.scheduler.memory_helpers import set_auto_advance_lessons_preference
 
         mm = MemoryManager(db_session)
-        set_last_sent_lesson_id(mm, user.user_id, 1)
+        set_next_lesson(mm, user.user_id, 1)
         set_auto_advance_lessons_preference(mm, user.user_id, True, source="test")
 
         # When: Executing scheduled task
@@ -201,14 +202,14 @@ class TestSchedulerService:
         assert sent, "Expected next lesson message to be sent"
         assert "Lesson 2" in sent[0][1]
 
-        pending = db_session.query(Memory).filter_by(key="lesson_confirmation_pending").first()
+        pending = db_session.query(Memory).filter_by(key=MemoryKey.LESSON_CONFIRMATION_PENDING).first()
         assert pending is None
 
-        completed = db_session.query(Memory).filter_by(key="lesson_completed").first()
+        completed = db_session.query(Memory).filter_by(key=MemoryKey.LESSON_COMPLETED).first()
         assert completed is not None
         assert completed.value == "1"
 
-        assert get_last_sent_lesson_id(mm, user.user_id) == 2
+        assert get_current_lesson(mm, user.user_id) == 2
 
     def test_deactivate_user_schedules(
         self, db_session, scheduler_session_factory, monkeypatch
@@ -250,4 +251,3 @@ class TestSchedulerService:
         assert deactivated == 1
         assert schedule.is_active is False
         assert removed == [f"schedule_{schedule.schedule_id}"]
-

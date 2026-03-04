@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
-from src.lessons.state import set_last_sent_lesson_id
+from src.lessons.state import set_next_lesson
 from src.models.database import MessageLog, Schedule, User
 from src.scheduler import SchedulerService
 from src.scheduler.memory_helpers import get_pending_confirmation
@@ -28,7 +28,7 @@ class TestSchedulerCharacterization:
         # Given: User with last sent lesson 1
         user_id = test_user_with_memories.user_id
         mm = MemoryManager(db_session)
-        set_last_sent_lesson_id(mm, user_id, 1)
+        set_next_lesson(mm, user_id, 1)
         
         # And: A daily schedule at 09:00
         schedule = SchedulerService.create_daily_schedule(
@@ -67,7 +67,7 @@ class TestSchedulerCharacterization:
         # Given: User with last sent lesson 1
         user_id = make_ready_user(db_session, external_id="810002", first_name="Char")
         mm = MemoryManager(db_session)
-        set_last_sent_lesson_id(mm, user_id, 1)
+        set_next_lesson(mm, user_id, 1)
         
         # And: An overdue schedule (next_send_time in the past)
         schedule = SchedulerService.create_daily_schedule(
@@ -117,7 +117,7 @@ class TestSchedulerCharacterization:
         # Given: User with last sent lesson 1
         user_id = test_user_with_memories.user_id
         mm = MemoryManager(db_session)
-        set_last_sent_lesson_id(mm, user_id, 1)
+        set_next_lesson(mm, user_id, 1)
         
         # And: A daily schedule
         schedule = SchedulerService.create_daily_schedule(

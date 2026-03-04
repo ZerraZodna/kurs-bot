@@ -11,7 +11,7 @@ from src.models.database import init_db, SessionLocal, Memory
 from src.memories.manager import MemoryManager
 from src.memories.topic_manager import TopicManager
 from src.memories.topics import MemoryTopic
-from src.memories.constants import MemoryCategory
+from src.memories.constants import MemoryCategory, MemoryKey
 
 
 @pytest.fixture
@@ -46,7 +46,7 @@ def test_name_temporal_resolution(clean_test_data, test_user_id):
     # Store old Telegram name first (like from Telegram first_name)
     mm.store_memory(
         user_id=test_user_id,
-        key="first_name",
+        key=MemoryKey.FIRST_NAME,
         value="Dev",
         category=MemoryCategory.PROFILE.value,
         source="telegram",
@@ -55,7 +55,7 @@ def test_name_temporal_resolution(clean_test_data, test_user_id):
     # Manually set created_at to be older
     mem = db.query(Memory).filter(
         Memory.user_id == test_user_id,
-        Memory.key == "first_name",
+        Memory.key == MemoryKey.FIRST_NAME,
         Memory.value == "Dev"
     ).first()
     if mem:
@@ -65,7 +65,7 @@ def test_name_temporal_resolution(clean_test_data, test_user_id):
     # Store new user-provided name (like from "my name is Johannes")
     mm.store_memory(
         user_id=test_user_id,
-        key="name",  # Different key synonym
+        key=MemoryKey.NAME,  # Different key synonym
         value="Johannes",
         category=MemoryCategory.PROFILE.value,
         source="user_conversation",
@@ -74,7 +74,7 @@ def test_name_temporal_resolution(clean_test_data, test_user_id):
     # Manually set created_at to be newer
     mem = db.query(Memory).filter(
         Memory.user_id == test_user_id,
-        Memory.key == "name",
+        Memory.key == MemoryKey.NAME,
         Memory.value == "Johannes"
     ).first()
     if mem:
@@ -92,4 +92,4 @@ def test_name_temporal_resolution(clean_test_data, test_user_id):
     assert resolved_name == "Johannes", f"Expected 'Johannes' but got '{resolved_name}'"
 
     # Test 3: Verify both keys are mapped to same canonical field
-    assert identity.fields["name"].current.original_key in ["first_name", "name"]
+    assert identity.fields["name"].current.original_key in [MemoryKey.FIRST_NAME, MemoryKey.NAME]

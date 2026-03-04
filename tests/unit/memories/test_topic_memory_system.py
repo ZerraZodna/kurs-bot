@@ -8,7 +8,7 @@ from src.models.database import init_db, SessionLocal, Memory
 from src.memories.manager import MemoryManager
 from src.memories.topic_manager import TopicManager
 from src.memories.topics import MemoryTopic, resolve_canonical_key
-from src.memories.constants import MemoryCategory
+from src.memories.constants import MemoryCategory, MemoryKey
 
 
 @pytest.fixture
@@ -44,25 +44,25 @@ def test_all_topics(memory_manager, clean_test_data, test_user_id):
     # Test data for each topic
     test_data = {
         MemoryTopic.IDENTITY: [
-            ("first_name", "Alice", MemoryCategory.PROFILE.value),
+            (MemoryKey.FIRST_NAME, "Alice", MemoryCategory.PROFILE.value),
             ("email", "alice@example.com", MemoryCategory.PROFILE.value),
             ("background", "Software engineer", MemoryCategory.PROFILE.value),
         ],
         MemoryTopic.LESSONS: [
-            ("current_lesson", "42", MemoryCategory.PROGRESS.value),
-            ("lesson_completed", "41", MemoryCategory.PROGRESS.value),
+            (MemoryKey.LESSON_CURRENT, "42", MemoryCategory.PROGRESS.value),
+            (MemoryKey.LESSON_COMPLETED, "41", MemoryCategory.PROGRESS.value),
         ],
         MemoryTopic.SCHEDULE: [
-            ("preferred_lesson_time", "08:00", MemoryCategory.PREFERENCE.value),
+            (MemoryKey.PREFERRED_LESSON_TIME, "08:00", MemoryCategory.PREFERENCE.value),
             ("timezone", "Europe/Oslo", MemoryCategory.PREFERENCE.value),
         ],
         MemoryTopic.GOALS: [
-            ("learning_goal", "Complete ACIM course", MemoryCategory.GOALS.value),
-            ("acim_commitment", "committed to daily practice", MemoryCategory.GOALS.value),
+            (MemoryKey.LEARNING_GOAL, "Complete ACIM course", MemoryCategory.GOALS.value),
+            (MemoryKey.ACIM_COMMITMENT, "committed to daily practice", MemoryCategory.GOALS.value),
         ],
         MemoryTopic.PREFERENCES: [
             ("learning_style", "Visual learner", MemoryCategory.PREFERENCES.value),
-            ("user_language", "en", MemoryCategory.PREFERENCES.value),
+            (MemoryKey.USER_LANGUAGE, "en", MemoryCategory.PREFERENCES.value),
         ],
     }
 
@@ -116,14 +116,14 @@ def test_temporal_resolution(memory_manager, clean_test_data, test_user_id):
     for value, created_at in times:
         mm.store_memory(
             user_id=test_user_id,
-            key="name",
+            key=MemoryKey.NAME,
             value=value,
             category=MemoryCategory.PROFILE.value,
         )
         # Update created_at
         mem = db.query(Memory).filter(
             Memory.user_id == test_user_id,
-            Memory.key == "name",
+            Memory.key == MemoryKey.NAME,
             Memory.value == value
         ).first()
         if mem:
@@ -140,9 +140,9 @@ def test_ai_context(memory_manager, clean_test_data, test_user_id):
     tm = mm.topic_manager
 
     # Store diverse memories across different topics
-    mm.store_memory(test_user_id, "first_name", "Bob", category=MemoryCategory.PROFILE.value)
-    mm.store_memory(test_user_id, "current_lesson", "15", category=MemoryCategory.PROGRESS.value)
-    mm.store_memory(test_user_id, "learning_goal", "Spiritual growth", category=MemoryCategory.GOALS.value)
+    mm.store_memory(test_user_id, MemoryKey.FIRST_NAME, "Bob", category=MemoryCategory.PROFILE.value)
+    mm.store_memory(test_user_id, MemoryKey.LESSON_CURRENT, "15", category=MemoryCategory.PROGRESS.value)
+    mm.store_memory(test_user_id, MemoryKey.LEARNING_GOAL, "Spiritual growth", category=MemoryCategory.GOALS.value)
     mm.store_memory(test_user_id, "learning_style", "Visual learner", category=MemoryCategory.PREFERENCES.value)
 
     # Get AI context

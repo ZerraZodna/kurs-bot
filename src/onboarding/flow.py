@@ -9,7 +9,7 @@ from src.models.database import User
 
 from src.models.database import Lesson
 from src.services.gdpr_service import record_consent
-from src.lessons.api import format_lesson_message, set_current_lesson, get_current_lesson, set_last_sent_lesson_id
+from src.lessons.api import format_lesson_message, set_current_lesson, get_current_lesson
 from src.lessons.handler import translate_text
 from src.onboarding.user_management import delete_user_and_data
 from src.memories.dialogue_helpers import get_user_language
@@ -66,10 +66,7 @@ class OnboardingFlow:
             source="dialogue_engine",
             allow_duplicates=False,
         )
-        # Also set last_sent_lesson_id to prevent next-day confirmation prompt
-        # from triggering immediately after onboarding
-        if lesson_id and lesson_id.isdigit():
-            set_last_sent_lesson_id(self.memory_manager, user_id, int(lesson_id))
+        # set_current_lesson already handles lesson tracking
 
     def _store_memory(
         self,

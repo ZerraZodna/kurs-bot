@@ -16,6 +16,16 @@ class MemoryManager:
         self.memory_handler: MemoryStore = memory_store or MemoryHandler(self.db)
         # Lazy initialization of topic_manager
         self._topic_manager = None
+        # Lazy initialization of AI judge
+        self._ai_judge = None
+
+    @property
+    def ai_judge(self):
+        """Lazy initialization of AI judge for memory quality/conflict detection."""
+        if self._ai_judge is None:
+            from src.memories.ai_judge import MemoryJudge
+            self._ai_judge = MemoryJudge()
+        return self._ai_judge
 
     # Note: embedding generation scheduling and persistence removed.
     # The private helpers that generated and stored embeddings were deleted
@@ -66,48 +76,112 @@ class MemoryManager:
         if key == MemoryKey.PREFERRED_LESSON_TIME:
             logger.info(f"Stored preferred_lesson_time for user {user_id} (no auto-schedule created)")
 
-        # Post-store actions (e.g., update lesson state)
-        try:
-            self._after_store(user_id, key, value, category)
-        except Exception:
-            logger.exception("Post-store action failed")
-
         return memory_id
 
-    def _after_store(self, user_id: int, key: str, value: str, category: str) -> None:
-        """Run post-store side-effects for certain memory keys.
-
-        Currently used to keep consolidated lesson_state in sync when
-        the user reports a completed lesson.
-        """
-        if key != MemoryKey.LESSON_COMPLETED:
-            return
-
-        # Only react to progress category values
-        if category and category != MemoryCategory.PROGRESS.value:
-            return
-
-        try:
-            # Normalize and compute next lesson id
-            n = int(str(value).strip())
-            next_id = n + 1 if n < 365 else 365
-            # Lazy import to avoid circular imports
-            from src.lessons.state import set_current_lesson
-
-            set_current_lesson(self, user_id, next_id)
-        except Exception:
-            logger.exception("Failed to update lesson state after lesson_completed memory")
 
     def archive_memories(self, user_id: int, memory_ids: List[int]) -> int:
         """Archive (soft-delete) memories by IDs for a user. Returns count archived."""
         return self.memory_handler.archive_memories(user_id=user_id, memory_ids=memory_ids)
 
-
-    def set_next_lesson(self, user_id: int, lesson_id: int) -> None:
-        """Helper: set the last sent / next lesson id for a user (used by trigger dispatcher)."""
-        # Use consolidated lesson_state helper so state stays consistent.
-        from src.lessons.state import set_last_sent_lesson_id
-        set_last_sent_lesson_id(self, user_id, lesson_id, write_legacy=True)
+    async def store_memory_with_judgment(
+        self,
+        user_id: int,
+        key: str,
+        value: str,
+        user_message: str,
+        confidence: float = 1.0,
+        source: str = "dialogue_engine",
+        ttl_hours: Optional[int] = None,
+        category: str = "fact",
+        allow_duplicates: bool = False
+    ) -> Optional[int]:
+        """Store a memory with AI-powered quality check and conflict resolution.
+        
+        This method uses the AI judge to:
+        1. Validate memory quality (detect corrupted values)
+        2. Find semantic conflicts with existing memories
+        3. Decide whether to store, clean, archive, or flag
+        
+        Args:
+            user_id: User ID
+            key: Memory key
+            value: Memory value (may be cleaned by AI)
+            user_message: Original user message for context
+            confidence: Confidence score (0.0-1.0)
+            source: Source of memory
+            ttl_hours: Hours until memory expires (None = never)
+            category: Memory category
+            allow_duplicates: Bypass AI judgment if True
+        
+        Returns:
+            Memory ID if stored, None if rejected by AI judge
+        """
+        if allow_duplicates:
+            # Bypass AI judgment for explicit duplicates
+            return self.store_memory(
+                user_id=user_id,
+                key=key,
+                value=value,
+                confidence=confidence,
+                source=source,
+                ttl_hours=ttl_hours,
+                category=category,
+                allow_duplicates=True
+            )
+        
+        # Get all existing memories for context
+        from src.models.database import Memory
+        existing = (
+            self.db.query(Memory)
+            .filter(Memory.user_id == user_id, Memory.is_active == True)
+            .all()
+        )
+        
+        # AI evaluates the proposed memory
+        decision = await self.ai_judge.evaluate_storage(
+            user_id=user_id,
+            proposed_key=key,
+            proposed_value=value,
+            user_message=user_message,
+            existing_memories=existing
+        )
+        
+        logger.info(f"AI Judge [{key}]: quality={decision.quality_score:.2f}, store={decision.should_store}")
+        if decision.reasoning:
+            logger.debug(f"AI Judge reasoning: {decision.reasoning}")
+        
+        # Reject low quality memories
+        if not decision.should_store:
+            logger.warning(f"AI Judge rejected {key}: {decision.issues}")
+            return None
+        
+        # Use cleaned value if provided
+        final_value = decision.cleaned_value if decision.cleaned_value else value
+        
+        # Handle conflicts
+        for conflict in decision.conflicts:
+            if conflict.action == "REPLACE":
+                logger.info(f"AI Judge: Archiving memory {conflict.existing_memory_id} (replaced by new {key})")
+                self.archive_memories(user_id, [conflict.existing_memory_id])
+            elif conflict.action == "MERGE":
+                # For now, just use the new value (could be enhanced to actually merge)
+                logger.info(f"AI Judge: Merging with memory {conflict.existing_memory_id}")
+            elif conflict.action == "FLAG":
+                logger.warning(f"AI Judge flagged {key} for review: {conflict.reason}")
+                # Still store but maybe mark for review in future
+            # KEEP_BOTH: do nothing, store alongside
+        
+        # Store the memory
+        return self.store_memory(
+            user_id=user_id,
+            key=key,
+            value=final_value,
+            confidence=confidence,
+            source=source,
+            ttl_hours=ttl_hours,
+            category=category,
+            allow_duplicates=False
+        )
 
     @property
     def topic_manager(self):

@@ -6,10 +6,7 @@ from typing import Optional
 
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.memories.manager import MemoryManager
-from src.lessons.state import (
-    get_last_sent_lesson_id as _get_last_sent_lesson_id,
-    set_last_sent_lesson_id as _set_last_sent_lesson_id,
-)
+
 from src.core.timezone import to_utc
 
 
@@ -28,16 +25,6 @@ def get_schedule_message(memory_manager: MemoryManager, user_id: int, schedule_i
 def get_user_language(memory_manager: MemoryManager, user_id: int) -> str:
     memories = memory_manager.get_memory(user_id, MemoryKey.USER_LANGUAGE)
     return memories[0].get("value", "en") if memories else "en"
-
-
-def get_last_sent_lesson_id(memory_manager: MemoryManager, user_id: int) -> Optional[int]:
-    """Wrapper: use consolidated lesson_state getter."""
-    return _get_last_sent_lesson_id(memory_manager, user_id)
-
-
-def set_last_sent_lesson_id(memory_manager: MemoryManager, user_id: int, lesson_id: int) -> None:
-    """Wrapper: use consolidated lesson_state setter."""
-    _set_last_sent_lesson_id(memory_manager, user_id, lesson_id, write_legacy=True)
 
 
 def is_auto_advance_lessons_enabled(memory_manager: MemoryManager, user_id: int) -> bool:

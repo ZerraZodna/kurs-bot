@@ -294,4 +294,4 @@ class TestAsyncExample:
         # mock_embedding_service is an async mock
         result = await mock_embedding_service.generate_embedding("test")
         assert result is not None
-        assert len(result) == 384  # Default dimension
+        assert len(result) == mock_embedding_service.embedding_dimension

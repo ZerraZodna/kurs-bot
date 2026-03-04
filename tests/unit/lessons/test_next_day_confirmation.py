@@ -14,9 +14,9 @@ from src.models.database import Lesson, SessionLocal
 from tests.fixtures.users import create_test_user
 from src.memories import MemoryManager
 from src.lessons.state import (
-    get_last_sent_lesson_id,
+    get_current_lesson,
     set_current_lesson,
-    set_last_sent_lesson_id,
+    set_next_lesson,
 )
 from src.services.dialogue.command_handlers import handle_debug_next_day
 from src.lessons.advance import maybe_send_next_lesson
@@ -151,7 +151,7 @@ async def test_next_day_auto_advance_preference_skips_confirmation_prompt():
     assert result is not None
     assert "Lesson 9" in result
     assert get_pending_confirmation(mm, user_id) is None
-    assert get_last_sent_lesson_id(mm, user_id) == 9
+    assert get_current_lesson(mm, user_id) == 9
 
     db.close()
 
@@ -166,7 +166,7 @@ async def test_auto_advance_intent_is_persisted_and_negative_override_adjusts_pr
     db = SessionLocal()
     user_id = create_test_user(db, "test_next_day_auto_assume_override")
     mm = MemoryManager(db)
-    set_last_sent_lesson_id(mm, user_id, 9)
+    set_next_lesson(mm, user_id, 9)
 
     async def _fake_translate(text: str, language: str):
         return text
@@ -200,7 +200,7 @@ async def test_auto_advance_intent_is_persisted_and_negative_override_adjusts_pr
     )
     assert override_response is not None
     assert "keep you on lesson 8" in override_response.lower()
-    assert get_last_sent_lesson_id(mm, user_id) == 8
+    assert get_current_lesson(mm, user_id) == 8
 
     db.close()
 
@@ -228,7 +228,7 @@ async def test_scheduler_full_two_day_flow_after_onboarding():
     set_current_lesson(mm, user_id, 17)
 
     # Verify initial state
-    assert get_last_sent_lesson_id(mm, user_id) is None, "last_sent should be None after onboarding"
+    assert get_current_lesson(mm, user_id) == 17, "current_lesson should be 17 after onboarding"
 
     # Seed lessons 17, 18, 19 if not present
     for lid in (17, 18, 19):
@@ -301,9 +301,9 @@ async def test_scheduler_full_two_day_flow_after_onboarding():
     assert confirmation_response is not None, "Day 1 confirmation: Expected lesson delivery response"
     assert "18" in confirmation_response, f"Day 1 confirmation: Expected lesson 18, got: {confirmation_response}"
 
-    # Verify last_sent is now 18
-    last_sent_after_confirm = get_last_sent_lesson_id(mm, user_id)
-    assert last_sent_after_confirm == 18, f"After Day 1 confirm: Expected last_sent=18, got {last_sent_after_confirm}"
+    # Verify current_lesson is now 18
+    current_after_confirm = get_current_lesson(mm, user_id)
+    assert current_after_confirm == 18, f"After Day 1 confirm: Expected current_lesson=18, got {current_after_confirm}"
 
     # Verify pending confirmation is resolved (returns resolved dict or None)
     pending_after_confirm = get_pending_confirmation(mm, user_id)
@@ -344,9 +344,9 @@ async def test_scheduler_full_two_day_flow_after_onboarding():
     assert confirmation_response_day2 is not None, "Day 2 confirmation: Expected lesson delivery response"
     assert "19" in confirmation_response_day2, f"Day 2 confirmation: Expected lesson 19, got: {confirmation_response_day2}"
 
-    # Verify last_sent is now 19
-    last_sent_after_day2 = get_last_sent_lesson_id(mm, user_id)
-    assert last_sent_after_day2 == 19, f"After Day 2 confirm: Expected last_sent=19, got {last_sent_after_day2}"
+    # Verify current_lesson is now 19
+    current_after_day2 = get_current_lesson(mm, user_id)
+    assert current_after_day2 == 19, f"After Day 2 confirm: Expected current_lesson=19, got {current_after_day2}"
 
     db.close()
 

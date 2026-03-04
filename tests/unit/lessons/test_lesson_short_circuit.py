@@ -24,9 +24,12 @@ async def test_todays_lesson_via_ai_function_calling(monkeypatch):
     from tests.fixtures.users import make_ready_user
 
     user_id = make_ready_user(session, external_id="u1", first_name="Test")
-    lesson = Lesson(lesson_id=1, title="Lesson 1", content="Lesson 1\nFull lesson text")
-    session.add(lesson)
-    session.commit()
+    # Only add lesson if it doesn't exist
+    existing_lesson = session.query(Lesson).filter_by(lesson_id=1).first()
+    if not existing_lesson:
+        lesson = Lesson(lesson_id=1, title="Lesson 1", content="Lesson 1\nFull lesson text")
+        session.add(lesson)
+        session.commit()
 
     engine = DialogueEngine(db=session)
 
@@ -94,9 +97,12 @@ async def test_numbered_lesson_still_short_circuits(monkeypatch):
     from tests.fixtures.users import make_ready_user
 
     user_id = make_ready_user(session, external_id="u2", first_name="Test")
-    lesson = Lesson(lesson_id=5, title="Lesson 5", content="Lesson 5\nFull lesson text")
-    session.add(lesson)
-    session.commit()
+    # Only add lesson if it doesn't exist
+    existing_lesson = session.query(Lesson).filter_by(lesson_id=5).first()
+    if not existing_lesson:
+        lesson = Lesson(lesson_id=5, title="Lesson 5", content="Lesson 5\nFull lesson text")
+        session.add(lesson)
+        session.commit()
 
     engine = DialogueEngine(db=session)
 

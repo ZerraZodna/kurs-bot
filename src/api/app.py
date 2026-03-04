@@ -186,6 +186,7 @@ async def lifespan(app: FastAPI):
     # If embedding backend uses Ollama, explicitly confirm local Ollama is present
     embedding_backend = getattr(settings, "EMBEDDING_BACKEND", "local")
     if str(embedding_backend).lower() == "ollama":
+        local = getattr(settings, "LOCAL_OLLAMA_URL", None)
         if local:
             b = local
             if "/api" in b:
