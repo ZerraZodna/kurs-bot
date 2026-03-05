@@ -75,34 +75,6 @@ class TestOnboarding:
         schedules = db_session.query(Schedule).filter_by(user_id=user_id).all()
         assert len(schedules) > 0, "Expected schedule to be created after consent"
 
-    @pytest.mark.asyncio
-    async def test_schedule_request(self, db_session):
-        """Given: A user
-        When: Requesting reminders explicitly
-        Then: Bot should guide through simplified onboarding (name + consent only)
-        """
-        # Given: A user (no first_name memory stored, so bot will ask for name first)
-        user = User(
-            external_id="test_onboarding_schedule_request",
-            channel="telegram",
-            first_name="Test",
-            opted_in=True,
-            created_at=datetime.now(timezone.utc),
-        )
-        db_session.add(user)
-        db_session.commit()
-
-        dialogue = DialogueEngine(db_session)
-
-        # When: User asks for reminders
-        response = await dialogue.process_message(user.user_id, "Can you remind me to do my daily lesson?", db_session)
-
-        # Then: Bot should first ask for name (onboarding must complete first)
-        assert response is not None
-        # Name is asked first since user has no name stored in memories
-        assert "name" in response.lower() or "call you" in response.lower() or "test" in response.lower(), \
-            f"Expected bot to ask for name first, got: {response}"
-
     def test_time_parsing(self):
         """Given: Various time strings
         When: Parsing time

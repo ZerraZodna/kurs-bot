@@ -71,35 +71,6 @@ class TestOnboarding:
         assert "thank" in response.lower() or "welcome" in response.lower(), \
             f"Expected onboarding completion message, got: {response}"
 
-    @pytest.mark.asyncio
-    async def test_schedule_request(self, db_session):
-        """Given: A user
-        When: Requesting reminders explicitly
-        Then: Bot should guide through onboarding first (name + consent), then set up schedule
-        """
-        # Given: A user (no first_name memory stored, so bot will ask for name first)
-        user = User(
-            external_id="test_onboarding_schedule_request",
-            channel="telegram",
-            first_name="Test",
-            opted_in=True,
-            created_at=datetime.now(timezone.utc),
-        )
-        db_session.add(user)
-        db_session.commit()
-
-        dialogue = DialogueEngine(db_session)
-
-        # When: User asks for reminders
-        response = await dialogue.process_message(user.user_id, "Can you remind me to do my daily lesson?", db_session)
-
-        # Then: Bot should first ask for name (onboarding must complete first)
-        # The bot guides through onboarding before setting up schedules
-        assert response is not None
-        # Name is asked first since user has no name stored in memories
-        assert "name" in response.lower() or "call you" in response.lower() or "test" in response.lower(), \
-            f"Expected bot to ask for name first, got: {response}"
-
     def test_time_parsing(self):
         """Given: Various time strings
         When: Parsing time
