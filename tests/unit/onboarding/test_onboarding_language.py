@@ -35,6 +35,6 @@ class TestOnboardingLanguage:
         
         # And: The onboarding response should be in Norwegian
         assert (
-            "Hva heter" in resp or "Velkommen" in resp or "Før vi fortsetter" in resp
+            "Jeg er din åndelige følgesvenn" in resp or "Samtykker du til" in resp or "Et kurs i mirakler" in resp
         ), f"Onboarding response was not Norwegian: {resp}"
 

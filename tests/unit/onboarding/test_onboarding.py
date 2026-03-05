@@ -124,13 +124,10 @@ class TestOnboarding:
         assert any(m["value"].lower().startswith("no") for m in lang_memories), \
             f"Expected 'no' to be stored after message 'Hei', got: {[m['value'] for m in lang_memories]}"
 
-        # And: Response should be in Norwegian
+        # And: Response should match updated Norwegian consent onboarding prompt
         assert (
-            "navnet ditt i Telegram" in response
-            or "Jeg ser at navnet ditt i Telegram" in response
-            or "kaller deg" in response
-            or "Hva heter du" in response
-            or "Velkommen! Hva heter du" in response
-            or ("Velkommen!" in response and "Hva" in response)
-        ), f"Expected Norwegian onboarding prompt, got: {response}"
+            "Hei" in response
+            and "Jeg er din åndelige følgesvenn for Et kurs i mirakler" in response
+            and "Samtykker du til at jeg lagrer samtalen vår" in response
+        ), f"Expected updated Norwegian consent prompt, got: {response}"
 
