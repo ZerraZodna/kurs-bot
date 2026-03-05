@@ -111,7 +111,7 @@ def _extract_chat_text(resp: Any) -> Optional[str]:
 async def _call_local_http(model: str, prompt: str, temperature: Optional[float] = None) -> str:
     url = LOCAL_OLLAMA_URL
     temp = OLLAMA_TEMPERATURE if temperature is None else temperature
-    payload = {"model": model, "prompt": prompt, "stream": False, "temperature": float(temp)}
+    payload = {"model": model, "prompt": prompt, "stream": False, "temperature": float(temp), "think": False}
     timeout = OLLAMA_LONG_TIMEOUT if "gpt-oss" in model.lower() else OLLAMA_TIMEOUT
     async with httpx.AsyncClient() as client:
         r = await client.post(url, json=payload, timeout=timeout)
@@ -131,10 +131,10 @@ def _cloud_call_sync(host_base: str, api_key: Optional[str], model: str, prompt:
     messages = [{"role": "user", "content": prompt}]
     # Use non-streaming chat for simplicity, forward temperature
     try:
-        return client.chat(str(model), messages=messages, stream=False, temperature=float(temperature))
+        return client.chat(str(model), messages=messages, stream=False, temperature=float(temperature), think=False)
     except TypeError:
         # Older clients may not accept temperature kwarg; fallback
-        return client.chat(str(model), messages=messages, stream=False)
+        return client.chat(str(model), messages=messages, stream=False, think=False)
 
 
 async def stream_ollama(
@@ -188,6 +188,7 @@ async def stream_ollama(
             "prompt": prompt,
             "stream": True,
             "temperature": float(temp),
+            "think": False,
         }
         logger.info(
             "AI STREAM PROMPT cloud (model=%s): %s",
@@ -245,6 +246,7 @@ async def stream_ollama(
         "prompt": prompt,
         "stream": True,
         "temperature": float(temp),
+        "think": False,
     }
 
     logger.info(
