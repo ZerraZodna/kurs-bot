@@ -1,15 +1,16 @@
 """Database fixtures for test isolation and setup.
 
-Uses the application's own engine and SessionLocal (file-based test.db when
-IS_TEST_ENV=1) so that data committed in db_session is visible to services
-like TriggerMatcher and SchedulerService that also call SessionLocal()
-internally.
+This is the single source of truth for test database configuration.
+Uses temporary file-based SQLite databases per worker for parallel test safety.
+
+The application engine is not used - instead we create a dedicated test engine
+to ensure complete isolation from any production or development databases.
 
 Test isolation is provided by the ensure_test_db autouse fixture in
 tests/conftest.py, which drops and recreates all tables before each test.
 
 For parallel test execution with pytest-xdist, each worker gets its own
-database file to avoid file contention.
+temporary database file to avoid SQLite file locking issues.
 """
 
 import os
@@ -129,3 +130,4 @@ def clean_db() -> Generator[None, None, None]:
     Base.metadata.drop_all(_app_engine)
     Base.metadata.create_all(_app_engine)
     yield
+

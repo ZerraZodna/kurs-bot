@@ -77,40 +77,20 @@ if not _test_use_real or str(_test_use_real).strip().lower() not in ("1", "true"
 import time
 from pathlib import Path
 import pytest
-# Ensure test DB is used for the test session
-# (override early so modules importing settings pick up test DB URL)
 
-# Test database configuration (in-memory for parallel test safety)
-# Using :memory: ensures each test worker gets its own isolated database
-# This prevents "readonly database" errors when running tests in parallel with pytest-xdist
-TEST_DB_URL = 'sqlite:///:memory:'
-
-# Safety check: warn if DATABASE_URL points to prod.db before we override it
-# This ensures the warning appears at test startup, not after tests run
-_original_db_url = os.environ.get('DATABASE_URL', '')
-if 'prod.db' in _original_db_url:
-    # Use stderr and flush to ensure immediate output (not buffered by pytest -q)
-    import sys
-    sys.stderr.write("\n⚠️  WARNING: Detected test run with DATABASE_URL pointing to prod.db - overriding to test.db to avoid data loss.\n")
-    sys.stderr.flush()
-    import logging
-    logging.getLogger(__name__).warning(
-        "Detected test run with DATABASE_URL pointing to prod.db - overriding to test.db to avoid data loss."
-    )
-
-# Export DATABASE_URL so code using settings picks up the test DB
-os.environ['DATABASE_URL'] = TEST_DB_URL
+# Test database configuration is handled by db_engine fixture in tests/fixtures/database.py
+# This uses temporary file-based SQLite databases per worker for parallel test safety
 
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_environment():
     """
     Setup test environment and cleanup after tests.
-    - Uses in-memory SQLite database for parallel test safety
-    - No file cleanup needed for in-memory database
+    - Uses temporary file-based SQLite database for parallel test safety
+    - Database is managed by db_engine fixture in tests/fixtures/database.py
     """
-    # In-memory database - no file cleanup needed
-    print(f"🧪 Using in-memory test database for parallel execution safety")
+    # Database is handled by db_engine fixture - see tests/fixtures/database.py
+    print(f"🧪 Using temporary file-based test database for parallel execution safety")
 
     # Ensure schema exists in test DB
     try:
@@ -192,7 +172,7 @@ def setup_test_environment():
 
     yield
 
-    # In-memory database cleanup is automatic - no file to delete
+    # Database cleanup handled by db_engine fixture
     print("\n✅ Test session complete")
 
 
