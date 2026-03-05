@@ -365,24 +365,35 @@ class FunctionExecutor:
         from src.scheduler import api as scheduler_api
         from src.scheduler.domain import is_one_time_schedule_type
         from src.scheduler.memory_helpers import get_schedule_message
+        from src.core.timezone import get_user_timezone_from_db, format_dt_in_timezone
         
         user_id = context.get("user_id")
+        session = context.get("session")
         memory_manager = context.get("memory_manager")
+        
+        # Get user's timezone for converting times to local display
+        tz_name = get_user_timezone_from_db(session, user_id) if session else "UTC"
         
         try:
             schedules = scheduler_api.get_user_schedules(
                 user_id=user_id,
                 active_only=True,
-                session=context.get("session"),
+                session=session,
             )
             
             schedule_list = []
             for s in schedules:
+                # Convert next_send_time to user's local timezone for display
+                local_time = None
+                if s.next_send_time:
+                    local_dt, _ = format_dt_in_timezone(s.next_send_time, tz_name)
+                    local_time = local_dt.isoformat()
+                
                 schedule_data = {
                     "schedule_id": s.schedule_id,
                     "schedule_type": s.schedule_type,
                     "cron_expression": s.cron_expression,
-                    "next_send_time": s.next_send_time.isoformat() if s.next_send_time else None,
+                    "next_send_time": local_time,  # Return local time, not UTC
                     "is_active": s.is_active,
                 }
                 
@@ -397,6 +408,7 @@ class FunctionExecutor:
             return {
                 "ok": True,
                 "schedules": schedule_list,
+                "timezone": tz_name,  # Include timezone info for debugging
             }
         except Exception as e:
             return {"ok": False, "error": str(e)}

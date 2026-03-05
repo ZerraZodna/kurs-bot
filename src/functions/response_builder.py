@@ -206,13 +206,17 @@ class ResponseBuilder:
         elif result.function_name == "query_schedule":
             # Build schedule list
             schedules = result_data.get("schedules", [])
+            # Get user's timezone for display
+            tz_name = result_data.get("timezone", "UTC")
+            
             if schedules:
                 details = []
                 for s in schedules:
                     schedule_type = s.get('schedule_type', 'reminder')
                     time_display = self._format_cron_expression(
                         s.get('cron_expression', ''),
-                        s.get('next_send_time')
+                        s.get('next_send_time'),
+                        tz_name
                     )
                     
                     # Map schedule types to friendly display names
@@ -236,7 +240,12 @@ class ResponseBuilder:
                 kwargs["details"] = "\n".join(details)
             else:
                 kwargs["details"] = "No active reminders found."
-        
+            
+            # Add timezone to output if available
+            tz_name = result_data.get("timezone", "")
+            if tz_name:
+                kwargs["details"] += f"\n\n(Timezone: {tz_name})"
+
         try:
             return template.format(**kwargs)
         except KeyError:
@@ -256,22 +265,31 @@ class ResponseBuilder:
         except KeyError:
             return f"⚠ {result.function_name} failed: {result.error}"
     
-    def _format_cron_expression(self, cron_expr: str, next_send_time: Optional[str] = None) -> str:
+    def _format_cron_expression(self, cron_expr: str, next_send_time: Any = None, tz_name: str = "UTC") -> str:
         """Format a cron expression or special time format into human-readable time.
         
         Args:
             cron_expr: The cron expression (e.g., "0 7 * * *") or special format (e.g., "once:2024-01-15T07:00:00")
-            next_send_time: Optional ISO format datetime string for one-time reminders
+            next_send_time: Optional datetime object or ISO format datetime string for one-time reminders
+            tz_name: User's timezone for local time display
             
         Returns:
             Human-readable time string (e.g., "07:00", "2024-01-15 07:00")
         """
+        # Handle datetime object (passed from executor with local timezone)
+        from datetime import datetime
+        from src.core.timezone import format_datetime_for_display as fdfd
+        
+        if isinstance(next_send_time, datetime):
+            # Already a datetime object - format it directly
+            return fdfd(next_send_time.isoformat())
+        
         if not cron_expr:
             return "unknown"
         
         # Handle one-time reminder format: "once:ISO8601"
         if cron_expr.startswith("once:"):
-            return format_datetime_for_display(next_send_time) if next_send_time else "one-time"
+            return fdfd(next_send_time) if next_send_time else "one-time"
         
         # Parse standard cron expression: "M H * * *"
         parts = cron_expr.split()
@@ -279,7 +297,19 @@ class ResponseBuilder:
             try:
                 minute = int(parts[0])
                 hour = int(parts[1])
-                return f"{hour:02d}:{minute:02d}"
+                
+                # Convert UTC hour/minute to user's local timezone
+                from datetime import datetime, timezone as tz
+                from zoneinfo import ZoneInfo
+                try:
+                    tzinfo = ZoneInfo(tz_name)
+                except Exception:
+                    tzinfo = tz.utc
+                
+                # Create a datetime in UTC and convert to user's timezone
+                utc_dt = datetime(2000, 1, 1, hour, minute, 0, tzinfo=tz.utc)
+                local_dt = utc_dt.astimezone(tzinfo)
+                return f"{local_dt.hour:02d}:{local_dt.minute:02d}"
             except (ValueError, IndexError):
                 pass
         
