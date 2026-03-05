@@ -454,10 +454,7 @@ class DialogueEngine:
             # Use the schedule query response builder to list all active reminders
             from src.scheduler.schedule_query_handler import build_schedule_status_response
 
-            tz_name = get_user_timezone_from_db(self.db.object_session,
-                user_id,
-                get_user_language(self.memory_manager, user_id)
-            )
+            tz_name = get_user_timezone_from_db(self.db.object_session, user_id)
 
             resp_text = build_schedule_status_response(schedules, tz_name)
             # Clear any pending flag and translate if necessary
@@ -511,10 +508,7 @@ When would you like to receive them? (e.g., "9:00 AM", "morning", "evening", "8:
                 session=session,
             )
 
-            tz_name = get_user_timezone_from_db(self.db.object_session,
-                user_id,
-                get_user_language(self.memory_manager, user_id)
-            )
+            tz_name = get_user_timezone_from_db(self.db.object_session, user_id)
             if schedule.next_send_time:
                 local_dt, _ = format_dt_in_timezone(schedule.next_send_time, tz_name)
                 time_display = f"{local_dt:%H:%M}"
