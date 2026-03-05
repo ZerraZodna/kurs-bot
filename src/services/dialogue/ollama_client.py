@@ -33,10 +33,10 @@ CLOUD_OLLAMA_DEFAULT = "https://ollama.com/api/generate"
 LOCAL_OLLAMA_URL = getattr(settings, "LOCAL_OLLAMA_URL", LOCAL_OLLAMA_DEFAULT)
 CLOUD_OLLAMA_URL = getattr(settings, "CLOUD_OLLAMA_URL", CLOUD_OLLAMA_DEFAULT)
 
-OLLAMA_TIMEOUT = getattr(settings, "OLLAMA_TIMEOUT", 30.0)
-OLLAMA_RETRIES = getattr(settings, "OLLAMA_RETRIES", 2)
+OLLAMA_TIMEOUT = getattr(settings, "OLLAMA_TIMEOUT", 120.0)
+OLLAMA_RETRIES = getattr(settings, "OLLAMA_RETRIES", 1)
 OLLAMA_MODEL = getattr(settings, "OLLAMA_MODEL")
-OLLAMA_LONG_TIMEOUT = getattr(settings, "OLLAMA_LONG_TIMEOUT", 180.0)
+OLLAMA_LONG_TIMEOUT = getattr(settings, "OLLAMA_LONG_TIMEOUT", 380.0)
 OLLAMA_LONG_RETRIES = getattr(settings, "OLLAMA_LONG_RETRIES", 0)
 OLLAMA_TEMPERATURE = getattr(settings, "OLLAMA_TEMPERATURE", 0.2)
 

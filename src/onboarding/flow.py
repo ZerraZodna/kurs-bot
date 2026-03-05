@@ -5,8 +5,6 @@ from enum import Enum
 from typing import Optional
 
 from sqlalchemy.orm import Session
-from src.models.database import User
-
 from src.models.database import Lesson
 from src.services.gdpr_service import record_consent
 from src.lessons.api import format_lesson_message, set_current_lesson, get_current_lesson
@@ -23,10 +21,7 @@ NEEDS_AI_PROCESSING = "NEEDS_AI_PROCESSING"
 
 
 class OnboardingStep(Enum):
-    NAME = "name"
     CONSENT = "consent"
-    # Removed: TIMEZONE, COMMITMENT, LESSON_STATUS, INTRO_OFFER - simplified to name + consent only
-
 
 class OnboardingFlow:
     def __init__(self, memory_manager, onboarding_service, call_ollama):
@@ -106,65 +101,6 @@ class OnboardingFlow:
             return None
         return None
 
-    async def _handle_pending_step(self, user_id: int, text: str, session: Session, step: str) -> Optional[str]:
-        if step == OnboardingStep.CONSENT.value:
-            return self._handle_consent_pending(user_id, text, session)
-        elif step == OnboardingStep.NAME.value:
-            return await self._handle_name_pending(user_id, text, session)
-        # Removed: TIMEZONE, COMMITMENT, LESSON_STATUS, INTRO_OFFER handlers
-        return None
-
-    async def _handle_name_pending(self, user_id: int, text: str, session: Session) -> Optional[str]:
-        """Handle the pending 'name' step.
-
-        Expected behaviour:
-        - If user confirms (yes), store the Telegram first_name from DB as `first_name` memory.
-        - If user replies with a name, store that as `first_name` memory.
-        - If user explicitly declines, ask what they prefer to be called.
-        After storing the preferred name, continue onboarding (next prompt from service).
-        """
-        logger.debug(f"_handle_name_pending - user_id={user_id} text={text}")
-        t = (text or "").strip()
-        lname = t.lower()
-
-        # simple affirmative/negative detection
-        affirmatives = {"yes", "y", "sure", "ok", "okay", "ja", "yea", "yep", "sure!", "ok!"}
-        negatives = {"no", "n", "don't", "dont", "nope", "nei"}
-
-        # If user confirms, use DB user first_name if present
-        if lname in affirmatives:
-            try:
-                db_user = session.query(User).filter(User.user_id == user_id).first()
-                if db_user and db_user.first_name:
-                    self._store_memory(user_id, MemoryKey.FIRST_NAME, db_user.first_name, category=MemoryCategory.PROFILE.value)
-                    self._resolve_pending_step(user_id)
-                    return self.onboarding.get_onboarding_prompt(user_id)
-            except Exception:
-                pass
-            # fallback: ask for name explicitly
-            self._store_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING, OnboardingStep.NAME.value, ttl_hours=2)
-            language = get_user_language(self.memory_manager, user_id)
-            if language == "no":
-                return "Hva vil du at jeg skal kalle deg?"
-            return "What would you like me to call you?"
-
-        if lname in negatives:
-            # user declined — ask for preferred name explicitly
-            self._store_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING, OnboardingStep.NAME.value, ttl_hours=2)
-            language = get_user_language(self.memory_manager, user_id)
-            if language == "no":
-                return "Hva vil du at jeg skal kalle deg?"
-            return "What would you like me to call you?"
-
-        # Otherwise, treat the reply as the preferred name and store it
-        preferred = t
-        if preferred:
-            self._store_memory(user_id, MemoryKey.FIRST_NAME, preferred, category=MemoryCategory.PROFILE.value)
-            self._resolve_pending_step(user_id)
-            return self.onboarding.get_onboarding_prompt(user_id)
-
-        return None
-
     def _handle_consent_pending(self, user_id: int, text: str, session: Session) -> Optional[str]:
         logger.debug(f"_handle_consent_pending - user_id={user_id} text={text}")
         consent = self.onboarding.detect_consent_keywords(text)
@@ -190,9 +126,9 @@ class OnboardingFlow:
         """
         Handle onboarding flow.
 
-        Simplified onboarding: only requires name + consent.
-        - Name is asked first (or use Telegram name if available)
-        - Consent is asked after name
+        Simplified onboarding: only requires consent.
+        - Name is now skipped - using Telegram name from DB
+        - Consent is asked immediately for new users
         - Onboarding completes after consent is given
         
         Returns:
@@ -201,28 +137,37 @@ class OnboardingFlow:
         status = self.onboarding.get_onboarding_status(user_id)
         logger.debug(f"handle_onboarding - user_id={user_id} text={text} status={status}")
 
-        # If there is a pending onboarding step, handle it first so replies
-        # to prompts (e.g. consent "yes") are processed instead of re-asking.
+        # Check if there's a pending step that needs processing
         pending_step = self._get_pending_step(user_id)
-        if pending_step:
-            logger.debug(f"pending_step detected: {pending_step} for user {user_id}")
-            response = await self._handle_pending_step(user_id, text, session, pending_step)
-            if response:
-                return response
-            self._resolve_pending_step(user_id)
+        logger.debug(f"handle_onboarding - user_id={user_id} pending_step={pending_step}")
 
-        # If no name info exists, delegate to the onboarding service which
-        # may prefer to ask permission to use an existing Telegram `first_name`.
-        if not status.get("has_name"):
-            logger.debug(f"asking for name (no name) delegating to service user_id={user_id}")
-            return self.onboarding.get_onboarding_prompt(user_id)
+        # If there's a pending consent step, process the user's answer
+        if pending_step == "consent":
+            # Process user's response to the consent question
+            consent_response = self._handle_consent_pending(user_id, text, session)
+            if consent_response:
+                # Consent was granted or declined - return the response
+                return consent_response
+            # If consent_response is None, the answer was unclear - ask again
+            # Fall through to ask consent again
 
-        # If no consent, ask for consent
+        # Skip name check - using Telegram name from DB
+        # Only check for consent
         if not status.get("has_consent"):
             language = get_user_language(self.memory_manager, user_id)
-            self._store_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING, "consent", ttl_hours=2)
+            # Only store pending step if there wasn't one already
+            if pending_step != "consent":
+                self._store_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING, "consent", ttl_hours=2)
             logger.debug(f"asking for consent (no consent) user_id={user_id} language={language}")
-            return self._get_message("consent_prompt", language)
+            # Get personalized consent prompt with user's name
+            name = self._get_user_name(user_id)
+            consent_prompt = self._get_message("consent_prompt", language)
+            if name and name != "friend" and "{name}" in consent_prompt:
+                consent_prompt = consent_prompt.replace("{name}", name)
+            elif "{name}" in consent_prompt:
+                # Remove the placeholder if name is not available
+                consent_prompt = consent_prompt.replace("{name}! ", "").replace("{name} ", "")
+            return consent_prompt
 
         # Handle declined consent case
         if status.get("declined_consent"):

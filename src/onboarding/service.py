@@ -23,7 +23,6 @@ from src.language.onboarding_prompts import (
     get_onboarding_complete_message_text,
     get_onboarding_message,
 )
-from src.models.database import User
 from src.onboarding.status import get_onboarding_status_dict
 from src.onboarding.schedule_setup import create_auto_schedule
 from src.onboarding.user_management import delete_user_and_data, is_user_new
@@ -46,10 +45,11 @@ class OnboardingService:
 
         Returns:
             Dict with onboarding_complete, steps_completed, next_step
+        
+        Note: Name is now always considered complete - using Telegram name from DB.
         """
-        # Use topic-based name retrieval for temporal resolution
-        name = self.memory_manager.topic_manager.get_name(user_id)
-        has_name = name != "friend"
+        # Name is now automatically considered complete (using Telegram name from DB)
+        # We still check memory in case user explicitly set a different name
 
         consent_memories = self.memory_manager.get_memory(user_id, MemoryKey.DATA_CONSENT)
         has_consent = bool(consent_memories)
@@ -58,8 +58,8 @@ class OnboardingService:
             for m in consent_memories
         )
 
+        # Pass has_consent first (required arg), has_name uses default (True)
         return get_onboarding_status_dict(
-            has_name=has_name,
             has_consent=has_consent,
             declined_consent=declined_consent,
         )
@@ -71,60 +71,13 @@ class OnboardingService:
         if status["onboarding_complete"]:
             return None
 
-        #language = get_user_language(self.memory_manager, user_id)
         lang_memories = self.memory_manager.get_memory(user_id, MemoryKey.USER_LANGUAGE)
         language = lang_memories[0]["value"] if lang_memories else "en"
 
         next_step = status["next_step"]
-        # Use topic-based name retrieval for temporal resolution
-        name = self.memory_manager.topic_manager.get_name(user_id)
-
-        if next_step == "name":
-            self.memory_manager.store_memory(
-                user_id=user_id,
-                key=MemoryKey.ONBOARDING_STEP_PENDING,
-                value="name",
-                category=MemoryCategory.CONVERSATION.value,
-                ttl_hours=2,
-                source="onboarding_service",
-                allow_duplicates=False,
-            )
-            # If we have a first/last name in the DB (from Telegram), prefer
-            # asking permission to use that first name rather than asking for
-            # the full name again. Re-use the `name_prompt` template and
-            # format it with `first` and `full` placeholders. If no name is
-            # available at all, fall back to a simple, generic "What's your
-            # name?" question (don't return an unformatted template).
-            first_name_memories = self.memory_manager.get_memory(user_id, MemoryKey.FIRST_NAME)
-            last_name_memories = self.memory_manager.get_memory(user_id, MemoryKey.LAST_NAME)
-
-            # Helper to format the template with available parts
-            def _format_with(first: str, last: Optional[str] = None) -> str:
-                full = f"{first} {last}".strip() if last else first
-                return get_onboarding_message("name_prompt", language).format(first=first, full=full)
-
-            # Prefer memory-stored names
-            if first_name_memories:
-                first = first_name_memories[0].get("value")
-                # use last_name memory if present
-                last = last_name_memories[0].get("value") if last_name_memories else None
-                return _format_with(first, last)
-
-            # Try to fetch from the users table as a fallback
-            try:
-                db_user = self.db.query(User).filter(User.user_id == user_id).first()
-                if db_user and db_user.first_name:
-                    return _format_with(db_user.first_name, db_user.last_name)
-            except Exception:
-                # If DB lookup fails, fall back to the generic prompt
-                pass
-
-            # No name available — return a generic localized prompt asking
-            # for the user's name (do not attempt to format the template).
-            if language == "no":
-                return "Velkommen! Hva heter du? 👋"
-            return "Welcome! What's your name? 👋"
-        elif next_step == "consent":
+        
+        # Only handle consent step - name is skipped (using Telegram name from DB)
+        if next_step == "consent":
             self.memory_manager.store_memory(
                 user_id=user_id,
                 key=MemoryKey.ONBOARDING_STEP_PENDING,
@@ -135,6 +88,21 @@ class OnboardingService:
                 allow_duplicates=False,
             )
             return get_onboarding_message("consent_prompt", language)
+        
+        # If somehow we get "name" as next_step, just skip it and return consent
+        # This shouldn't happen with the new logic, but just in case
+        if next_step == "name":
+            self.memory_manager.store_memory(
+                user_id=user_id,
+                key=MemoryKey.ONBOARDING_STEP_PENDING,
+                value="consent",
+                category=MemoryCategory.CONVERSATION.value,
+                ttl_hours=2,
+                source="onboarding_service",
+                allow_duplicates=False,
+            )
+            return get_onboarding_message("consent_prompt", language)
+        
         return None
     
     def get_onboarding_complete_message(self, user_id: int) -> str:

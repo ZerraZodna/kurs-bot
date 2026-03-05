@@ -101,7 +101,7 @@ async def extract_and_store_memories(
                 key = memory.get("key")
                 val = memory.get("value")
                 # Route lesson state writes through the centralized helper
-                if key == MemoryKey.CURRENT_LESSON:
+                if key == MemoryKey.LESSON_CURRENT:
                     # Normalize numeric lesson values to int, keep strings like 'continuing'
                     parsed = None
                     try:

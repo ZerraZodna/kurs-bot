@@ -22,7 +22,7 @@ class ProxyingHandler(http.server.SimpleHTTPRequestHandler):
 
             # Use loopback explicitly and allow a generous timeout for model calls
             # Increase timeout to accommodate slow local model inference
-            conn = http.client.HTTPConnection('127.0.0.1', self.api_port, timeout=60)
+            conn = http.client.HTTPConnection('127.0.0.1', self.api_port, timeout=160)
             # Forward minimal headers
             headers = {'Content-Type': self.headers.get('Content-Type', 'application/json')}
             try:

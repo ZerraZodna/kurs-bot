@@ -2,8 +2,6 @@
 
 from .ollama_client import call_ollama, stream_ollama
 from src.lessons.handler import (
-    detect_lesson_request,
-    handle_lesson_request,
     format_lesson_message,
     translate_text,
 )
@@ -35,8 +33,6 @@ from .command_handlers import (
 __all__ = [
     "call_ollama",
     "stream_ollama",
-    "detect_lesson_request",
-    "handle_lesson_request",
     "format_lesson_message",
     "translate_text",
     "get_pending_confirmation",
@@ -58,3 +54,4 @@ __all__ = [
     "handle_schedule_messages",
     "maybe_send_next_lesson",
 ]
+

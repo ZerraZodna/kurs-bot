@@ -4,7 +4,6 @@ import json
 
 from src.models.database import SessionLocal, User, Lesson
 from src.services.dialogue_engine import DialogueEngine
-from src.lessons.handler import process_lesson_query
 
 
 @pytest.mark.skipif(os.getenv("EMBEDDING_BACKEND", "local").lower() == "none", reason="Embeddings disabled")

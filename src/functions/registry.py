@@ -17,6 +17,7 @@ class ParameterType(Enum):
     """Supported parameter types for function calls."""
     STRING = "string"
     INTEGER = "integer"
+    NUMBER = "number"
     BOOLEAN = "boolean"
     DATETIME = "datetime"
     TIME = "time"  # HH:MM format
@@ -34,22 +35,52 @@ class ParameterSchema:
     examples: List[str] = field(default_factory=list)
     
     def validate(self, value: Any) -> tuple[bool, Optional[str]]:
-        """Validate a parameter value."""
+        """Validate a parameter value with type coercion for common cases."""
         if value is None:
             if self.required:
                 return False, f"Required parameter '{self.name}' is missing"
             return True, None
         
-        # Type validation
-        if self.type == ParameterType.STRING and not isinstance(value, str):
-            return False, f"Parameter '{self.name}' must be a string"
+        # Type validation with tolerance for common AI mistakes
+        if self.type == ParameterType.STRING:
+            if not isinstance(value, str):
+                return False, f"Parameter '{self.name}' must be a string"
         elif self.type == ParameterType.INTEGER:
-            if not isinstance(value, int) or isinstance(value, bool):
+            # Allow string numbers to be parsed and float values that are whole numbers
+            if isinstance(value, bool):
+                return False, f"Parameter '{self.name}' must be an integer"
+            if isinstance(value, str):
                 try:
-                    int(value)
+                    parsed = float(value)
+                    if not parsed.is_integer():
+                        return False, f"Parameter '{self.name}' must be an integer"
                 except (ValueError, TypeError):
                     return False, f"Parameter '{self.name}' must be an integer"
-        elif self.type == ParameterType.BOOLEAN and not isinstance(value, bool):
+            elif isinstance(value, float):
+                if not value.is_integer():
+                    return False, f"Parameter '{self.name}' must be an integer"
+            elif not isinstance(value, int):
+                return False, f"Parameter '{self.name}' must be an integer"
+        elif self.type == ParameterType.NUMBER:
+            # Lenient numeric validation for LLM-generated values (int/float/numeric strings)
+            if isinstance(value, bool):
+                return False, f"Parameter '{self.name}' must be a number"
+            if isinstance(value, str):
+                try:
+                    float(value)
+                except (ValueError, TypeError):
+                    return False, f"Parameter '{self.name}' must be a number"
+            elif not isinstance(value, (int, float)):
+                return False, f"Parameter '{self.name}' must be a number"
+        elif self.type == ParameterType.BOOLEAN:
+            # Be tolerant: accept string "true"/"false" or numeric 0/1
+            if isinstance(value, bool):
+                return True, None
+            if isinstance(value, str):
+                if value.lower() in ("true", "false"):
+                    return True, None
+                if value in ("0", "1"):
+                    return True, None
             return False, f"Parameter '{self.name}' must be a boolean"
         elif self.type == ParameterType.TIME:
             if not isinstance(value, str):
@@ -99,16 +130,22 @@ class FunctionMetadata:
     contexts: List[str] = field(default_factory=lambda: ["general_chat"])
     
     def validate_parameters(self, params: Dict[str, Any]) -> tuple[bool, List[str]]:
-        """Validate all parameters for this function."""
+        """Validate all parameters for this function.
+        
+        Note: This validation is tolerant of unknown parameters - extra parameters
+        that are not defined in the schema are ignored to allow AI flexibility.
+        """
         errors = []
         
-        # Check for unknown parameters
+        # Get known parameters from schema
         known_params = {p.name for p in self.parameters}
-        for param_name in params.keys():
-            if param_name not in known_params:
-                errors.append(f"Unknown parameter '{param_name}'")
         
-        # Validate each parameter
+        # Log unknown parameters but don't error - be tolerant of AI flexibility
+        unknown_params = set(params.keys()) - known_params
+        if unknown_params:
+            logger.debug(f"Ignoring unknown parameters for {self.name}: {unknown_params}")
+        
+        # Validate each parameter that is in the schema
         for schema in self.parameters:
             value = params.get(schema.name)
             is_valid, error = schema.validate(value)
@@ -308,7 +345,15 @@ class FunctionRegistry:
         self.register(FunctionMetadata(
             name="send_todays_lesson",
             description="Send today's scheduled lesson with full text. Use when user asks for 'today's lesson', 'the text', 'all the text', 'full text', or 'entire lesson'.",
-            parameters=[],
+            parameters=[
+                ParameterSchema(
+                    name="lesson_id",
+                    description="Specific lesson ID to send (optional, defaults to today's scheduled lesson)",
+                    type=ParameterType.INTEGER,
+                    required=False,
+                    examples=[1, 42, 365],
+                ),
+            ],
             contexts=["general_chat", "morning_lesson_confirmation"],
         ))
         
@@ -490,7 +535,7 @@ class FunctionRegistry:
                 ParameterSchema(
                     name="confidence",
                     description="Confidence level 0.0-1.0 (default 0.8)",
-                    type=ParameterType.INTEGER,
+                    type=ParameterType.NUMBER,
                     required=False,
                     default=0.8,
                     examples=[0.9, 0.8, 0.7],

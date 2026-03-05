@@ -10,8 +10,6 @@ from src.scheduler import api as scheduler_api
 from src.services.dialogue import (
     call_ollama,
     stream_ollama,
-    detect_lesson_request,
-    handle_lesson_request,
     format_lesson_message,
     translate_text,
     handle_lesson_confirmation,
@@ -28,7 +26,6 @@ from src.services.dialogue import (
     maybe_send_next_lesson,
     handle_list_memories,
 )
-from src.lessons.api import process_lesson_query
 from src.config import settings
 from src.models.database import User, Lesson
 from src.memories.constants import MemoryCategory, MemoryKey
@@ -252,22 +249,11 @@ class DialogueEngine:
         if lesson_response:
             return lesson_response
 
-        # Handle lesson-related queries
-        # Note: process_lesson_query now only handles explicit numbered lessons (e.g., "lesson 15").
-        # "Today's lesson" requests are handled by the AI function calling system (send_todays_lesson)
-        # to prevent keyword hijacking of complex requests like "remind me about todays lesson".
-        lesson_resp = await process_lesson_query(
-            user_id=user_id,
-            text=text,
-            session=session,
-            prompt_builder=self.prompt_builder,
-            memory_manager=self.memory_manager,
-            onboarding_flow=self.onboarding_flow,
-            onboarding_service=self.onboarding,
-            user_language=user_lang,
-        )
-        if lesson_resp:
-            return lesson_resp
+        # NOTE: Removed process_lesson_query() call here to prevent keyword hijacking.
+        # Lesson requests are now handled by AI function calling.
+        # The AI receives the full user message and uses send_lesson, send_todays_lesson,
+        # or send_next_lesson functions as appropriate. This allows the AI to first
+        # extract memories (e.g., current_lesson=21) before sending lesson content.
 
         # Handle schedule follow-ups
         schedule_response = await handle_schedule_messages(

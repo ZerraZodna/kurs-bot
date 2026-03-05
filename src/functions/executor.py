@@ -622,18 +622,21 @@ class FunctionExecutor:
     
     async def _handle_repeat_lesson(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle repeat_lesson function."""
-        from src.memories.constants import MemoryKey
+        from src.lessons.state import get_current_lesson
         
         user_id = context.get("user_id")
         memory_manager = context.get("memory_manager")
         
         try:
-            # Get last sent lesson
-            last_sent = memory_manager.get_memory(user_id, MemoryKey.LAST_SENT_LESSON_ID)
-            if not last_sent:
+            # Use centralized lesson state as single source of truth
+            current = get_current_lesson(memory_manager, user_id)
+            if current is None:
                 return {"ok": False, "error": "No previous lesson to repeat"}
             
-            lesson_id = int(last_sent[0]["value"])
+            try:
+                lesson_id = int(current)
+            except (TypeError, ValueError):
+                return {"ok": False, "error": "No previous lesson to repeat"}
             
             # Get lesson content
             from src.models.database import Lesson

@@ -131,6 +131,34 @@ class TestIntentParser:
         assert result.is_fallback is True
         assert result.response_text == response
         assert len(result.functions) == 0
+
+    def test_parse_extract_memory_current_lesson_json(self):
+        """Test parsing provided JSON payload with extract_memory for current lesson."""
+        parser = IntentParser()
+
+        response = json.dumps({
+            "response": "Thank you for letting me know, Dev. I honor your journey as you continue with lesson 23.",
+            "functions": [
+                {
+                    "name": "extract_memory",
+                    "parameters": {
+                        "key": "current_lesson",
+                        "value": "23",
+                        "confidence": 0.9
+                    }
+                }
+            ]
+        })
+
+        result = parser.parse(response)
+
+        assert result.success is True
+        assert result.response_text == "Thank you for letting me know, Dev. I honor your journey as you continue with lesson 23."
+        assert len(result.functions) == 1
+        assert result.functions[0]["name"] == "extract_memory"
+        assert result.functions[0]["parameters"]["key"] == "current_lesson"
+        assert result.functions[0]["parameters"]["value"] == "23"
+        assert result.functions[0]["parameters"]["confidence"] == 0.9
     
     def test_parse_invalid_function_name(self):
         """Test validation of unknown function names."""

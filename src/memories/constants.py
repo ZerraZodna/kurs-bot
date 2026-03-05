@@ -27,7 +27,7 @@ class MemoryKey:
     DATA_CONSENT = "data_consent"
 
     PREFERRED_LESSON_TIME = "preferred_lesson_time"
-    LESSON_CURRENT = "lesson_current"
+    LESSON_CURRENT = "current_lesson"
     LESSON_COMPLETED = "lesson_completed"
     LESSON_CONFIRMATION_PENDING = "lesson_confirmation_pending"
     AUTO_ADVANCE_LESSONS = "auto_advance_lessons"

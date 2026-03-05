@@ -1,62 +1,10 @@
 """Lesson intent detection module.
 
-Centralizes all lesson-related detection logic that was previously scattered
-across onboarding/detectors.py and lessons/handler.py.
+Centralizes lesson-related detection logic for onboarding flow.
 """
 
 import re
-from typing import Optional, Dict, Any
-
-
-def detect_lesson_request(text: str) -> Optional[Dict[str, Any]]:
-    """
-    Detect if user is requesting information about a specific lesson.
-
-    Examples:
-    - "Tell me about lesson 10"
-    - "What is lesson 5?"
-    - "Explain lesson 42"
-    - "Lesson 1 content"
-
-    Returns:
-        Dict with lesson_id if detected, None otherwise
-    """
-    # Normalize input for robust matching: lowercase, replace punctuation
-    # with spaces, and collapse multiple whitespace.
-    raw = text or ""
-    text_lower = raw.lower()
-    text_normalized = re.sub(r"[^\w\s]", " ", text_lower)
-    text_normalized = re.sub(r"\s+", " ", text_normalized).strip()
-    tokens = set(text_normalized.split())
-
-    def _extract_number(s: str) -> Optional[int]:
-        patterns = [
-            r"\b(?:lesson|leksjon|lekse|day)\s*(?:number|nr|no|text|tekst|content|innhold)?\s*#?\s*(\d{1,3})\b",
-            r"\b(?:lesson|leksjon|lekse)\s*(?:text|tekst|content|innhold)\s*#?\s*(\d{1,3})\b",
-        ]
-        for pattern in patterns:
-            m = re.search(pattern, s)
-            if not m:
-                continue
-            try:
-                n = int(m.group(1))
-            except Exception:
-                return None
-            if 1 <= n <= 365:
-                return n
-        return None
-
-    # 1) explicit numbered lesson
-    num = _extract_number(text_normalized)
-    if num:
-        return {"lesson_id": num}
-
-    # Note: "today's lesson" keyword detection removed to prevent hijacking.
-    # The AI function calling system (send_todays_lesson) should handle this instead.
-    # This prevents issues where complex requests like "remind me about todays lesson"
-    # incorrectly return the lesson content instead of creating reminders.
-
-    return None
+from typing import Dict, Any
 
 
 def handle_lesson_status_response(text: str) -> Dict[str, Any]:
@@ -143,6 +91,6 @@ def handle_lesson_status_response(text: str) -> Dict[str, Any]:
 
 
 __all__ = [
-    "detect_lesson_request",
     "handle_lesson_status_response",
 ]
+

@@ -71,42 +71,13 @@ ONBOARD_MESSAGES = {
 		"en": "Understood. I won't store your information. If you change your mind, just message me again. 🙏",
 		"no": "Forstått. Jeg lagrer ikke informasjonen din. Hvis du ombestemmer deg, bare send meg en melding igjen. 🙏",
 	},
-	"name_prompt": {
-		"en": "Welcome! I'm your spiritual coach for A Course in Miracles. I see your name in Telegram is {full}. Is it OK if I call you {first}? 👋",
-		"no": "Velkommen! Jeg er din åndelige veileder for A Course in Miracles. Jeg ser at navnet ditt i Telegram er {full}. Er det greit at jeg kaller deg {first}? 👋",
-	},
 	"consent_prompt": {
-		"en": "To help me support you better: Do you consent to me storing our conversation? You can erase your data anytime with 'GDPR erase'. 🗑️ (yes/no)",
-		"no": "For å hjelpe meg å støtte deg bedre: Samtykker du til at jeg lagrer samtalen vår? Du kan slette dataene dine når som helst med 'GDPR erase'. 🗑️ (ja/nei)",
+		"en": "Hi {name}! 👋\n\nI'm your spiritual companion for A Course in Miracles. Each day, I'll send you one lesson and we can chat about it anytime.\n\nTo help me support you better: Do you consent to me storing our conversation? You can erase your data anytime with 'GDPR erase'. 🗑️ (yes/no)",
+		"no": "Hei {name}! 👋\n\nJeg er din åndelige følgesvenn for Et kurs i mirakler. Hver dag sender jeg deg én leksjon, og vi kan snakke om den når som helst.\n\nFor å hjelpe meg å støtte deg bedre: Samtykker du til at jeg lagrer samtalen vår? Du kan slette dataene dine når som helst med 'GDPR erase'. 🗑️ (ja/nei)",
 	},
 	"consent_granted": {
 		"en": "Thank you! You're all set. 🙏\n\nWelcome to our spiritual community! You can ask me about ACIM lessons anytime, or we can chat about anything on your mind.",
 		"no": "Takk! Du er klar. 🙏\n\nVelkommen til vårt åndelige fellesskap! Du kan spørre meg om ACIM-leksjoner når som helst, eller vi kan snakke om alt som opptar deg.",
-	},
-	"commitment_prompt": {
-		# Deprecated - no longer used in simplified flow
-		"en": "",
-		"no": "",
-	},
-	"ask_new_or_continuing": {
-		# Deprecated - no longer used in simplified flow
-		"en": "",
-		"no": "",
-	},
-	"offer_course_intro_now": {
-		# Deprecated - no longer used in simplified flow
-		"en": "",
-		"no": "",
-	},
-	"timezone_prompt": {
-		# Deprecated - no longer used in simplified flow
-		"en": "",
-		"no": "",
-	},
-	"commitment_declined": {
-		# Deprecated - no longer used in simplified flow
-		"en": "",
-		"no": "",
 	},
 	"lesson_load_error": {
 		"en": "I couldn't load that lesson right now. Please try again. 🔁",

@@ -138,7 +138,7 @@ async def maybe_send_next_lesson(
         message = await translate_text(message, language, call_ollama)
 
     # Persist current lesson
-    from src.lessons.state import set_lesson_current
-    set_lesson_current(memory_manager, user_id, lesson.lesson_id)
+    from src.lessons.state import set_current_lesson
+    set_current_lesson(memory_manager, user_id, lesson.lesson_id)
 
     return message

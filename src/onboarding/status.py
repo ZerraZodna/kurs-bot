@@ -6,33 +6,32 @@ from typing import Any, Dict, Optional
 
 
 def get_onboarding_status_dict(
-    has_name: bool,
     has_consent: bool,
+    has_name: bool = True,  # Default to True - name from Telegram DB
     declined_consent: bool = False,
 ) -> Dict[str, Any]:
     """
     Build onboarding status dictionary for minimal onboarding.
 
     Required onboarding:
-    - name
-    - consent
+    - consent (name is now skipped - using Telegram name from DB)
     """
     steps_completed = []
-    if has_name:
-        steps_completed.append("name")
+    # Name is now automatically considered complete (using Telegram name)
+    steps_completed.append("name")
     if has_consent:
         steps_completed.append("consent")
 
     next_step = None
-    if not has_name:
-        next_step = "name"
-    elif not has_consent:
+    # Only require consent - name step is skipped
+    if not has_consent:
         next_step = "consent"
 
-    onboarding_complete = has_name and has_consent
+    # Onboarding complete when consent is given (name always True from Telegram)
+    onboarding_complete = has_consent
 
     return {
-        "has_name": has_name,
+        "has_name": True,  # Always True - using Telegram name
         "has_consent": has_consent,
         "onboarding_complete": onboarding_complete,
         "steps_completed": steps_completed,

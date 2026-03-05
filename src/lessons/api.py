@@ -23,11 +23,8 @@ from src.lessons.state import (
     compute_current_lesson_state as _compute_current_lesson_state,
 )
 from src.lessons.handler import (
-    detect_lesson_request as _detect_lesson_request,
     format_lesson_message as _format_lesson_message,
     _find_lesson_by_id as _find_lesson,
-    handle_lesson_request as _handle_lesson_request,
-    process_lesson_query as _process_lesson_query,
 )
 from src.lessons.advance import maybe_send_next_lesson as _maybe_send_next_lesson
 from src.lessons.state_flow import apply_reported_progress as _apply_reported_progress
@@ -48,29 +45,6 @@ def format_lesson_message(lesson: Lesson, language: Optional[str] = None) -> str
     except Exception as e:
         logger.warning(f"Failed to format lesson message: {e}")
         return f"Lesson {lesson.lesson_id}: {lesson.title}\n\n{lesson.content}"
-
-
-async def deliver_lesson(
-    user_id: int,
-    text: str,
-    session: Session,
-    prompt_builder: Any,
-    memory_manager: MemoryManager,
-    onboarding_flow: Any,
-    onboarding_service: Any,
-    user_language: Optional[str] = None,
-) -> Optional[str]:
-    """Process a lesson-related query from a user."""
-    return await _process_lesson_query(
-        user_id=user_id,
-        text=text,
-        session=session,
-        prompt_builder=prompt_builder,
-        memory_manager=memory_manager,
-        onboarding_flow=onboarding_flow,
-        onboarding_service=onboarding_service,
-        user_language=user_language,
-    )
 
 
 async def maybe_send_next_lesson(
@@ -127,47 +101,16 @@ def compute_current_lesson_state(memory_manager: MemoryManager, user_id: int, to
     return _compute_current_lesson_state(memory_manager, user_id, today)
 
 
-# Re-export handler functions
-def detect_lesson_request(text: str) -> Optional[Dict[str, Any]]:
-    """Detect if text contains a lesson request."""
-    return _detect_lesson_request(text)
-
-
-async def process_lesson_query(
-    user_id: int,
-    text: str,
-    session: Session,
-    prompt_builder: Any,
-    memory_manager: MemoryManager,
-    onboarding_flow: Any,
-    onboarding_service: Any,
-    user_language: Optional[str] = None,
-) -> Optional[str]:
-    """Process a lesson-related query from a user."""
-    return await _process_lesson_query(
-        user_id=user_id,
-        text=text,
-        session=session,
-        prompt_builder=prompt_builder,
-        memory_manager=memory_manager,
-        onboarding_flow=onboarding_flow,
-        onboarding_service=onboarding_service,
-        user_language=user_language,
-    )
-
-
 # Re-export types for convenience
 __all__ = [
     "get_lesson",
     "format_lesson_message",
-    "deliver_lesson",
-    "detect_lesson_request",
     "get_current_lesson",
     "set_current_lesson",
     "set_next_lesson",
     "has_lesson_status",
     "compute_current_lesson_state",
-    "process_lesson_query",
     "maybe_send_next_lesson",
     "apply_reported_progress",
 ]
+
