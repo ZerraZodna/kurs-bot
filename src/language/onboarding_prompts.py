@@ -3,8 +3,6 @@ from __future__ import annotations
 from typing import Dict
 
 
-
-
 def get_lesson_1_welcome_message(language: str, name: str) -> str:
 	messages = {
 		"no": f"""Perfekt, {name}! La oss begynne sammen med Leksjon 1. Dette er hvor transformasjonen starter.
@@ -67,15 +65,48 @@ You can also:
 	return messages.get(language, messages["en"])
 
 
-# General onboarding messages used by the onboarding flow
+# Onboarding messages - simplified to name + consent only
 ONBOARD_MESSAGES = {
 	"consent_declined": {
 		"en": "Understood. I won't store your information. If you change your mind, just message me again. 🙏",
 		"no": "Forstått. Jeg lagrer ikke informasjonen din. Hvis du ombestemmer deg, bare send meg en melding igjen. 🙏",
 	},
+	"name_prompt": {
+		"en": "Welcome! I'm your spiritual coach for A Course in Miracles. I see your name in Telegram is {full}. Is it OK if I call you {first}? 👋",
+		"no": "Velkommen! Jeg er din åndelige veileder for A Course in Miracles. Jeg ser at navnet ditt i Telegram er {full}. Er det greit at jeg kaller deg {first}? 👋",
+	},
+	"consent_prompt": {
+		"en": "To help me support you better: Do you consent to me storing our conversation? You can erase your data anytime with 'GDPR erase'. 🗑️ (yes/no)",
+		"no": "For å hjelpe meg å støtte deg bedre: Samtykker du til at jeg lagrer samtalen vår? Du kan slette dataene dine når som helst med 'GDPR erase'. 🗑️ (ja/nei)",
+	},
+	"consent_granted": {
+		"en": "Thank you! You're all set. 🙏\n\nWelcome to our spiritual community! You can ask me about ACIM lessons anytime, or we can chat about anything on your mind.",
+		"no": "Takk! Du er klar. 🙏\n\nVelkommen til vårt åndelige fellesskap! Du kan spørre meg om ACIM-leksjoner når som helst, eller vi kan snakke om alt som opptar deg.",
+	},
+	"commitment_prompt": {
+		# Deprecated - no longer used in simplified flow
+		"en": "",
+		"no": "",
+	},
+	"ask_new_or_continuing": {
+		# Deprecated - no longer used in simplified flow
+		"en": "",
+		"no": "",
+	},
+	"offer_course_intro_now": {
+		# Deprecated - no longer used in simplified flow
+		"en": "",
+		"no": "",
+	},
+	"timezone_prompt": {
+		# Deprecated - no longer used in simplified flow
+		"en": "",
+		"no": "",
+	},
 	"commitment_declined": {
-		"en": "Understood. I won't ask about ACIM lessons. If you want to resume later, just message me. You still have access if there is anything I can help you with. 🌿",
-		"no": "Forstått. Jeg spør ikke om ACIM-leksjoner. Hvis du vil fortsette senere, bare send meg en melding. Du kan fortsatt spørre meg om alt mulig. Jeg er her hvis det er noe jeg kan hjelpe deg med. 🌿",
+		# Deprecated - no longer used in simplified flow
+		"en": "",
+		"no": "",
 	},
 	"lesson_load_error": {
 		"en": "I couldn't load that lesson right now. Please try again. 🔁",
@@ -92,34 +123,6 @@ ONBOARD_MESSAGES = {
 	"ask_lesson_number": {
 		"en": "Great! Which lesson are you currently working on? 📚",
 		"no": "Flott! Hvilken leksjon jobber du med nå? 📚",
-	},
-	"name_prompt": {
-		"en": "Welcome! I'm your spiritual coach for A Course in Miracles. I see your name in Telegram is {full}. Is it OK if I call you {first}? 👋",
-		"no": "Velkommen! Jeg er din åndelige veileder for A Course in Miracles. Jeg ser at navnet ditt i Telegram er {full}. Er det greit at jeg kaller deg {first}? 👋",
-	},
-	"consent_prompt": {
-		"en": "Before we continue: Do you consent to me storing the conversation and relevant info to support you? At any time you may erase all your data with GDPR erase. 🗑️ (yes/no)",
-		"no": "Før vi fortsetter: Er det greit at jeg lagrer samtalen og relevant informasjon for å gi deg oppfølging? Du kan når som helst slette alle dataene dine med kommandoen 'GDPR erase'. 🗑️ (ja/nei)",
-	},
-	"consent_granted": {
-		"en": "Thank you for consenting to store your conversation data. This helps me provide better support. 🙏\nIf you have any concerns type: gdpr",
-		"no": "Takk for at du samtykker til å lagre samtalen. Dette hjelper meg å gi deg bedre støtte. 🙏\nHvis du har bekymringer, skriv: gdpr",
-	},
-	"commitment_prompt": {
-		"en": "Beautiful, {name}!\nAre you interested in exploring these lessons together? I'm here to guide and support you on this journey. Will you commit to doing the ACIM lessons each day? 🌿",
-		"no": "Herlig, {name}!\nEr du interessert i å utforske disse leksjonene sammen med meg? Jeg er her for å veilede og støtte deg på denne reisen. Er du bestemt for å gjøre ACIM leksjonene hver dag så godt som? 🌿",
-	},
-	"ask_new_or_continuing": {
-		"en": "Now, {name}, are you new to ACIM, or have you already begun working with the lessons? 🌱",
-		"no": "Nå, {name}, er du ny til ACIM, eller har du allerede begynt med leksjonene? 🌱",
-	},
-	"offer_course_intro_now": {
-		"en": "Thank you, {name}. As a gentle first step, would you like me to send the Introduction now? It is a short introduction to the course. 🌿 (yes/no)",
-		"no": "Takk, {name}. Som et mykt første steg: vil du at jeg sender Introduksjonen nå? Det er en kort introduksjon til kurset. 🌿 (ja/nei)",
-	},
-	"timezone_prompt": {
-		"en": "Based on your language, I assume you're in {timezone}. Is this correct? (yes/no)",
-		"no": "Basert på språket ditt, antar jeg at du er i {timezone}. Er dette riktig? (ja/nei)",
 	},
 }
 
@@ -160,3 +163,4 @@ ONBOARD_MESSAGES["confirm_lesson"] = {
     "en": "From a gentle, loving place: You mentioned Lesson {lesson_id} last time. Would you like to move to the next lesson, or continue where you left off? Reply 'yes' to move forward, or 'no' to stay with this lesson.",
     "no": "Fra et mildt, kjærlig sted: Du nevnte Leksjon {lesson_id} sist. Vil du gå videre til neste leksjon, eller fortsette der du slapp? Svar 'ja' for å gå videre, eller 'nei' for å bli på denne leksjonen.",
 }
+

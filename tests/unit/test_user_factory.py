@@ -27,15 +27,6 @@ class TestUserFactory:
         lang = mm.get_memory(user.user_id, "user_language")
         assert lang[0]["value"] == "es"
 
-    def test_factory_create_does_not_set_timezone(self, user_factory):
-        """Regular create() should NOT set timezone - it should remain None."""
-        user = user_factory.create(
-            external_id="no_tz_user",
-            first_name="NoTimezone"
-        )
-
-        # Timezone should be None for regular create
-        assert user.timezone is None
 
     def test_factory_creates_ready_user(self, db_session: Session, user_factory):
         """UserFactory should create ready user with onboarding complete."""
@@ -47,7 +38,7 @@ class TestUserFactory:
         # Verify user has expected attributes
         assert user.external_id == "ready_123"
         assert user.first_name == "Ready"
-        assert user.timezone == None # Ready users do not have timezone set
+        assert user.timezone == "Europe/Oslo" # Ready users are assumed Europe/Oslo
 
         # Verify memories were created
         mm = MemoryManager(db_session)

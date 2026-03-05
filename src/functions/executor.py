@@ -982,8 +982,11 @@ class FunctionExecutor:
         ttl_hours = params.get("ttl_hours")
         memory_manager = context.get("memory_manager")
         
+        logger.info(f"extract_memory called: user_id={user_id}, key={key}, value={value}, confidence={confidence}")
+        
         # Validate confidence threshold
         if confidence < 0.7:
+            logger.warning(f"extract_memory rejected: confidence {confidence} below threshold")
             return {
                 "ok": False,
                 "error": f"Confidence {confidence} below threshold (0.7)",
@@ -999,6 +1002,7 @@ class FunctionExecutor:
                 parsed = int(value)
             except Exception:
                 parsed = value
+            logger.info(f"extract_memory routing to set_current_lesson: user_id={user_id}, lesson={parsed}")
             set_current_lesson(memory_manager, user_id, parsed)
             return {
                 "ok": True,
@@ -1033,6 +1037,7 @@ class FunctionExecutor:
         # For non-lesson memories, continue with existing logic
         # Determine category from key
         category = self._infer_memory_category(key)
+        logger.info(f"extract_memory storing: user_id={user_id}, key={key}, value={value}, category={category}")
         
         try:
             # Check for existing memory with same key
@@ -1048,6 +1053,7 @@ class FunctionExecutor:
                 ttl_hours=ttl_hours,
             )
             
+            logger.info(f"extract_memory stored successfully: user_id={user_id}, key={key}")
             return {
                 "ok": True,
                 "key": key,
@@ -1057,6 +1063,7 @@ class FunctionExecutor:
                 "updated": bool(existing),
             }
         except Exception as e:
+            logger.error(f"extract_memory failed: user_id={user_id}, key={key}, error={e}")
             return {"ok": False, "error": str(e)}
     
     def _infer_memory_category(self, key: str) -> str:

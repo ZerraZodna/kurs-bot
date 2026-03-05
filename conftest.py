@@ -75,15 +75,15 @@ if not _test_use_real or str(_test_use_real).strip().lower() not in ("1", "true"
             pass
 
 import time
-import time
 from pathlib import Path
 import pytest
 # Ensure test DB is used for the test session
 # (override early so modules importing settings pick up test DB URL)
 
-# Test database configuration (single source of truth)
-TEST_DB_PATH = Path('src/data/test.db')
-TEST_DB_URL = f'sqlite:///{TEST_DB_PATH}'
+# Test database configuration (in-memory for parallel test safety)
+# Using :memory: ensures each test worker gets its own isolated database
+# This prevents "readonly database" errors when running tests in parallel with pytest-xdist
+TEST_DB_URL = 'sqlite:///:memory:'
 
 # Safety check: warn if DATABASE_URL points to prod.db before we override it
 # This ensures the warning appears at test startup, not after tests run
@@ -106,18 +106,12 @@ os.environ['DATABASE_URL'] = TEST_DB_URL
 def setup_test_environment():
     """
     Setup test environment and cleanup after tests.
-    - Removes old test database before tests start
-    - Removes test database after tests complete (with retry for Windows file locking)
+    - Uses in-memory SQLite database for parallel test safety
+    - No file cleanup needed for in-memory database
     """
-    # Remove old test database if it exists
-    if TEST_DB_PATH.exists():
-        try:
-            TEST_DB_PATH.unlink()
-            print("\n🧪 Cleaned up old test database")
-        except PermissionError:
-            print("\n⚠️  Old test database locked, will be overwritten")
-    
-    print(f"🧪 Using test database: {TEST_DB_URL}")
+    # In-memory database - no file cleanup needed
+    print(f"🧪 Using in-memory test database for parallel execution safety")
+
     # Ensure schema exists in test DB
     try:
         # Prevent background threads (lifespan) from starting during tests
@@ -195,23 +189,11 @@ def setup_test_environment():
         init_db()
     except Exception as e:
         print(f"⚠️  Could not initialize test DB schema: {e}")
-    
+
     yield
-    
-    # Cleanup after all tests (with retry for Windows file locking)
-    if TEST_DB_PATH.exists():
-        for attempt in range(3):
-            try:
-                TEST_DB_PATH.unlink()
-                print("\n✅ Test session complete - cleaned up test database")
-                break
-            except PermissionError:
-                if attempt < 2:
-                    time.sleep(0.5)  # Wait briefly for file locks to release
-                else:
-                    print("\n⚠️  Test session complete - test.db is locked (will be cleaned on next run)")
-    else:
-        print("\n✅ Test session complete")
+
+    # In-memory database cleanup is automatic - no file to delete
+    print("\n✅ Test session complete")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -279,3 +261,4 @@ def pytest_configure(config):
             print(f"🔧 Test overrides applied: {', '.join(applied)}")
         except Exception as e:
             print(f"⚠️ Could not reload src.config after env override: {e}")
+

@@ -41,9 +41,11 @@ def test_create_schedule_europe_oslo_0900():
         sched = SchedulerService.create_daily_schedule(user_id=user_id, lesson_id=None, time_str="09:00", session=db)
         assert sched is not None
 
-        # reload schedules and pick active one
-        schedules = SchedulerService.get_user_schedules(user_id)
-        active = [s for s in schedules if s.is_active]
+        # reload schedules using the same session and pick active one
+        # Note: We use the session directly instead of SchedulerService.get_user_schedules
+        # to ensure we're using the same database connection
+        all_schedules = db.query(Schedule).filter_by(user_id=user_id).all()
+        active = [s for s in all_schedules if s.is_active]
         assert len(active) >= 1
         s = active[0]
 

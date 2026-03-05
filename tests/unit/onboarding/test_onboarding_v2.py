@@ -1,4 +1,4 @@
-"""Updated unit tests for onboarding service with correct flow order: Name -> Consent -> Timezone."""
+"""Updated unit tests for onboarding service with simplified flow: Name -> Consent."""
 
 import pytest
 from datetime import datetime, timezone
@@ -39,28 +39,8 @@ class TestOnboarding:
         response = await dialogue.process_message(user_id, "Yes, I consent", db_session)
         assert response is not None
         
-        # Step 4: User confirms timezone
-        response = await dialogue.process_message(user_id, "Yes", db_session)
-        assert response is not None
-        # Verify timezone was set
-        user = db_session.query(User).filter_by(user_id=user_id).first()
-        assert user.timezone is not None, "Timezone should be set after confirmation"
-        
-        # Step 5: User commits to lessons
-
-        response = await dialogue.process_message(user_id, "Yes, I'm ready to commit to this journey!", db_session)
-        assert response is not None
-        
-        # Step 6: User provides lesson status (new vs continuing) - says "new"
-        response = await dialogue.process_message(user_id, "I'm new to ACIM", db_session)
-        assert response is not None
-        
-        # Step 7: Handle the intro offer (new user gets offer for Lesson 0)
-        # Accept the introduction offer
-        response = await dialogue.process_message(user_id, "yes", db_session)
-        assert response is not None
-        
-        # Then: Schedule should be auto-created
+        # Then: Onboarding is complete and schedule should be auto-created
+        # (Simplified flow: name + consent only, timezone is assumed Europe/Oslo)
         db_session.expire_all()
         schedules = db_session.query(Schedule).filter_by(user_id=user_id).all()
         assert len(schedules) > 0, "Expected schedule to be created"
@@ -68,10 +48,10 @@ class TestOnboarding:
             f"Expected active daily schedule, got {schedules}"
 
     @pytest.mark.asyncio
-    async def test_consent_granted_continues_onboarding(self, db_session):
+    async def test_consent_granted_completes_onboarding(self, db_session):
         """Given: A new user
         When: Consenting to data storage
-        Then: Should show thank-you and continue to commitment
+        Then: Should complete onboarding
         """
         # Given: A new user
         user_id = create_test_user(db_session, "test_onboarding_consent", "Alex")
@@ -85,23 +65,17 @@ class TestOnboarding:
         # And: Providing consent
         response = await dialogue.process_message(user_id, "Yes, I consent", db_session)
         
-        # Then: Response should include localized thank-you or continue to next step
-        # Note: After consent, the flow may show thank-you + next step (timezone or commitment)
-        assert (
-            "Thank you for consenting" in response
-            or "Are you interested" in response
-            or "Are you new to ACIM" in response
-            or "Are you ready" in response
-            or "commit" in response.lower()
-            or "timezone" in response.lower()
-            or "assume you're in" in response.lower()
-        ), f"Expected onboarding continuation after consent, got: {response}"
+        # Then: Response should indicate onboarding completion
+        # (Simplified flow: name + consent only, timezone is assumed Europe/Oslo)
+        assert response is not None
+        assert "thank" in response.lower() or "welcome" in response.lower(), \
+            f"Expected onboarding completion message, got: {response}"
 
     @pytest.mark.asyncio
     async def test_schedule_request(self, db_session):
         """Given: A user
         When: Requesting reminders explicitly
-        Then: Bot should guide through setup (first getting name, then consent, timezone, commitment, lesson status)
+        Then: Bot should guide through onboarding first (name + consent), then set up schedule
         """
         # Given: A user (no first_name memory stored, so bot will ask for name first)
         user = User(

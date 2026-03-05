@@ -49,7 +49,7 @@ def infer_timezone_from_language(language: Optional[str]) -> str:
     return _get_local_timezone_name()
 
 
-def get_user_timezone_from_db(session, user_id: int, default: str = "UTC") -> str:
+def get_user_timezone_from_db(session, user_id: int, default: str = "Europe/Oslo") -> str:
     """Get user's timezone from DB, inferring from language if needed.
     
     Order of resolution:

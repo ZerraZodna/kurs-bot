@@ -383,7 +383,7 @@ class FunctionRegistry:
                     examples=["en", "no", "es", "de"],
                 ),
             ],
-            contexts=["general_chat", "onboarding"],
+            contexts=["general_chat", "onboarding", "onboarding_name"],
         ))
         
         self.register(FunctionMetadata(
@@ -419,7 +419,7 @@ class FunctionRegistry:
                     required=True,
                 ),
             ],
-            contexts=["general_chat", "onboarding"],
+            contexts=["general_chat", "onboarding", "onboarding_name"],
         ))
         
         # RAG functions
@@ -450,7 +450,7 @@ class FunctionRegistry:
                     examples=["lesson_completed", "schedule_created"],
                 ),
             ],
-            contexts=["general_chat", "lesson_review"],
+            contexts=["general_chat", "lesson_review", "onboarding", "onboarding_name", "onboarding_consent"],
         ))
         
         self.register(FunctionMetadata(
@@ -465,7 +465,7 @@ class FunctionRegistry:
                     examples=["not_completed", "needs_more_time"],
                 ),
             ],
-            contexts=["general_chat", "lesson_review"],
+            contexts=["general_chat", "lesson_review", "onboarding", "onboarding_name", "onboarding_consent"],
         ))
         
         # Memory extraction function
@@ -508,7 +508,7 @@ class FunctionRegistry:
                 {"key": "timezone", "value": "Asia/Tokyo", "confidence": 0.85},
                 {"key": "current_lesson", "value": "25", "confidence": 0.8},
             ],
-            contexts=["general_chat", "onboarding", "schedule_setup", "lesson_review", "morning_lesson_confirmation"],
+            contexts=["general_chat", "onboarding", "onboarding_name", "onboarding_consent", "schedule_setup", "lesson_review", "morning_lesson_confirmation"],
         ))
     
     def register(self, function: FunctionMetadata):

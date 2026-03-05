@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 class FunctionDefinitions:
     """Generates function definitions for AI prompts."""
     
+    # Mapping from onboarding step values to granular context names
+    ONBOARDING_STAGE_MAP = {
+        "consent": "onboarding_consent",
+    }
+    
     # JSON format instructions template
     JSON_FORMAT_INSTRUCTIONS = """
 You must ALWAYS respond with valid JSON in the following format:
@@ -40,6 +45,15 @@ Rules:
 4. All required parameters must be included
 5. Use exact function names and parameter names as shown
 6. Return ONLY the JSON, no markdown formatting, no explanations outside the JSON
+
+CRITICAL MEMORY EXTRACTION RULE:
+When the user shares personal information (name, timezone, current lesson, preferences, etc.), you MUST call extract_memory to store it. NEVER just acknowledge the information in text - always extract and store it using the extract_memory function.
+
+Examples of when to use extract_memory:
+- User says "My name is John" → call extract_memory with key="first_name", value="John"
+- User says "I'm on lesson 25" → call extract_memory with key="current_lesson", value="25"
+- User says "Call me Sarah" → call extract_memory with key="first_name", value="Sarah"
+- User says "I'm in Tokyo" → call extract_memory with key="timezone", value="Asia/Tokyo"
 """
     
     # Multi-function example
@@ -138,7 +152,89 @@ User: "I'm not sure I understand yesterday's lesson fully"
   ]
 }
 """,
+        "onboarding_name": """
+Example - User confirms using Telegram name:
+User: "yes"
+
+{
+  "response": "Great! I'll use your name from Telegram.",
+  "functions": [
+    {"name": "confirm_yes", "parameters": {"context": "use_telegram_name"}}
+  ]
+}
+
+Example - User declines using Telegram name:
+User: "no"
+
+{
+  "response": "No problem! What would you like me to call you?",
+  "functions": [
+    {"name": "confirm_no", "parameters": {"context": "use_telegram_name"}}
+  ]
+}
+
+Example - Extracting name from complex sentence:
+User: "My name is Johannes. Got that?"
+
+{
+  "response": "Nice to meet you, Johannes! I've noted your name.",
+  "functions": [
+    {"name": "extract_memory", "parameters": {"key": "first_name", "value": "Johannes", "confidence": 0.9}}
+  ]
+}
+
+Example - Remembering name:
+User: "Remember my name is Sarah"
+
+{
+  "response": "Nice to meet you, Sarah! I've noted your name.",
+  "functions": [
+    {"name": "extract_memory", "parameters": {"key": "name", "value": "Sarah", "confidence": 0.95}}
+  ]
+}
+""",
+        "onboarding_consent": """
+Example - User grants consent:
+User: "yes, I agree"
+
+{
+  "response": "Thank you! Your consent has been recorded. Let's continue with your setup.",
+  "functions": [
+    {"name": "confirm_yes", "parameters": {"context": "data_consent"}}
+  ]
+}
+
+Example - User declines consent:
+User: "no, I don't want that"
+
+{
+  "response": "I understand. Without consent to store your data, I cannot provide personalized service. Your information will be deleted.",
+  "functions": [
+    {"name": "confirm_no", "parameters": {"context": "data_consent"}}
+  ]
+}
+""",
         "onboarding": """
+Example - User confirms using Telegram name:
+User: "yes"
+
+{
+  "response": "Great! I'll use your name from Telegram.",
+  "functions": [
+    {"name": "confirm_yes", "parameters": {"context": "use_telegram_name"}}
+  ]
+}
+
+Example - User declines using Telegram name:
+User: "no"
+
+{
+  "response": "No problem! What would you like me to call you?",
+  "functions": [
+    {"name": "confirm_no", "parameters": {"context": "use_telegram_name"}}
+  ]
+}
+
 Example - Onboarding timezone:
 User: "I'm in Oslo"
 
@@ -146,6 +242,16 @@ User: "I'm in Oslo"
   "response": "Great! I'll set your timezone to Europe/Oslo. This will ensure your lesson reminders come at the right time for you.",
   "functions": [
     {"name": "set_timezone", "parameters": {"timezone": "Europe/Oslo"}}
+  ]
+}
+
+Example - Extracting name from complex sentence:
+User: "My name is Johannes. Got that?"
+
+{
+  "response": "Nice to meet you, Johannes! I've noted your name.",
+  "functions": [
+    {"name": "extract_memory", "parameters": {"key": "first_name", "value": "Johannes", "confidence": 0.9}}
   ]
 }
 
@@ -250,7 +356,13 @@ User: "My name is John and I'm in Tokyo, studying lesson 30"
     
     def for_context(self, context: str) -> str:
         """Generate function definitions for a specific context."""
-        functions = self.registry.list_for_context(context)
+        # Map granular onboarding contexts to the base "onboarding" for function filtering
+        # while using stage-specific examples
+        function_context = context
+        if context.startswith("onboarding_"):
+            function_context = "onboarding"
+        
+        functions = self.registry.list_for_context(function_context)
         
         lines = [
             "### Available Functions",
@@ -271,6 +383,7 @@ User: "My name is John and I'm in Tokyo, studying lesson 30"
         ])
         
         # Add context-specific example if available
+        # Check for exact match first (including granular onboarding stages)
         if context in self.CONTEXT_EXAMPLES:
             lines.append("### Examples for this context")
             lines.append(self.CONTEXT_EXAMPLES[context])

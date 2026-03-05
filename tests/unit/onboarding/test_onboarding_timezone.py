@@ -69,26 +69,6 @@ class TestOnboardingTimezoneHandling:
         assert "06:30" not in response, f"User should NOT see 06:30 UTC. Got: {response}"
         assert "05:30" not in response, f"User should NOT see 05:30 UTC. Got: {response}"
 
-    def test_create_auto_schedule_uses_utc_when_no_timezone(self, db_session):
-        """Given: A user with no timezone set
-        When: create_auto_schedule is called
-        Then: Schedule should be created at 07:30 UTC."""
-        # Given: User with no timezone
-        user_id = create_test_user(db_session, "test_tz_utc", "Test")
-        user = db_session.query(User).filter_by(user_id=user_id).first()
-        user.timezone = None
-        db_session.commit()
-
-        # When: Create auto schedule
-        result = schedule_setup.create_auto_schedule(db_session, user_id)
-
-        # Then: Schedule should be created at 07:30 UTC
-        assert result is True
-
-        schedule = db_session.query(Schedule).filter_by(user_id=user_id).first()
-        assert schedule is not None
-        assert schedule.next_send_time.hour == 7
-        assert schedule.next_send_time.minute == 30
 
     def test_create_auto_schedule_infers_from_norwegian_language(self, db_session):
         """Given: A Norwegian user with no timezone but Norwegian language

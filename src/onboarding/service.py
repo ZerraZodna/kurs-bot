@@ -26,7 +26,6 @@ from src.language.onboarding_prompts import (
 from src.models.database import User
 from src.onboarding.status import get_onboarding_status_dict
 from src.onboarding.schedule_setup import create_auto_schedule
-from src.core.timezone import infer_timezone_from_language
 from src.onboarding.user_management import delete_user_and_data, is_user_new
 from src.lessons.api import set_current_lesson, has_lesson_status
 from src.memories.constants import MemoryCategory, MemoryKey
@@ -48,13 +47,6 @@ class OnboardingService:
         Returns:
             Dict with onboarding_complete, steps_completed, next_step
         """
-        commitment_memories = self.memory_manager.get_memory(user_id, MemoryKey.ACIM_COMMITMENT)
-        has_commitment = bool(commitment_memories)
-        declined_commitment = any(
-            str(m.get("value", "")).lower() in ["declined", "no", "not interested"]
-            for m in commitment_memories
-        )
-
         # Use topic-based name retrieval for temporal resolution
         name = self.memory_manager.topic_manager.get_name(user_id)
         has_name = name != "friend"
@@ -66,20 +58,9 @@ class OnboardingService:
             for m in consent_memories
         )
 
-        # Use consolidated lesson_state helper for onboarding status
-        lesson_status_present = has_lesson_status(self.memory_manager, user_id)
-
-        # Check if timezone is set in DB (the canonical source of truth)
-        db_user = self.db.query(User).filter(User.user_id == user_id).first()
-        has_timezone = db_user and db_user.timezone is not None
-
         return get_onboarding_status_dict(
             has_name=has_name,
-            has_timezone=has_timezone,
             has_consent=has_consent,
-            has_commitment=has_commitment,
-            has_lesson_status=lesson_status_present,
-            declined_commitment=declined_commitment,
             declined_consent=declined_consent,
         )
     
@@ -143,22 +124,6 @@ class OnboardingService:
             if language == "no":
                 return "Velkommen! Hva heter du? 👋"
             return "Welcome! What's your name? 👋"
-        elif next_step == "timezone":
-            self.memory_manager.store_memory(
-                user_id=user_id,
-                key=MemoryKey.ONBOARDING_STEP_PENDING,
-                value="timezone",
-                category=MemoryCategory.CONVERSATION.value,
-                ttl_hours=2,
-                source="onboarding_service",
-                allow_duplicates=False,
-            )
-            # Infer timezone from language
-            inferred_tz = infer_timezone_from_language(language)
-            
-            return get_onboarding_message("timezone_prompt", language).format(
-                timezone=inferred_tz
-            )
         elif next_step == "consent":
             self.memory_manager.store_memory(
                 user_id=user_id,
@@ -170,48 +135,18 @@ class OnboardingService:
                 allow_duplicates=False,
             )
             return get_onboarding_message("consent_prompt", language)
-        elif next_step == "commitment":
-            self.memory_manager.store_memory(
-                user_id=user_id,
-                key=MemoryKey.ONBOARDING_STEP_PENDING,
-                value="commitment",
-                category=MemoryCategory.CONVERSATION.value,
-                ttl_hours=2,
-                source="onboarding_service",
-                allow_duplicates=False,
-            )
-            # commitment prompt includes the user's name
-            return get_onboarding_message("commitment_prompt", language).format(name=name)
-        elif next_step == "lesson_status":
-            self.memory_manager.store_memory(
-                user_id=user_id,
-                key=MemoryKey.ONBOARDING_STEP_PENDING,
-                value="lesson_status",
-                category=MemoryCategory.CONVERSATION.value,
-                ttl_hours=2,
-                source="onboarding_service",
-                allow_duplicates=False,
-            )
-            return get_onboarding_message("ask_new_or_continuing", language).format(name=name)
-
         return None
     
     def get_onboarding_complete_message(self, user_id: int) -> str:
         """
         Finalize onboarding side-effects (schedule) and return
         the onboarding completion message text for the user.
-        
-        Note: Timezone is now set during the explicit timezone confirmation step,
-        not automatically here. This ensures users are asked to confirm their timezone.
         """
         # Use topic-based name retrieval for temporal resolution
         name = self.memory_manager.topic_manager.get_name(user_id)
 
         lang_memories = self.memory_manager.get_memory(user_id, MemoryKey.USER_LANGUAGE)
         language = lang_memories[0]["value"] if lang_memories else "en"
-
-        # Timezone is set during the explicit timezone step in _handle_timezone_pending
-        # We no longer auto-set it here to ensure users confirm their timezone
 
         # Auto-create schedule when onboarding is completed
         create_auto_schedule(self.db, user_id)
@@ -239,7 +174,7 @@ class OnboardingService:
         
         # Show if not complete and user is relatively new (or never completed)
         if not status["onboarding_complete"]:
-            if status.get("declined_consent") or status.get("declined_commitment"):
+            if status.get("declined_consent"):
                 return False
             return True
         

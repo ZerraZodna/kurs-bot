@@ -32,6 +32,10 @@ engine = create_engine(
     pool_size=10, max_overflow=20,
     connect_args={"check_same_thread": False, "timeout": 30} if is_sqlite else {},
     future=True,
+) if not is_sqlite else create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False, "timeout": 30},
+    future=True,
 )
 
 # Log/print which database URL is in use when the module is imported so

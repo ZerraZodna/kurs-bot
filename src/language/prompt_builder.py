@@ -163,7 +163,13 @@ class PromptBuilder:
             if function_context:
                 context_parts.append(f"\n\n{function_context}")
         
-        # 8. Current Message
+        # 8. Onboarding Next Step Context (if in onboarding)
+        if context_type.startswith("onboarding"):
+            onboarding_context = self._build_onboarding_next_step_context(user_id)
+            if onboarding_context:
+                context_parts.append(onboarding_context)
+        
+        # 9. Current Message
         context_parts.append(f"\n### Current Message\nUser: {user_input}\n\nAssistant:")
         
         return "".join(context_parts)
@@ -260,7 +266,13 @@ class PromptBuilder:
             if function_context:
                 context_parts.append(f"\n\n{function_context}")
         
-        # 5. Current message
+        # 5. Onboarding Next Step Context (if in onboarding)
+        if context_type.startswith("onboarding"):
+            onboarding_context = self._build_onboarding_next_step_context(user_id)
+            if onboarding_context:
+                context_parts.append(onboarding_context)
+        
+        # 6. Current message
         context_parts.append(f"\n### Current Message\nUser: {user_input}\n\nAssistant:")
         
         return "".join(context_parts)
@@ -544,6 +556,57 @@ class PromptBuilder:
         """Build function definitions context for the given context type."""
         return self.function_definitions.for_context(context_type)
     
+    def _build_onboarding_next_step_context(self, user_id: int) -> str:
+        """Build context for the next onboarding step to guide the AI.
+        
+        This injects the next onboarding question into the prompt so the AI
+        knows what to ask after extracting information like the user's name.
+        """
+        from src.onboarding.service import OnboardingService
+        
+        onboarding = OnboardingService(self.db)
+        status = onboarding.get_onboarding_status(user_id)
+        
+        # If onboarding is complete, no need to add context
+        if status.get("onboarding_complete"):
+            return ""
+        
+        # Get the next onboarding prompt
+        next_prompt = onboarding.get_onboarding_prompt(user_id)
+        if not next_prompt:
+            return ""
+        
+        # Determine which step is next based on status
+        next_step = status.get("next_step", "unknown")
+        
+        return f"""
+### Next Onboarding Step
+Current step: {next_step}
+
+After acknowledging the user's input, ask this next question:
+"{next_prompt}"
+
+Important: Combine your acknowledgment with the next question naturally. For example:
+- "Nice to meet you, Johannes! What would you like to talk about today?" → WRONG
+- "Nice to meet you, Johannes! To help me serve you better, could you tell me if you're comfortable with me storing our conversation to personalize your experience?" → CORRECT
+
+Always transition smoothly to the next onboarding question."""
+    
+    def _detect_onboarding_stage(self, user_id: int) -> Optional[str]:
+        """Detect specific onboarding stage from pending step memory."""
+        from src.memories.constants import MemoryKey
+        from src.functions.definitions import FunctionDefinitions
+        
+        pending_step = self.memory_manager.get_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING)
+        if not pending_step:
+            return None
+        
+        # Get the step value from the most recent memory
+        step_value = str(pending_step[0].get("value", "")).lower()
+        
+        # Use centralized stage map from FunctionDefinitions (DRY)
+        return FunctionDefinitions.ONBOARDING_STAGE_MAP.get(step_value)
+    
     def _detect_context_from_state(self, user_id: int) -> str:
         """Detect context based on user state."""
         # Check for pending schedule request
@@ -553,7 +616,12 @@ class PromptBuilder:
         if pending_schedule:
             return "schedule_setup"
         
-        # Check if user is new (onboarding)
+        # Check for specific onboarding stage first
+        onboarding_stage = self._detect_onboarding_stage(user_id)
+        if onboarding_stage:
+            return onboarding_stage
+        
+        # Check if user is new (general onboarding)
         user = self.db.query(User).filter_by(user_id=user_id).first()
         if user and (datetime.now(timezone.utc) - to_utc(user.created_at)).days < 1:
             return "onboarding"

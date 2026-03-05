@@ -133,13 +133,32 @@ def ensure_test_db(db_engine, monkeypatch):
     
     Uses the worker-aware db_engine fixture to support pytest-xdist parallel
     execution. Also patches SessionLocal to use the worker-specific engine.
+    
+    Patches all locations where SessionLocal is imported to ensure they use
+    the worker-specific database during parallel test execution.
     """
     # Patch SessionLocal to use the worker-specific engine
     from sqlalchemy.orm import sessionmaker
     TestSessionLocal = sessionmaker(bind=db_engine, autoflush=False, autocommit=False, future=True)
+    
+    # Patch all locations where SessionLocal is imported directly
+    # This ensures parallel test execution works correctly with pytest-xdist
     monkeypatch.setattr("src.models.database.SessionLocal", TestSessionLocal)
-    # Also patch the scheduler module's SessionLocal reference, since it imports its own copy
     monkeypatch.setattr("src.scheduler.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("src.scheduler.manager.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("src.scheduler.maintenance.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("src.scheduler.job_state.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("src.memories.manager.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("src.integrations.telegram.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("src.api.telegram_routes.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("src.api.dialogue_routes.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("src.api.dev_web_client.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("src.api.gdpr_routes.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("src.api.app.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("src.services.dialogue.command_handlers.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("src.services.maintenance.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("src.middleware.consent.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("src.language.prompt_registry.SessionLocal", TestSessionLocal)
     
     repo_root = Path(__file__).resolve().parents[1]
     
