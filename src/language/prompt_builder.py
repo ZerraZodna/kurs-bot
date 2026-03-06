@@ -48,15 +48,18 @@ class PromptBuilder:
     }
 
     TELEGRAM_OUTPUT_RULES = (
-        "### Output Format Rules\n"
+        "== Output Format Rules ==\n"
         "- The user reads replies in Telegram on a small screen.\n"
         "- Never use ASCII/Unicode tables, box-drawing tables, or markdown tables.\n"
+        "- Use <b> for bold text instead of ** or __\n"
+        "- Use <i> for italic text instead of * or _\n"
+        "- Use <pre> for code blocks or formatted content instead of ```\n"
         "- Use short paragraphs and simple bullet or numbered lists instead.\n"
         "- Keep layout plain and mobile-friendly."
     )
 
     LESSON_TEXT_RETRIEVAL_RULES = (
-        "### Lesson Text Retrieval Rules\n"
+        "== Lesson Text Retrieval Rules ==\n"
         "- If the user asks for today's lesson or a specific lesson number/text, return the lesson text exactly as provided.\n"
         "- Do not summarize, interpret, explain, or rewrite the lesson text.\n"
         "- Return only the lesson body."
@@ -114,13 +117,13 @@ class PromptBuilder:
         if include_lesson and not is_direct_lesson_request:
             lesson_context, progress_note = self._get_today_lesson(user_id)
             if lesson_context:
-                context_parts.append(f"\n### Today's ACIM Lesson\n{lesson_context}")
+                context_parts.append(f"\n== Today's ACIM Lesson\n{lesson_context}")
             if progress_note:
-                context_parts.append(f"\n### Lesson Progress Note\n{progress_note}")
+                context_parts.append(f"\n== Lesson Progress Note\n{progress_note}")
         elif is_direct_lesson_request:
             # Add instruction to use function instead of summarizing
             context_parts.append(
-                f"\n### Lesson Text Request\n"
+                f"\n-- Lesson Text Request\n"
                 f"The user is asking for the lesson text. "
                 f"DO NOT summarize or describe the lesson. "
                 f"Instead, call the send_todays_lesson function to return the full lesson text."
@@ -129,33 +132,33 @@ class PromptBuilder:
         # 2. User Profile Context
         profile_context = self._build_profile_context(user)
         if profile_context:
-            context_parts.append(f"\n### User Profile\n{profile_context}")
+            context_parts.append(f"\n-- User Profile\n{profile_context}")
         
         # 3. Goals & Learning Progress
         goals_context = self._build_goals_context(user_id)
         if goals_context:
-            context_parts.append(f"\n### Current Goals\n{goals_context}")
+            context_parts.append(f"\n-- Current Goals\n{goals_context}")
         
         # 4. User Preferences
         prefs_context = self._build_preferences_context(user_id)
         if prefs_context:
-            context_parts.append(f"\n### Preferences\n{prefs_context}")
+            context_parts.append(f"\n-- Preferences\n{prefs_context}")
         
         # 5. Recent Progress/Insights
         progress_context = self._build_progress_context(user_id)
         if progress_context:
-            context_parts.append(f"\n### Recent Progress\n{progress_context}")
+            context_parts.append(f"\n-- Recent Progress\n{progress_context}")
 
         # 5b. Semantic Relevant Memories (optional)
         semantic_context = self._build_semantic_memory_context(relevant_memories or [])
         if semantic_context:
-            context_parts.append(f"\n### Relevant Memories\n{semantic_context}")
+            context_parts.append(f"\n-- Relevant Memories\n{semantic_context}")
         
         # 6. Conversation History
         if include_conversation_history:
             history_context = self._build_conversation_history(user_id, history_turns)
             if history_context:
-                context_parts.append(f"\n### Recent Conversation\n{history_context}")
+                context_parts.append(f"\n-- Recent Conversation\n{history_context}")
         
         # 7. Function Definitions (if enabled)
         if include_functions:
@@ -170,7 +173,7 @@ class PromptBuilder:
                 context_parts.append(onboarding_context)
         
         # 9. Current Message
-        context_parts.append(f"\n### Current Message\nUser: {user_input}\n\nAssistant:")
+        context_parts.append(f"\n-- Current Message\nUser: {user_input}\n\nAssistant:")
         
         return "".join(context_parts)
 
@@ -244,7 +247,7 @@ class PromptBuilder:
             name = user.first_name
             if user.last_name:
                 name += f" {user.last_name}"
-            context_parts.append(f"\n### User\n{name}")
+            context_parts.append(f"\n-- User\n{name}")
             local_time = self._get_user_local_time_str(user)
             if local_time:
                 context_parts.append(f"\n{local_time}")
@@ -252,13 +255,13 @@ class PromptBuilder:
         # 2. Semantically relevant memories only
         semantic_context = self._build_semantic_memory_context(relevant_memories or [], max_items=max_memories)
         if semantic_context:
-            context_parts.append(f"\n### Relevant Context\n{semantic_context}")
+            context_parts.append(f"\n-- Relevant Context\n{semantic_context}")
         
         # 3. Light conversation history
         if include_conversation_history:
             history_context = self._build_conversation_history(user_id, history_turns)
             if history_context:
-                context_parts.append(f"\n### Recent Conversation\n{history_context}")
+                context_parts.append(f"\n-- Recent Conversation\n{history_context}")
         
         # 4. Function Definitions (if enabled)
         if include_functions:
@@ -273,7 +276,7 @@ class PromptBuilder:
                 context_parts.append(onboarding_context)
         
         # 6. Current message
-        context_parts.append(f"\n### Current Message\nUser: {user_input}\n\nAssistant:")
+        context_parts.append(f"\n-- Current Message\nUser: {user_input}\n\nAssistant:")
         
         return "".join(context_parts)
 
@@ -330,7 +333,7 @@ class PromptBuilder:
         if max_chars and len(content) > max_chars:
             content = content[:max_chars].rsplit(" ", 1)[0] + "..."
 
-        lesson_text = f"**Lesson {lesson.lesson_id}**: \"{lesson.title}\"\n\n{content}"
+        lesson_text = f"<b>Lesson {lesson.lesson_id}</b>: \"{lesson.title}\"\n\n{content}"
         return lesson_text, state.get("progress_note")
 
     def get_today_lesson_context(self, user_id: int, max_chars: int = 800) -> Dict[str, Any]:
@@ -347,8 +350,8 @@ class PromptBuilder:
         content = lesson.content or ""
         if max_chars and len(content) > max_chars:
             content = content[:max_chars].rsplit(" ", 1)[0] + "..."
-
-        lesson_text = f"**Lesson {lesson.lesson_id}**: \"{lesson.title}\"\n\n{content}"
+        
+        lesson_text = f"<b>Lesson {lesson.lesson_id}</b>: \"{lesson.title}\"\n\n{content}"
         return {"lesson_text": lesson_text, "state": state}
 
     def _get_current_lesson_state(self, user_id: int) -> Dict[str, Any]:
@@ -469,7 +472,7 @@ class PromptBuilder:
         )
         if ai_context:
             import json
-            parts.append(f"\n### Structured User Context\n```json\n{json.dumps(ai_context, indent=2, default=str)}\n```")
+            parts.append(f"\n== Structured User Context ==\n<pre>{json.dumps(ai_context, indent=2, default=str)}</pre>")
         
         return "\n".join(parts) if parts else ""
     
@@ -580,7 +583,7 @@ class PromptBuilder:
         next_step = status.get("next_step", "unknown")
         
         return f"""
-### Next Onboarding Step
+-- Next Onboarding Step
 Current step: {next_step}
 
 After acknowledging the user's input, ask this next question:
@@ -691,7 +694,7 @@ Always transition smoothly to the next onboarding question."""
         """Build initial onboarding prompt for new users."""
         return f"""{system_prompt}
 
-### Onboarding
+-- Onboarding
 You are meeting this user for the first time. Your goal is to understand:
 1. Their name and preferred way to be addressed
 2. Their main learning goals or interests

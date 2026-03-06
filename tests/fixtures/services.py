@@ -112,11 +112,11 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
                 sys.stderr.write(f"[MOCK] Step found: {step_match.group(1)}\n")
         
         # Extract the last user message from the prompt
-        # The prompt ends with: "### Current Message\nUser: {user_input}\n\nAssistant:"
+        # The prompt ends with: "-- Current Message\nUser: {user_input}\n\nAssistant:"
         user_msg = ""
         
         # Try to find in Current Message section - match up to \n\nAssistant:
-        current_msg_match = re.search(r'### Current Message\s*\n\s*User:\s*(.+?)(?:\n\nAssistant:|$)', prompt, re.IGNORECASE | re.DOTALL)
+        current_msg_match = re.search(r'-- Current Message\s*\n\s*User:\s*(.+?)(?:\n\nAssistant:|$)', prompt, re.IGNORECASE | re.DOTALL)
         if current_msg_match:
             user_msg = current_msg_match.group(1).strip()
         else:

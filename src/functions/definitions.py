@@ -365,7 +365,7 @@ User: "My name is John and I'm in Tokyo, studying lesson 30"
         functions = self.registry.list_for_context(function_context)
         
         lines = [
-            "### Available Functions",
+            "-- Available Functions",
             "",
             "You can call these functions to perform actions:",
             "",
@@ -385,7 +385,7 @@ User: "My name is John and I'm in Tokyo, studying lesson 30"
         # Add context-specific example if available
         # Check for exact match first (including granular onboarding stages)
         if context in self.CONTEXT_EXAMPLES:
-            lines.append("### Examples for this context")
+            lines.append("-- Examples for this context")
             lines.append(self.CONTEXT_EXAMPLES[context])
         else:
             lines.append(self.MULTI_FUNCTION_EXAMPLE)
@@ -395,7 +395,7 @@ User: "My name is John and I'm in Tokyo, studying lesson 30"
     def for_functions(self, function_names: List[str]) -> str:
         """Generate definitions for specific functions."""
         lines = [
-            "### Available Functions",
+            "-- Available Functions",
             "",
             "You can call these functions to perform actions:",
             "",

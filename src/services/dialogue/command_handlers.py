@@ -406,7 +406,7 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
             if not rows:
                 return "You have no memories stored."
             lines = _format_mem_lines(rows)
-            return "```\n" + "\n".join(lines) + "\n```"
+            return "<pre>\n" + "\n".join(lines) + "\n</pre>"
 
         # Otherwise run a semantic search for the provided query tail and list matching memories
         def _run_coro_sync(coro):
@@ -460,7 +460,7 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
                 return "No results for query"
             mems = [m for (m, s) in results]
             lines = _format_mem_lines(mems)
-            return "```\n" + "\n".join(lines) + "\n```"
+            return "<pre>\n" + "\n".join(lines) + "\n</pre>"
         except Exception as e:
             logger.exception("Semantic search failed for list memories: %s", e)
             # Include exception text to help debugging in dev environments
