@@ -42,7 +42,7 @@ def ensure_lessons_imported():
             logging.info(f"Auto-importing lessons from {pdf_path}...")
             
             # Import the importer module
-            from scripts.utils.import_acim_lessons import extract_formatted_text, parse_lessons_from_text, import_to_db
+            from src.lessons import extract_formatted_text, parse_lessons_from_text, import_to_db
             
             text = extract_formatted_text(pdf_path)
             lessons = parse_lessons_from_text(text)

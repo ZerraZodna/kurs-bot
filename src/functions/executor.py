@@ -600,8 +600,33 @@ class FunctionExecutor:
             return {"ok": False, "error": str(e)}
     
     async def _handle_send_todays_lesson(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle send_todays_lesson function."""
-        # Same as send_next_lesson for now
+        """Handle send_todays_lesson function.
+        
+        If lesson_id is provided in params, use it directly.
+        Otherwise, fall back to computing from memory (same as send_next_lesson).
+        """
+        from src.models.database import Lesson
+        
+        lesson_id = params.get("lesson_id")
+        session = context.get("session")
+        
+        # If lesson_id is provided, use it directly (fixes issue where AI passes lesson_id but it's ignored)
+        if lesson_id is not None:
+            try:
+                lesson = session.query(Lesson).filter_by(lesson_id=lesson_id).first()
+                if not lesson:
+                    return {"ok": False, "error": f"Lesson {lesson_id} not found"}
+                
+                return {
+                    "ok": True,
+                    "lesson_id": lesson_id,
+                    "title": lesson.title,
+                    "content": lesson.content,
+                }
+            except Exception as e:
+                return {"ok": False, "error": str(e)}
+        
+        # Fallback: compute from memory if no lesson_id provided
         return await self._handle_send_next_lesson(params, context)
     
     async def _handle_mark_lesson_complete(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
