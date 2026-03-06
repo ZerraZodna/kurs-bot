@@ -12,7 +12,7 @@ The import script uses **pypdf** for reliable PDF text extraction:
 ### What's Preserved
 - **Complete lesson content** → All text extracted and parsed correctly
 - **Paragraph structure** → Paragraph breaks preserved as blank lines
-- **Inline formatting** → Italics and bold preserved as markdown
+- **Inline formatting** → Italics and bold preserved as html code
 
 ### Why Markdown?
 Markdown keeps the formatting found in the PDF while staying easy to render:
@@ -29,10 +29,6 @@ Content can be rendered at presentation layer:
 .lesson-content em { font-style: italic; }
 .lesson-content p { margin: 1em 0; }
 ```
-
-**Option 2: Markdown Rendering**
-- Render stored markdown to HTML
-- Use a markdown library to preserve *italics* and **bold**
 
 **Option 3: Custom Markup**
 - Parse specific ACIM lesson structure
@@ -103,6 +99,5 @@ The script extracts 365 lessons and stores them in the database with clean, comp
 If specific formatting (bold, italic) becomes essential, options remain:
 1. Implement pdfplumber for character-level font detection
 2. Use AI to infer formatting from content context
-3. Apply manual markdown markup post-import
 
 For now, plain text content is complete and ready for styled presentation.

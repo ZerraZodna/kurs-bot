@@ -6,7 +6,6 @@ from typing import Optional, Dict, Any, AsyncIterator
 from datetime import datetime, timedelta, timezone
 from src.config import settings
 from src.models.database import SessionLocal, MessageLog, BatchLock
-from src.core.markdown_processor import markdown_to_telegram_html
 
 logger = logging.getLogger(__name__)
 
@@ -41,11 +40,10 @@ async def edit_message(chat_id: int, message_id: int, text: str) -> Optional[dic
     if not TELEGRAM_BOT_TOKEN:
         return None
     url = f"{API_BASE}/editMessageText"
-    html_text = markdown_to_telegram_html(text)
     payload = {
         "chat_id": chat_id,
         "message_id": message_id,
-        "text": html_text,
+        "text": text,
         "parse_mode": "HTML",
     }
     async with httpx.AsyncClient() as client:
@@ -163,10 +161,9 @@ async def send_message(chat_id: int, text: str) -> Optional[dict]:
         chunks = _split_text(text, max_len) or [""]
         last_response = None
         for chunk in chunks:
-            html_chunk = markdown_to_telegram_html(chunk)
             payload = {
                 "chat_id": chat_id,
-                "text": html_chunk,
+                "text": chunk,
                 "parse_mode": "HTML"  # Use HTML instead of MarkdownV2
             }
             try:

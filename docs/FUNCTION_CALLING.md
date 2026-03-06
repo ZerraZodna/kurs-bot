@@ -103,7 +103,7 @@ result: ParseResult = parser.parse(llm_response)
   ]
 }
 
-// With markdown code blocks (also supported)
+// With html code blocks (also supported)
 ```json
 {
   "response": "Got it!",
@@ -336,7 +336,7 @@ pytest tests/unit/functions/test_critical_path.py -v
 
 Key test coverage:
 - Function registry (all 20+ functions registered)
-- Intent parsing (valid JSON, markdown blocks, fallback)
+- Intent parsing (valid JSON, html blocks, fallback)
 - Parameter validation (time, timezone, language, datetime)
 - Function execution (success and error cases)
 - Memory extraction (confidence threshold, storage)

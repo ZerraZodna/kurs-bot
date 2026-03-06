@@ -44,7 +44,7 @@ Rules:
 3. Only use functions listed under "Available Functions" for the current context
 4. All required parameters must be included
 5. Use exact function names and parameter names as shown
-6. Return ONLY the JSON, no markdown formatting, no explanations outside the JSON
+6. Return ONLY the JSON, no explanations outside the JSON
 
 CRITICAL MEMORY EXTRACTION RULE:
 When the user shares personal information (name, timezone, current lesson, preferences, etc.), you MUST call extract_memory to store it. NEVER just acknowledge the information in text - always extract and store it using the extract_memory function.

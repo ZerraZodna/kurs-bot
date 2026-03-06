@@ -84,11 +84,11 @@ def extract_formatted_text(pdf_path: Path) -> str:
                     bold, italic, underline = _span_styles_from_font(font)
                     plain = raw_norm
                     if underline:
-                        plain = f'__{plain}__'
+                        plain = f'<u>{plain}</u>'
                     if italic:
-                        plain = f'*{plain}*'
+                        plain = f'<em>{plain}</em>'
                     if bold:
-                        plain = f'**{plain}**'
+                        plain = f'<b>{plain}</b>'
                     styled_parts.append(plain)
 
                 if raw_parts:
@@ -310,19 +310,24 @@ def extract_formatted_text(pdf_path: Path) -> str:
     plain_text = plain_text.replace('\n', ' ')
     plain_text = plain_text.replace(marker, '\n\n')
 
-    # Keep adjacent quoted exercise statements on separate lines.
-    # Example: *“This table...”* *“This chair...”* -> newline-separated.
+    # Replace bold italcs start/stop "space" bold italic with a new line break
+    # Example:  <b><em>“Nothing I see in this room [on this street,</em></b> <b><em>from this window, in this place] means anything.”</em></b> Now look slowly around 
+    # Here we want a NewLine after "</em></b> " -> "</em>>/b>\n" 
+    # New:  <b><em>“Nothing I see in this room [on this street,</em></b>\n<b><em>from this window, in this place] means anything.”</em></b>\nNow look slowly around 
     plain_text = re.sub(
-        r'([*]*["“][^"”]{3,260}["”][.!?]?[*]*)\s+(?=[*]*["“])',
-        r'\1\n',
+        '</em></b> ',
+        '</em></b>\n',
         plain_text,
     )
-    # Also split adjacent italic blocks so indented instructional lines keep line breaks.
+
+    # <em>“I can escape from the world by giving </em> <em>up attack thoughts about _____.”</em> Hold each attack thought in m
+    # <em>“I can escape from the world by giving </em>\n<em>up attack thoughts about _____.”</em>\nHold each attack thought in m
     plain_text = re.sub(
-        r'(\*[^\n*]{6,260}\*)\s+(?=\*[^\n*]{3,260}\*)',
-        r'\1\n',
+        '</em> ',
+        '</em>\n',
         plain_text,
     )
+
     # If a quoted/italic exercise line is followed by regular sentence text,
     # keep that transition on a new paragraph.
     plain_text = re.sub(r'(\*[^\n*]{6,260}\*)\s+([A-Z])', r'\1\n\n\2', plain_text)
@@ -737,6 +742,11 @@ def main(argv=None):
             # leftovers) directly to a following 'lesson' continuation.
             short_join_re = re.compile(r'(?<![\.\!\?])\b(\w{1,4})\n\n(lesson\b)', flags=re.I)
             out_text = short_join_re.sub(r'\1 \2', out_text)
+
+            # Apply same newline substitutions as extract_formatted_text()
+            # to preserve </em></b> -> newline transformations
+            out_text = re.sub(r'</em></b> ', r'</em></b>\n', out_text)
+            out_text = re.sub(r'</em> ', r'</em>\n', out_text)
 
             # Targeted Lesson 1 formatting fixes: insert paragraph breaks
             # around the epigraph and before/after quoted lists so Lesson 1
