@@ -7,14 +7,14 @@ def get_lesson_1_welcome_message(language: str, name: str) -> str:
 	messages = {
 		"no": f"""Perfekt, {name}! La oss begynne sammen med Leksjon 1. Dette er hvor transformasjonen starter.
 
-📅 **Daglig støtte**: Hver morgen kl. 07:30 sender jeg deg neste leksjon.
-💬 **Alltid tilgjengelig**: Du kan ta kontakt når som helst for å diskutere innsikter, stille spørsmål, eller reflektere sammen.
+📅 <strong>Daglig støtte</strong>: Hver morgen kl. 07:30 sender jeg deg neste leksjon.
+💬 <strong>Alltid tilgjengelig</strong>: Du kan ta kontakt når som helst for å diskutere innsikter, stille spørsmål, eller reflektere sammen.
 
 Ta deg tid med dagens leksjon. Når du er klar til å snakke om den, er jeg her. 🌿""",
 		"en": f"""Perfect, {name}! Let's begin together with Lesson 1. This is where transformation starts.
 
-📅 **Daily support**: Each morning at 7:30 AM, I'll send you the next lesson.
-💬 **Always available**: You can reach out anytime to discuss insights, ask questions, or reflect together.
+📅 <strong>Daily support</strong>: Each morning at 7:30 AM, I'll send you the next lesson.
+💬 <strong>Always available</strong>: You can reach out anytime to discuss insights, ask questions, or reflect together.
 
 If you want to change the time, or need to take a pause, just let me know.
 
@@ -27,14 +27,14 @@ def get_continuation_welcome_message(language: str, name: str, lesson_id: int) -
 	messages = {
 		"no": f"""Flott, {name}! Du er på Leksjon {lesson_id}. La oss fortsette reisen sammen.
 
-📅 **Daglig støtte**: Hver morgen kl. 07:30 sender jeg deg neste leksjon.
-💬 **Alltid tilgjengelig**: Du kan ta kontakt når som helst for å diskutere, stille spørsmål, eller reflektere.
+📅 <strong>Daglig støtte</strong>: Hver morgen kl. 07:30 sender jeg deg neste leksjon.
+💬 <strong>Alltid tilgjengelig</strong>: Du kan ta kontakt når som helst for å diskutere, stille spørsmål, eller reflektere.
 
 Her er dagens leksjon:""",
 		"en": f"""Wonderful, {name}! You're on Lesson {lesson_id}. Let's continue this journey together.
 
-📅 **Daily support**: Each morning at 7:30 AM, I'll send you the next lesson.
-💬 **Always available**: You can reach out anytime to discuss, ask questions, or reflect.
+📅 <strong>Daily support</strong>: Each morning at 7:30 AM, I'll send you the next lesson.
+💬 <strong>Always available</strong>: You can reach out anytime to discuss, ask questions, or reflect.
 
 Here's today's lesson:""",
 	}
@@ -47,20 +47,20 @@ def get_onboarding_complete_message_text(language: str, name: str) -> str:
 
 Jeg er her for å støtte deg på reisen din med A Course in Miracles.
 
-📅 **Daglige påminnelser satt opp** - Jeg vil sende deg leksjoner hver dag klokken 07:30. Du kan endre tiden når som helst.
+📅 <strong>Daglige påminnelser satt opp</strong> - Jeg vil sende deg leksjoner hver dag klokken 07:30. Du kan endre tiden når som helst.
 
 Du kan også:
-💬 **Chat med meg når som helst** - Still spørsmål, del innsikter eller diskuter leksjonene
-📖 **Utforsk leksjoner** - Spør meg om noen av de 365 leksjonene når du er klar""",
+💬 <strong>Chat med meg når som helst</strong> - Still spørsmål, del innsikter eller diskuter leksjonene
+📖 <strong>Utforsk leksjoner</strong> - Spør meg om noen av de 365 leksjonene når du er klar""",
 		"en": f"""Welcome to our spiritual community, {name}! 🙏
 
 I'm here to support you on your journey with A Course in Miracles.
 
-📅 **Daily reminders set up** - I'll send you lessons every day at 07:30 AM. You can change the time anytime.
+📅 <strong>Daily reminders set up</strong> - I'll send you lessons every day at 07:30 AM. You can change the time anytime.
 
 You can also:
-💬 **Chat with me anytime** - Ask questions, share insights, or discuss the lessons
-📖 **Explore lessons** - Ask me about any of the 365 lessons whenever you're ready""",
+💬 <strong>Chat with me anytime</strong> - Ask questions, share insights, or discuss the lessons
+📖 <strong>Explore lessons</strong> - Ask me about any of the 365 lessons whenever you're ready""",
 	}
 	return messages.get(language, messages["en"])
 
@@ -91,10 +91,6 @@ ONBOARD_MESSAGES = {
 		"en": "Introduction\n\nWelcome to A Course in Miracles. This introduction gives you the context for the journey ahead and how to work with the lessons gently, one day at a time.",
 		"no": "Introduksjon\n\nVelkommen til Et kurs i mirakler. Denne introduksjonen gir deg rammen for reisen videre og hvordan du kan jobbe med leksjonene rolig, én dag av gangen.",
 	},
-	"ask_lesson_number": {
-		"en": "Great! Which lesson are you currently working on? 📚",
-		"no": "Flott! Hvilken leksjon jobber du med nå? 📚",
-	},
 }
 
 
@@ -117,6 +113,24 @@ def get_onboarding_message(key: str, language: str = "en") -> str:
 	if not entry:
 		return ""
 	return entry.get(lang_key, entry.get("en", ""))
+
+
+def format_onboarding_message_with_name(template: str, name: str) -> str:
+	"""Format an onboarding message template with the user's name.
+	
+	Args:
+		template: The message template containing optional {name} placeholder
+		name: The user's name (from get_name which returns "friend" as fallback)
+	
+	Returns:
+		The template with {name} replaced by actual name, or cleaned up if name is "friend"
+	"""
+	if name and name != "friend" and "{name}" in template:
+		return template.replace("{name}", name)
+	elif "{name}" in template:
+		# Remove the placeholder if name is not available
+		return template.replace("{name}! ", "").replace("{name} ", "")
+	return template
 
 
 def get_lesson_confirmation_prompt(language: str, lesson_id: int) -> str:

@@ -45,13 +45,13 @@ class ResponseBuilder:
         "create_schedule": "✓ Daily reminder set for {time}",
         "update_schedule": "✓ Schedule updated to {time}",
         "delete_schedule": "✓ Schedule removed",
-        "query_schedule": "Here are your reminders:\n{details}",
+        "query_schedule": "Here are your reminders:<br><br>{details}",
         "create_one_time_reminder": "✓ One-time reminder set for {run_at}",
-        "send_lesson": "📖 **Lesson {lesson_id}**: {title}\n\n{content}",
-        "send_next_lesson": "📖 **Lesson {lesson_id}**: {title}\n\n{content}",
-        "send_todays_lesson": "📖 **Lesson {lesson_id}**: {title}\n\n{content}",
+        "send_lesson": "📖 <strong>Lesson {lesson_id}</strong>: {title}<br><br>{content}",
+        "send_next_lesson": "📖 <strong>Lesson {lesson_id}</strong>: {title}<br><br>{content}",
+        "send_todays_lesson": "📖 <strong>Lesson {lesson_id}</strong>: {title}<br><br>{content}",
         "mark_lesson_complete": "✓ Lesson marked complete",
-        "repeat_lesson": "📖 **Lesson {lesson_id}** (repeat): {title}\n\n{content}",
+        "repeat_lesson": "📖 <strong>Lesson {lesson_id}</strong> (repeat): {title}<br><br>{content}",
         "set_lesson_preference": "✓ Lesson preference set to {preference}",
         "set_timezone": "✓ Timezone set to {timezone}",
         "set_language": "✓ Language set to {language}",
@@ -415,3 +415,4 @@ def reset_builder():
     """Reset the global instance (useful for testing)."""
     global _builder
     _builder = None
+

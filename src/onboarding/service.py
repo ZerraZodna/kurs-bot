@@ -16,12 +16,12 @@ from src.onboarding.detectors import (
     detect_consent_keywords,
     detect_decline_keywords,
 )
-from src.lessons.detection import handle_lesson_status_response
 from src.language.onboarding_prompts import (
     get_continuation_welcome_message,
     get_lesson_1_welcome_message,
     get_onboarding_complete_message_text,
     get_onboarding_message,
+    format_onboarding_message_with_name,
 )
 from src.onboarding.status import get_onboarding_status_dict
 from src.onboarding.schedule_setup import create_auto_schedule
@@ -87,7 +87,10 @@ class OnboardingService:
                 source="onboarding_service",
                 allow_duplicates=False,
             )
-            return get_onboarding_message("consent_prompt", language)
+            # Get personalized consent prompt with user's name
+            consent_prompt = get_onboarding_message("consent_prompt", language)
+            name = self.memory_manager.topic_manager.get_name(user_id)
+            return format_onboarding_message_with_name(consent_prompt, name)
         
         # If somehow we get "name" as next_step, just skip it and return consent
         # This shouldn't happen with the new logic, but just in case
@@ -168,38 +171,6 @@ class OnboardingService:
         """Return True if consent given, False if declined, None if unclear."""
         return detect_consent_keywords(message)
     
-    def handle_lesson_status_response(self, user_id: int, text: str) -> Dict[str, Any]:
-        """
-        Handle user's response about whether they're new or continuing.
-
-        Uses the detectors' structured facts to store a `current_lesson` memory when
-        an explicit lesson number is provided, and to avoid re-asking the 'new/continue'
-        question when facts indicate the user is continuing or has completed the course.
-
-        Returns the detector response dict for downstream handling.
-        """
-        result = handle_lesson_status_response(text)
-
-        # Persist explicit lesson number so onboarding flow won't ask again
-        try:
-            action = result.get("action")
-            facts = result.get("facts") or {}
-        except Exception:
-            action = None
-            facts = {}
-
-        if action == "send_specific_lesson":
-            lesson_id = result.get("lesson_id")
-            if lesson_id:
-                # store as a progress memory so get_onboarding_status sees it
-                # Use consolidated lesson_state helper to keep state consistent
-                set_current_lesson(self.memory_manager, user_id, int(lesson_id))
-        elif facts.get("is_continuing") or facts.get("completed_before"):
-            # mark that user is continuing (no specific lesson known)
-            set_current_lesson(self.memory_manager, user_id, "continuing")
-
-        return result
-
     def get_lesson_1_welcome_message(self, user_id: int) -> str:
         """Welcome message for brand new users starting with Lesson 1."""
         # Use topic-based name retrieval for temporal resolution

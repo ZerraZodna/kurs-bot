@@ -192,9 +192,6 @@ result = lessons_detection.detect_lesson_request("Send me lesson 5")
 # Returns: {"type": "lesson_request", "action": "send_lesson", "lesson_id": 5}
 ```
 
-#### `handle_lesson_status_response(text)`
-Extracts lesson status information from user response.
-
 **Parameters:**
 - `text` (str): The user's response about their lesson status
 
@@ -202,12 +199,6 @@ Extracts lesson status information from user response.
 - `is_new_user` (bool): True if user is new
 - `lesson_number` (int or None): Reported lesson number if continuing
 - `has_completed_before` (bool): True if user completed course before
-
-**Example:**
-```python
-result = lessons_detection.handle_lesson_status_response("I'm on lesson 10")
-# Returns: {"is_new_user": False, "lesson_number": 10, "has_completed_before": False}
-```
 
 ## Internal Modules (Do Not Import Directly)
 

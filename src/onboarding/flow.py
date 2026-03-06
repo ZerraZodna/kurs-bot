@@ -13,6 +13,7 @@ from src.onboarding.user_management import delete_user_and_data
 from src.memories.dialogue_helpers import get_user_language
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.language import onboarding_prompts as prompts_module
+from src.language.onboarding_prompts import format_onboarding_message_with_name
 
 logger = logging.getLogger(__name__)
 
@@ -162,12 +163,7 @@ class OnboardingFlow:
             # Get personalized consent prompt with user's name
             name = self._get_user_name(user_id)
             consent_prompt = self._get_message("consent_prompt", language)
-            if name and name != "friend" and "{name}" in consent_prompt:
-                consent_prompt = consent_prompt.replace("{name}", name)
-            elif "{name}" in consent_prompt:
-                # Remove the placeholder if name is not available
-                consent_prompt = consent_prompt.replace("{name}! ", "").replace("{name} ", "")
-            return consent_prompt
+            return format_onboarding_message_with_name(consent_prompt, name)
 
         # Handle declined consent case
         if status.get("declined_consent"):

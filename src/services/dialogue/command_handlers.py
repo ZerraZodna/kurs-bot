@@ -214,13 +214,13 @@ async def handle_gdpr_commands(
     parts = text_lower.replace("/gdpr", "gdpr", 1).split()
     if len(parts) == 1:
         return (
-            "GDPR options:\n"
+            "<b>GDPR options:</b>\n"
             "- gdpr export: receive a JSON copy of your data\n"
             "- gdpr erase: delete your data (you can onboard again later)\n"
             "- gdpr clear: delete/anonymize PII but keep the user id active for reuse\n"
-            "- gdpr restrict <reason>: limit processing (onboarding is blocked)\n"
-            "- gdpr object <reason>: object to processing and restrict it (onboarding is blocked)\n"
-            "- gdpr withdraw <scope>: withdraw consent (onboarding is blocked; default scope: data_storage)"
+            "- gdpr restrict &lt;reason&gt;: limit processing (onboarding is blocked)\n"
+            "- gdpr object &lt;reason&gt;: object to processing and restrict it (onboarding is blocked)\n"
+            "- gdpr withdraw &lt;scope&gt;: withdraw consent (onboarding is blocked; default scope: data_storage)"
         )
 
     action = parts[1]
@@ -231,14 +231,13 @@ async def handle_gdpr_commands(
 
     # Descriptions of what each GDPR action does
     action_descriptions = {
-        "export": "📥 **Export Data**: You will receive a JSON copy of all your stored data including memories, schedules, and message history.",
-        "erase": "⚠️ **Erase Data**: This will **permanently delete all your personal data** including memories, schedules, and messages. This action cannot be undone and you will need to onboard again to use the service.",
-        "clear": "⚠️ **Clear Data**: This will delete your personal information but keep your user ID active. Your memories, schedules, and messages will be removed. This is mainly used for testing purposes.",
-        "restrict": "⚠️ **Restrict Processing**: This will limit how your data is used and **block you from onboarding** until the restriction is lifted. You will not be able to use the service while processing is restricted.",
-        "object": "⚠️ **Object to Processing**: This will restrict all data processing and **block you from using the service** (onboarding will be disabled). A legal record will be created for GDPR compliance.",
-        "withdraw": "⚠️ **Withdraw Consent**: This will withdraw your consent for data storage and **disable your access** to the service. You will be opted out and blocked from onboarding until you provide consent again.",
+        "export": "📥 <b>Export Data</b>: You will receive a JSON copy of all your stored data including memories, schedules, and message history.",
+        "erase": "⚠️ <b>Erase Data</b>: This will <b>permanently delete all your personal data</b> including memories, schedules, and messages. This action cannot be undone and you will need to onboard again to use the service.",
+        "clear": "⚠️ <b>Clear Data</b>: This will delete your personal information but keep your user ID active. Your memories, schedules, and messages will be removed. This is mainly used for testing purposes.",
+        "restrict": "⚠️ <b>Restrict Processing</b>: This will limit how your data is used and <b>block you from onboarding</b> until the restriction is lifted. You will not be able to use the service while processing is restricted.",
+        "object": "⚠️ <b>Object to Processing</b>: This will restrict all data processing and <b>block you from using the service</b> (onboarding will be disabled). A legal record will be created for GDPR compliance.",
+        "withdraw": "⚠️ <b>Withdraw Consent</b>: This will withdraw your consent for data storage and <b>disable your access</b> to the service. You will be opted out and blocked from onboarding until you provide consent again.",
     }
-
     payload = {}
     if action in {"restrict", "object", "erase", "clear"} and reason:
         payload["reason"] = reason

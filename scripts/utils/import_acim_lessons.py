@@ -53,7 +53,7 @@ def _span_styles_from_font(font_name: str) -> Tuple[bool, bool, bool]:
 def extract_formatted_text(pdf_path: Path) -> str:
     """Return formatted text extracted from PDF using PyMuPDF (fitz).
 
-    Text will use Markdown-like markers: **bold**, *italic*, __underline__.
+    Text will use HTML-like markers: <b>, <em>, <u>
     """
     if fitz is None:
         raise RuntimeError('PyMuPDF (fitz) is not installed')
@@ -365,10 +365,6 @@ def _normalize_lesson_content_header(content: str, lesson_id: int) -> str:
     # If no leading lesson header exists, prepend one.
     if not re.match(rf'(?i)^\s*Lesson\s+{lesson_id}\b', txt):
         txt = f'Lesson {lesson_id}\n\n{txt}'
-
-    # Keep a clear paragraph break after opening epigraph/title quote.
-    # Example: ...***“...means anything.”*** Now look slowly... -> ...***\n\nNow look slowly...
-    txt = re.sub(r'(\*\*\*["“][^"”]{20,260}["”]\*\*\*)\s+(?=[A-Z])', r'\1\n\n', txt, count=1)
 
     # Lesson 1 formatting preference: keep this sentence attached to the prior paragraph.
     txt = re.sub(
@@ -747,44 +743,6 @@ def main(argv=None):
             # to preserve </em></b> -> newline transformations
             out_text = re.sub(r'</em></b> ', r'</em></b>\n', out_text)
             out_text = re.sub(r'</em> ', r'</em>\n', out_text)
-
-            # Targeted Lesson 1 formatting fixes: insert paragraph breaks
-            # around the epigraph and before/after quoted lists so Lesson 1
-            # appears as the expected set of paragraphs for inspection.
-            try:
-                low = out_text.lower().find('lesson 1')
-                if low != -1:
-                    hi = out_text.lower().find('\n\nlesson 2', low+1)
-                    if hi == -1:
-                        hi = out_text.lower().find('lesson 2', low+1)
-                    block = out_text[low:hi] if hi != -1 else out_text[low:]
-                    b = block
-                    # break after the epigraph closing marker if present
-                    b = re.sub(r'(”\*\*\*|"\*\*\*)\s*Now', r'\1\n\nNow', b)
-                    # ensure a blank line before the first quoted example list
-                    b = b.replace(': *"', ':\n\n*"')
-                    b = b.replace(': *“', ':\n\n*“')
-                    # separate the 'Then look farther away' sentence into its own paragraph
-                    b = b.replace('*Then look farther away', '\n\nThen look farther away')
-                    # write back if changed
-                    if b != block:
-                        out_text = out_text[:low] + b + (out_text[hi:] if hi != -1 else '')
-            except Exception:
-                pass
-            # Ensure each adjacent italic quoted item appears on its own line
-            # Example: *“This table does not mean anything.”* *“This chair...”* -> separate lines
-            try:
-                out_text = re.sub(r'(\*\u201c[^\u201d]+\u201d\*)\s+(?=\*\u201c)', r"\1\n", out_text)
-            except Exception:
-                # fallback for ASCII quotes
-                out_text = re.sub(r'("\*[^\"]+\"\*)\s+(?=\")', r"\1\n", out_text)
-
-            # Split consecutive bold-italic blocks (***...***) onto separate lines
-            try:
-                bold_italic_re = re.compile(r'(\*\*\*.*?\*\*\*)\s*(?=\*\*\*)', flags=re.DOTALL)
-                out_text = bold_italic_re.sub(r'\1\n', out_text)
-            except Exception:
-                pass
 
             # Ensure each lesson header 'lesson N' starts on its own paragraph
             try:
