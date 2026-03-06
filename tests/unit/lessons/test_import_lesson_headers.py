@@ -1,11 +1,12 @@
 from pathlib import Path
 import pytest
 
-from scripts.utils.import_acim_lessons import (
+from src.lessons.lesson_parser import (
     parse_lessons_from_text,
-    extract_formatted_text,
     _normalize_sentence_spacing,
 )
+
+from src.lessons.pdf_extractor import extract_formatted_text
 
 
 def test_parsed_lessons_use_canonical_capitalized_header_prefix():

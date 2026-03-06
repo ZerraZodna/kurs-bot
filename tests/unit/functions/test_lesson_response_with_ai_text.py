@@ -105,7 +105,7 @@ def test_lesson_response_with_empty_ai_text():
     print("======================================\n")
     
     # Should only have the lesson content, no extra text
-    assert built.text.startswith("📖 **Lesson 20**")
+    assert built.text.startswith("📖 <strong>Lesson 20</strong>")
     assert "I am determined to see." in built.text
     assert "The idea for today is a beginning step" in built.text
 

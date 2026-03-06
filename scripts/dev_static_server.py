@@ -16,7 +16,7 @@ class ProxyingHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         # Proxy API calls to the backend
-        if self.path.startswith('/dev/message') or self.path.startswith('/api/render-markdown'):
+        if self.path.startswith('/dev/message'):
             length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(length) if length else b''
 

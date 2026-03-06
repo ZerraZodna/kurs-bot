@@ -241,11 +241,9 @@ def init_db(database_url: str, yes: bool = False, lessons: Optional[str] = None)
                 print(f'⚠️  Lessons PDF not found: {pdf_path} — skipping import.')
             else:
                 print(f'\n==> Importing ACIM lessons from {pdf_path}')
-                utils_script = repo_root / 'scripts' / 'utils' / 'import_acim_lessons.py'
-                if utils_script.exists():
-                    subprocess.run([sys.executable, str(utils_script), '--pdf', str(pdf_path)])
-                else:
-                    print('⚠️  No import_acim_lessons script found under scripts/utils/. See docs/ACIM_LESSONS_IMPORT.md')
+                from src.lessons import main as import_main
+                import_main(['--pdf', str(pdf_path)])
+
     except Exception as e:
         print(f'⚠️  Failed during ACIM lessons import step: {e}')
 

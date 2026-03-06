@@ -3,10 +3,7 @@
 Provides a single entrypoint so import logic isn't duplicated across
 dialogue handlers and scheduler codepaths.
 """
-from pathlib import Path
-import importlib.util
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -25,25 +22,18 @@ def ensure_lessons_available(session) -> bool:
         if count and count > 0:
             return True
 
-        # Attempt to find and run the bundled import script
-        repo_root = Path(__file__).resolve().parents[3]
-        script_path = repo_root / 'scripts' / 'utils' / 'import_acim_lessons.py'
-        if not script_path.exists():
-            logger.warning("import_acim_lessons.py not found at %s", script_path)
-            return False
-
+        # Use the refactored import from src.lessons
+        from src.lessons import main as import_main
+        
         try:
-            spec = importlib.util.spec_from_file_location("import_acim_lessons", str(script_path))
-            mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(mod)
-            rc = mod.main([])
+            rc = import_main([])
             if rc == 0:
                 # re-query to confirm import
                 return bool(session.query(Lesson).count())
-            logger.warning("import_acim_lessons returned code %s", rc)
+            logger.warning("Lesson import returned code %s", rc)
             return False
         except Exception as e:
-            logger.exception("Failed to run import_acim_lessons: %s", e)
+            logger.exception("Failed to run lesson import: %s", e)
             return False
 
     except Exception as e:
