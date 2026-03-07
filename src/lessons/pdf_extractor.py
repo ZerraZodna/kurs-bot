@@ -211,17 +211,6 @@ def extract_formatted_text(pdf_path: Path) -> str:
             current = []
             continue
 
-        # Keep standalone quoted exercise lines on their own line/paragraph.
-        # This preserves structures like:
-        # "This table does not mean anything."
-        is_quoted_line = bool(re.match(r'^(?:<[biuems]+>|</?[biuems]+>)*["][^\n]{3,220}["][.!?]?(?:</[biuems]+>)*$', s))
-        if is_quoted_line:
-            flush_current()
-            current = [s]
-            flush_current()
-            current = []
-            continue
-
         # If current is empty, start new paragraph
         if not current:
             current.append(s)
@@ -306,15 +295,12 @@ def extract_formatted_text(pdf_path: Path) -> str:
     # Example:  <b><em>"Nothing I see in this room [on this street,</em></b> <b><em>from this window, in this place] means anything."</em></b> Now look slowly around 
     # Here we want a NewLine after "</em></b> " -> "</em>>/b>\n" 
     # New:  <b><em>"Nothing I see in this room [on this street,</em></b>\n<b><em>from this window, in this place] means anything."</em></b>\nNow look slowly around 
-    plain_text = re.sub(
-        '</em></b> ',
-        '</em></b>\n',
-        plain_text,
-    )
+    plain_text = plain_text.replace('</em></b> ', '</em></b>\n')
 
     # <em>"I can escape from the world by giving </em> <em>up attack thoughts about _____."</em> Hold each attack thought in m
     # <em>"I can escape from the world by giving </em>\n<em>up attack thoughts about _____."</em>\nHold each attack thought in m
-    plain_text = re.sub('</em> ', '</em>\n', plain_text)
+    plain_text = plain_text.replace('</em> ', '</em>\n')
+    #plain_text = plain_text.replace(':\n\n', ':\n')
 
     # PDF keystone thinks we dont need " " between ".T" -> ". T"
     plain_text = re.sub(r'\.T', '. T', plain_text)
