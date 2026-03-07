@@ -1,69 +1,19 @@
 """
 AI-powered memory extraction and validation.
-Combines extraction + quality validation in a single Ollama call.
-Replaces MemoryExtractor to avoid double Ollama calls.
+Combines extraction + quality validation + conflict detection in a single Ollama call.
 """
 
 import json
 import logging
-import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 
 from src.config import settings
+from src.memories.prompts import MEMORY_EXTRACTION_JUDGE_PROMPT, STORAGE_EVALUATION_PROMPT, MEMORY_RELEVANCE_PROMPT
+from src.memories.cache import DecisionCache
 
 logger = logging.getLogger(__name__)
-
-# Combined extraction + validation prompt
-MEMORY_EXTRACTION_JUDGE_PROMPT = """You are a personal memory system. Extract facts from user messages and validate their quality.
-
-EXTRACTION RULES:
-1. Extract explicit facts: name, goals, preferences, commitments
-2. Store long-term goals, learning objectives, personal preferences
-3. Only store sensitive info with explicit consent
-4. Skip casual chit-chat, questions, vague statements
-5. Work in any language - Norwegian, English, etc.
-6. Prefer user corrections over inferred information
-
-COMMON KEYS:
-- "first_name": User's first/given name (ALWAYS use this key for any name)
-- "learning_goal": What they want to learn/achieve
-- "preferred_lesson_time": When they want lessons (morning, evening, 9:00 AM, etc.)
-- "acim_commitment": Commitment to ACIM lessons
-- "current_lesson": Lesson number they're on (numeric)
-- "lesson_completed": Lesson number they finished (numeric)
-- "email": Email address
-- "phone": Phone number
-- "birth_date": User's birth date. When you detect an explicit birth date, store it under this key.
-    - Prefer ISO 8601 date format (YYYY-MM-DD) in the `value` when possible.
-    - Accept and parse common formats such as `DD.MM.YYYY`, `D M YYYY`, `Month D, YYYY`, `YYYY-MM-DD`.
-    - Example: "I was born on 23.05.1966" -> {"store": true, "key": "birth_date", "value": "1966-05-23", "confidence": 0.98}
-
-VALIDATION RULES:
-- quality_score: 0.0-1.0 based on clarity and certainty
-- cleaned_value: extract just the fact, remove extra text
-- should_store: false if corrupted, nonsensical, or already known
-- Reject values like "No, my full name is spelled backwards sennahoJ" → cleaned: "Johannes"
-
-Output ONLY valid JSON:
-{
-  "memories": [
-    {
-      "key": "first_name",
-      "value": "raw extracted value",
-      "cleaned_value": "cleaned value or null",
-      "quality_score": 0.0-1.0,
-      "should_store": true/false,
-      "confidence": 0.0-1.0,
-      "reasoning": "brief explanation"
-    }
-  ]
-}
-
-Empty if nothing to store: {"memories": []}
-
-User message: "{user_message}"
-{context_str}"""
 
 
 @dataclass
@@ -109,36 +59,48 @@ class StorageDecision:
 
 class MemoryJudge:
     """
-    Single AI interface for memory extraction AND validation.
-    Replaces MemoryExtractor to avoid double Ollama calls.
+    Single AI interface for memory extraction, validation, and conflict detection.
+    Uses unified prompts to minimize Ollama calls.
     """
     
     def __init__(self, ollama_client=None):
         self.ollama_client = ollama_client
-        self._cache = {}  # Simple in-memory cache for decisions
+        self._cache = DecisionCache()
+    
+    def invalidate_cache_for_key(self, user_id: int, key: str) -> None:
+        """Invalidate all cache entries for a specific user and key."""
+        self._cache.invalidate_for_key(user_id, key)
+    
+    def clear_cache(self) -> None:
+        """Clear all cached decisions."""
+        self._cache.clear()
     
     async def extract_and_judge_memories(
         self,
         user_message: str,
         user_context: Optional[Dict[str, Any]] = None,
         language: Optional[str] = None,
+        existing_memories: Optional[List[Any]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Extract AND validate memories in a single Ollama call.
-        Replaces MemoryExtractor.extract_memories().
+        Also detects conflicts with existing memories when provided.
         
-        Returns only high-quality memories (quality_score >= 0.7).
+        Args:
+            user_message: The user's message to extract memories from
+            user_context: Optional context dict (may include user_id)
+            language: Optional language hint for Ollama
+            existing_memories: List of existing Memory objects for conflict detection
+        
+        Returns:
+            List of dicts with extracted memories including conflict info.
         """
         if not user_message or len(user_message.strip()) < 3:
             return []
         
         try:
-            # Build context string
-            context_str = ""
-            if user_context:
-                existing = user_context.get("existing_memories", {})
-                if existing:
-                    context_str = f"\nUser's existing memories: {json.dumps(existing)}"
+            # Build context string with existing memories
+            context_str = self._build_context_str(existing_memories, user_context)
             
             # Build prompt
             prompt = MEMORY_EXTRACTION_JUDGE_PROMPT.format(
@@ -162,6 +124,14 @@ class MemoryJudge:
                 and m.get("quality_score", 0) >= 0.7
             ]
             
+            # Log extraction results
+            user_id_str = user_context.get('user_id') if user_context else 'N/A'
+            logger.info(
+                f"MemoryJudge.extract_and_judge: user_id={user_id_str}, "
+                f"extracted={len(memories)}, valid={len(valid_memories)}, "
+                f"message={user_message[:50]!r}..."
+            )
+            
             # Use cleaned_value if available
             for m in valid_memories:
                 if m.get("cleaned_value"):
@@ -173,6 +143,44 @@ class MemoryJudge:
         except Exception as e:
             logger.error(f"Error in extract_and_judge: {e}")
             return []
+    
+    def _build_context_str(
+        self,
+        existing_memories: Optional[List[Any]],
+        user_context: Optional[Dict[str, Any]]
+    ) -> str:
+        """Build context string from existing memories."""
+        context_str = ""
+        
+        # Use existing_memories parameter if provided
+        if existing_memories is not None and len(existing_memories) > 0:
+            existing_list = []
+            for m in existing_memories:
+                # Support both Memory objects and dicts
+                if hasattr(m, 'memory_id'):
+                    existing_list.append({
+                        "memory_id": m.memory_id,
+                        "key": m.key,
+                        "value": m.value,
+                        "category": getattr(m, 'category', 'fact')
+                    })
+                elif isinstance(m, dict):
+                    existing_list.append({
+                        "memory_id": m.get('memory_id', 0),
+                        "key": m.get('key', ''),
+                        "value": m.get('value', ''),
+                        "category": m.get('category', 'fact')
+                    })
+            
+            if existing_list:
+                context_str = f"\nUser's existing memories: {json.dumps(existing_list)}"
+        elif user_context:
+            # Fallback to user_context for backward compatibility
+            existing = user_context.get("existing_memories", {})
+            if existing:
+                context_str = f"\nUser's existing memories: {json.dumps(existing)}"
+        
+        return context_str
     
     def _parse_extraction_response(self, response_text: str) -> List[Dict[str, Any]]:
         """Parse JSON response from Ollama extraction."""
@@ -208,7 +216,6 @@ class MemoryJudge:
         return []
     
     def _format_memories(self, memories: List[Any]) -> str:
-
         """Format memories for prompt context."""
         if not memories:
             return "  (none)"
@@ -229,114 +236,67 @@ class MemoryJudge:
     ) -> StorageDecision:
         """
         AI decides: Should we store this? What conflicts exist? What action?
+        Uses persistent caching.
         """
         # Check cache
         cache_key = f"{user_id}:{proposed_key}:{proposed_value}:{user_message}"
-        if cache_key in self._cache:
+        cached = self._cache.get(cache_key)
+        if cached:
             logger.debug(f"MemoryJudge cache hit for {proposed_key}")
-            return self._cache[cache_key]
+            return StorageDecision.parse(cached)
         
         memory_context = self._format_memories(existing_memories)
         
-        prompt = f"""You are a memory system judge. Evaluate this proposed memory storage.
-
-USER MESSAGE: "{user_message}"
-
-PROPOSED MEMORY:
-  key: {proposed_key}
-  value: {proposed_value}
-
-EXISTING USER MEMORIES:
-{memory_context}
-
-Evaluate and respond in JSON:
-{{
-  "should_store": true/false,
-  "quality_score": 0.0-1.0,
-  "issues": ["list any problems"],
-  "cleaned_value": "cleaned version or null",
-  "conflicts": [
-    {{
-      "existing_memory_id": 123,
-      "reason": "why this conflicts",
-      "action": "REPLACE|KEEP_BOTH|MERGE|FLAG",
-      "existing_value": "value of existing memory"
-    }}
-  ],
-  "reasoning": "brief explanation"
-}}
-
-Rules:
-- should_store=false if value is corrupted, nonsensical, or already known
-- cleaned_value: extract just the fact if value contains extra text
-- conflicts: identify ANY memory referring to the same concept (any key)
-- action=REPLACE when new is correction/update
-- action=KEEP_BOTH when genuinely different facts
-- action=MERGE when combining gives better result
-- action=FLAG when uncertain
-
-Examples of conflicts:
-- "first_name=Bob" vs "name=Robert" → same person, different keys
-- "email=old@example.com" vs "email=new@example.com" → same concept, updated
-- "lesson_current=5" vs "lesson_completed=5" → different concepts
-
-Examples of corrupted values:
-- "No, my full name is spelled backwards sennahoJ" → cleaned: "Johannes"
-- "I think maybe around 5 or 6 lessons" → cleaned: "5-6" or null"""
-
+        prompt = STORAGE_EVALUATION_PROMPT.format(
+            user_message=user_message,
+            proposed_key=proposed_key,
+            proposed_value=proposed_value,
+            memory_context=memory_context
+        )
+        
         try:
-            # Lazy import to avoid circular dependencies
             from src.services.dialogue.ollama_client import call_ollama
             from src.config import settings
             
-            # Use settings (conftest.py handles TEST_* env var overrides)
             model = getattr(settings, "OLLAMA_CHAT_RAG_MODEL", None) or settings.OLLAMA_MODEL
             response_text = await call_ollama(prompt, model=model)
             
             # Parse JSON from response
-            try:
-                # Try to extract JSON if wrapped in markdown
-                if "```json" in response_text:
-                    start = response_text.find("```json") + 7
-                    end = response_text.find("```", start)
-                    json_str = response_text[start:end].strip()
-                elif "```" in response_text:
-                    start = response_text.find("```") + 3
-                    end = response_text.find("```", start)
-                    json_str = response_text[start:end].strip()
-                else:
-                    # Find first { and last }
-                    start = response_text.find("{")
-                    end = response_text.rfind("}") + 1
-                    json_str = response_text[start:end]
-                
-                data = json.loads(json_str)
+            data = self._extract_json(response_text)
+            if data:
                 decision = StorageDecision.parse(data)
-                
                 # Cache the decision
-                self._cache[cache_key] = decision
-                
+                self._cache.set(cache_key, {
+                    "should_store": decision.should_store,
+                    "quality_score": decision.quality_score,
+                    "issues": decision.issues,
+                    "cleaned_value": decision.cleaned_value,
+                    "conflicts": [
+                        {
+                            "existing_memory_id": c.existing_memory_id,
+                            "reason": c.reason,
+                            "action": c.action,
+                            "existing_value": c.existing_value
+                        }
+                        for c in decision.conflicts
+                    ],
+                    "reasoning": decision.reasoning
+                })
                 logger.info(f"MemoryJudge: {proposed_key} → quality={decision.quality_score}, store={decision.should_store}")
-                logger.debug(f"MemoryJudge reasoning: {decision.reasoning}")
-                
                 return decision
-                
-            except (json.JSONDecodeError, ValueError) as e:
-                logger.error(f"Failed to parse AI judge response: {e}")
-                logger.error(f"Response: {response_text[:200]}")
-                # Fallback: allow storage with warning
-                return StorageDecision(
-                    should_store=True,
-                    quality_score=0.5,
-                    issues=["AI judge parse failed, allowing with caution"],
-                    cleaned_value=None,
-                    conflicts=[],
-                    reasoning="Parse error, fallback to allow"
-                )
+            
+            # Fallback if parse failed
+            return StorageDecision(
+                should_store=True,
+                quality_score=0.5,
+                issues=["AI judge parse failed, allowing with caution"],
+                cleaned_value=None,
+                conflicts=[],
+                reasoning="Parse error, fallback to allow"
+            )
                 
         except Exception as e:
             logger.error(f"AI judge call failed: {e}")
-            # Fallback: allow storage
             return StorageDecision(
                 should_store=True,
                 quality_score=0.5,
@@ -346,62 +306,59 @@ Examples of corrupted values:
                 reasoning="AI judge unavailable, fallback to allow"
             )
     
+    def _extract_json(self, response_text: str) -> Optional[Dict[str, Any]]:
+        """Extract JSON from response text."""
+        # Try to extract JSON if wrapped in markdown
+        if "```json" in response_text:
+            start = response_text.find("```json") + 7
+            end = response_text.find("```", start)
+            if end > start:
+                return json.loads(response_text[start:end].strip())
+        elif "```" in response_text:
+            start = response_text.find("```") + 3
+            end = response_text.find("```", start)
+            if end > start:
+                return json.loads(response_text[start:end].strip())
+        else:
+            # Find first { and last }
+            start = response_text.find("{")
+            end = response_text.rfind("}") + 1
+            if start >= 0 and end > start:
+                return json.loads(response_text[start:end])
+        
+        return None
+    
     async def find_relevant_memories(
         self,
         query: str,
         memories: List[Any],
         context: Optional[str] = None
     ) -> List[int]:
-        """
-        AI selects relevant memories for a query.
-        """
+        """AI selects relevant memories for a query."""
         if not memories:
             return []
         
         memory_context = self._format_memories(memories)
         
-        prompt = f"""Select memories relevant to this query.
-
-QUERY: "{query}"
-CONTEXT: "{context or 'None'}"
-
-MEMORIES:
-{memory_context}
-
-Return JSON:
-{{
-  "selected_ids": [123, 456],
-  "reasoning": "why selected",
-  "confidence": 0.0-1.0
-}}
-
-Select ALL memories that answer the query. If multiple conflict, select most recent."""
-
+        prompt = MEMORY_RELEVANCE_PROMPT.format(
+            query=query,
+            context=context or "None",
+            memory_context=memory_context
+        )
+        
         try:
             from src.services.dialogue.ollama_client import call_ollama
             from src.config import settings
             
-            # Use settings (conftest.py handles TEST_* env var overrides)
             model = getattr(settings, "OLLAMA_CHAT_RAG_MODEL", None) or settings.OLLAMA_MODEL
             response_text = await call_ollama(prompt, model=model)
             
-            # Extract JSON
-            if "```json" in response_text:
-                start = response_text.find("```json") + 7
-                end = response_text.find("```", start)
-                json_str = response_text[start:end].strip()
-            elif "```" in response_text:
-                start = response_text.find("```") + 3
-                end = response_text.find("```", start)
-                json_str = response_text[start:end].strip()
-            else:
-                start = response_text.find("{")
-                end = response_text.rfind("}") + 1
-                json_str = response_text[start:end]
-            
-            data = json.loads(json_str)
-            return data.get("selected_ids", [])
+            data = self._extract_json(response_text)
+            if data:
+                return data.get("selected_ids", [])
             
         except Exception as e:
             logger.error(f"Memory retrieval AI call failed: {e}")
-            return [m.memory_id for m in memories]
+        
+        return [m.memory_id for m in memories]
+

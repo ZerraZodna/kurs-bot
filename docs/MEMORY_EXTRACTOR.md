@@ -4,7 +4,7 @@
 
 The **Memory Judge Service** automatically extracts and validates meaningful user facts, preferences, and goals from conversation messages using an offline Ollama LLM. It works with any language (English, Norwegian, etc.) and intelligently decides what's worth storing.
 
-**Note:** This replaces the old `MemoryExtractor` with a combined extraction + validation system in a single Ollama call.
+**Note:** This uses a combined extraction + validation system in a single Ollama call.
 
 ## How It Works
 
@@ -16,11 +16,14 @@ User Message → Ollama LLM → JSON Decision → MemoryManager → Database
 
 1. **User sends message** to the bot
 2. **DialogueEngine.process_message()** automatically calls the extractor
-3. **MemoryJudge** sends the message to Ollama with a combined extraction + validation prompt
-4. **Ollama** returns JSON with memories including `quality_score` and `cleaned_value`
+3. **MemoryJudge.extract_and_judge_memories()** sends the message to Ollama with existing memories as context
+4. **Ollama** returns JSON with candidate memories including `quality_score` and `cleaned_value`
 5. **MemoryJudge** filters for high-quality memories (quality_score >= 0.7)
-6. **MemoryManager** stores the extracted memory with conflict resolution
-7. **Dialogue** continues and bot responds
+6. **MemoryManager.store_memory_with_judgment()** evaluates each memory for semantic conflicts
+7. **MemoryHandler** stores the memory with conflict resolution (archive old, insert new)
+8. **Dialogue** continues and bot responds
+
+**Key:** Steps 6-7 use `evaluate_storage()` to detect semantic conflicts across different keys!
 
 **Recommended Models for Memory Extraction:**
 - `qwen2.5-coder:7b` ⭐ (best balance, 4.7 GB)
@@ -202,16 +205,22 @@ pytest tests/unit/memories/test_memory_extractor.py -v
 - If issues, check Ollama model supports that language
 - `qwen2.5-coder` models support 20+ languages
 
+## Implemented Features
+
+These features are already working in the current implementation:
+
+- ✅ **Semantic Deduplication** - The `evaluate_storage()` method (called via `store_memory_with_judgment()`) detects semantic conflicts across different keys (e.g., "first_name=Bob" vs "name=Robert" → recognized as same person)
+- ✅ **Confidence-based Ranking** - `quality_score` (0.0-1.0) filters memories (≥0.7 required), and `top_active_memories()` sorts by confidence
+- ✅ **Multi-turn Context** - `extract_and_judge_memories()` accepts `user_context` with existing memories, and the prompt includes this context
+
 ## Future Enhancements
 
 - [ ] Fine-tune Ollama model on custom memory keys
-- [ ] Add semantic deduplication (find similar memories)
-- [ ] Confidence-based ranking (show user what was learned)
 - [ ] Privacy-aware extraction (skip PII without consent)
-- [ ] Multi-turn context memory (remember conversation flow)
 
 ---
 
 **Implementation**: Feb 2, 2026
 **Updated**: Mar 4, 2026 (Migrated to MemoryJudge)
+**Updated**: May 25, 2025 (Documented implemented features: semantic deduplication, confidence ranking, multi-turn context)
 **Status**: Production-ready

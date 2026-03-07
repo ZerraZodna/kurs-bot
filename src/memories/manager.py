@@ -69,6 +69,14 @@ class MemoryManager:
             category=category,
             allow_duplicates=allow_duplicates,
         )
+        
+        # Invalidate AI judge cache for this key when memory is stored
+        # This ensures fresh decisions are made on future judgments
+        try:
+            self.ai_judge.invalidate_cache_for_key(user_id, key)
+        except Exception as e:
+            logger.warning(f"Failed to invalidate cache for key {key}: {e}")
+        
         # Generate embedding if needed — removed in this branch.
         # If this memory indicates a preferred lesson time, do NOT modify schedules here.
         # Creating schedules is the responsibility of the schedule/triggering codepath
@@ -172,7 +180,7 @@ class MemoryManager:
             # KEEP_BOTH: do nothing, store alongside
         
         # Store the memory
-        return self.store_memory(
+        memory_id = self.store_memory(
             user_id=user_id,
             key=key,
             value=final_value,
@@ -182,6 +190,8 @@ class MemoryManager:
             category=category,
             allow_duplicates=False
         )
+        
+        return memory_id
 
     @property
     def topic_manager(self):

@@ -8,6 +8,7 @@ or service modules.
 from __future__ import annotations
 
 import hashlib
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
@@ -17,6 +18,8 @@ from sqlalchemy.orm import Session
 from src.models.database import Memory, init_db
 from src.memories.store import MemoryStore
 from src.memories.types import MemoryEntity, MemoryRecord
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryHandler(MemoryStore):
@@ -138,6 +141,13 @@ class MemoryHandler(MemoryStore):
         allow_duplicates: bool = False,
     ) -> int:
         """Store a memory row with conflict handling and return memory_id."""
+        # Validate and normalize category for consistency
+        from src.memories.constants import MemoryCategory
+        validated_category = MemoryCategory.normalize(category)
+        if validated_category != category:
+            logger.debug(f"Category '{category}' normalized to '{validated_category}' for key '{key}'")
+        category = validated_category
+        
         now = datetime.now(timezone.utc)
         value_hash = self.hash_value(value)
         ttl = now + timedelta(hours=ttl_hours) if ttl_hours else None

@@ -16,6 +16,39 @@ class MemoryCategory(str, Enum):
     CONVERSATION = "conversation"
     AUDIT = "audit"
 
+    @classmethod
+    def is_valid(cls, category: str) -> bool:
+        """Check if a category string is valid."""
+        return category in {c.value for c in cls}
+
+    @classmethod
+    def normalize(cls, category: str) -> str:
+        """Normalize a category string to a valid value."""
+        if not category:
+            return cls.FACT.value
+        
+        normalized = category.lower().strip()
+        
+        # Handle common aliases
+        aliases = {
+            "preferences": cls.PREFERENCES.value,
+            "pref": cls.PREFERENCE.value,
+            "goal": cls.GOALS.value,
+            "goals": cls.GOALS.value,
+            "learning_goal": cls.GOALS.value,
+            "profile": cls.PROFILE.value,
+            "fact": cls.FACT.value,
+            "facts": cls.FACT.value,
+            "progress": cls.PROGRESS.value,
+            "insight": cls.INSIGHTS.value,
+            "insights": cls.INSIGHTS.value,
+            "conversation": cls.CONVERSATION.value,
+            "chat": cls.CONVERSATION.value,
+            "audit": cls.AUDIT.value,
+        }
+        
+        return aliases.get(normalized, cls.FACT.value)
+
 
 class MemoryKey:
     FIRST_NAME = "first_name"

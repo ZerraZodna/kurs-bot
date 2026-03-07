@@ -362,7 +362,7 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
 
                 # If onboarding is not required, extract and store memories from the combined text.
                 if 'dialogue' in locals() and dialogue.onboarding and not dialogue.onboarding.should_show_onboarding(user_id):
-                    await extract_and_store_memories(dialogue.memory_manager, dialogue.memory_extractor, user_id, combined_text, rag_mode=False)
+                    await extract_and_store_memories(dialogue.memory_manager, dialogue.memory_judge, user_id, combined_text, rag_mode=False)
 
                 log = MessageLog(
                     user_id=user_id,

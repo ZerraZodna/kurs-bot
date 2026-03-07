@@ -45,6 +45,11 @@ class DialogueEngine:
         self.prompt_builder = PromptBuilder(db, self.memory_manager)
         self.onboarding = OnboardingService(db)
         self.onboarding_flow = OnboardingFlow(self.memory_manager, self.onboarding, self.call_ollama)
+
+    @property
+    def memory_judge(self):
+        """Expose MemoryJudge from memory_manager for memory extraction."""
+        return self.memory_manager.ai_judge
     
     async def call_ollama(self, prompt: str, model: Optional[str] = None, language: Optional[str] = None) -> str:
         """Delegate to dialogue.ollama_client with optional language hint."""
