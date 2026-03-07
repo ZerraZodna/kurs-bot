@@ -7,7 +7,7 @@ Migrated from tests/test_embedding_service.py to use new test fixtures.
 import pytest
 import numpy as np
 from src.config import settings
-from src.services.embedding_service import EmbeddingService
+from src.services.embedding_service import EmbeddingService, get_default_embedding_dimension
 from unittest.mock import AsyncMock, patch, MagicMock
 
 
@@ -26,7 +26,7 @@ class TestEmbeddingService:
         When: Generating an embedding for a test string
         Then: Should return a valid embedding with correct dimension."""
         mock_response = {
-            "embedding": [0.1] * settings.EMBEDDING_DIMENSION,
+            "embedding": [0.1] * embedding_service.embedding_dimension,
             "model": "nomic-embed-text:latest"
         }
 
@@ -37,7 +37,7 @@ class TestEmbeddingService:
             embedding = await embedding_service.generate_embedding("test text")
 
             assert embedding is not None
-            assert len(embedding) == settings.EMBEDDING_DIMENSION
+            assert len(embedding) == embedding_service.embedding_dimension
             assert all(v == 0.1 for v in embedding)
 
     @pytest.mark.asyncio
@@ -162,8 +162,9 @@ class TestEmbeddingService:
         """Given: A list of text strings
         When: Batch embedding them
         Then: Should return embeddings for all texts."""
+        expected_dim = get_default_embedding_dimension(embedding_service.backend)
         mock_response = {
-            "embedding": [0.1] * settings.EMBEDDING_DIMENSION,
+            "embedding": [0.1] * expected_dim,
             "model": "nomic-embed-text:latest"
         }
 
@@ -176,5 +177,5 @@ class TestEmbeddingService:
 
             assert len(embeddings) == 3
             assert all(e is not None for e in embeddings)
-            assert all(len(e) == settings.EMBEDDING_DIMENSION for e in embeddings if e is not None)
+            assert all(len(e) == expected_dim for e in embeddings if e is not None)
 

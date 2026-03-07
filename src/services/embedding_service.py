@@ -17,24 +17,42 @@ from src.config import settings
 logger = logging.getLogger(__name__)
 
 
+def get_default_embedding_dimension(backend: str) -> int:
+    """Get the default embedding dimension for a given backend.
+
+    Args:
+        backend: The embedding backend ("local", "ollama", or custom)
+
+    Returns:
+        The default embedding dimension for the backend
+    """
+    if backend == "local":
+        return 384
+    elif backend == "ollama":
+        return 768
+    else:
+        return settings.EMBEDDING_DIMENSION
+
+
 class EmbeddingService:
     """Service for generating and managing text embeddings"""
-    
+
     def __init__(self):
         self.embed_url = settings.OLLAMA_EMBED_URL
         self.embed_model = settings.OLLAMA_EMBED_MODEL
         # Embedding backend must be explicitly configured via EMBEDDING_BACKEND
         self.backend = getattr(settings, "EMBEDDING_BACKEND", "local")
-        # Determine expected embedding dimension per backend. Allow override
-        # from settings.EMBEDDING_DIMENSION but prefer a sensible default.
-        if self.backend == "local":
-            default_dim = 384
-        elif self.backend == "ollama":
-            default_dim = 768
-        else:
-            default_dim = settings.EMBEDDING_DIMENSION
+        # Determine expected embedding dimension per backend. Use backend-specific
+        # defaults (384 for local, 768 for ollama). Allow override from
+        # settings.EMBEDDING_DIMENSION only for ollama backend.
+        default_dim = get_default_embedding_dimension(self.backend)
 
-        self.embedding_dimension = getattr(settings, "EMBEDDING_DIMENSION", default_dim) or default_dim
+        if self.backend == "ollama":
+            # For ollama, allow settings.EMBEDDING_DIMENSION to override the default
+            self.embedding_dimension = getattr(settings, "EMBEDDING_DIMENSION", default_dim) or default_dim
+        else:
+            # For local and other backends, use the backend-specific default
+            self.embedding_dimension = default_dim
         # Client proxy exposes a `post` coroutine so tests can patch it.
         class _ClientProxy:
             async def post(self, *args, **kwargs):
