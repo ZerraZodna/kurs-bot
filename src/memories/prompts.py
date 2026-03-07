@@ -23,13 +23,13 @@ COMMON KEYS:
 - "birth_date": User's birth date. When you detect an explicit birth date, store it under this key.
     - Prefer ISO 8601 date format (YYYY-MM-DD) in the `value` when possible.
     - Accept and parse common formats such as `DD.MM.YYYY`, `D M YYYY`, `Month D, YYYY`, `YYYY-MM-DD`.
-    - Example: "I was born on 23.05.1966" -> {"store": true, "key": "birth_date", "value": "1966-05-23", "confidence": 0.98}
+    - Example: "I was born on 23.05.1966" -> {{"key": "birth_date", "value": "1966-05-23", "confidence": 0.98}}
 
 VALIDATION RULES:
 - quality_score: 0.0-1.0 based on clarity and certainty
 - cleaned_value: extract just the fact, remove extra text
 - should_store: false if corrupted, nonsensical, or already known
-- Reject values like "No, my full name is spelled backwards sennahoJ" → cleaned: "Johannes"
+- Reject values like "No, my full name is spelled backwards sennahoJ" -> cleaned: "Johannes"
 
 CONFLICT DETECTION RULES:
 When existing memories are provided, detect conflicts:
@@ -39,9 +39,9 @@ When existing memories are provided, detect conflicts:
 - For each conflict, include: existing_memory_id, reason, action (REPLACE/KEEP_BOTH/MERGE/FLAG)
 
 Output ONLY valid JSON:
-{
+{{
   "memories": [
-    {
+    {{
       "key": "first_name",
       "value": "raw extracted value",
       "cleaned_value": "cleaned value or null",
@@ -50,18 +50,18 @@ Output ONLY valid JSON:
       "confidence": 0.0-1.0,
       "reasoning": "brief explanation",
       "conflicts": [
-        {
+        {{
           "existing_memory_id": 123,
           "reason": "why this conflicts",
           "action": "REPLACE|KEEP_BOTH|MERGE|FLAG",
           "existing_value": "value of existing memory"
-        }
+        }}
       ]
-    }
+    }}
   ]
-}
+}}
 
-Empty if nothing to store: {"memories": []}
+Empty if nothing to store: {{"memories": []}}
 
 User message: "{user_message}"
 {context_str}"""
@@ -112,14 +112,14 @@ Rules:
 - action=FLAG when uncertain
 
 Examples of conflicts:
-- "first_name=Bob" vs "name=Robert" → same person, different keys → REPLACE
-- "email=old@example.com" vs "email=new@example.com" → same key, updated value → REPLACE (same key!)
-- "lesson_current=5" vs "lesson_completed=5" → different concepts → no conflict
-- "preferred_lesson_time=07:30" vs "preferred_lesson_time=08:00" → SAME KEY → REPLACE
+- "first_name=Bob" vs "name=Robert" -> same person, different keys -> REPLACE
+- "email=old@example.com" vs "email=new@example.com" -> same key, updated value -> REPLACE (same key!)
+- "lesson_current=5" vs "lesson_completed=5" -> different concepts -> no conflict
+- "preferred_lesson_time=07:30" vs "preferred_lesson_time=08:00" -> SAME KEY -> REPLACE
 
 Examples of corrupted values:
-- "No, my full name is spelled backwards sennahoJ" → cleaned: "Johannes"
-- "I think maybe around 5 or 6 lessons" → cleaned: "5-6" or null"""
+- "No, my full name is spelled backwards sennahoJ" -> cleaned: "Johannes"
+- "I think maybe around 5 or 6 lessons" -> cleaned: "5-6" or null"""
 
 
 # Prompt for finding relevant memories

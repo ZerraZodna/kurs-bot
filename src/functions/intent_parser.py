@@ -51,9 +51,7 @@ class IntentParser:
             
         Returns:
             ParseResult with extracted functions or error info
-        """
-        logger.debug(f"Parsing AI response: {response_text[:200]}...")
-        
+        """        
         if not response_text or not response_text.strip():
             return ParseResult(
                 success=False,
@@ -70,8 +68,6 @@ class IntentParser:
             logger.debug("No JSON found in response, treating as natural language")
             # No JSON found - treat as natural language only
             return self._create_fallback_result(response_text)
-        
-        logger.debug(f"Extracted JSON: {json_str[:200]}...")
         
         try:
             data = json.loads(json_str)

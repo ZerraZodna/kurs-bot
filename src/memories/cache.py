@@ -68,7 +68,10 @@ class DecisionCache:
     """Persistent cache for AI judge storage decisions."""
     
     def __init__(self):
-        self._cache: Dict[str, Any] = {}
+        # In-memory cache for parsed objects (for identity checks)
+        self._object_cache: Dict[str, Any] = {}
+        # Disk cache for serialized data
+        self._serialized_cache: Dict[str, Any] = {}
         self._disk_cache_loaded = False
     
     def ensure_loaded(self) -> None:
@@ -78,28 +81,35 @@ class DecisionCache:
             # Only keep fresh entries
             for key, entry in list(disk_data.get("entries", {}).items()):
                 if is_cache_entry_fresh(entry):
-                    self._cache[key] = entry.get("decision", {})
+                    self._serialized_cache[key] = entry.get("decision", {})
                 else:
                     # Remove stale entry
                     del disk_data["entries"][key]
             # Save if we cleaned stale entries
-            if len(disk_data.get("entries", {})) != len(self._cache):
+            if len(disk_data.get("entries", {})) != len(self._serialized_cache):
                 _save_disk_cache(disk_data)
             self._disk_cache_loaded = True
-            logger.info(f"Loaded {len(self._cache)} fresh cache entries from disk")
+            logger.info(f"Loaded {len(self._serialized_cache)} fresh cache entries from disk")
     
     def get(self, key: str) -> Optional[Dict[str, Any]]:
         """Get cached decision by key."""
         self.ensure_loaded()
-        return self._cache.get(key)
+        return self._serialized_cache.get(key)
     
-    def set(self, key: str, decision: Dict[str, Any]) -> None:
-        """Cache a decision."""
+    def get_object(self, key: str) -> Optional[Any]:
+        """Get cached parsed object by key (for identity checks)."""
         self.ensure_loaded()
-        self._cache[key] = decision
+        return self._object_cache.get(key)
+    
+    def set(self, key: str, decision: Dict[str, Any], parsed_object: Any = None) -> None:
+        """Cache a decision. Optionally store parsed object for identity checks."""
+        self.ensure_loaded()
+        self._serialized_cache[key] = decision
+        if parsed_object is not None:
+            self._object_cache[key] = parsed_object
         # Persist to disk
         cache_data = {"entries": {}, "version": 1}
-        for k, v in self._cache.items():
+        for k, v in self._serialized_cache.items():
             cache_data["entries"][k] = {
                 "decision": v,
                 "created_at": datetime.now(timezone.utc).isoformat()
@@ -109,13 +119,15 @@ class DecisionCache:
     def invalidate_for_key(self, user_id: int, key: str) -> None:
         """Invalidate all cache entries for a specific user and key."""
         self.ensure_loaded()
-        keys_to_remove = [k for k in self._cache if k.startswith(f"{user_id}:{key}:")]
+        keys_to_remove = [k for k in self._serialized_cache if k.startswith(f"{user_id}:{key}:")]
         for k in keys_to_remove:
-            del self._cache[k]
+            del self._serialized_cache[k]
+            if k in self._object_cache:
+                del self._object_cache[k]
         if keys_to_remove:
             # Save updated cache to disk
             cache_data = {"entries": {}, "version": 1}
-            for k, v in self._cache.items():
+            for k, v in self._serialized_cache.items():
                 cache_data["entries"][k] = {
                     "decision": v,
                     "created_at": datetime.now(timezone.utc).isoformat()
@@ -125,7 +137,8 @@ class DecisionCache:
     
     def clear(self) -> None:
         """Clear all cached decisions."""
-        self._cache = {}
+        self._serialized_cache = {}
+        self._object_cache = {}
         _save_disk_cache({"entries": {}, "version": 1})
         logger.info("Cleared AI judge cache")
 

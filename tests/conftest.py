@@ -184,6 +184,14 @@ def per_test_cleanup():
     """
     yield
 
+    # Clear AI Judge cache before/after each test to ensure tests call Ollama
+    try:
+        from src.memories.cache import DecisionCache
+        cache = DecisionCache()
+        cache.clear()
+    except Exception:
+        pass
+
     # Best-effort scheduler shutdown after each test
     try:
         from src.scheduler.core import SchedulerService
