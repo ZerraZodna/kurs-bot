@@ -110,7 +110,6 @@ class TestOnboardingTimezoneHandling:
         mm = MemoryManager(db_session)
         mm.store_memory(user_id, "first_name", "Test", category="profile")
         mm.store_memory(user_id, "data_consent", "granted", category="profile")
-        mm.store_memory(user_id, "acim_commitment", "committed to ACIM lessons", category="goals")
         mm.store_memory(user_id, "current_lesson", "1", category="progress")
 
         # When: Complete onboarding

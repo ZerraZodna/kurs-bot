@@ -31,7 +31,6 @@ def _create_test_user(db, timezone_name=None):
     return user.user_id
 
 
-@pytest.mark.serial
 def test_create_schedule_europe_oslo_0900():
     db = SessionLocal()
     try:

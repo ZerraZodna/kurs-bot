@@ -382,7 +382,6 @@ For further details, see the GDPR documentation in the `docs/` directory.
          │  Insights        │
          │  (AI-derived)    │
          ├──────────────────┤
-         │learning_pattern  │
          │engagement_level  │
          │knowledge_gap     │
          │strength_area     │

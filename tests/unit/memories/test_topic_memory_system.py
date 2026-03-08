@@ -56,10 +56,6 @@ def test_all_topics(memory_manager, clean_test_data, test_user_id):
             (MemoryKey.PREFERRED_LESSON_TIME, "08:00", MemoryCategory.PREFERENCE.value),
             ("timezone", "Europe/Oslo", MemoryCategory.PREFERENCE.value),
         ],
-        MemoryTopic.GOALS: [
-            (MemoryKey.LEARNING_GOAL, "Complete ACIM course", MemoryCategory.GOALS.value),
-            (MemoryKey.ACIM_COMMITMENT, "committed to daily practice", MemoryCategory.GOALS.value),
-        ],
         MemoryTopic.PREFERENCES: [
             ("learning_style", "Visual learner", MemoryCategory.PREFERENCES.value),
             (MemoryKey.USER_LANGUAGE, "en", MemoryCategory.PREFERENCES.value),
@@ -152,7 +148,6 @@ def test_ai_context(memory_manager, clean_test_data, test_user_id):
     assert "identity" in ai_context, "identity topic not present"
     assert "name" in ai_context.get("identity", {}), "identity.name not present"
     assert "lessons" in ai_context, "lessons topic not present"
-    assert "goals" in ai_context, "goals topic not present"
     assert "preferences" in ai_context, "preferences topic not present"
     assert "learning_style" in ai_context.get("preferences", {}), "preferences.learning_style not present"
 

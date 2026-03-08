@@ -357,49 +357,6 @@ class FunctionRegistry:
             contexts=["general_chat", "morning_lesson_confirmation"],
         ))
         
-        self.register(FunctionMetadata(
-            name="repeat_lesson",
-            description="Repeat yesterday's lesson (for review)",
-            parameters=[],
-            contexts=["morning_lesson_confirmation"],
-        ))
-        
-        self.register(FunctionMetadata(
-            name="mark_lesson_complete",
-            description="Mark a lesson as completed",
-            parameters=[
-                ParameterSchema(
-                    name="lesson_id",
-                    description="ID of the completed lesson",
-                    type=ParameterType.INTEGER,
-                    required=False,
-                ),
-            ],
-            contexts=["general_chat", "lesson_review"],
-        ))
-        
-        self.register(FunctionMetadata(
-            name="set_lesson_preference",
-            description="Set user's preference for lesson progression",
-            parameters=[
-                ParameterSchema(
-                    name="preference",
-                    description="Preferred behavior",
-                    type=ParameterType.STRING,
-                    required=True,
-                    examples=["always_next", "always_ask", "repeat_until_understood"],
-                ),
-                ParameterSchema(
-                    name="skip_confirmation",
-                    description="Whether to skip daily confirmation",
-                    type=ParameterType.BOOLEAN,
-                    required=False,
-                    default=False,
-                ),
-            ],
-            contexts=["morning_lesson_confirmation", "general_chat"],
-        ))
-        
         # Profile functions
         self.register(FunctionMetadata(
             name="set_timezone",

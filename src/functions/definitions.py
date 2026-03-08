@@ -89,26 +89,14 @@ User: "all the text?"
 }
 
 Example - Multiple reminders + lesson:
-User: "Remind me about today's lesson every 30 minutes"
+User: "Remind me about today's thru the day"
 
 {
   "response": "I'll remind you about today's lesson every 30 minutes. Here are the reminders:",
   "functions": [
-    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T14:30:00", "message": "Lesson reminder"}},
+    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T12:30:00", "message": "Lesson reminder"}},
     {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T15:00:00", "message": "Lesson reminder"}},
-    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T15:30:00", "message": "Lesson reminder"}},
-    {"name": "send_todays_lesson", "parameters": {}}
-  ]
-}
-
-Example - Two reminders only:
-User: "give me two reminders next every 30 minute about todays lesson"
-
-{
-  "response": "I'll remind you about today's lesson twice, every 30 minutes. Here are the reminders:",
-  "functions": [
-    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T14:30:00", "message": "Lesson reminder"}},
-    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T15:00:00", "message": "Lesson reminder"}},
+    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T17:30:00", "message": "Lesson reminder"}},
     {"name": "send_todays_lesson", "parameters": {}}
   ]
 }
@@ -123,35 +111,11 @@ If you write any text in the response field, the user will see duplicate or part
 
 Important: When creating multiple reminders:
 1. Calculate times starting from the current time (e.g., if current time is 14:15, first reminder at 14:30)
-2. Space them exactly as requested (e.g., "every 30 minutes" means 30-minute intervals)
-3. Create ONLY the number of reminders requested (e.g., "two reminders" = exactly 2 reminders)
-4. Never create duplicate reminders at the same time - each reminder must have a unique timestamp
+2. Never create duplicate reminders at the same time - each reminder must have a unique timestamp
 """
     
     # Context-specific examples
-    CONTEXT_EXAMPLES = {
-        "morning_lesson_confirmation": """
-Example - Morning lesson confirmation:
-User: "I always want the next lesson without asking"
-
-{
-  "response": "Perfect! I'll send you the next lesson now and remember to always send the next lesson without asking in the future.",
-  "functions": [
-    {"name": "send_next_lesson", "parameters": {}},
-    {"name": "set_lesson_preference", "parameters": {"preference": "always_next", "skip_confirmation": true}}
-  ]
-}
-
-Example - User wants to review:
-User: "I'm not sure I understand yesterday's lesson fully"
-
-{
-  "response": "No problem! Let me send you yesterday's lesson again so you can review it. Take your time with it.",
-  "functions": [
-    {"name": "repeat_lesson", "parameters": {}}
-  ]
-}
-""",
+    CONTEXT_EXAMPLES = { 
         "onboarding_name": """
 Example - User confirms using Telegram name:
 User: "yes"
@@ -211,57 +175,6 @@ User: "no, I don't want that"
   "response": "I understand. Without consent to store your data, I cannot provide personalized service. Your information will be deleted.",
   "functions": [
     {"name": "confirm_no", "parameters": {"context": "data_consent"}}
-  ]
-}
-""",
-        "onboarding": """
-Example - User confirms using Telegram name:
-User: "yes"
-
-{
-  "response": "Great! I'll use your name from Telegram.",
-  "functions": [
-    {"name": "confirm_yes", "parameters": {"context": "use_telegram_name"}}
-  ]
-}
-
-Example - User declines using Telegram name:
-User: "no"
-
-{
-  "response": "No problem! What would you like me to call you?",
-  "functions": [
-    {"name": "confirm_no", "parameters": {"context": "use_telegram_name"}}
-  ]
-}
-
-Example - Onboarding timezone:
-User: "I'm in Oslo"
-
-{
-  "response": "Great! I'll set your timezone to Europe/Oslo. This will ensure your lesson reminders come at the right time for you.",
-  "functions": [
-    {"name": "set_timezone", "parameters": {"timezone": "Europe/Oslo"}}
-  ]
-}
-
-Example - Extracting name from complex sentence:
-User: "My name is Johannes. Got that?"
-
-{
-  "response": "Nice to meet you, Johannes! I've noted your name.",
-  "functions": [
-    {"name": "extract_memory", "parameters": {"key": "first_name", "value": "Johannes", "confidence": 0.9}}
-  ]
-}
-
-Example - Remembering name:
-User: "Remember my name is Sarah"
-
-{
-  "response": "Nice to meet you, Sarah! I've noted your name.",
-  "functions": [
-    {"name": "extract_memory", "parameters": {"key": "name", "value": "Sarah", "confidence": 0.95}}
   ]
 }
 """,

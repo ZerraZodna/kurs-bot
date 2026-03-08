@@ -363,10 +363,8 @@ class PromptBuilder:
         from src.lessons.state import compute_current_lesson_state
 
         now = datetime.now(timezone.utc)
-        day_offset = self._get_debug_day_offset(user_id)
-        today = (now + timedelta(days=day_offset)).date()
 
-        return compute_current_lesson_state(self.memory_manager, user_id, today=today)
+        return compute_current_lesson_state(self.memory_manager, user_id, today=now)
 
     def _get_user_local_time_str(self, user: Any) -> Optional[str]:
         """Return a compact local time string for the user, or None if unavailable.
@@ -387,24 +385,6 @@ class PromptBuilder:
             return f"Local time: {local_dt.strftime('%Y-%m-%d %H:%M')} ({resolved_name})"
         except Exception:
             return None
-
-    def _get_debug_day_offset(self, user_id: int) -> int:
-        """Return temporary day offset for testing (e.g., via 'next_day' command)."""
-        debug_offsets = self.memory_manager.get_memory(user_id, MemoryKey.DEBUG_DAY_OFFSET)
-        if not debug_offsets:
-            return 0
-
-        def _normalize_dt(value: Any) -> datetime:
-            if isinstance(value, datetime):
-                return to_utc(value)
-            return to_utc(datetime.min)
-
-        latest = max(debug_offsets, key=lambda x: _normalize_dt(x.get("created_at")))
-        raw_value = str(latest.get("value", "")).strip()
-        try:
-            return int(raw_value)
-        except ValueError:
-            return 0
 
     def _get_last_lesson_from_logs(self, user_id: int) -> Optional[Dict[str, Any]]:
         """Fallback: infer last sent lesson from message logs."""
@@ -479,7 +459,6 @@ class PromptBuilder:
     def _build_goals_context(self, user_id: int) -> str:
         """Retrieve user goals and learning objectives."""
         goals = self.memory_manager.get_memory(user_id, MemoryKey.LEARNING_GOAL)
-        milestones = self.memory_manager.get_memory(user_id, MemoryKey.MILESTONE)
         
         parts = []
         if goals:
@@ -487,34 +466,22 @@ class PromptBuilder:
             for i, g in enumerate(goals[:3], 1):  # Top 3 goals
                 confidence = f" (confidence: {g['confidence']:.1%})" if g['confidence'] < 1.0 else ""
                 parts.append(f"  {i}. {g['value']}{confidence}")
-        
-        if milestones:
-            parts.append("\nCompleted Milestones:")
-            for i, m in enumerate(milestones[:3], 1):  # Top 3 milestones
-                parts.append(f"  {i}. {m['value']}")
-        
+                
         return "\n".join(parts) if parts else ""
     
     def _build_preferences_context(self, user_id: int) -> str:
         """Retrieve user communication and learning preferences."""
-        style = self.memory_manager.get_memory(user_id, MemoryKey.LEARNING_STYLE)
         tone = self.memory_manager.get_memory(user_id, MemoryKey.PREFERRED_TONE)
-        frequency = self.memory_manager.get_memory(user_id, MemoryKey.CONTACT_FREQUENCY)
         
         parts = []
-        if style:
-            parts.append(f"Learning Style: {style[0]['value']}")
         if tone:
             parts.append(f"Preferred Tone: {tone[0]['value']}")
-        if frequency:
-            parts.append(f"Contact Frequency: {frequency[0]['value']}")
         
         return "\n".join(parts) if parts else ""
     
     def _build_progress_context(self, user_id: int) -> str:
         """Retrieve recent progress and insights."""
         lessons_completed = self.memory_manager.get_memory(user_id, MemoryKey.LESSON_COMPLETED)
-        insights = self.memory_manager.get_memory(user_id, MemoryKey.INSIGHT)
         
         parts = []
         if lessons_completed:
@@ -522,12 +489,6 @@ class PromptBuilder:
             parts.append("Recent Lessons:")
             for i, lesson in enumerate(recent, 1):
                 parts.append(f"  {i}. {lesson['value']}")
-        
-        if insights:
-            recent_insights = sorted(insights, key=lambda x: x['created_at'], reverse=True)[:2]
-            parts.append("\nKey Insights:")
-            for i, insight in enumerate(recent_insights, 1):
-                parts.append(f"  {i}. {insight['value']}")
         
         return "\n".join(parts) if parts else ""
     

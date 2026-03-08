@@ -63,8 +63,6 @@ A comprehensive multi-user memory and context-aware prompt building system has b
    - Integrated `PromptBuilder` for context-aware prompts
    - Enhanced `process_message()` with full context awareness
    - `_log_conversation()` for tracking message pairs
-   - `get_conversation_state()` for context retrieval
-   - `set_conversation_state()` for state persistence
    - `get_onboarding_prompt()` for new users
 
 9. **[src/api/app.py](../src/api/app.py)** (Enhanced)

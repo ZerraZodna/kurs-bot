@@ -4,7 +4,7 @@
 MEMORY_EXTRACTION_JUDGE_PROMPT = """You are a personal memory system. Extract facts from user messages, validate their quality, AND detect conflicts with existing memories.
 
 EXTRACTION RULES:
-1. Extract explicit facts: name, goals, preferences, commitments
+1. Extract explicit facts: name, goals, preferences
 2. Store long-term goals, learning objectives, personal preferences
 3. Only store sensitive info with explicit consent
 4. Skip casual chit-chat, questions, vague statements
@@ -15,7 +15,6 @@ COMMON KEYS:
 - "first_name": User's first/given name (ALWAYS use this key for any name)
 - "learning_goal": What they want to learn/achieve
 - "preferred_lesson_time": When they want lessons (morning, evening, 9:00 AM, etc.)
-- "acim_commitment": Commitment to ACIM lessons
 - "current_lesson": Lesson number they're on (numeric)
 - "lesson_completed": Lesson number they finished (numeric)
 - "email": Email address

@@ -197,17 +197,6 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
                         {"name": "confirm_yes", "parameters": {"context": "data_consent"}}
                     ]
                 })
-            if current_onboarding_step == "commitment" or "commitment" in prompt_lower or "acim" in prompt_lower:
-                response_text = "Wonderful! Your commitment to the ACIM lessons is noted."
-                if next_question:
-                    response_text += f" {next_question}"
-                return json.dumps({
-                    "response": response_text,
-                    "functions": [
-                        {"name": "confirm_yes", "parameters": {"context": "acim_commitment"}},
-                        {"name": "extract_memory", "parameters": {"key": MemoryKey.ACIM_COMMITMENT, "value": "committed", "confidence": 0.95}}
-                    ]
-                })
             # Generic yes
             return json.dumps({
                 "response": "Great! I've noted that.",
@@ -221,6 +210,15 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
                 "response": "No problem! Let me know if you need anything else.",
                 "functions": [
                     {"name": "confirm_no", "parameters": {}}
+                ]
+            })
+        
+        # Check for "today's lesson" or "give me today's lesson" pattern
+        if "today" in user_msg_lower and "lesson" in user_msg_lower:
+            return json.dumps({
+                "response": "Here is today's lesson for you.",
+                "functions": [
+                    {"name": "send_todays_lesson", "parameters": {}}
                 ]
             })
         

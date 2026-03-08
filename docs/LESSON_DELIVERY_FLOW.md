@@ -46,29 +46,11 @@ actionable decisions: `"send"`, `"confirm"`, or `"wait"`.
 4. Sends **confirmation prompt**: "Quick check-in: are you still on lesson 17?"
 5. Stores pending confirmation: `{lesson_id: 17, next_lesson_id: 18}`
 
-### Day 1 — User confirms "yes"
-1. `src/services/dialogue/reminder_handler.py` → `handle_lesson_confirmation()`
-2. Reads pending confirmation → `{lesson_id: 17, next_lesson_id: 18}`
-3. Classifies "yes" via `_semantic_yes_no()` (see Trigger Dependencies below)
-4. Marks lesson 17 as completed
-5. Delivers lesson 18
-6. Sets `last_sent_lesson_id = 18`
-7. Resolves pending confirmation
-
 ### Day 2 — Scheduler fires
 1. `compute_current_lesson_state()` sees `last_sent=18`, `updated_at` is yesterday
 2. Returns `advanced_by_day=True`, `lesson_id=19`, `previous_lesson_id=18`
 3. Scheduler sends confirmation prompt for lesson 18
 4. User confirms → gets lesson 19, `last_sent=19`
-
-## Trigger Dependencies for Confirmation
-
-`_semantic_yes_no()` in `src/services/dialogue/reminder_handler.py` classifies
-user responses using trigger embeddings:
-
-- Computes embedding of user text via sentence-transformers
-- Matches against `trigger_embeddings` table for `action_type = confirm_yes` or `confirm_no`
-- Returns `(is_yes, is_no)` based on cosine similarity vs threshold (0.55)
 
 **CRITICAL**: The `trigger_embeddings` table MUST contain `confirm_yes` and
 `confirm_no` entries. Without them, `_semantic_yes_no` returns `(False, False)`
@@ -83,12 +65,11 @@ for the full trigger pipeline.
 | File | Role |
 |---|---|
 | `src/lessons/state.py` | `get_lesson_state`, `set_current_lesson`, `set_last_sent_lesson_id`, `compute_current_lesson_state` |
-| `src/lessons/state_flow.py` | `determine_lesson_action` (send/confirm/wait), `apply_reported_progress` |
+| `src/lessons/state_flow.py` | `determine_lesson_action` (send/confirm/wait) |
 | `src/lessons/advance.py` | `maybe_send_next_lesson` — greeting-triggered lesson delivery |
 | `src/scheduler/execution.py` | `_execute_lesson_schedule`, `_handle_no_last_sent_execution` |
-| `src/services/dialogue/reminder_handler.py` | `handle_lesson_confirmation`, `_semantic_yes_no` |
 | `src/scheduler/memory_helpers.py` | `get_pending_confirmation`, `set_pending_confirmation` |
-| `src/language/onboarding_prompts.py` | `get_lesson_confirmation_prompt` (template text) |
+| `src/language/onboarding_prompts.py` | (template text) |
 
 ## Test Coverage
 

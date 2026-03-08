@@ -52,12 +52,6 @@ definitions. `scripts/ci_trigger_data.py` must contain precomputed embeddings
 for ALL entries in STARTER. If STARTER is updated (new action types, new
 phrases) but `ci_trigger_data.py` is not regenerated:
 
-- Tests will be missing triggers (e.g., `confirm_yes`, `confirm_no`, `greeting`)
-- `_semantic_yes_no()` in `reminder_handler.py` will return `(False, False)` for
-  all inputs, silently breaking the lesson confirmation flow
-- The completeness test (`tests/unit/triggers/test_ci_trigger_data_completeness.py`)
-  will catch this and fail with regeneration instructions
-
 **Current STARTER action types** (as of 2025-06-26, 123 entries total):
 `confirm_no` (5), `confirm_yes` (6), `create_schedule`, `enter_rag`, `exit_rag`,
 `greeting` (11), `next_lesson`, `query_schedule`, `raw_lesson`, `set_timezone`,

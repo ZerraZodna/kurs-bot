@@ -18,7 +18,6 @@ class FakeSchedule:
         self.next_send_time = next_send_time
 
 
-@pytest.mark.serial
 class TestSchedulerJobs:
     """Tests for scheduler job management.
     

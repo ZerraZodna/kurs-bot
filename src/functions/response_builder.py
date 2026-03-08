@@ -50,9 +50,6 @@ class ResponseBuilder:
         "send_lesson": "📖 <strong>Lesson {lesson_id}</strong>: {title}<br><br>{content}",
         "send_next_lesson": "📖 <strong>Lesson {lesson_id}</strong>: {title}<br><br>{content}",
         "send_todays_lesson": "📖 <strong>Lesson {lesson_id}</strong>: {title}<br><br>{content}",
-        "mark_lesson_complete": "✓ Lesson marked complete",
-        "repeat_lesson": "📖 <strong>Lesson {lesson_id}</strong> (repeat): {title}<br><br>{content}",
-        "set_lesson_preference": "✓ Lesson preference set to {preference}",
         "set_timezone": "✓ Timezone set to {timezone}",
         "set_language": "✓ Language set to {language}",
         "set_preferred_time": "✓ Preferred time set to {time}",
@@ -73,9 +70,6 @@ class ResponseBuilder:
         "send_lesson": "I couldn't find that lesson. {error}",
         "send_next_lesson": "I couldn't get the next lesson. {error}",
         "send_todays_lesson": "I couldn't get today's lesson. {error}",
-        "mark_lesson_complete": "I couldn't mark the lesson complete. {error}",
-        "repeat_lesson": "I couldn't repeat the lesson. {error}",
-        "set_lesson_preference": "I couldn't set that preference. {error}",
         "set_timezone": "I couldn't set that timezone. {error}",
         "set_language": "I couldn't set that language. {error}",
         "set_preferred_time": "I couldn't set that time. {error}",
@@ -189,12 +183,10 @@ class ResponseBuilder:
             kwargs["time"] = result_data.get("time", "the specified time")
         elif result.function_name == "create_one_time_reminder":
             kwargs["run_at"] = format_datetime_for_display(result_data.get("run_at"))
-        elif result.function_name in ["send_lesson", "send_next_lesson", "send_todays_lesson", "repeat_lesson"]:
+        elif result.function_name in ["send_lesson", "send_next_lesson", "send_todays_lesson"]:
             kwargs["lesson_id"] = result_data.get("lesson_id", "")
             kwargs["title"] = result_data.get("title", "ACIM Lesson")
             kwargs["content"] = result_data.get("content", "")
-        elif result.function_name == "set_lesson_preference":
-            kwargs["preference"] = result_data.get("preference", "custom")
         elif result.function_name == "set_timezone":
             kwargs["timezone"] = result_data.get("timezone", "the specified timezone")
         elif result.function_name == "set_language":

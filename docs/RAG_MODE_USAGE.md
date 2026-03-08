@@ -28,7 +28,6 @@ rag_mode off      # Disable RAG, back to normal
 
 **Effect:**
 - Once enabled, all messages use RAG until you turn it off
-- Similar to the `next_day` debug command
 
 ## Workflow Comparison
 

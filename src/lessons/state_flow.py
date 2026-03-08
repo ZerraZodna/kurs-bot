@@ -117,30 +117,3 @@ def determine_lesson_action(
     result["reason"] = "no_advance"
     return result
 
-
-def apply_reported_progress(
-    memory_manager: MemoryManager, user_id: int, reported_current_lesson: int
-) -> Dict[str, Any]:
-    """Update lesson state based on a user reporting their current lesson.
-
-    Returns a dict with keys: current_lesson, completed_lesson.
-    """
-    from src.lessons.state import record_lesson_completed
-    
-    if not reported_current_lesson or reported_current_lesson < 1:
-        return {"current_lesson": None, "completed_lesson": None}
-
-    current = min(int(reported_current_lesson), 365)
-    completed = max(current - 1, 1)
-
-    # Use centralized helper for DRY - record completion and set next lesson
-    # Pass current as next_lesson since that's what the user reported
-    record_lesson_completed(
-        memory_manager,
-        user_id,
-        completed,
-        source="lesson_state_flow",
-        next_lesson=current,
-    )
-
-    return {"current_lesson": current, "completed_lesson": completed}

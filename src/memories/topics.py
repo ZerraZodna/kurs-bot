@@ -51,20 +51,11 @@ CANONICAL_KEY_MAP: Dict[str, tuple[MemoryTopic, str]] = {
     "lesson_time": (MemoryTopic.SCHEDULE, "preferred_time"),
     "reminder_time": (MemoryTopic.SCHEDULE, "preferred_time"),
     "preferred_time": (MemoryTopic.SCHEDULE, "preferred_time"),
-    
-    # Goals topic
-    "learning_goal": (MemoryTopic.GOALS, "learning_goal"),
-    "goal": (MemoryTopic.GOALS, "learning_goal"),
-    "acim_commitment": (MemoryTopic.GOALS, "acim_commitment"),
-    "commitment": (MemoryTopic.GOALS, "acim_commitment"),
-    "milestone": (MemoryTopic.GOALS, "milestones"),
-    "milestones": (MemoryTopic.GOALS, "milestones"),
-    
+        
     # Preferences topic
     "learning_style": (MemoryTopic.PREFERENCES, "learning_style"),
     "preferred_tone": (MemoryTopic.PREFERENCES, "preferred_tone"),
     "tone": (MemoryTopic.PREFERENCES, "preferred_tone"),
-    "contact_frequency": (MemoryTopic.PREFERENCES, "contact_frequency"),
     "user_language": (MemoryTopic.PREFERENCES, "language"),
     "language": (MemoryTopic.PREFERENCES, "language"),
     "data_consent": (MemoryTopic.PREFERENCES, "data_consent"),
@@ -81,13 +72,6 @@ TOPIC_SCHEMAS: Dict[MemoryTopic, Set[str]] = {
     },
     MemoryTopic.SCHEDULE: {
         "preferred_time"
-    },
-    MemoryTopic.GOALS: {
-        "learning_goal", "acim_commitment", "milestones"
-    },
-    MemoryTopic.PREFERENCES: {
-        "learning_style", "preferred_tone", "contact_frequency", 
-        "language", "data_consent"
     },
 }
 

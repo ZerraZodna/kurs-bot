@@ -89,30 +89,8 @@ from src.services.context_utils import MemoryKey
 MemoryKey.FULL_NAME
 MemoryKey.LANGUAGE
 
-# Goals
-MemoryKey.LEARNING_GOAL
-MemoryKey.LEARNING_STYLE
-MemoryKey.MILESTONE
-
 # Preferences
 MemoryKey.PREFERRED_TONE
-MemoryKey.CONTACT_FREQUENCY
-MemoryKey.LESSON_DIFFICULTY
-
-# Progress
-MemoryKey.LESSON_COMPLETED
-MemoryKey.PRACTICE_STREAK
-MemoryKey.MASTERY_LEVEL
-
-# Insights
-MemoryKey.LEARNING_PATTERN
-MemoryKey.ENGAGEMENT_LEVEL
-MemoryKey.KNOWLEDGE_GAP
-
-# Conversation
-MemoryKey.LAST_TOPIC
-MemoryKey.OPEN_QUESTIONS
-MemoryKey.CONVERSATION_STATE
 ```
 
 ## API Endpoints

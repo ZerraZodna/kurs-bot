@@ -254,11 +254,7 @@ class TestWithUserFixture:
         # Should have consent memory
         consent = mm.get_memory(test_user_with_memories.user_id, "data_consent")
         assert consent
-        
-        # Should have commitment memory
-        commitment = mm.get_memory(test_user_with_memories.user_id, "acim_commitment")
-        assert commitment
-    
+            
     def test_norwegian_user_has_language_set(
         self,
         db_session: Session,

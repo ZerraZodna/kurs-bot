@@ -42,8 +42,6 @@ from .state import (
     set_current_lesson,
     set_next_lesson,
 )
-from .state_flow import apply_reported_progress, determine_lesson_action
-
 
 
 __all__ = [
@@ -53,8 +51,6 @@ __all__ = [
     'import_to_db',
     'verify_db_count',
     # CLI entry points
-    'main',
-    'run_import',
     # Lesson delivery/progression functions
     'is_simple_greeting',
     'maybe_send_next_lesson',
@@ -67,7 +63,6 @@ __all__ = [
     'has_lesson_status',
     'set_current_lesson',
     'set_next_lesson',
-    'apply_reported_progress',
     'determine_lesson_action',
 ]
 

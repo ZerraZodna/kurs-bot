@@ -12,7 +12,6 @@ from src.services.dialogue import (
     stream_ollama,
     format_lesson_message,
     translate_text,
-    handle_lesson_confirmation,
     handle_schedule_messages,
     get_user_language,
     detect_and_store_language,
@@ -22,7 +21,6 @@ from src.services.dialogue import (
     is_rag_mode_enabled,
     handle_forget_commands,
     handle_gdpr_commands,
-    handle_debug_next_day,
     maybe_send_next_lesson,
     handle_list_memories,
 )
@@ -158,13 +156,6 @@ class DialogueEngine:
         if forget_response:
             return forget_response
 
-        # Debug magic command: simulate next day for lesson progression
-        debug_response = handle_debug_next_day(
-            text, self.memory_manager, session, user_id
-        )
-        if debug_response:
-            return debug_response
-
         return None
 
     async def _handle_onboarding_stage(self, user_id: int, text: str, session: Session, use_rag: bool) -> Optional[str]:
@@ -239,27 +230,6 @@ class DialogueEngine:
     async def _handle_lesson_and_schedule_stage(
         self, user_id: int, text: str, session: Session, user_lang: str, include_lesson: bool, use_rag: bool
     ) -> Optional[str]:
-        """Handle lesson confirmations, queries, and schedule-related messages."""
-        # Handle lesson confirmation replies
-        lesson_response = await handle_lesson_confirmation(
-            user_id,
-            text,
-            session,
-            self.memory_manager,
-            self.onboarding,
-            translate_text,
-            lambda uid: get_user_language(self.memory_manager, uid),
-            lambda les, lang: format_lesson_message(les, lang, self.call_ollama),
-        )
-        if lesson_response:
-            return lesson_response
-
-        # NOTE: Removed process_lesson_query() call here to prevent keyword hijacking.
-        # Lesson requests are now handled by AI function calling.
-        # The AI receives the full user message and uses send_lesson, send_todays_lesson,
-        # or send_next_lesson functions as appropriate. This allows the AI to first
-        # extract memories (e.g., current_lesson=21) before sending lesson content.
-
         # Handle schedule follow-ups
         schedule_response = await handle_schedule_messages(
             user_id=user_id,
@@ -447,11 +417,11 @@ class DialogueEngine:
         Handle explicit schedule/reminder requests.
         """
         # Check if user already has commitment
-        status = self.onboarding.get_onboarding_status(user_id)
-        
-        if not status["has_commitment"]:
-            # Need commitment first
-            return self.onboarding.get_onboarding_prompt(user_id)
+        #status = self.onboarding.get_onboarding_status(user_id)
+        #
+        #if not status["has_commitment"]:
+        #    # Need commitment first
+        #    return self.onboarding.get_onboarding_prompt(user_id)
         
         # Check if they already have a schedule
         schedules = scheduler_api.get_user_schedules(user_id, session=session)

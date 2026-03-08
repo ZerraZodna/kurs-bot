@@ -27,30 +27,6 @@ def get_user_language(memory_manager: MemoryManager, user_id: int) -> str:
     return memories[0].get("value", "en") if memories else "en"
 
 
-def is_auto_advance_lessons_enabled(memory_manager: MemoryManager, user_id: int) -> bool:
-    memories = memory_manager.get_memory(user_id, MemoryKey.AUTO_ADVANCE_LESSONS)
-    if not memories:
-        return False
-    value = str(memories[0].get("value", "")).strip().lower()
-    return value in {"true", "1", "yes", "on", "enabled"}
-
-
-def set_auto_advance_lessons_preference(
-    memory_manager: MemoryManager,
-    user_id: int,
-    enabled: bool,
-    source: str = "dialogue_engine",
-) -> None:
-    memory_manager.store_memory(
-        user_id=user_id,
-        key=MemoryKey.AUTO_ADVANCE_LESSONS,
-        value="true" if enabled else "false",
-        category=MemoryCategory.PREFERENCE.value,
-        confidence=1.0,
-        source=source,
-    )
-
-
 def get_pending_confirmation(memory_manager: MemoryManager, user_id: int) -> Optional[dict]:
     memories = memory_manager.get_memory(user_id, MemoryKey.LESSON_CONFIRMATION_PENDING)
     if not memories:
@@ -89,3 +65,4 @@ def set_pending_confirmation(
         ttl_hours=24,
         source="scheduler",
     )
+

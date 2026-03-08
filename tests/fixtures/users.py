@@ -50,7 +50,6 @@ def test_user_with_memories(db_session: Session, test_user: User) -> Generator[U
     # Add standard onboarding memories
     mm.store_memory(test_user.user_id, "first_name", DEFAULT_FIRST_NAME, category="profile", source="test")
     mm.store_memory(test_user.user_id, "data_consent", "yes", category="profile", source="test")
-    mm.store_memory(test_user.user_id, "acim_commitment", "yes", category="profile", source="test")
     mm.store_memory(test_user.user_id, "user_language", DEFAULT_LANGUAGE, category="profile", source="test")
     
     # Set current lesson
@@ -135,7 +134,6 @@ class UserFactory:
             
             if with_onboarding_complete:
                 mm.store_memory(user.user_id, "data_consent", "yes", category="profile", source="test")
-                mm.store_memory(user.user_id, "acim_commitment", "yes", category="profile", source="test")
                 set_current_lesson(mm, user.user_id, 1)
         
         return user
@@ -211,7 +209,6 @@ def make_ready_user(db: Session, external_id: str, first_name: str = "Test", tim
             db.commit()
     
     mm = MemoryManager(db)
-    mm.store_memory(user_id, "acim_commitment", "yes", category="profile", source="test")
     mm.store_memory(user_id, "data_consent", "yes", category="profile", source="test")
     mm.store_memory(user_id, "first_name", first_name, category="profile", source="test")
     set_current_lesson(mm, user_id, 1)

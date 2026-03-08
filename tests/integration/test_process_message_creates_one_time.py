@@ -15,7 +15,6 @@ from src.scheduler.core import SchedulerService
 
 
 @pytest.mark.asyncio
-@pytest.mark.serial
 async def test_process_message_creates_one_time_reminder(monkeypatch):
     """Given: A user sends a message to create a one-time reminder
     When: The dialogue engine processes the message

@@ -85,9 +85,6 @@ class FunctionExecutor:
         self._handlers["send_lesson"] = self._handle_send_lesson
         self._handlers["send_next_lesson"] = self._handle_send_next_lesson
         self._handlers["send_todays_lesson"] = self._handle_send_todays_lesson
-        self._handlers["mark_lesson_complete"] = self._handle_mark_lesson_complete
-        self._handlers["repeat_lesson"] = self._handle_repeat_lesson
-        self._handlers["set_lesson_preference"] = self._handle_set_lesson_preference
         
         # Profile handlers
         self._handlers["set_timezone"] = self._handle_set_timezone
@@ -628,110 +625,7 @@ class FunctionExecutor:
         
         # Fallback: compute from memory if no lesson_id provided
         return await self._handle_send_next_lesson(params, context)
-    
-    async def _handle_mark_lesson_complete(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle mark_lesson_complete function."""
-        from src.lessons.state import record_lesson_completed
-        
-        user_id = context.get("user_id")
-        lesson_id = params.get("lesson_id")
-        memory_manager = context.get("memory_manager")
-        
-        # Use centralized helper for DRY
-        if lesson_id:
-            result = record_lesson_completed(
-                memory_manager,
-                user_id,
-                lesson_id,
-                source="function_executor"
-            )
-            return {
-                "ok": True,
-                "lesson_id": lesson_id,
-                "marked_complete": True,
-                "result": result,
-            }
-        else:
-            return {
-                "ok": False,
-                "error": "lesson_id is required",
-            }
-    
-    async def _handle_repeat_lesson(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle repeat_lesson function."""
-        from src.lessons.state import get_current_lesson
-        
-        user_id = context.get("user_id")
-        memory_manager = context.get("memory_manager")
-        
-        try:
-            # Use centralized lesson state as single source of truth
-            current = get_current_lesson(memory_manager, user_id)
-            if current is None:
-                return {"ok": False, "error": "No previous lesson to repeat"}
-            
-            try:
-                lesson_id = int(current)
-            except (TypeError, ValueError):
-                return {"ok": False, "error": "No previous lesson to repeat"}
-            
-            # Get lesson content
-            from src.models.database import Lesson
-            session = context.get("session")
-            lesson = session.query(Lesson).filter_by(lesson_id=lesson_id).first()
-            
-            if not lesson:
-                return {"ok": False, "error": f"Lesson {lesson_id} not found"}
-            
-            return {
-                "ok": True,
-                "lesson_id": lesson_id,
-                "title": lesson.title,
-                "content": lesson.content,
-                "is_repeat": True,
-            }
-        except Exception as e:
-            return {"ok": False, "error": str(e)}
-    
-    async def _handle_set_lesson_preference(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle set_lesson_preference function."""
-        from src.memories.constants import MemoryCategory, MemoryKey
-        
-        user_id = context.get("user_id")
-        preference = params.get("preference")
-        skip_confirmation = params.get("skip_confirmation", False)
-        memory_manager = context.get("memory_manager")
-        
-        try:
-            # Store preference
-            memory_manager.store_memory(
-                user_id=user_id,
-                key="lesson_preference",
-                value=preference,
-                category=MemoryCategory.PREFERENCES.value,
-                source="function_executor",
-                confidence=1.0,
-            )
-            
-            # Store skip confirmation setting
-            if skip_confirmation:
-                memory_manager.store_memory(
-                    user_id=user_id,
-                    key="skip_lesson_confirmation",
-                    value="true",
-                    category=MemoryCategory.PREFERENCES.value,
-                    source="function_executor",
-                    confidence=1.0,
-                )
-            
-            return {
-                "ok": True,
-                "preference": preference,
-                "skip_confirmation": skip_confirmation,
-            }
-        except Exception as e:
-            return {"ok": False, "error": str(e)}
-    
+
     async def _handle_set_timezone(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle set_timezone function."""
         from src.core.timezone import resolve_timezone_name, to_utc
@@ -1114,10 +1008,6 @@ class FunctionExecutor:
             MemoryKey.FULL_NAME, MemoryKey.FIRST_NAME, MemoryKey.NAME,
             MemoryKey.USER_LANGUAGE, MemoryKey.PREFERRED_LESSON_TIME,
             MemoryKey.PERSONAL_BACKGROUND,
-        ]
-        preference_keys = [
-            "learning_style", "preferred_tone",
-            "contact_frequency", "lesson_preference",
         ]
         progress_keys = [
             MemoryKey.LESSON_COMPLETED, MemoryKey.LESSON_CURRENT,

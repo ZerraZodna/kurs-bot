@@ -15,14 +15,13 @@ from src.functions.executor import get_function_executor
 
 @pytest.mark.asyncio
 async def test_memory_driven_schedule_creation(db_session, test_user):
-    """Given: A user with commitment and preferred time stored as memories
+    """Given: A user with preferred time stored as memories
     When: Creating schedule via function executor
     Then: Should create a schedule at the preferred time."""
     user_id = test_user.user_id
 
-    # Store commitment and preferred time as memories
+    # Store  preferred time as memories
     mm = MemoryManager(db_session)
-    mm.store_memory(user_id=user_id, key=MemoryKey.ACIM_COMMITMENT, value="yes")
     mm.store_memory(user_id=user_id, key=MemoryKey.PREFERRED_LESSON_TIME, value="10:15")
 
     # Use FunctionExecutor to create schedule directly

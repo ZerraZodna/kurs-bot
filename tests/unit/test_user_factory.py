@@ -44,5 +44,3 @@ class TestUserFactory:
         mm = MemoryManager(db_session)
         consent = mm.get_memory(user.user_id, "data_consent")
         assert consent
-        commitment = mm.get_memory(user.user_id, "acim_commitment")
-        assert commitment

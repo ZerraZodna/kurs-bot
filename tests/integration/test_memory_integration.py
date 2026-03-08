@@ -241,42 +241,6 @@ class TestCompleteWorkflow:
         # Should have all sections but truncated
         assert "profile" in truncated
 
-    def test_batch_memory_operations(self, db_session: Session, test_user: User):
-        """Given: Batch onboarding data
-        When: Storing multiple memories at once
-        Then: All should be stored and retrievable."""
-        mm = MemoryManager(db_session)
-
-        # Simulate batch onboarding data
-        batch_data = [
-            ("full_name", "John Doe", "profile"),
-            ("learning_goal", "Master Python", "goals"),
-            ("contact_frequency", "Daily", "preferences"),
-        ]
-
-        # Store in batch
-        memory_ids = []
-        for key, value, category in batch_data:
-            mid = mm.store_memory(
-                user_id=test_user.user_id,
-                key=key,
-                value=value,
-                category=category,
-            )
-            memory_ids.append(mid)
-
-        # Verify all stored
-        assert len(memory_ids) == len(batch_data)
-
-        # Retrieve specific categories
-        profile_memories = db_session.query(Memory).filter(
-            Memory.user_id == test_user.user_id,
-            Memory.category == "profile",
-            Memory.is_active == True,
-        ).all()
-
-        assert len(profile_memories) == 1  # full_name only (timezone is stored in User.timezone DB column)
-
     def test_ttl_memory_filtering(self, db_session: Session, test_user: User):
         """Given: Memories with and without TTL
         When: Retrieving memories

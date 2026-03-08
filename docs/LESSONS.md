@@ -160,16 +160,6 @@ Determines if the next lesson should be sent and sends it.
 
 **Returns:** `dict` with results
 
-#### `apply_reported_progress(memory_manager, user_id, lesson_id)`
-Applies user-reported progress to update lesson state.
-
-**Parameters:**
-- `memory_manager` (MemoryManager): The memory manager instance
-- `user_id` (int): The user ID
-- `lesson_id` (int): The lesson ID the user reported
-
-**Returns:** `bool` - True if progress was applied
-
 ### Detection Functions
 
 Lesson intent detection is available through `src/lessons/detection.py`:
@@ -226,7 +216,6 @@ if current_lesson_id:
 ```python
 # User reports they're on lesson 10
 lessons_api.set_current_lesson(memory_manager, user_id, 10)
-lessons_api.apply_reported_progress(memory_manager, user_id, 10)
 ```
 
 ### Checking Lesson Status
@@ -267,5 +256,4 @@ pytest tests/ -k lesson -v
 
 Key test files:
 - `tests/unit/lessons/test_lesson_delivery.py`
-- `tests/unit/lessons/test_next_day_confirmation.py`
 - `tests/unit/onboarding/test_onboarding_fact_extraction.py`

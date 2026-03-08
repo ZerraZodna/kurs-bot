@@ -13,8 +13,6 @@ ACTION_EXIT_RAG = "exit_rag"
 ACTION_CONFIRM_YES = "confirm_yes"
 ACTION_CONFIRM_NO = "confirm_no"
 ACTION_GREETING = "greeting"
-ACTION_REPEAT_LESSON = "repeat_lesson"
-ACTION_SET_LESSON_PREFERENCE = "set_lesson_preference"
 ACTION_CREATE_ONE_TIME_REMINDER = "create_one_time_reminder"
 
 # Schedule types

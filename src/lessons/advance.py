@@ -10,13 +10,6 @@ from src.models.database import Lesson
 
 from .handler import format_lesson_message, translate_text
 from src.memories.dialogue_helpers import get_user_language
-from src.language.onboarding_prompts import get_lesson_confirmation_prompt
-
-
-def _get_set_pending_confirmation():
-    from src.scheduler.memory_helpers import set_pending_confirmation
-    return set_pending_confirmation
-
 
 def is_simple_greeting(text: str) -> bool:
     cleaned = re.sub(r"[^a-zA-Z\s]", "", text or "").strip().lower()
@@ -68,53 +61,10 @@ async def maybe_send_next_lesson(
     lesson_id = state.get("lesson_id")
     previous_lesson_id = state.get("previous_lesson_id")
 
-    # If the computed state signals we need confirmation (user reported a
-    # current lesson but we have no last_sent record), ask for confirmation
-    # regardless of `advanced_by_day` so onboarding 'continuing' users are
-    # prompted on first contact.  However we don't want to repeat the same
-    # prompt multiple times in a single day/session; once a pending
-    # confirmation exists we simply return None until it's resolved.
-    if state.get("need_confirmation") and lesson_id and is_simple_greeting(text):
-        # avoid re-sending the question if already pending or recently resolved
-        from src.scheduler.memory_helpers import (
-            get_pending_confirmation,
-            is_auto_advance_lessons_enabled,
-        )
-
-        pending = get_pending_confirmation(memory_manager, user_id)
-        if pending:
-            # If pending has lesson_id, it's an active confirmation (don't re-prompt)
-            # If pending has resolved=True, it was recently resolved (don't re-prompt yet)
-            return None
-
-        next_id = (int(lesson_id) % 365) + 1
-        if is_auto_advance_lessons_enabled(memory_manager, user_id):
-            lesson = session.query(Lesson).filter(Lesson.lesson_id == next_id).first()
-            if not lesson:
-                return None
-
-            message = await format_lesson_message(lesson, "en", call_ollama)
-            if (language or "").lower() not in ["en"]:
-                message = await translate_text(message, language, call_ollama)
-
-            from src.lessons.state import record_lesson_completed
-            record_lesson_completed(
-                memory_manager,
-                user_id,
-                int(lesson_id),
-                source="dialogue_auto_advance",
-                next_lesson=next_id,
-            )
-            return message
-
-        # Persist a pending confirmation so dialogue handlers can resolve it
-        _get_set_pending_confirmation()(
-            memory_manager, user_id, int(lesson_id), next_id
-        )
-        return get_lesson_confirmation_prompt(language, lesson_id)
-
-    # Only proceed to auto-send when today's lesson was advanced by the
-    # scheduler and the assistant was greeted with a short/simple greeting.
+    # Only proceed to auto-send when:
+    # 1. The lesson was advanced by day (new day since last lesson) - advanced_by_day=True
+    # 2. AND the user sent a simple greeting
+    # This ensures we only send ONE lesson per day, not on every user message.
     if not state.get("advanced_by_day") or not is_simple_greeting(text):
         return None
 

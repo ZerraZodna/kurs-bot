@@ -1,4 +1,4 @@
-"""Onboarding service - guide users through setup and commitment.
+"""Onboarding service - guide users through setup.
 
 Provides the `OnboardingService` implementation that coordinates
 detectors, prompt generation, schedule setup, and user management.
@@ -12,7 +12,6 @@ from src.memories import MemoryManager
 import logging
 
 from src.onboarding.detectors import (
-    detect_commitment_keywords,
     detect_consent_keywords,
     detect_decline_keywords,
 )
@@ -33,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 class OnboardingService:
-    """Manages user onboarding flow and commitment tracking."""
+    """Manages user onboarding flow"""
 
     def __init__(self, db: Session):
         self.db = db
@@ -151,18 +150,6 @@ class OnboardingService:
         
         return False
     
-    def detect_commitment_keywords(self, message: str) -> bool:
-        """
-        Detect if user message indicates readiness to commit to lessons.
-        
-        Args:
-            message: Users message text
-        
-        Returns:
-            True if commitment keywords detected
-        """
-        return detect_commitment_keywords(message)
-
     def detect_decline_keywords(self, message: str) -> bool:
         """Detect if user declines ACIM or consent."""
         return detect_decline_keywords(message)

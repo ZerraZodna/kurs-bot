@@ -57,25 +57,87 @@ def has_lesson_status(memory_manager: MemoryManager, user_id: int) -> bool:
 
 
 def compute_current_lesson_state(memory_manager: MemoryManager, user_id: int, today: Optional[date] = None) -> Dict[str, Any]:
-    """Compute the lesson state used for determining "today's" lesson."""
+    """Compute the lesson state used for determining "today's" lesson.
+    
+    Returns:
+        - lesson_id: The current/next lesson ID to send
+        - advanced_by_day: True if we should advance to next lesson (new day since last lesson)
+        - previous_lesson_id: The lesson that was previously sent
+        - need_confirmation: True if we need user confirmation before advancing
+    """
     if today is None:
         today = datetime.now(timezone.utc).date()
 
-    cur = get_current_lesson(memory_manager, user_id)
+    # Get the LESSON_CURRENT memory to check when it was created
+    memories = memory_manager.get_memory(user_id, MemoryKey.LESSON_CURRENT)
+    
+    # If no current lesson, start with lesson 1
+    if not memories:
+        return {
+            "lesson_id": 1, 
+            "progress_note": None, 
+            "advanced_by_day": True,  # New user, can start with lesson 1
+            "previous_lesson_id": None, 
+            "need_confirmation": False
+        }
+
+    # Get the most recent LESSON_CURRENT memory
+    current_memory = memories[0]
+    cur = current_memory.get("value")
+    created_at = current_memory.get("created_at")
     
     if cur is None:
-        return {"lesson_id": 1, "progress_note": None, "advanced_by_day": False, "previous_lesson_id": None, "need_confirmation": False}
+        return {
+            "lesson_id": 1, 
+            "progress_note": None, 
+            "advanced_by_day": True, 
+            "previous_lesson_id": None, 
+            "need_confirmation": False
+        }
 
     if str(cur).isdigit():
         lesson_id = int(cur)
-        need_confirmation = lesson_id > 1 and lesson_id < 365
-        return {
-            "lesson_id": lesson_id,
-            "progress_note": None,
-            "advanced_by_day": False,
-            "previous_lesson_id": None,
-            "need_confirmation": need_confirmation
-        }
+        # Note: need_confirmation is NOT used for lesson progression anymore.
+        # It's only used for GDPR-related confirmations (e.g., during onboarding or GDPR delete requests).
+        
+        # Check if the lesson was already sent today
+        if created_at:
+            # Convert created_at to date for comparison
+            if isinstance(created_at, datetime):
+                created_date = created_at.date()
+            else:
+                # Handle string format if needed
+                created_date = created_at
+            
+            # If created today, don't advance (lesson already sent)
+            if created_date == today:
+                return {
+                    "lesson_id": lesson_id,
+                    "progress_note": None,
+                    "advanced_by_day": False,  # Already sent today
+                    "previous_lesson_id": None,
+                    "need_confirmation": False
+                }
+            else:
+                # Created before today - it's a new day, advance to next lesson
+                previous_lesson_id = lesson_id
+                next_lesson_id = (lesson_id % 365) + 1
+                return {
+                    "lesson_id": next_lesson_id,
+                    "progress_note": None,
+                    "advanced_by_day": True,  # New day, advance
+                    "previous_lesson_id": previous_lesson_id,
+                    "need_confirmation": False
+                }
+        else:
+            # No created_at - assume it's a new day
+            return {
+                "lesson_id": lesson_id,
+                "progress_note": None,
+                "advanced_by_day": False,
+                "previous_lesson_id": None,
+                "need_confirmation": False
+            }
 
     return {"lesson_id": 1, "progress_note": None, "advanced_by_day": False, "previous_lesson_id": None, "need_confirmation": False}
 

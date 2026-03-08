@@ -113,12 +113,12 @@ class TestSchedulerService:
         assert log is not None
         assert "Lesson 1" in log.content
 
-    def test_execute_scheduled_task_prompts_confirmation(
+    def test_execute_scheduled_task_auto_advances(
         self, db_session, scheduler_session_factory, monkeypatch
     ):
         """Given: User has already received lesson 1
         When: execute_scheduled_task is called
-        Then: Confirmation prompt for lesson 2 is sent
+        Then: Next lesson is auto-advanced without confirmation prompt
         """
         sent = []
 
@@ -143,73 +143,21 @@ class TestSchedulerService:
 
         # Given: Last sent lesson is 1
         from src.memories import MemoryManager
-        from src.lessons.state import set_next_lesson
-
-        mm = MemoryManager(db_session)
-        set_next_lesson(mm, user.user_id, 1)
-
-        # When: Executing scheduled task
-        scheduler_module.SchedulerService.execute_scheduled_task(schedule.schedule_id)
-
-        # Then: Confirmation prompt should be sent
-        assert sent, "Expected confirmation prompt to be sent"
-        assert "Lesson 1" in sent[0][1]
-
-        pending = db_session.query(Memory).filter_by(key=MemoryKey.LESSON_CONFIRMATION_PENDING).first()
-        assert pending is not None
-
-    def test_execute_scheduled_task_auto_advance_skips_confirmation_when_preference_enabled(
-        self, db_session, scheduler_session_factory, monkeypatch
-    ):
-        """Given: User has auto-advance preference enabled
-        When: execute_scheduled_task is called
-        Then: Next lesson is sent without confirmation prompt
-        """
-        sent = []
-
-        async def fake_send_message(chat_id: int, text: str):
-            sent.append((chat_id, text))
-            return {"ok": True}
-
-        monkeypatch.setattr(scheduler_module, "send_message", fake_send_message)
-
-        user = db_session.query(User).first()
-        schedule = Schedule(
-            user_id=user.user_id,
-            lesson_id=None,
-            schedule_type="daily",
-            cron_expression="0 9 * * *",
-            next_send_time=datetime.now(timezone.utc),
-            is_active=True,
-            created_at=datetime.now(timezone.utc),
-        )
-        db_session.add(schedule)
-        db_session.commit()
-
-        # Given: Last sent is lesson 1 and auto-advance is enabled
-        from src.memories import MemoryManager
         from src.lessons.state import set_next_lesson, get_current_lesson
-        from src.scheduler.memory_helpers import set_auto_advance_lessons_preference
 
         mm = MemoryManager(db_session)
         set_next_lesson(mm, user.user_id, 1)
-        set_auto_advance_lessons_preference(mm, user.user_id, True, source="test")
 
         # When: Executing scheduled task
         scheduler_module.SchedulerService.execute_scheduled_task(schedule.schedule_id)
 
-        # Then: Next lesson should be sent without confirmation
+        # Then: Next lesson should be auto-advanced without confirmation
         assert sent, "Expected next lesson message to be sent"
         assert "Lesson 2" in sent[0][1]
 
-        pending = db_session.query(Memory).filter_by(key=MemoryKey.LESSON_CONFIRMATION_PENDING).first()
-        assert pending is None
-
-        completed = db_session.query(Memory).filter_by(key=MemoryKey.LESSON_COMPLETED).first()
-        assert completed is not None
-        assert completed.value == "1"
-
-        assert get_current_lesson(mm, user.user_id) == 2
+        # Verify current lesson is now 2
+        current = get_current_lesson(mm, user.user_id)
+        assert current == 2
 
     def test_deactivate_user_schedules(
         self, db_session, scheduler_session_factory, monkeypatch

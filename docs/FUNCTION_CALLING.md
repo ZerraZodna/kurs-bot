@@ -69,7 +69,7 @@ scheduling_funcs = registry.list_for_context("schedule_setup")
 | Category | Functions |
 |----------|-----------|
 | **Scheduling** | `create_schedule`, `update_schedule`, `delete_schedule`, `query_schedule`, `create_one_time_reminder` |
-| **Lessons** | `send_lesson`, `send_next_lesson`, `send_todays_lesson`, `repeat_lesson`, `mark_lesson_complete`, `set_lesson_preference` |
+| **Lessons** | `send_lesson`, `send_next_lesson`, `send_todays_lesson` |
 | **Profile** | `set_timezone`, `set_language`, `set_preferred_time`, `update_profile` |
 | **RAG** | `enter_rag`, `exit_rag` |
 | **Confirmation** | `confirm_yes`, `confirm_no` |
@@ -150,18 +150,6 @@ response: BuiltResponse = builder.build(
 ```
 
 ---
-
-## Context-Specific Function Availability
-
-Functions are filtered by conversation context to make the AI's job easier:
-
-| Context | Available Functions | Use Case |
-|---------|---------------------|----------|
-| `general_chat` | All general functions | Default state |
-| `onboarding` | `set_timezone`, `set_language`, `set_preferred_time`, `update_profile`, `extract_memory` | New user setup |
-| `schedule_setup` | `create_schedule`, `update_schedule`, `delete_schedule`, `query_schedule` | Configuring reminders |
-| `lesson_review` | `mark_lesson_complete`, `send_next_lesson`, `send_lesson` | After lesson delivery |
-| `morning_lesson_confirmation` | `repeat_lesson`, `send_next_lesson`, `set_lesson_preference` | Daily lesson choice |
 
 **Context Detection in DialogueEngine:**
 ```python

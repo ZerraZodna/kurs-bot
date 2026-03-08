@@ -31,10 +31,6 @@ class SchedulerService:
     """Manages background scheduling for lessons and reminders."""
 
     @staticmethod
-    def _confirmation_prompt(language: str, lesson_id: int) -> str:
-        return scheduler_execution._confirmation_prompt(language, lesson_id)
-
-    @staticmethod
     def _parse_lesson_int(value) -> Optional[int]:
         return scheduler_execution._parse_lesson_int(value)
 

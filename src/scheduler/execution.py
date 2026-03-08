@@ -17,7 +17,6 @@ from src.models.database import Lesson, Schedule, User
 
 from .domain import is_one_time_schedule_type, job_id_for_schedule
 from .memory_helpers import (
-    is_auto_advance_lessons_enabled,
     get_pending_confirmation,
     get_schedule_message,
     get_user_language,
@@ -26,13 +25,6 @@ from .memory_helpers import (
 from .message_utils import format_lesson_message, send_outbound_message
 
 logger = logging.getLogger(__name__)
-
-
-def _confirmation_prompt(language: str, lesson_id: int) -> str:
-    # Local import to avoid module import cycles
-    from src.language.onboarding_prompts import get_lesson_confirmation_prompt
-
-    return get_lesson_confirmation_prompt(language, lesson_id)
 
 
 def _parse_lesson_int(value) -> Optional[int]:
@@ -79,11 +71,10 @@ def _preview_build_for_no_last_sent(
     lesson_id = _parse_lesson_int(cur)
     if lesson_id is not None:
         next_id = (lesson_id % 365) + 1
-        if is_auto_advance_lessons_enabled(memory_manager, user_id):
-            lesson = _load_lesson(db, next_id)
-            if lesson:
-                return format_lesson_message(lesson, language)
-        return _confirmation_prompt(language, lesson_id)
+        # Always auto-advance without asking for confirmation
+        lesson = _load_lesson(db, next_id)
+        if lesson:
+            return format_lesson_message(lesson, language)
 
     lesson = _load_lesson(db, 1)
     if lesson:
@@ -118,28 +109,22 @@ def _handle_no_last_sent_execution(
         lesson_id = _parse_lesson_int(cur)
         if lesson_id is not None:
             next_id = (lesson_id % 365) + 1
-            if is_auto_advance_lessons_enabled(memory_manager, schedule.user_id):
-                lesson = _load_lesson(db, next_id)
-                if lesson:
-                    message = format_lesson_message(lesson, language)
-                    send_outbound_message(db, user, message)
-                    if simulate:
-                        messages.append(message)
-                    from src.lessons.state import record_lesson_completed
-                    record_lesson_completed(
-                        memory_manager,
-                        schedule.user_id,
-                        lesson_id,
-                        source="scheduler_auto_advance",
-                        next_lesson=next_id,
-                    )
-                    return
-            set_pending_confirmation(memory_manager, schedule.user_id, lesson_id, next_id)
-            prompt = _confirmation_prompt(language, lesson_id)
-            send_outbound_message(db, user, prompt)
-            if simulate:
-                messages.append(prompt)
-            return
+            # Always auto-advance without asking for confirmation
+            lesson = _load_lesson(db, next_id)
+            if lesson:
+                message = format_lesson_message(lesson, language)
+                send_outbound_message(db, user, message)
+                if simulate:
+                    messages.append(message)
+                from src.lessons.state import record_lesson_completed
+                record_lesson_completed(
+                    memory_manager,
+                    schedule.user_id,
+                    lesson_id,
+                    source="scheduler_auto_advance",
+                    next_lesson=next_id,
+                )
+                return
 
     if preferred is None:
         preferred = 1
@@ -165,11 +150,6 @@ def _build_schedule_message(
         return message or "Reminder"
 
     language = get_user_language(memory_manager, schedule.user_id)
-    pending = get_pending_confirmation(memory_manager, schedule.user_id)
-    if pending and not pending.get("resolved"):
-        lesson_id = pending.get("lesson_id")
-        next_id = pending.get("next_lesson_id")
-        return _confirmation_prompt(language, lesson_id)
 
     from src.lessons.state import get_current_lesson
     
@@ -178,13 +158,14 @@ def _build_schedule_message(
         return _preview_build_for_no_last_sent(db, memory_manager, schedule.user_id, language)
 
     next_id = (last_sent % 365) + 1
-    if is_auto_advance_lessons_enabled(memory_manager, schedule.user_id):
-        lesson = _load_lesson(db, next_id)
-        if lesson:
-            return format_lesson_message(lesson, language)
-    # Do not persist pending confirmation when only building a
-    # preview message; return the confirmation prompt text only.
-    return _confirmation_prompt(language, last_sent)
+    # Always auto-advance without asking for confirmation
+    lesson = _load_lesson(db, next_id)
+    if lesson:
+        return format_lesson_message(lesson, language)
+
+    # No lesson to send
+    # Send a failure message?
+    return None
 
 
 def run_recovery_check(
@@ -406,10 +387,15 @@ def _execute_lesson_schedule(
     if pending and not pending.get("resolved"):
         lesson_id = pending.get("lesson_id")
         next_id = pending.get("next_lesson_id")
-        prompt = _confirmation_prompt(language, lesson_id)
-        send_outbound_message(db, user, prompt)
-        if simulate:
-            messages.append(prompt)
+        # Load the lesson object before calling format_lesson_message
+        lesson = _load_lesson(db, next_id)
+        if lesson:
+            message = format_lesson_message(lesson, language)
+            send_outbound_message(db, user, message)
+            if simulate:
+                messages.append(message)
+            return messages
+        # Fallback if lesson not found
         return messages
 
     from src.lessons.state import get_current_lesson
@@ -420,27 +406,36 @@ def _execute_lesson_schedule(
         return messages
 
     next_id = (last_sent % 365) + 1
-    if is_auto_advance_lessons_enabled(memory_manager, schedule.user_id):
-        lesson = _load_lesson(db, next_id)
-        if lesson:
-            message = format_lesson_message(lesson, language)
-            send_outbound_message(db, user, message)
-            if simulate:
-                messages.append(message)
-            from src.lessons.state import record_lesson_completed
-            record_lesson_completed(
-                memory_manager,
-                schedule.user_id,
-                last_sent,
-                source="scheduler_auto_advance",
-                next_lesson=next_id,
-            )
-            return messages
+    # Always auto-advance without asking for confirmation
+    lesson = _load_lesson(db, next_id)
+    if lesson:
+        message = format_lesson_message(lesson, language)
+        send_outbound_message(db, user, message)
+        if simulate:
+            messages.append(message)
+        # Set pending confirmation before auto-advancing (so it contains correct lesson_ids)
+        set_pending_confirmation(
+            memory_manager,
+            schedule.user_id,
+            lesson_id=last_sent,
+            next_lesson_id=next_id,
+        )
+        from src.lessons.state import record_lesson_completed
+        record_lesson_completed(
+            memory_manager,
+            schedule.user_id,
+            last_sent,
+            source="scheduler_auto_advance",
+            next_lesson=next_id,
+        )
+        return messages
 
-    # Ask if previous lesson was completed before proceeding
-    set_pending_confirmation(memory_manager, schedule.user_id, last_sent, next_id)
-    prompt = _confirmation_prompt(language, last_sent)
-    send_outbound_message(db, user, prompt)
-    if simulate:
-        messages.append(prompt)
+    # If lesson not found, ask for confirmation as fallback
+    # Load lesson object before calling format_lesson_message
+    lesson = _load_lesson(db, last_sent)
+    if lesson:
+        message = format_lesson_message(lesson, language)
+        send_outbound_message(db, user, message)
+        if simulate:
+            messages.append(message)
     return messages

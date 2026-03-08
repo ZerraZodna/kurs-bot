@@ -5,11 +5,6 @@ from src.lessons.handler import (
     format_lesson_message,
     translate_text,
 )
-from .reminder_handler import (
-    get_pending_confirmation,
-    resolve_pending_confirmation,
-    handle_lesson_confirmation,
-)
 from src.memories.dialogue_helpers import (
     get_user_language,
     extract_and_store_memories,
@@ -27,7 +22,6 @@ from .command_handlers import (
     handle_forget_commands,
     handle_list_memories,
     handle_gdpr_commands,
-    handle_debug_next_day,
 )
 
 __all__ = [
@@ -35,9 +29,6 @@ __all__ = [
     "stream_ollama",
     "format_lesson_message",
     "translate_text",
-    "get_pending_confirmation",
-    "resolve_pending_confirmation",
-    "handle_lesson_confirmation",
     "get_user_language",
     "detect_and_store_language",
     "extract_and_store_memories",
@@ -50,7 +41,6 @@ __all__ = [
     "handle_forget_commands",
     "handle_list_memories",
     "handle_gdpr_commands",
-    "handle_debug_next_day",
     "handle_schedule_messages",
     "maybe_send_next_lesson",
 ]

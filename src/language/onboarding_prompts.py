@@ -133,19 +133,3 @@ def format_onboarding_message_with_name(template: str, name: str) -> str:
 	return template
 
 
-def get_lesson_confirmation_prompt(language: str, lesson_id: int) -> str:
-	"""Return a bilingual, gentle confirmation prompt with a repeat option."""
-	template = get_onboarding_message("confirm_lesson", language)
-	try:
-		return template.format(lesson_id=lesson_id)
-	except Exception:
-		# Fallback to a simple English message if formatting fails
-		return ONBOARD_MESSAGES["confirm_lesson"]["en"].format(lesson_id=lesson_id)
-
-
-# Confirmation prompt template for when a user reports a current lesson
-ONBOARD_MESSAGES["confirm_lesson"] = {
-    "en": "From a gentle, loving place: You mentioned Lesson {lesson_id} last time. Would you like to move to the next lesson, or continue where you left off? Reply 'yes' to move forward, or 'no' to stay with this lesson.",
-    "no": "Fra et mildt, kjærlig sted: Du nevnte Leksjon {lesson_id} sist. Vil du gå videre til neste leksjon, eller fortsette der du slapp? Svar 'ja' for å gå videre, eller 'nei' for å bli på denne leksjonen.",
-}
-

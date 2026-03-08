@@ -27,7 +27,6 @@ from src.lessons.handler import (
     _find_lesson_by_id as _find_lesson,
 )
 from src.lessons.advance import maybe_send_next_lesson as _maybe_send_next_lesson
-from src.lessons.state_flow import apply_reported_progress as _apply_reported_progress
 
 logger = logging.getLogger(__name__)
 
@@ -66,15 +65,6 @@ async def maybe_send_next_lesson(
     )
 
 
-def apply_reported_progress(
-    memory_manager: MemoryManager,
-    user_id: int,
-    lesson_id: int,
-) -> None:
-    """Apply reported progress to lesson state."""
-    _apply_reported_progress(memory_manager, user_id, lesson_id)
-
-
 # Re-export state functions
 def get_current_lesson(memory_manager: MemoryManager, user_id: int) -> Optional[Any]:
     """Get the user's current lesson."""
@@ -111,6 +101,5 @@ __all__ = [
     "has_lesson_status",
     "compute_current_lesson_state",
     "maybe_send_next_lesson",
-    "apply_reported_progress",
 ]
 

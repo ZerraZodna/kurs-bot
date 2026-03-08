@@ -34,7 +34,6 @@ class TestLanguageOverrideSetCommand:
         
         mm = MemoryManager(db_session)
         mm.store_memory(user.user_id, "first_name", "John", category="profile", source="test")
-        mm.store_memory(user.user_id, "acim_commitment", "yes", category="profile", source="test")
         mm.store_memory(user.user_id, "data_consent", "yes", category="profile", source="test")
         
         # Seed existing language preference as French
