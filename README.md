@@ -74,6 +74,27 @@ That's it! npm handles:
 
 3. **Test**: Start the bot with `npm start`, then open Telegram and send a message!
 
+### Telegram Long-Polling (Alternative to ngrok)
+
+By default, the bot uses webhooks with ngrok for local development. If ngrok is not installed or unavailable, you can use Telegram's long-polling API instead.
+
+**Enable long-polling** by adding to your `.env`:
+```
+USE_TELEGRAM_LONG_POLLING=true
+```
+
+This is useful for:
+- Working without ngrok (no account needed)
+- Running behind NAT/firewall
+- Simpler local setup
+
+**Environment variables:**
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `USE_TELEGRAM_LONG_POLLING` | `false` | Enable long-polling mode |
+| `TELEGRAM_POLL_TIMEOUT` | `25` | Long-poll timeout in seconds |
+| `TELEGRAM_POLL_LIMIT` | `100` | Max updates per request |
+
 ## NPM Commands
 
 | Command | Description |

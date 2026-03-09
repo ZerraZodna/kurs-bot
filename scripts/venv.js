@@ -379,9 +379,13 @@ switch (cmd) {
           if (ngrokStarted) console.log('Started ngrok detached (logs:', ngrokOut, ngrokErr + ')');
         } else {
           console.log('ngrok not found in PATH; skipping ngrok startup');
+          console.log('\n💡 To use Telegram bot without ngrok, enable long-polling:');
+          console.log('   Add USE_TELEGRAM_LONG_POLLING=true to your .env file');
         }
       } catch (e) {
         console.log('ngrok not available; skipping');
+        console.log('\n💡 To use Telegram bot without ngrok, enable long-polling:');
+        console.log('   Add USE_TELEGRAM_LONG_POLLING=true to your .env file');
       }
 
       // Determine uvicorn command

@@ -118,6 +118,32 @@ class TelegramHandler:
             "timestamp": datetime.fromtimestamp(msg.get("date", 0), timezone.utc),
         }
 
+async def send_typing_action(chat_id: int) -> bool:
+    """Send typing indicator to Telegram chat.
+    
+    Args:
+        chat_id: Telegram chat ID
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    if not TELEGRAM_BOT_TOKEN:
+        return False
+    
+    url = f"{API_BASE}/sendChatAction"
+    payload = {
+        "chat_id": chat_id,
+        "action": "typing"
+    }
+    async with httpx.AsyncClient() as client:
+        try:
+            r = await client.post(url, json=payload, timeout=10.0)
+            r.raise_for_status()
+            return r.json().get("ok", False)
+        except Exception:
+            return False
+
+
 async def edit_message(chat_id: int, message_id: int, text: str) -> Optional[dict]:
     """Edit an existing Telegram message with new text."""
     if not TELEGRAM_BOT_TOKEN:
@@ -312,6 +338,10 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
     from src.services.dialogue_engine import DialogueEngine
     from src.services.traffic_tracker import record_traffic_event
     from src.services.dialogue import extract_and_store_memories
+
+    # Send typing indicator to show user we're processing (works for both webhook and polling)
+    chat_id = int(external_id)
+    await send_typing_action(chat_id)
 
     await asyncio.sleep(1.0)
 

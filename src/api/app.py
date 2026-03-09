@@ -14,7 +14,9 @@ from src.scheduler import SchedulerService
 from src.api.dialogue_routes import router as dialogue_router
 from src.api.gdpr_routes import router as gdpr_router
 from src.api.telegram_routes import router as telegram_router
+from src.integrations.telegram_polling import start_polling_task
 import threading
+import asyncio
 from urllib.parse import urlparse
 from pathlib import Path
 import logging
@@ -70,8 +72,12 @@ async def lifespan(app: FastAPI):
 
         t2 = threading.Thread(target=run_downtime_monitor, daemon=True)
         t2.start()
+        
+        # Start Telegram long-polling if enabled
+        polling_task = start_polling_task()
     else:
         logging.info("Background threads disabled in test environment")
+        polling_task = None
 
     # Ensure APScheduler is explicitly initialized at application startup
     try:
@@ -204,6 +210,17 @@ async def lifespan(app: FastAPI):
             logging.error("Embedding backend is set to 'ollama' but LOCAL_OLLAMA_URL is not configured")
 
     yield
+
+    # Shutdown: cancel Telegram polling task if running
+    if polling_task:
+        logging.info("[lifespan] Cancelling Telegram polling task...")
+        polling_task.cancel()
+        try:
+            await polling_task
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logging.exception(f"[lifespan] Error during polling task cancellation: {e}")
 
 
 app = FastAPI(lifespan=lifespan)

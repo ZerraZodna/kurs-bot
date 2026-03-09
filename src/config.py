@@ -74,6 +74,11 @@ Only use functions relevant to the current context.
     # Minimum seconds between Telegram editMessageText calls during streaming.
     # 0.1 s gives ~10 edits/second — smooth without hitting Telegram rate limits.
     TELEGRAM_STREAM_UPDATE_INTERVAL: float = 0.1
+    # Telegram long-polling (alternative to ngrok/webhook for local dev)
+    USE_TELEGRAM_LONG_POLLING: bool = False
+    TELEGRAM_POLL_TIMEOUT: int = 25
+    TELEGRAM_POLL_LIMIT: int = 100
+    TELEGRAM_POLL_ALLOWED_UPDATES: list = ["message", "edited_message"]
     # Enable the developer web UI when True (set in .env during local dev)
     DEV_WEB_CLIENT: bool = False
     # Add more config as needed
