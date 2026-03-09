@@ -155,20 +155,9 @@ class StreamingFilter:
                 self._functions_boundary_reached = False  # Actually we've reached it
                 
                 if text_part:
-                    # Clean up the text part - remove trailing comma, quote, and whitespace
-                    # This handles cases like: "...text", 
-                    text_part = text_part.strip()
-                    if text_part.endswith('",'):
-                        text_part = text_part[:-1]  # Remove trailing comma
-                    elif text_part.endswith(','):
-                        text_part = text_part[:-1]  # Remove trailing comma
-                    
                     # Yield the text part (might need to flush buffer)
                     self._buffer = ""
-                    # Try to extract just the string value (remove surrounding quotes)
-                    clean_text = self._extract_string_value(text_part)
-                    if clean_text:
-                        yield clean_text
+                    yield text_part
                 continue
             
             # Step 3: Buffer incomplete HTML tags
@@ -182,23 +171,10 @@ class StreamingFilter:
                 continue
             
             # Step 5: Buffer is complete - extract string value and yield
-            clean_text = self._extract_string_value(self._buffer)
-            if clean_text:
-                yield clean_text
+            if self._buffer:
+                yield self._buffer
             self._buffer = ""
-        
-    def _extract_string_value(self, text: str) -> str:
-        """Extract the string value from a JSON string value.
-
-        Handles escaped characters and returns the unescaped content.
-        """
-        if not text:
-            return ""
-
-        text = text.replace('\n', '-n-')
-
-        return text
-    
+            
     def get_remaining_for_functions(self) -> Optional[str]:
         """Get any remaining content that should be used for function processing.
         
@@ -217,11 +193,7 @@ class StreamingFilter:
             else:
                 # No functions boundary - this might be incomplete text or empty
                 # Try to extract as string and check if it's valid
-                extracted = self._extract_string_value(self._buffer)
-                if extracted and extracted.strip():
-                    # This is valid text, not functions - don't include in functions
-                    pass
-                elif '"functions"' in self._buffer or '"functions":' in self._buffer:
+                if '"functions"' in self._buffer or '"functions":' in self._buffer:
                     # Buffer contains functions-related content
                     self._remaining_for_functions = (self._remaining_for_functions or "") + self._buffer
             self._buffer = ""

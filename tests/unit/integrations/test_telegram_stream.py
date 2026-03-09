@@ -144,6 +144,63 @@ async def test_stops_at_functions_boundary():
 
 
 @pytest.mark.asyncio
+async def test_functions_not_returned_to_user():
+    """
+    StreamingFilter should NOT return the functions part to the user.
+    This tests that bug #1 is fixed - the functions JSON should be stripped
+    from the output and only the text response should be yielded.
+    """
+    # Token contains both response text AND functions JSON
+    tokens = ['{"response": "Hello world", "functions": [{"name": "test_function", "parameters": {"arg1": "value1"}}]}']
+    generator = mock_token_generator(tokens)
+    filter = StreamingFilter(generator)
+    
+    results = []
+    async for chunk in filter.filter_stream():
+        results.append(chunk)
+    
+    combined = "".join(results)
+    
+    # The text response should be returned
+    assert "Hello world" in combined
+    
+    # The functions part should NOT be returned to the user
+    assert "functions" not in combined
+    assert "test_function" not in combined
+    assert "parameters" not in combined
+    assert "arg1" not in combined
+    assert "value1" not in combined
+
+
+@pytest.mark.asyncio
+async def test_functions_not_returned_with_multiple_tokens():
+    """
+    StreamingFilter should not return functions part even when tokens are split.
+    """
+    # Split the JSON across multiple tokens to test boundary detection with fragmentation
+    tokens = [
+        '{"response": "Hello ', 
+        'world', 
+        '", "functions": [{"name": "test"}]}'
+    ]
+    generator = mock_token_generator(tokens)
+    filter = StreamingFilter(generator)
+    
+    results = []
+    async for chunk in filter.filter_stream():
+        results.append(chunk)
+    
+    combined = "".join(results)
+    
+    # Should include the text
+    assert "Hello world" in combined
+    
+    # Should NOT include functions
+    assert "functions" not in combined
+    assert "test" not in combined
+
+
+@pytest.mark.asyncio
 async def test_returns_remaining_for_functions():
     """
     StreamingFilter should return remaining content for function processing.
