@@ -7,6 +7,7 @@ from typing import Optional, Dict, Any, AsyncIterator
 from datetime import datetime, timedelta, timezone
 from src.config import settings
 from src.models.database import SessionLocal, MessageLog, BatchLock
+from src.integrations.telegram_stream import StreamingFilter
 
 logger = logging.getLogger(__name__)
 
@@ -403,14 +404,17 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                     # Stream tokens to Telegram via progressive edits
                     logger.info(f"[batch] Using STREAMING path for user_id={user_id}")
                     
-                    # Use send_message_streaming to stream tokens directly to Telegram
-                    # This sends an initial message then edits it progressively
-                    generator = result["generator"]
-                    extract_text_fn = result.get("extract_text")
+                    # Use StreamingFilter to clean up the raw LLM tokens before streaming
+                    # This handles: JSON prefix, incomplete HTML tags, HTML entities, functions boundary
+                    raw_generator = result["generator"]
+                    stream_filter = StreamingFilter(raw_generator)
+                    
+                    # Get the filtered stream for Telegram
+                    filtered_stream = stream_filter.filter_stream()
                     
                     full_response, telegram_message_id = await send_message_streaming(
                         chat_id=chat_id,
-                        token_generator=generator,
+                        token_generator=filtered_stream,
                     )
                     
                     logger.info(f"[batch] Streamed to Telegram, message_id={telegram_message_id}, full_response length={len(full_response)}")
@@ -419,13 +423,14 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                         ai_response = "[No response from LLM]"
                         await send_message(chat_id, ai_response)
                     else:
-                        # Extract just the response text if the response contains JSON
-                        if extract_text_fn:
-                            ai_response = extract_text_fn(full_response)
-                        else:
-                            ai_response = full_response
+                        # Get any remaining content for function processing
+                        remaining_for_functions = stream_filter.get_remaining_for_functions()
                         
-                        logger.info(f"[batch] Extracted ai_response: {ai_response[:200] if ai_response else 'EMPTY'}...")
+                        # Use remaining content for function parsing if available
+                        # Otherwise use the full streamed response
+                        function_parse_text = remaining_for_functions if remaining_for_functions else full_response
+                        
+                        logger.info(f"[batch] Extracted ai_response: {full_response[:200] if full_response else 'EMPTY'}...")
                         
                         # Run post-response hooks to check for function calls
                         # This runs after streaming is complete
@@ -440,7 +445,8 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                                 
                                 response_builder = get_response_builder()
                                 parser = get_intent_parser()
-                                parse_result = parser.parse(full_response)
+                                # Parse using the remaining content (contains functions)
+                                parse_result = parser.parse(function_parse_text)
                                 
                                 built_response = response_builder.build(
                                     user_text=combined_text,
@@ -452,6 +458,9 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                                 has_function_results = True
                         except Exception as e:
                             print(f"[stream post_hook error] {e}")
+                        
+                        # Set ai_response for logging
+                        ai_response = full_response
                         
                         # If we have function results, send the combined response once
                         # Otherwise, the AI text was already streamed so no need to send again

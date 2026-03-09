@@ -652,7 +652,11 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
             return diagnostics
 
         def _extract_response_text(full_response_text: str) -> str:
-            """Extract just the response text from potentially JSON-formatted response."""
+            """Extract just the response text from potentially JSON-formatted response.
+            
+            Note: This is used for non-English path. For English streaming, the
+            StreamingFilter in telegram_stream.py handles this during streaming.
+            """
             from src.functions.intent_parser import get_intent_parser
             parser = get_intent_parser()
             parse_result = parser.parse(full_response_text)
@@ -662,17 +666,14 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
 
         if is_english:
             # Stream the LLM response directly
+            # Note: Text extraction is handled by StreamingFilter in telegram_stream.py
             gen = stream_ollama(
                 prompt,
                 model=settings.OLLAMA_CHAT_RAG_MODEL if use_rag else None,
                 language=user_lang,
             )
-            # Wrap generator to extract just the response text from JSON
-            async def _extracted_gen():
-                async for token in gen:
-                    yield token
             
-            return {"type": "stream", "generator": _extracted_gen(), "post_hook": _post_hook, "extract_text": _extract_response_text}
+            return {"type": "stream", "generator": gen, "post_hook": _post_hook}
         else:
             # Non-English: get full LLM response first, then stream translation
             response = await self.call_ollama(
