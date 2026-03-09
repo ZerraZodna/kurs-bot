@@ -25,6 +25,7 @@ class StreamingFilter:
     - Buffers HTML entities (&nbsp;, &amp;, etc.) until complete
     - Stops at "functions": boundary (end of text response)
     - Returns remaining content for function processing
+    - Properly unescapes JSON strings including Unicode sequences
     """
     
     # HTML tags that Telegram supports and should be buffered
@@ -154,6 +155,14 @@ class StreamingFilter:
                 self._functions_boundary_reached = False  # Actually we've reached it
                 
                 if text_part:
+                    # Clean up the text part - remove trailing comma, quote, and whitespace
+                    # This handles cases like: "...text", 
+                    text_part = text_part.strip()
+                    if text_part.endswith('",'):
+                        text_part = text_part[:-1]  # Remove trailing comma
+                    elif text_part.endswith(','):
+                        text_part = text_part[:-1]  # Remove trailing comma
+                    
                     # Yield the text part (might need to flush buffer)
                     self._buffer = ""
                     # Try to extract just the string value (remove surrounding quotes)
@@ -178,27 +187,59 @@ class StreamingFilter:
                 yield clean_text
             self._buffer = ""
     
+    def _unescape_json_string(self, text: str) -> str:
+        """Unescape a JSON string value.
+        
+        Handles all common escape sequences including:
+        - \\n -> newline
+        - \\t -> tab
+        - \\r -> carriage return
+        - \\uXXXX -> Unicode characters
+        - \\" -> quote
+        - \\\\ -> backslash
+        """
+        if not text:
+            return ""
+        
+        # First, handle Unicode escape sequences (\\uXXXX)
+        # This must be done first, before other escape sequences
+        def replace_unicode(match):
+            try:
+                return chr(int(match.group(1), 16))
+            except (ValueError, OverflowError):
+                return match.group(0)  # Return original if invalid
+        
+        text = re.sub(r'\\u([0-9a-fA-F]{4})', replace_unicode, text)
+        
+        # Handle extended Unicode (\\uXXXXXXXX) if present
+        text = re.sub(r'\\u([0-9a-fA-F]{8})', replace_unicode, text)
+        
+        # Unescape common escape sequences
+        text = text.replace('\\\\', '\\')
+        text = text.replace('\\"', '"')
+        text = text.replace('\\n', '\n')
+        text = text.replace('\\t', '\t')
+        text = text.replace('\\r', '\r')
+        
+        return text
+    
     def _extract_string_value(self, text: str) -> str:
         """Extract the string value from a JSON string value.
-        
+
         Handles escaped characters and returns the unescaped content.
         """
         if not text:
             return ""
-            
+
         # Try to match a quoted string: "content"
         match = re.match(r'^"(.*)"$', text, re.DOTALL)
         if match:
-            # Unescape the string content
-            content = match.group(1)
-            # Unescape common escape sequences
-            content = content.replace(r'\"', '"')
-            content = content.replace(r'\\', '\\')
-            content = content.replace(r'\n', '\n')
-            content = content.replace(r'\t', '\t')
-            content = content.replace(r'\r', '\r')
+            # Get the raw content and unescape it
+            raw_content = match.group(1)
+            # Unescape JSON string (including Unicode)
+            content = self._unescape_json_string(raw_content)
             return content
-        
+
         # If no quotes, return as-is (might be plain text)
         return text
     
@@ -211,8 +252,22 @@ class StreamingFilter:
             Remaining text for function processing, or None if nothing remaining
         """
         # Also include any remaining buffer content
-        if self._buffer and not self._functions_boundary_reached:
-            self._remaining_for_functions = (self._remaining_for_functions or "") + self._buffer
+        if self._buffer:
+            # Check if buffer contains functions boundary
+            func_pos = self._find_functions_boundary(self._buffer)
+            if func_pos != -1:
+                # Functions boundary found in remaining buffer
+                self._remaining_for_functions = self._buffer[func_pos:]
+            else:
+                # No functions boundary - this might be incomplete text or empty
+                # Try to extract as string and check if it's valid
+                extracted = self._extract_string_value(self._buffer)
+                if extracted and extracted.strip():
+                    # This is valid text, not functions - don't include in functions
+                    pass
+                elif '"functions"' in self._buffer or '"functions":' in self._buffer:
+                    # Buffer contains functions-related content
+                    self._remaining_for_functions = (self._remaining_for_functions or "") + self._buffer
             self._buffer = ""
             
         return self._remaining_for_functions
