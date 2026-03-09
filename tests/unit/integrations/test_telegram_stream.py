@@ -220,6 +220,55 @@ async def test_unescapes_quoted_strings():
     assert "world" in combined
 
 
+@pytest.mark.asyncio
+async def test_unescapes_newlines():
+    """
+    StreamingFilter should unescape \\n to actual newlines (linefeed/lf).
+    This tests the fix for the issue where \\n was appearing as literal \\n
+    instead of actual newlines in the output.
+    """
+    # Use actual newline character in the JSON string
+    # The LLM outputs JSON with \n (0x0A) as the escape sequence for newline
+    json_with_newline = '{"response": "Hello\nworld!"}'
+    tokens = [json_with_newline]
+    generator = mock_token_generator(tokens)
+    filter = StreamingFilter(generator)
+    
+    results = []
+    async for chunk in filter.filter_stream():
+        results.append(chunk)
+    
+    combined = "".join(results)
+    # Should contain actual newline (0x0A)
+    assert "\n" in combined
+    assert "Hello" in combined
+    assert "world" in combined
+
+
+@pytest.mark.asyncio
+async def test_escaped_backslash_not_converted_to_newline():
+    """
+    StreamingFilter should NOT convert escaped backslash followed by n to newline.
+    In JSON, \\\\n represents a literal backslash + n, not a newline.
+    """
+    # In JSON, "path\\to\\file" represents the string: path\to\file
+    # The raw token contains: backslash, n, backslash, n, backslash, n
+    json_with_backslashes = '{"response": "path\\\\to\\\\file"}'
+    tokens = [json_with_backslashes]
+    generator = mock_token_generator(tokens)
+    filter = StreamingFilter(generator)
+    
+    results = []
+    async for chunk in filter.filter_stream():
+        results.append(chunk)
+    
+    combined = "".join(results)
+    # Should have literal backslashes, not newlines
+    assert "\\" in combined
+    # Should NOT have actual newlines
+    assert "\n" not in combined
+
+
 # ─── Helper to run tests standalone ───────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -240,6 +289,8 @@ if __name__ == "__main__":
             ("test_handles_plain_text_response", test_handles_plain_text_response),
             ("test_handles_empty_generator", test_handles_empty_generator),
             ("test_unescapes_quoted_strings", test_unescapes_quoted_strings),
+            ("test_unescapes_newlines", test_unescapes_newlines),
+            ("test_escaped_backslash_not_converted_to_newline", test_escaped_backslash_not_converted_to_newline),
         ]
         
         for name, test_fn in tests:

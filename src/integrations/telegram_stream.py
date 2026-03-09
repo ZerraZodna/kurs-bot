@@ -214,12 +214,17 @@ class StreamingFilter:
         # Handle extended Unicode (\\uXXXXXXXX) if present
         text = re.sub(r'\\u([0-9a-fA-F]{8})', replace_unicode, text)
         
-        # Unescape common escape sequences
-        text = text.replace('\\\\', '\\')
-        text = text.replace('\\"', '"')
+        # Unescape common escape sequences FIRST (before handling backslashes)
+        # This order is important: \\\\ -> \\ must happen AFTER \n -> newline
+        # Otherwise \\n gets incorrectly converted to newline when it should
+        # remain as \n (escaped backslash followed by letter n)
         text = text.replace('\\n', '\n')
         text = text.replace('\\t', '\t')
         text = text.replace('\\r', '\r')
+        text = text.replace('\\"', '"')
+        
+        # Finally, handle escaped backslashes (must be last!)
+        text = text.replace('\\\\', '\\')
         
         return text
     
