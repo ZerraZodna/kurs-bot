@@ -1,189 +1,121 @@
 # Kurs Bot
 
-A chatbot/consultant with persistent memory that delivers daily lessons and interval reminders via DM channels (Telegram, Slack, SMS, Teams) and email.
+A chatbot with persistent memory that delivers daily lessons via Telegram, Slack, SMS, and email.
 
-## Tech Stack
-- Python 3.10+
-- FastAPI
-- SQLAlchemy ORM
-- SQLite (for prototyping) / SQL Server (production)
-- Alembic (migrations)
-- pytest (testing)
+## Prerequisites
 
-## Unified quickstart (all platforms)
-Use the npm helper everywhere; it creates `.venv`, installs Python deps, and runs the common scripts. You still need to set secrets and install ngrok yourself.
-
+### macOS
 ```bash
-git clone https://github.com/ZerraZodna/kurs-bot.git
-cd kurs-bot
-cp .env.template .env
-# Required in .env (npm will NOT set these):
-#   TELEGRAM_BOT_TOKEN, SLACK_BOT_TOKEN, API_AUTH_TOKEN, GDPR_ADMIN_TOKEN
-# Optional: NGROK_AUTH_TOKEN (or run `ngrok config add-authtoken`)
+# Install Homebrew (if not present)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-npm install                      # builds .venv and installs Python deps
-npm run init_db -- --db prod     # or --db dev for src/data/dev.db
-npm start                        # starts uvicorn + ngrok if present
-# Optional dev UI: set DEV_WEB_CLIENT=true in .env, then
-npm run start:ui
-npm stop                         # stops processes started by npm start
+# Install Git, Node.js
+brew install git node
+
+# Install Python 3.10+ (usually comes with Node.js, verify with: python3 --version)
+
+# Install ngrok (optional, for Telegram dev)
+brew install ngrok
+ngrok config add-authtoken <your-ngrok-token>
 ```
 
-What `npm install` does: creates `.venv`, installs project requirements. What it does **not** do: set any tokens/keys, install ngrok, or open firewall ports.
-
-## Platform prerequisites
-Install these before running the unified quickstart above.
-
-### Debian/Ubuntu (incl. AWS Debian 12/Ubuntu 20.04+)
+### Ubuntu/Debian (including AWS)
 ```bash
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y git curl build-essential python3 python3-venv python3-pip
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
-# Optional: sudo apt install -y powershell
-# ngrok (not installed by npm):
-# curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
-# echo "deb https://ngrok-agent.s3.amazonaws.com/apt/ stable main" | sudo tee /etc/apt/sources.list.d/ngrok.list
-# sudo apt update && sudo apt install -y ngrok
-# ngrok config add-authtoken <your-ngrok-token>
+
+# Install ngrok (optional, for Telegram dev)
+curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+echo "deb https://ngrok-agent.s3.amazonaws.com/apt/ stable main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+sudo apt update && sudo apt install -y ngrok
+ngrok config add-authtoken <your-ngrok-token>
 ```
-- CPU-only PyTorch (small/headless servers): `python -m pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.4.1+cpu` before `npm install` if you want to pin the CPU wheel.
 
-### macOS (Apple Silicon)
-- Install Node.js 20+ (e.g., `brew install node`).
-- Runtime: `npm start` to start the application.
-
-### Windows (npm helper)
+### Windows
 ```powershell
+# Install winget (comes with Windows 10+)
+winget install -e --id Git.Git
 winget install -e --id OpenJS.NodeJS.LTS
 winget install -e --id Python.Python.3.10
-# (optional) winget install -e --id Microsoft.PowerShell
-git clone https://github.com/ZerraZodna/kurs-bot.git
-cd kurs-bot
-copy .env.template .env
-npm install
-npm run init_db -- --db prod   # or --db dev
-# Install ngrok separately (npm does NOT install it):
-# choco install ngrok  # or download from https://ngrok.com/download
-# ngrok config add-authtoken <your-ngrok-token>
-npm start
-# optional dev UI (after setting DEV_WEB_CLIENT=true)
-npm run start:ui
-npm stop
+
+# Install ngrok (optional, for Telegram dev)
+winget install -e --id ngrok.ngrok
+ngrok config add-authtoken <your-ngrok-token>
 ```
 
-Manual fallback (if npm scripts can’t run):
-```powershell
-python -m venv .venv
-.\.venv\Scripts\activate
-pip install -r requirements.txt
-alembic upgrade head
-uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
-```
-
-## Where to put the ngrok key
-
-- Preferred: authenticate ngrok locally using `ngrok config add-authtoken <token>`; no env var needed.
-- Alternative: set `NGROK_AUTH_TOKEN` in `.env` if you want the project to be explicit. Example in your `.env`:
-
-```
-NGROK_AUTH_TOKEN=your_ngrok_token_here
-```
-
-## Start-up summary (quick)
-
-1. Activate venv: `source .venv/bin/activate`
-2. Start app: `uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000`
-3. Start ngrok: `ngrok http 8000`
-4. Set Telegram webhook to `https://<ngrok-id>.ngrok.io/webhook/telegram`
-
---
-
-## Development Commands
-
-Use `cli.py` for common development tasks:
+## Quick Start
 
 ```bash
-# Database management
-python cli.py db status              # Show database status
-python cli.py db reset               # Reset dev.db (keeps 365 lessons)
-python cli.py db backup              # Create backup
-python cli.py db fresh-start         # Complete fresh start (delete + re-import)
-python cli.py db info                # Show detailed DB info
-
-# ACIM lessons
-python cli.py import-lessons         # Import ACIM lessons from PDF
-
-# Debugging
-python cli.py debug memory           # Debug memory extraction
-python cli.py debug schedule         # Debug schedule creation
-
-# Production
-python cli.py init-prod              # Initialize production database
+git clone https://github.com/ZerraZodna/kurs-bot.git
+cd kurs-bot
+cp .env.template .env
+npm install
+npm run config   # Add your TELEGRAM_BOT_TOKEN
+npm test        # Verify code runs
+npm start       # Start API + ngrok
 ```
 
-See [docs/SCRIPTS_ORGANIZATION.md](docs/SCRIPTS_ORGANIZATION.md) for full script documentation.
+That's it! npm handles:
+- Creating Python virtual environment (`.venv`)
+- Installing Python dependencies
+- Starting the API server (uvicorn)
+- Starting ngrok (if installed)
 
-## Local development helper scripts
+## Setup Telegram Bot
 
-The repository includes convenience scripts for getting a local development environment running quickly on Windows.
+1. **Get Bot Token**: Message [@BotFather](https://t.me/BotFather) on Telegram → `/newbot` → follow prompts → copy token
 
-- Start everything (uvicorn, ngrok):
-   ```powershell
-   .\start_kursbot.ps1 -StartInfra
+2. **Configure in `.env`**:
+   ```
+   TELEGRAM_BOT_TOKEN=your_bot_token_here
    ```
 
-## Deployment (production)
+3. **Test**: Start the bot with `npm start`, then open Telegram and send a message!
 
-This project can be deployed with a standard Python WSGI/ASGI process (uvicorn) and a production SQL database. Key points:
+## NPM Commands
 
-- Infrastructure: use Postgres (or other production SQL) and configure `DATABASE_URL` in environment. Optionally run worker processes for background tasks and a vector index (Faiss or managed vector DB) if required.
-- Important environment variables:
-   - `DATABASE_URL` — production DB connection string.
-   - `OLLAMA_EMBED_URL` and `OLLAMA_EMBED_MODEL` — embedding service endpoint and model (if using Ollama).
-   - `EMBEDDING_DIMENSION` — ensure this matches the embed model used.
-   - `NGROK_PATH` — local dev only; not required in production.
-
-- Recommended startup order:
-   1. Start the database and run migrations (`alembic upgrade head`).
-   2. Start background workers (if used).
-   3. Start the API: `uvicorn src.api.app:app`.
-
-- Upgrades and reindexing:
-   - If changing the embedding model or vector configuration, plan a backfill job to regenerate embeddings during a low-traffic window.
-   - Workers should check existing metadata before regenerating to avoid duplicate work.
-
-- CI and local development:
-   - CI runs `pytest` against SQLite by default; configure CI to opt-in to real backends if necessary.
-
-- Security & backups:
-   - Protect API keys and DB credentials with your secrets manager and follow GDPR/export controls when handling user memories.
-   - Implement regular DB backups and vector index dumps if used.
-
-Contact your ops/backend team to finalize sizing, alerting, and other production roll-out tasks.
+| Command | Description |
+|---------|-------------|
+| `npm install` | Install all dependencies |
+| `npm start` | Start API + ngrok (if available) |
+| `npm stop` | Stop all services |
+| `npm run start:ui` | Start dev web UI |
+| `npm run init_db` | Initialize database |
+| `npm run config` | Create/open `.env` file |
+| `npm run ping` | Test Telegram/Ollama connectivity |
+| `npm test` | Run tests |
 
 ## Configuration (.env)
-- `DATABASE_URL` - Database connection string (default: SQLite for dev)
-- `TELEGRAM_BOT_TOKEN` - Telegram bot token
-- `SLACK_BOT_TOKEN` - Slack bot token
-- `SENDGRID_API_KEY` - SendGrid API key
-- Note: vector-index configuration and runtime toggle have been removed in this branch; vector indexing is disabled by design.
 
-### Semantic Search (RAG mode)
+```bash
+# Required
+TELEGRAM_BOT_TOKEN=      # Get from @BotFather
+API_AUTH_TOKEN=          # For API authentication
 
-The bot supports RAG (Retrieval Augmented Generation) mode for answering questions about ACIM lessons. This uses Ollama's embedding capabilities via the API - no local embedding models required.
+# Optional
+SLACK_BOT_TOKEN=         # Slack bot token
+SENDGRID_API_KEY=        # For email
+NGROK_AUTH_TOKEN=        # Or run: ngrok config add-authtoken <token>
+OLLAMA_BASE_URL=         # Default: http://localhost:11434
+DATABASE_URL=            # SQLite for dev, SQL Server for prod
+```
 
-Enable RAG mode in chat by typing `rag on` or prefixing your message with `rag: `.
+## Tech Stack
+
+- Python 3.10+ / FastAPI / SQLAlchemy
+- Node.js (build tooling only)
+- SQLite (dev) / SQL Server (prod)
 
 ## Project Structure
-- `src/models/database.py` - SQLAlchemy ORM models
-- `src/api/app.py` - FastAPI app and webhook handler
-- `src/services/` - Business logic (memory, scheduling, etc.)
-- `src/integrations/` - Channel integrations (Telegram, Slack, etc.)
-- `migrations/` - Alembic migration scripts
-- `tests/` - Unit tests
 
-## Purpose
-Kurs Bot is designed to help users complete wellness lessons and receive reminders, with persistent memory and multi-channel support.
+```
+src/
+├── api/          # FastAPI routes & webhooks
+├── integrations/ # Telegram, Slack, email adapters
+├── lessons/      # ACIM lesson delivery engine
+├── memories/     # Persistent memory & RAG
+└── models/       # SQLAlchemy ORM
+```
 
----
