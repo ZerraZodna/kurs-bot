@@ -1,6 +1,7 @@
 import asyncio
 import httpx
 import logging
+import re
 import time
 from typing import Optional, Dict, Any, AsyncIterator
 from datetime import datetime, timedelta, timezone
@@ -11,6 +12,88 @@ logger = logging.getLogger(__name__)
 
 TELEGRAM_BOT_TOKEN = settings.TELEGRAM_BOT_TOKEN
 API_BASE = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+
+
+def sanitize_html_for_telegram(text: str) -> str:
+    """Sanitize HTML to Telegram-supported format.
+    
+    Converts unsupported tags (<ul>, <li>, <br>) to plain text
+    while preserving supported formatting tags (<b>, <i>, <em>, <u>, etc).
+    
+    Telegram supports: <b>, <strong>, <i>, <em>, <u>, <s>, <code>, <pre>, <a>
+    Unsupported (converted): <ul>, <li>, <br>
+    """
+    if not text:
+        return text
+    
+    # Step 1: Convert <ul><li> items to bullet points with dashes
+    # First handle <li> content and prepend with dash
+    text = re.sub(r'<li>(.*?)</li>', r'- \1\n', text, flags=re.DOTALL)
+    # Remove <ul> tags
+    text = re.sub(r'</?ul[^>]*>', '', text, flags=re.IGNORECASE)
+    
+    # Step 2: Convert <br> to newlines
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    
+    # Step 3: Strip unsupported HTML tags but keep their content
+    text = _strip_unsupported_tags(text)
+    
+    # Clean up excessive newlines
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    
+    return text.strip()
+
+
+def _strip_unsupported_tags(text: str) -> str:
+    """Remove HTML tags that Telegram doesn't support, keeping their content."""
+    # List of tags Telegram supports
+    supported_tags = ['b', 'strong', 'i', 'em', 'u', 's', 'code', 'pre', 'a']
+    
+    # Pattern to match any tag not in supported list
+    # This matches <tag> or </tag> where tag is not in supported list
+    def replace_tag(match):
+        # Return just the content between tags
+        return match.group(1) or ''
+    
+    # Match opening tags with content: <unsupported>content</unsupported>
+    pattern = r'<(/?)(?!/?(?:' + '|'.join(supported_tags) + r')\b)(\w+)[^>]*>([^<]*)'
+    
+    # Use a different approach: find each tag and check if supported
+    result = []
+    i = 0
+    while i < len(text):
+        if text[i] == '<':
+            # Find the end of the tag
+            end = text.find('>', i)
+            if end == -1:
+                result.append(text[i])
+                i += 1
+                continue
+            
+            tag = text[i:end+1]
+            
+            # Check if it's a closing tag
+            is_closing = tag.startswith('</')
+            
+            # Extract tag name
+            tag_name = re.sub(r'[</>]', '', tag).lower()
+            # Handle self-closing tags and attributes
+            tag_name = re.split(r'[\s>]', tag_name)[0]
+            
+            if tag_name in supported_tags:
+                # Keep the tag
+                result.append(tag)
+            else:
+                # Skip the tag but keep content (handled separately)
+                pass
+            
+            i = end + 1
+        else:
+            result.append(text[i])
+            i += 1
+    
+    return ''.join(result)
+
 
 class TelegramHandler:
     @staticmethod
@@ -39,6 +122,10 @@ async def edit_message(chat_id: int, message_id: int, text: str) -> Optional[dic
     """Edit an existing Telegram message with new text."""
     if not TELEGRAM_BOT_TOKEN:
         return None
+    
+    # Sanitize HTML to Telegram-supported format
+    text = sanitize_html_for_telegram(text)
+    
     url = f"{API_BASE}/editMessageText"
     payload = {
         "chat_id": chat_id,
@@ -154,6 +241,10 @@ async def send_message(chat_id: int, text: str) -> Optional[dict]:
     if not TELEGRAM_BOT_TOKEN:
         print("[telegram] TELEGRAM_BOT_TOKEN not set")
         return None
+    
+    # Sanitize HTML to Telegram-supported format
+    text = sanitize_html_for_telegram(text)
+    
     url = f"{API_BASE}/sendMessage"
     async with httpx.AsyncClient() as client:
         # Telegram hard limit is 4096 chars; stay below to be safe
