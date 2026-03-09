@@ -191,41 +191,13 @@ class StreamingFilter:
         """Unescape a JSON string value.
         
         Handles all common escape sequences including:
-        - \\n -> newline
-        - \\t -> tab
-        - \\r -> carriage return
-        - \\uXXXX -> Unicode characters
-        - \\" -> quote
-        - \\\\ -> backslash
+        - \n -> newline
         """
         if not text:
             return ""
         
-        # First, handle Unicode escape sequences (\\uXXXX)
-        # This must be done first, before other escape sequences
-        def replace_unicode(match):
-            try:
-                return chr(int(match.group(1), 16))
-            except (ValueError, OverflowError):
-                return match.group(0)  # Return original if invalid
-        
-        text = re.sub(r'\\u([0-9a-fA-F]{4})', replace_unicode, text)
-        
-        # Handle extended Unicode (\\uXXXXXXXX) if present
-        text = re.sub(r'\\u([0-9a-fA-F]{8})', replace_unicode, text)
-        
-        # Unescape common escape sequences FIRST (before handling backslashes)
-        # This order is important: \\\\ -> \\ must happen AFTER \n -> newline
-        # Otherwise \\n gets incorrectly converted to newline when it should
-        # remain as \n (escaped backslash followed by letter n)
-        text = text.replace('\\n', '\n')
-        text = text.replace('\\t', '\t')
-        text = text.replace('\\r', '\r')
-        text = text.replace('\\"', '"')
-        
-        # Finally, handle escaped backslashes (must be last!)
-        text = text.replace('\\\\', '\\')
-        
+        text = text.replace('\n', '-n-')
+                
         return text
     
     def _extract_string_value(self, text: str) -> str:
