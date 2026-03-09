@@ -403,19 +403,23 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                     # Stream tokens to Telegram via progressive edits
                     logger.info(f"[batch] Using STREAMING path for user_id={user_id}")
                     
-                    # Accumulate full response first to avoid sending JSON to user
-                    full_response = ""
-                    async for token in result["generator"]:
-                        full_response += token
+                    # Use send_message_streaming to stream tokens directly to Telegram
+                    # This sends an initial message then edits it progressively
+                    generator = result["generator"]
+                    extract_text_fn = result.get("extract_text")
                     
-                    logger.info(f"[batch] Accumulated full_response: {full_response[:200]}...")
+                    full_response, telegram_message_id = await send_message_streaming(
+                        chat_id=chat_id,
+                        token_generator=generator,
+                    )
+                    
+                    logger.info(f"[batch] Streamed to Telegram, message_id={telegram_message_id}, full_response length={len(full_response)}")
                     
                     if not full_response:
                         ai_response = "[No response from LLM]"
                         await send_message(chat_id, ai_response)
                     else:
                         # Extract just the response text if the response contains JSON
-                        extract_text_fn = result.get("extract_text")
                         if extract_text_fn:
                             ai_response = extract_text_fn(full_response)
                         else:
@@ -423,8 +427,8 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                         
                         logger.info(f"[batch] Extracted ai_response: {ai_response[:200] if ai_response else 'EMPTY'}...")
                         
-                        # Run post-response hooks FIRST to check for function calls
-                        # This prevents duplicate messages when functions are executed
+                        # Run post-response hooks to check for function calls
+                        # This runs after streaming is complete
                         function_response_text = None
                         has_function_results = False
                         try:
@@ -450,11 +454,10 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                             print(f"[stream post_hook error] {e}")
                         
                         # If we have function results, send the combined response once
-                        # Otherwise, send just the AI text (to avoid duplication)
+                        # Otherwise, the AI text was already streamed so no need to send again
                         if has_function_results and function_response_text and function_response_text.strip():
                             await send_message(chat_id, function_response_text)
-                        elif ai_response and ai_response.strip():
-                            await send_message(chat_id, ai_response)
+                        # Note: ai_response was already streamed via send_message_streaming
                 else:
                     # Non-LLM response — send normally
                     logger.info(f"[batch] Using NON-STREAMING (text) path for user_id={user_id}")
