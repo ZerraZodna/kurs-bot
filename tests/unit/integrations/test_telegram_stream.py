@@ -201,6 +201,45 @@ async def test_functions_not_returned_with_multiple_tokens():
 
 
 @pytest.mark.asyncio
+async def test_functions_not_returned_with_token_fragmentation():
+    """
+    StreamingFilter should NOT return functions when tokens are fragmented around 
+    the "functions" boundary. This tests the specific bug where:
+    - Token ends with '",' (end of response string + comma)
+    - Next tokens contain '"functions":'
+    
+    The filter must buffer when it detects possible string end to catch the 
+    functions boundary in subsequent tokens.
+    """
+    # This simulates the actual fragmentation pattern from Ollama
+    # Token splits at the exact problematic boundary
+    tokens = [
+        'Hello world',
+        '.',
+        '",',          # End of response string + comma
+        '\n  "',       # Whitespace + opening quote for next field
+        'functions',   # "functions" keyword - arrives later!
+        '": []',       # Colon + empty array
+        '\n}'          # End of JSON
+    ]
+    generator = mock_token_generator(tokens)
+    filter = StreamingFilter(generator)
+    
+    results = []
+    async for chunk in filter.filter_stream():
+        results.append(chunk)
+    
+    combined = "".join(results)
+    
+    # Should include the text response
+    assert "Hello world" in combined
+    
+    # The BUG: "functions" appears in output when buffer is flushed prematurely
+    # After fix: "functions" should NOT appear
+    assert "functions" not in combined, f"Bug: 'functions' leaked into output: {combined}"
+
+
+@pytest.mark.asyncio
 async def test_returns_remaining_for_functions():
     """
     StreamingFilter should return remaining content for function processing.

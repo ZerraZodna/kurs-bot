@@ -75,6 +75,34 @@ class StreamingFilter:
             return True
         return False
     
+    def _is_incomplete_json_escape(self, text: str) -> bool:
+        """Check if text ends with an incomplete JSON escape sequence.
+        
+        Returns True if we're in the middle of a JSON escape sequence that
+        needs more characters to be complete. This prevents premature
+        unescaping when escape sequences are fragmented across tokens.
+        """
+        if not text:
+            return False
+            
+        # Check if text ends with a backslash that could start an escape
+        if text.endswith('\\'):
+            # Check for double backslash - could be \\ followed by n
+            # In JSON, \\n = literal backslash + n, not newline
+            # But we need to see what comes next
+            # If we have just \\, buffer in case next char is n, u, x, etc.
+            return True
+            
+        # Check for incomplete \u escape (need \uXXXX - 4 hex digits)
+        if re.search(r'\\u[0-9a-fA-F]{0,3}$', text):
+            return True
+            
+        # Check for incomplete \x escape (need \xNN - 2 hex digits)
+        if re.search(r'\\x[0-9a-fA-F]{0,1}$', text):
+            return True
+            
+        return False
+    
     def _find_functions_boundary(self, text: str) -> int:
         """Find the position of "functions": boundary in text.
         
@@ -87,11 +115,54 @@ class StreamingFilter:
         if match:
             return match.start()
         return -1
+        
+    def _is_response_string_ended(self, text: str) -> bool:
+        """Check if the JSON response string value has ended.
+        
+        This detects when we've hit the closing quote of the "response" field,
+        followed by a comma (which marks the start of the next field like "functions").
+        
+        Once this is detected, nothing more should go to Telegram - all subsequent
+        content (functions, etc.) should be collected for function processing only.
+        
+        Returns True if text contains pattern like: "...",  (closing quote + comma)
+        """
+        # Match: " followed by , - this marks end of string value in JSON
+        # This is the closing quote of the response field, followed by comma
+        if re.search(r'"\s*,', text):
+            return True
+        return False
+
     
     def _flush_buffer(self) -> str:
         """Flush the internal buffer and return its contents."""
         result = self._buffer
         self._buffer = ""
+        return result
+    
+    def _unescape_json_string(self, text: str) -> str:
+        """Unescape JSON escape sequences in text.
+        
+        This handles the common JSON escape sequences that may appear
+        in the LLM response string content.
+        
+        Args:
+            text: Text that may contain JSON escape sequences
+            
+        Returns:
+            Text with JSON escape sequences converted to actual characters
+        """
+        if not text:
+            return text
+            
+        result = text
+        # Order matters: handle escaped backslashes first
+        result = result.replace('\\\\', '\\')  # \\ -> \
+        result = result.replace('\\n', '\n')    # \n -> newline
+        result = result.replace('\\r', '\r')    # \r -> carriage return
+        result = result.replace('\\t', '\t')    # \t -> tab
+        result = result.replace('\\"', '"')     # \" -> "
+        result = result.replace("\\'", "'")     # \' -> '
         return result
     
     async def filter_stream(self) -> AsyncIterator[str]:
@@ -155,9 +226,9 @@ class StreamingFilter:
                 self._functions_boundary_reached = False  # Actually we've reached it
                 
                 if text_part:
-                    # Yield the text part (might need to flush buffer)
+                    # Yield the text part (with JSON unescaping)
                     self._buffer = ""
-                    yield text_part
+                    yield self._unescape_json_string(text_part)
                 continue
             
             # Step 3: Buffer incomplete HTML tags
@@ -170,9 +241,34 @@ class StreamingFilter:
                 # Wait for more tokens to complete the entity
                 continue
             
-            # Step 5: Buffer is complete - extract string value and yield
+            # Step 5: Buffer incomplete JSON escape sequences
+            # Escape sequences like \n, \\n, \t can be fragmented across tokens
+            # We need to buffer until we have a complete escape sequence
+            if self._is_incomplete_json_escape(self._buffer):
+                # Wait for more tokens to complete the escape sequence
+                continue
+
+            # Step 6: Check if response string has ended
+            # Once we detect closing quote + comma (e.g., '?",' or '")'), 
+            # nothing more should go to Telegram - collect for functions only
+            if self._is_response_string_ended(self._buffer):
+                # Response string has ended - collect everything for functions
+                self._functions_boundary_reached = True
+                self._remaining_for_functions = self._buffer
+                # Yield what's left in buffer (the actual response text)
+                text_part = self._buffer
+                # Find where the "," starts and only yield before it
+                match = re.search(r'"\s*,', text_part)
+                if match:
+                    text_part = text_part[:match.start()]
+                if text_part:
+                    yield self._unescape_json_string(text_part)
+                self._buffer = ""
+                continue
+
+            # Step 7: Buffer is complete - extract string value and yield (with JSON unescaping)
             if self._buffer:
-                yield self._buffer
+                yield self._unescape_json_string(self._buffer)
             self._buffer = ""
             
     def get_remaining_for_functions(self) -> Optional[str]:
