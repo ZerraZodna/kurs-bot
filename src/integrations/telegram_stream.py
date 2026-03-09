@@ -186,20 +186,7 @@ class StreamingFilter:
             if clean_text:
                 yield clean_text
             self._buffer = ""
-    
-    def _unescape_json_string(self, text: str) -> str:
-        """Unescape a JSON string value.
         
-        Handles all common escape sequences including:
-        - \n -> newline
-        """
-        if not text:
-            return ""
-        
-        text = text.replace('\n', '-n-')
-                
-        return text
-    
     def _extract_string_value(self, text: str) -> str:
         """Extract the string value from a JSON string value.
 
@@ -208,16 +195,8 @@ class StreamingFilter:
         if not text:
             return ""
 
-        # Try to match a quoted string: "content"
-        match = re.match(r'^"(.*)"$', text, re.DOTALL)
-        if match:
-            # Get the raw content and unescape it
-            raw_content = match.group(1)
-            # Unescape JSON string (including Unicode)
-            content = self._unescape_json_string(raw_content)
-            return content
+        text = text.replace('\n', '-n-')
 
-        # If no quotes, return as-is (might be plain text)
         return text
     
     def get_remaining_for_functions(self) -> Optional[str]:
