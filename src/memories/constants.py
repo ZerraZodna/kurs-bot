@@ -85,3 +85,16 @@ class MemoryKey:
 
     # Lesson repeat tracking
     LESSON_REPEAT_OFFERED = "lesson_repeat_offered"
+
+    # Centralized key sets for memory category inference (DRY)
+    # These are frozensets for efficient membership testing
+    PROFILE_KEYS = frozenset({
+        FULL_NAME, FIRST_NAME, NAME, USER_LANGUAGE,
+        PREFERRED_LESSON_TIME, PERSONAL_BACKGROUND,
+    })
+    PREFERENCE_KEYS = frozenset({
+        "preferred_time", "reminder_frequency", "notification_enabled",
+    })
+    PROGRESS_KEYS = frozenset({
+        LESSON_COMPLETED, LESSON_CURRENT, MILESTONE, "insight",
+    })
