@@ -23,7 +23,7 @@ class PromptBuilder:
     Prompt Structure:
     1. System Role/Persona
     2. User Profile Context (name, preferences, goals)
-    3. Relevant Memories (recent, high-confidence)
+    3. Relevant Memories (recent)
     4. Conversation History (recent turns)
     5. Current User Input
     """
@@ -464,8 +464,7 @@ class PromptBuilder:
         if goals:
             parts.append("Learning Goals:")
             for i, g in enumerate(goals[:3], 1):  # Top 3 goals
-                confidence = f" (confidence: {g['confidence']:.1%})" if g['confidence'] < 1.0 else ""
-                parts.append(f"  {i}. {g['value']}{confidence}")
+                parts.append(f"  {i}. {g['value']}")
                 
         return "\n".join(parts) if parts else ""
     

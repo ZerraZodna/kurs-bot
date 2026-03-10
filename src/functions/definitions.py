@@ -166,7 +166,7 @@ User: "My name is Johannes. Got that?"
 {
   "response": "Nice to meet you, Johannes! I've noted your name.",
   "functions": [
-    {"name": "extract_memory", "parameters": {"key": "first_name", "value": "Johannes", "confidence": 0.9}}
+    {"name": "extract_memory", "parameters": {"key": "first_name", "value": "Johannes"}}
   ]
 }
 
@@ -176,7 +176,7 @@ User: "Remember my name is Sarah"
 {
   "response": "Nice to meet you, Sarah! I've noted your name.",
   "functions": [
-    {"name": "extract_memory", "parameters": {"key": "name", "value": "Sarah", "confidence": 0.95}}
+    {"name": "extract_memory", "parameters": {"key": "first_name", "value": "Sarah"}}
   ]
 }
 """,
@@ -210,7 +210,7 @@ User: "Remind me every day at 9am"
   "functions": [
     {"name": "create_schedule", "parameters": {"time": "09:00", "message": "Time for your daily ACIM lesson"}},
     {"name": "set_preferred_time", "parameters": {"time": "09:00"}},
-    {"name": "extract_memory", "parameters": {"key": "preferred_time", "value": "09:00", "confidence": 0.9}}
+    {"name": "extract_memory", "parameters": {"key": "preferred_lesson_time", "value": "09:00"}}
   ]
 }
 
@@ -269,7 +269,7 @@ User: "I'm on lesson 25 now"
 {
   "response": "Great progress! I've noted that you're on lesson 25.",
   "functions": [
-    {"name": "extract_memory", "parameters": {"key": "current_lesson", "value": "25", "confidence": 0.85}}
+    {"name": "extract_memory", "parameters": {"key": "current_lesson", "value": "25"}}
   ]
 }
 
@@ -279,9 +279,9 @@ User: "My name is John and I'm in Tokyo, studying lesson 30"
 {
   "response": "Thanks John! I've noted your details and set your timezone.",
   "functions": [
-    {"name": "extract_memory", "parameters": {"key": "name", "value": "John", "confidence": 0.9}},
+    {"name": "extract_memory", "parameters": {"key": "first_name", "value": "John"}},
     {"name": "set_timezone", "parameters": {"timezone": "Asia/Tokyo"}},
-    {"name": "extract_memory", "parameters": {"key": "current_lesson", "value": "30", "confidence": 0.8}}
+    {"name": "extract_memory", "parameters": {"key": "current_lesson", "value": "30"}}
   ]
 }
 """,

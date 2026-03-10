@@ -41,7 +41,6 @@ class TestCompleteWorkflow:
             key=MemoryKey.LEARNING_GOAL,
             value="Master Python basics",
             category=MemoryCategory.GOALS,
-            confidence=0.9,
         )
 
         # 3. Store preferences
@@ -145,7 +144,6 @@ class TestCompleteWorkflow:
             key="preferred_topic",
             value="Web development",
             category=MemoryCategory.GOALS,
-            confidence=0.8,
         )
 
         # Later changes mind to AI
@@ -154,7 +152,6 @@ class TestCompleteWorkflow:
             key="preferred_topic",
             value="Artificial intelligence",
             category=MemoryCategory.GOALS,
-            confidence=0.95,
         )
 
         # Should have newer goal active
@@ -163,9 +160,9 @@ class TestCompleteWorkflow:
         assert "Artificial intelligence" in memories[0]["value"]
 
     def test_prompt_optimization_with_multiple_contexts(self, db_session: Session, test_user: User):
-        """Given: Multiple memories with varying confidence levels
+        """Given: Multiple memories with different values
         When: Prioritizing memories
-        Then: Should return highest confidence memories first."""
+        Then: Should return memories appropriately."""
         mm = MemoryManager(db_session)
         po = PromptOptimizer()
 
@@ -181,19 +178,12 @@ class TestCompleteWorkflow:
                 key="interest",
                 value=topic,
                 category=MemoryCategory.PREFERENCES,
-                confidence=1.0 - (topics.index(topic) * 0.1),  # Decreasing confidence
                 allow_duplicates=True,  # Allow multiple interests
             )
 
         # Retrieve all
         interests = mm.get_memory(test_user.user_id, "interest")
-        assert len(interests) > 0
-
-        # Prioritize
-        prioritized = po.prioritize_memories(interests, max_count=2)
-        assert len(prioritized) <= 2
-        # Highest confidence should be first
-        assert prioritized[0]["confidence"] >= prioritized[1]["confidence"]
+        assert len(interests) >= 2
 
     def test_conversation_history_compression(self, db_session: Session, test_user: User):
         """Given: A long conversation history

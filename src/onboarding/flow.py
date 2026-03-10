@@ -69,7 +69,6 @@ class OnboardingFlow:
         key: str,
         value: str,
         category: str = MemoryCategory.CONVERSATION.value,
-        confidence: float = 1.0,
         source: str = "dialogue_engine",
         ttl_hours: Optional[float] = None,
     ):
@@ -78,7 +77,6 @@ class OnboardingFlow:
             key=key,
             value=value,
             category=category,
-            confidence=confidence,
             source=source,
             ttl_hours=ttl_hours,
             allow_duplicates=False,

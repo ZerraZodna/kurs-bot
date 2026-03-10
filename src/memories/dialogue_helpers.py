@@ -114,9 +114,7 @@ async def extract_and_store_memories(
 
         for memory in extracted_memories:
             try:
-                # AI only returns memories that should be stored
-                # No need to check should_store
-                
+                # Store all extracted memories
                 key = memory.get("key")
                 val = memory.get("value")
                 archive_memory_ids = memory.get("archive_memory_ids", [])  # List of IDs to archive
@@ -172,7 +170,6 @@ async def extract_and_store_memories(
                         user_id=user_id,
                         key=key,
                         value=val,
-                        confidence=memory.get("confidence", 1.0),
                         ttl_hours=memory.get("ttl_hours"),
                         source="dialogue_engine_extractor",
                     )

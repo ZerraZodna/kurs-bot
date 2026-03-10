@@ -3,8 +3,7 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 from src.models.database import SessionLocal
 from src.memories.store import MemoryStore
-from src.memories.types import MemoryRecord
-from src.memories.memory_handler import MemoryHandler
+from src.memories.memory_handler import MemoryHandler, MemoryRecord
 from src.memories.constants import MemoryCategory, MemoryKey
 
 logger = logging.getLogger(__name__)
@@ -34,13 +33,13 @@ class MemoryManager:
     def get_memory(self, user_id: int, key: str) -> List[MemoryRecord]:
         return self.memory_handler.get_memory(user_id=user_id, key=key)
 
-    def store_memory(self, user_id: int, key: str, value: str, confidence: float = 1.0,
+    def store_memory(self, user_id: int, key: str, value: str,
                      source: str = "dialogue_engine", ttl_hours: Optional[int] = None, category: str = "fact",
                      allow_duplicates: bool = False) -> int:
         """Store a memory with simple conflict resolution.
 
         Rules (when allow_duplicates=False):
-        - If an active memory exists with identical value_hash -> merge (update confidence/updated_at).
+        - If an active memory exists with identical value_hash -> merge (update updated_at).
         - If active memory exists with different value_hash -> archive existing, insert new as active and set conflict_group_id.
         - If none exists -> insert new.
         
@@ -51,7 +50,6 @@ class MemoryManager:
             user_id: User ID
             key: Memory key
             value: Memory value
-            confidence: Confidence score (0.0-1.0)
             source: Source of memory
             ttl_hours: Hours until memory expires (None = never)
             category: Memory category
@@ -63,7 +61,6 @@ class MemoryManager:
             user_id=user_id,
             key=key,
             value=value,
-            confidence=confidence,
             source=source,
             ttl_hours=ttl_hours,
             category=category,
@@ -105,6 +102,6 @@ if __name__ == '__main__':
     init_db()
     mm = MemoryManager()
     uid = 1
-    mid = mm.store_memory(uid, 'learning_goal', 'Complete ACIM 365 lessons', confidence=1.0)
+    mid = mm.store_memory(uid, 'learning_goal', 'Complete ACIM 365 lessons')
     print('stored', mid)
     print(mm.get_memory(uid, 'learning_goal'))

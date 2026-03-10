@@ -71,7 +71,6 @@ def create_auto_schedule(db: Session, user_id: int) -> bool:
             key=MemoryKey.PREFERRED_LESSON_TIME,
             value="07:30",
             category=MemoryCategory.PREFERENCE.value,
-            confidence=1.0,
             source="onboarding_auto_schedule",
             allow_duplicates=False,
         )

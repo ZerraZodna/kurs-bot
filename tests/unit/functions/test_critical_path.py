@@ -52,7 +52,6 @@ class TestFunctionRegistry:
         param_names = [p.name for p in func.parameters]
         assert "key" in param_names
         assert "value" in param_names
-        assert "confidence" in param_names
         assert "ttl_hours" in param_names
     
     def test_context_filtering(self):
@@ -89,7 +88,7 @@ class TestIntentParser:
             "response": "I'll set up your schedule for 9:00 AM.",
             "functions": [
                 {"name": "create_schedule", "parameters": {"time": "09:00"}},
-                {"name": "extract_memory", "parameters": {"key": "preferred_time", "value": "09:00", "confidence": 0.9}}
+                {"name": "extract_memory", "parameters": {"key": "preferred_time", "value": "09:00"}}
             ]
         })
         
@@ -142,8 +141,7 @@ class TestIntentParser:
                     "name": "extract_memory",
                     "parameters": {
                         "key": "current_lesson",
-                        "value": "23",
-                        "confidence": 0.9
+                        "value": "23"
                     }
                 }
             ]
@@ -157,7 +155,6 @@ class TestIntentParser:
         assert result.functions[0]["name"] == "extract_memory"
         assert result.functions[0]["parameters"]["key"] == "current_lesson"
         assert result.functions[0]["parameters"]["value"] == "23"
-        assert result.functions[0]["parameters"]["confidence"] == 0.9
     
     def test_parse_invalid_function_name(self):
         """Test validation of unknown function names."""
@@ -336,7 +333,6 @@ class TestFunctionExecutor:
         params = {
             "key": "name",
             "value": "Sarah",
-            "confidence": 0.9
         }
         
         result = await executor._handle_extract_memory(params, context)
@@ -351,24 +347,6 @@ class TestFunctionExecutor:
         call_args = mock_memory_manager.store_memory.call_args
         assert call_args[1]["key"] == "name"
         assert call_args[1]["value"] == "Sarah"
-    
-    @pytest.mark.asyncio
-    async def test_extract_memory_low_confidence_rejected(self):
-        """Test that low confidence extractions are rejected."""
-        executor = FunctionExecutor()
-        
-        context = {"user_id": 123, "memory_manager": Mock()}
-        
-        params = {
-            "key": "name",
-            "value": "MaybeSarah",
-            "confidence": 0.5  # Below 0.7 threshold
-        }
-        
-        result = await executor._handle_extract_memory(params, context)
-        
-        assert result["ok"] is False
-        assert "below threshold" in result["error"]
 
 
 class TestResponseBuilder:
@@ -456,7 +434,7 @@ class TestIntegration:
         llm_response = json.dumps({
             "response": "I'll remember your name and set your timezone.",
             "functions": [
-                {"name": "extract_memory", "parameters": {"key": "name", "value": "John", "confidence": 0.9}},
+                {"name": "extract_memory", "parameters": {"key": "name", "value": "John"}},
                 {"name": "set_timezone", "parameters": {"timezone": "Europe/Oslo"}}
             ]
         })

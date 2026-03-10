@@ -84,17 +84,6 @@ class PromptOptimizer:
             truncated = truncated[:last_space]
         return truncated + "..."
     
-    def prioritize_memories(self, memories: List[Dict], max_count: int = 5) -> List[Dict]:
-        """Return up to `max_count` memories prioritized by confidence (desc).
-
-        Keeps original dict items but sorts by `confidence` when available.
-        """
-        if not memories:
-            return []
-        # Ensure confidence defaults to 0 if missing
-        sorted_mem = sorted(memories, key=lambda m: m.get("confidence", 0), reverse=True)
-        return sorted_mem[:max_count]
-
     def compress_conversation_history(
         self,
         turns: List[tuple],

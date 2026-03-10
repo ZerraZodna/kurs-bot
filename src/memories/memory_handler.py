@@ -12,12 +12,12 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
+from .types import MemoryEntity, MemoryRecord
 
 from sqlalchemy.orm import Session
 
 from src.models.database import Memory, init_db
 from src.memories.store import MemoryStore
-from src.memories.types import MemoryEntity, MemoryRecord
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,6 @@ class MemoryHandler(MemoryStore):
             .filter(Memory.value.ilike(like_pattern))
             .all()
         )
-        rows.sort(key=lambda m: getattr(m, "confidence", 0.0), reverse=True)
         if limit is not None:
             rows = rows[:limit]
         return rows
@@ -83,7 +82,6 @@ class MemoryHandler(MemoryStore):
         limit: int = 100,
     ) -> List[MemoryEntity]:
         rows = self.list_active_memories(user_id=user_id, categories=categories)
-        rows.sort(key=lambda m: getattr(m, "confidence", 0.0), reverse=True)
         return rows[:limit]
 
     def list_user_memories(self, user_id: int) -> List[MemoryEntity]:
@@ -114,7 +112,6 @@ class MemoryHandler(MemoryStore):
             "memory_id": row.memory_id,
             "key": row.key,
             "value": row.value,
-            "confidence": row.confidence,
             "source": row.source,
             "created_at": row.created_at,
         }
@@ -134,7 +131,6 @@ class MemoryHandler(MemoryStore):
         user_id: int,
         key: str,
         value: str,
-        confidence: float = 1.0,
         source: str = "dialogue_engine",
         ttl_hours: Optional[int] = None,
         category: str = "fact",
@@ -169,7 +165,6 @@ class MemoryHandler(MemoryStore):
         # identical value -> merge
         for row in existing:
             if row.value_hash == value_hash:
-                row.confidence = max(row.confidence, float(confidence))
                 row.updated_at = now
                 if ttl:
                     row.ttl_expires_at = ttl
@@ -185,7 +180,6 @@ class MemoryHandler(MemoryStore):
                 key=key,
                 value=value,
                 value_hash=value_hash,
-                confidence=float(confidence),
                 source=source,
                 is_active=True,
                 ttl_expires_at=ttl,
@@ -208,7 +202,6 @@ class MemoryHandler(MemoryStore):
                 key=key,
                 value=value,
                 value_hash=value_hash,
-                confidence=float(confidence),
                 source=source,
                 is_active=True,
                 conflict_group_id=group_id,
@@ -225,7 +218,6 @@ class MemoryHandler(MemoryStore):
             key=key,
             value=value,
             value_hash=value_hash,
-            confidence=float(confidence),
             source=source,
             is_active=True,
             ttl_expires_at=ttl,

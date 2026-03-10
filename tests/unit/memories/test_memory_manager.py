@@ -25,7 +25,7 @@ class TestMemoryManager:
         # When: Storing a memory
         mem_id = mm.store_memory(
             test_user.user_id, "goal", "Learn Python", 
-            confidence=0.8, category="fact"
+            category="fact"
         )
         
         # Then: Memory should be stored and retrievable
@@ -42,11 +42,11 @@ class TestMemoryManager:
         # When: Storing initial memory then conflicting one
         mem_id1 = mm.store_memory(
             test_user.user_id, "goal", "Learn Python", 
-            confidence=0.8, category="fact"
+            category="fact"
         )
         mem_id2 = mm.store_memory(
             test_user.user_id, "goal", "Learn SQL", 
-            confidence=0.9, category="fact"
+            category="fact"
         )
         
         # Then: Should create new memory, archive old one
@@ -65,24 +65,24 @@ class TestMemoryManager:
         assert len(archived) == 1
 
     def test_store_memory_merge(self, db_session: Session, test_user):
-        """Same value should merge (update confidence)."""
+        """Same value should merge."""
         # Given: A memory manager
         mm = MemoryManager(db=db_session)
         
         # When: Storing same value twice
         mem_id1 = mm.store_memory(
             test_user.user_id, "goal", "Learn Python", 
-            confidence=0.8, category="fact"
+            category="fact"
         )
         mem_id2 = mm.store_memory(
             test_user.user_id, "goal", "Learn Python", 
-            confidence=0.9, category="fact"
+            category="fact"
         )
         
-        # Then: Should merge (same ID, updated confidence)
+        # Then: Should merge (same ID)
         assert mem_id1 == mem_id2
         mem = db_session.query(Memory).filter_by(memory_id=mem_id1).first()
-        assert mem.confidence in (0.9, 1.0)  # Merged confidence
+        assert mem is not None
 
     def test_purge_expired(self, db_session: Session, test_user):
         """Old archived memories should be purged."""
@@ -93,7 +93,6 @@ class TestMemoryManager:
             category="fact",
             key="old_key",
             value="old_value",
-            confidence=1.0,
             is_active=False,
             archived_at=old_date,
             created_at=old_date,

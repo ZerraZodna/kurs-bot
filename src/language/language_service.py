@@ -130,7 +130,6 @@ async def detect_and_store_language(
                         user_id=user_id,
                         key=MemoryKey.USER_LANGUAGE,
                         value=chosen,
-                        confidence=1.0,
                         source="user_override",
                         category=MemoryCategory.PREFERENCE.value,
                     )
@@ -161,7 +160,6 @@ async def detect_and_store_language(
             user_id=user_id,
             key=MemoryKey.USER_LANGUAGE,
             value=chosen,
-            confidence=float(conf or 1.0),
             source="dialogue_engine_language_detection",
             category=MemoryCategory.PREFERENCE.value,
         )

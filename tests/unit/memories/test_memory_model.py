@@ -23,7 +23,6 @@ class TestMemoryModel:
             category="fact",
             key="fav_color",
             value="blue",
-            confidence=0.9,
             is_active=True,
             created_at=datetime.datetime.utcnow(),
             updated_at=datetime.datetime.utcnow()
@@ -42,7 +41,6 @@ class TestMemoryModel:
             category="fact",
             key="fav_color",
             value="blue",
-            confidence=0.9,
             is_active=True,
             created_at=datetime.datetime.utcnow(),
             updated_at=datetime.datetime.utcnow()
@@ -64,7 +62,6 @@ class TestMemoryModel:
             category="fact",
             key="fav_color",
             value="blue",
-            confidence=0.9,
             is_active=True,
             created_at=datetime.datetime.utcnow(),
             updated_at=datetime.datetime.utcnow()
@@ -89,7 +86,6 @@ class TestMemoryModel:
             category="fact",
             key="fav_color",
             value="blue",
-            confidence=0.9,
             is_active=True,
             created_at=datetime.datetime.utcnow(),
             updated_at=datetime.datetime.utcnow()

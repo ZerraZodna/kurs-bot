@@ -25,7 +25,6 @@ class MemoryStore(ABC):
         user_id: int,
         key: str,
         value: str,
-        confidence: float = 1.0,
         source: str = "dialogue_engine",
         ttl_hours: Optional[int] = None,
         category: str = "fact",

@@ -93,7 +93,6 @@ async def maybe_send_next_lesson(
             value=str(previous_lesson_id),
             category=MemoryCategory.PROGRESS.value,
             source="advance.py",
-            confidence=1.0,
         )
     
     if (language or "").lower() not in ["en"]:

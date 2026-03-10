@@ -143,13 +143,13 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
                 return json.dumps({
                     "response": f"Nice to meet you, {name}! {next_question}",
                     "functions": [
-                        {"name": "extract_memory", "parameters": {"key": MemoryKey.FIRST_NAME, "value": name, "confidence": 0.9}}
+                        {"name": "extract_memory", "parameters": {"key": MemoryKey.FIRST_NAME, "value": name}}
                     ]
                 })
             return json.dumps({
                 "response": f"Nice to meet you, {name}! I've noted your name.",
                 "functions": [
-                    {"name": "extract_memory", "parameters": {"key": MemoryKey.FIRST_NAME, "value": name, "confidence": 0.9}}
+                    {"name": "extract_memory", "parameters": {"key": MemoryKey.FIRST_NAME, "value": name}}
                 ]
             })
         
@@ -171,7 +171,7 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
                 if name_from_profile:
                     functions.append({
                         "name": "extract_memory",
-                        "parameters": {"key": MemoryKey.FIRST_NAME, "value": name_from_profile, "confidence": 0.9}
+                        "parameters": {"key": MemoryKey.FIRST_NAME, "value": name_from_profile}
                     })
                 return json.dumps({
                     "response": response_text,
@@ -233,7 +233,7 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
             return json.dumps({
                 "response": response_text,
                 "functions": [
-                    {"name": "extract_memory", "parameters": {"key": MemoryKey.LESSON_CURRENT, "value": lesson_num, "confidence": 0.9}}
+                    {"name": "extract_memory", "parameters": {"key": MemoryKey.LESSON_CURRENT, "value": lesson_num}}
                 ]
             })
         
@@ -247,7 +247,7 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
             return json.dumps({
                 "response": response_text,
                 "functions": [
-                    {"name": "extract_memory", "parameters": {"key": MemoryKey.LESSON_CURRENT, "value": lesson_num, "confidence": 0.9}}
+                    {"name": "extract_memory", "parameters": {"key": MemoryKey.LESSON_CURRENT, "value": lesson_num}}
                 ]
             })
         
@@ -261,7 +261,7 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
             return json.dumps({
                 "response": response_text,
                 "functions": [
-                    {"name": "extract_memory", "parameters": {"key": MemoryKey.LESSON_CURRENT, "value": lesson_num, "confidence": 0.95}}
+                    {"name": "extract_memory", "parameters": {"key": MemoryKey.LESSON_CURRENT, "value": lesson_num}}
                 ]
             })
         
@@ -321,7 +321,7 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
             return json.dumps({
                 "response": response_text,
                 "functions": [
-                    {"name": "extract_memory", "parameters": {"key": MemoryKey.LESSON_CURRENT, "value": "1", "confidence": 0.9}}
+                    {"name": "extract_memory", "parameters": {"key": MemoryKey.LESSON_CURRENT, "value": "1"}}
                 ]
             })
         

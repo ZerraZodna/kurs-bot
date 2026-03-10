@@ -62,7 +62,6 @@ def handle_rag_mode_toggle(text: str, memory_manager, user_id: int) -> Optional[
             user_id=user_id,
             key=MemoryKey.RAG_MODE_ENABLED,
             value="true",
-            confidence=1.0,
             source="user_command",
             category=MemoryCategory.CONVERSATION.value,
         )
@@ -80,7 +79,6 @@ def handle_rag_mode_toggle(text: str, memory_manager, user_id: int) -> Optional[
             user_id=user_id,
             key=MemoryKey.RAG_MODE_ENABLED,
             value="false",
-            confidence=1.0,
             source="user_command",
             category=MemoryCategory.CONVERSATION.value,
         )
@@ -509,7 +507,6 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> Option
                 user_id=user_id,
                 key=MemoryKey.SELECTED_RAG_PROMPT_KEY,
                 value=key,
-                confidence=1.0,
                 source="user_command",
                 category=MemoryCategory.CONVERSATION.value,
             )
@@ -525,7 +522,6 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> Option
                 user_id=user_id,
                 key=MemoryKey.CUSTOM_RAG_PROMPT,
                 value=rest,
-                confidence=1.0,
                 source="user_command",
                 category=MemoryCategory.CONVERSATION.value,
             )

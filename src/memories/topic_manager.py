@@ -49,7 +49,6 @@ class TopicManager:
                 all_memories.append({
                     "key": key,
                     "value": mem["value"],
-                    "confidence": mem.get("confidence", 1.0),
                     "source": mem.get("source", "unknown"),
                     "created_at": mem.get("created_at"),
                     "memory_id": mem.get("memory_id"),
@@ -84,7 +83,6 @@ class TopicManager:
             current_mem = sorted_memories[0]
             current = TopicFieldValue(
                 value=current_mem["value"],
-                confidence=current_mem.get("confidence", 1.0),
                 source=current_mem.get("source", "unknown"),
                 updated_at=current_mem.get("created_at") or datetime.now(timezone.utc),
                 original_key=current_mem["key"],
@@ -95,7 +93,6 @@ class TopicManager:
             for old_mem in sorted_memories[1:]:
                 history.append(TopicFieldValue(
                     value=old_mem["value"],
-                    confidence=old_mem.get("confidence", 1.0),
                     source=old_mem.get("source", "unknown"),
                     updated_at=old_mem.get("created_at") or datetime.now(timezone.utc),
                     original_key=old_mem["key"],
@@ -130,7 +127,6 @@ class TopicManager:
         user_id: int, 
         key: str,  # Can be any synonym
         value: Any,
-        confidence: float = 1.0,
         source: str = "dialogue_engine",
         category: str = MemoryCategory.PROFILE.value,
     ) -> int:
@@ -155,7 +151,6 @@ class TopicManager:
             user_id=user_id,
             key=key,  # Store with original key
             value=str(value),
-            confidence=confidence,
             source=source,
             category=category,
             allow_duplicates=False,  # Will archive old value, keep history via conflict_group_id

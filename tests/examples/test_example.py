@@ -36,7 +36,6 @@ class TestMemoryManager:
             test_user.user_id,
             "goal",
             "Learn Python",
-            confidence=0.8,
             category="fact"
         )
         
@@ -50,22 +49,21 @@ class TestMemoryManager:
             category="fact"
         )
     
-    def test_store_memory_with_same_value_updates_confidence(
+    def test_store_memory_with_same_value(
         self,
         db_session: Session,
         test_user: User
     ):
-        """When storing same memory value, confidence should be updated."""
+        """When storing same memory value, it should be handled appropriately."""
         # Given: An existing memory
         mm = MemoryManager(db_session)
-        mm.store_memory(test_user.user_id, "goal", "Learn Python", confidence=0.8)
+        mm.store_memory(test_user.user_id, "goal", "Learn Python")
         
-        # When: Storing same value with higher confidence
-        mm.store_memory(test_user.user_id, "goal", "Learn Python", confidence=0.95)
+        # When: Storing same value again
+        mm.store_memory(test_user.user_id, "goal", "Learn Python")
         
-        # Then: Only one memory should exist with updated confidence
+        # Then: Only one memory should exist (same value merges)
         memories = assert_memory_count(db_session, test_user.user_id, 1, key="goal")
-        assert memories[0].confidence == 0.95
     
     def test_store_different_value_archives_old_memory(
         self,
@@ -75,10 +73,10 @@ class TestMemoryManager:
         """When storing different value, old memory should be archived."""
         # Given: An existing memory
         mm = MemoryManager(db_session)
-        mm.store_memory(test_user.user_id, "goal", "Learn Python", confidence=0.8)
+        mm.store_memory(test_user.user_id, "goal", "Learn Python")
         
         # When: Storing different value
-        mm.store_memory(test_user.user_id, "goal", "Learn SQL", confidence=0.9)
+        mm.store_memory(test_user.user_id, "goal", "Learn SQL")
         
         # Then: Old memory archived, new one active
         assert_memory_count(
@@ -107,14 +105,12 @@ class TestMemoryBuilder:
             .with_key("preference") \
             .with_value("morning") \
             .with_category("profile") \
-            .with_confidence(0.95) \
             .build()
         
         # Then: Memory created correctly
         assert memory.key == "preference"
         assert memory.value == "morning"
         assert memory.category == "profile"
-        assert memory.confidence == 0.95
     
     def test_build_archived_memory(self, db_session: Session, test_user: User):
         """Builder should support creating archived memories."""

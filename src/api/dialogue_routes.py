@@ -34,7 +34,6 @@ class MemoryRequest(BaseModel):
     key: str
     value: str
     category: str = "profile"
-    confidence: float = 1.0
     ttl_hours: Optional[int] = None
 
 
@@ -132,7 +131,6 @@ async def store_memory(request: MemoryRequest, db: Session = Depends(get_db)):
         key=request.key,
         value=request.value,
         category=request.category,
-        confidence=request.confidence,
         ttl_hours=request.ttl_hours,
     )
     
@@ -230,7 +228,6 @@ async def batch_store_memory(requests: List[MemoryRequest], db: Session = Depend
             key=req.key,
             value=req.value,
             category=req.category,
-            confidence=req.confidence,
             ttl_hours=req.ttl_hours,
         )
         
@@ -297,7 +294,6 @@ class MemoryWithScore(BaseModel):
     key: str
     value: str
     category: str
-    confidence: float
     similarity_score: float
 
 
@@ -352,7 +348,6 @@ async def semantic_search(request: SemanticSearchRequest, db: Session = Depends(
             key=memory.key,
             value=memory.value,
             category=memory.category,
-            confidence=memory.confidence,
             similarity_score=round(score, 4)
         ))
     

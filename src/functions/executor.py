@@ -739,7 +739,6 @@ class FunctionExecutor:
                 value=normalized_lang,
                 category=MemoryCategory.PROFILE.value,
                 source="function_executor",
-                confidence=1.0,
             )
             
             return self._ok_response(language=normalized_lang)
@@ -767,7 +766,6 @@ class FunctionExecutor:
                 value=normalized_time,
                 category=MemoryCategory.PROFILE.value,
                 source="function_executor",
-                confidence=1.0,
             )
             
             return self._ok_response(time=normalized_time)
@@ -801,7 +799,6 @@ class FunctionExecutor:
                 value=value,
                 category=MemoryCategory.PROFILE.value,
                 source="function_executor",
-                confidence=1.0,
             )
             
             return self._ok_response(key=key, value=value)
@@ -822,7 +819,6 @@ class FunctionExecutor:
                 value="true",
                 category=MemoryCategory.CONVERSATION.value,
                 source="function_executor",
-                confidence=1.0,
                 ttl_hours=24 * 7,  # 1 week default
             )
             
@@ -844,7 +840,6 @@ class FunctionExecutor:
                 value="false",
                 category=MemoryCategory.CONVERSATION.value,
                 source="function_executor",
-                confidence=1.0,
             )
             
             return self._ok_response(rag_mode=False)
@@ -895,7 +890,6 @@ class FunctionExecutor:
                 value=f"yes:{confirmation_context}",
                 category=MemoryCategory.CONVERSATION.value,
                 source="function_executor",
-                confidence=1.0,
                 ttl_hours=1,
             )
             
@@ -915,13 +909,7 @@ class FunctionExecutor:
             # Store confirmation
             memory_manager.store_memory(
                 user_id=user_id,
-                key="user_confirmation",
-                value=f"no:{confirmation_context}",
-                category=MemoryCategory.CONVERSATION.value,
-                source="function_executor",
-                confidence=1.0,
-                ttl_hours=1,
-            )
+                key="user_confirmation")
             
             return self._ok_response(confirmed=False, context=confirmation_context)
         except Exception as e:
@@ -935,19 +923,10 @@ class FunctionExecutor:
         user_id = context.get("user_id")
         key = params.get("key")
         value = params.get("value")
-        confidence = params.get("confidence", 0.7)
         ttl_hours = params.get("ttl_hours")
         memory_manager = context.get("memory_manager")
         
-        logger.info(f"extract_memory called: user_id={user_id}, key={key}, value={value}, confidence={confidence}")
-        
-        # Validate confidence threshold
-        if confidence < 0.7:
-            logger.warning(f"extract_memory rejected: confidence {confidence} below threshold")
-            return self._error_response(
-                f"Confidence {confidence} below threshold (0.7)",
-                key=key,
-            )
+        logger.info(f"extract_memory called: user_id={user_id}, key={key}, value={value}")
         
         # Route lesson state writes through the centralized helpers
         # This ensures DRY - all lesson progress goes through lesson_state
@@ -963,7 +942,6 @@ class FunctionExecutor:
             return self._ok_response(
                 key=key,
                 value=value,
-                confidence=confidence,
                 category=MemoryCategory.PROGRESS.value,
                 updated=True,
             )
@@ -980,7 +958,6 @@ class FunctionExecutor:
                 return self._ok_response(
                     key=key,
                     value=value,
-                    confidence=confidence,
                     category=MemoryCategory.PROGRESS.value,
                     updated=True,
                     result=result,
@@ -1003,7 +980,6 @@ class FunctionExecutor:
                 value=value,
                 category=category,
                 source="function_executor",
-                confidence=confidence,
                 ttl_hours=ttl_hours,
             )
             
@@ -1011,7 +987,6 @@ class FunctionExecutor:
             return self._ok_response(
                 key=key,
                 value=value,
-                confidence=confidence,
                 category=category,
                 updated=bool(existing),
             )

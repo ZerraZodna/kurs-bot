@@ -385,7 +385,6 @@ class TestHandleQueryScheduleIntegration:
             value=message_data,
             category=MemoryCategory.CONVERSATION.value,  # Use valid category
             source="test",
-            confidence=1.0,
         )
         
         with patch('src.core.timezone.get_user_timezone_from_db', return_value='UTC'):

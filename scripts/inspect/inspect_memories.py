@@ -28,7 +28,6 @@ def as_dict(m):
         "category": m.category,
         "key": m.key,
         "value": m.value,
-        "confidence": m.confidence,
         "source": m.source,
         "created_at": m.created_at.isoformat() if m.created_at else None,
     }

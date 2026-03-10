@@ -477,10 +477,10 @@ class FunctionRegistry:
             parameters=[
                 ParameterSchema(
                     name="key",
-                    description="Memory key/category (e.g., 'name', 'timezone', 'current_lesson', 'preferred_time')",
+                    description="Memory key/category (e.g., 'first_name', 'timezone', 'current_lesson', 'preferred_time')",
                     type=ParameterType.STRING,
                     required=True,
-                    examples=["name", "timezone", "current_lesson", "preferred_time", "learning_goal"],
+                    examples=["first_name", "timezone", "current_lesson", "preferred_lesson_time", "learning_goal"],
                 ),
                 ParameterSchema(
                     name="value",
@@ -488,14 +488,6 @@ class FunctionRegistry:
                     type=ParameterType.STRING,
                     required=True,
                     examples=["Sarah", "Europe/Oslo", "25", "09:00", "spiritual growth"],
-                ),
-                ParameterSchema(
-                    name="confidence",
-                    description="Confidence level 0.0-1.0 (default 0.8)",
-                    type=ParameterType.NUMBER,
-                    required=False,
-                    default=0.8,
-                    examples=[0.9, 0.8, 0.7],
                 ),
                 ParameterSchema(
                     name="ttl_hours",
@@ -506,9 +498,9 @@ class FunctionRegistry:
                 ),
             ],
             examples=[
-                {"key": "name", "value": "Sarah", "confidence": 0.9},
-                {"key": "timezone", "value": "Asia/Tokyo", "confidence": 0.85},
-                {"key": "current_lesson", "value": "25", "confidence": 0.8},
+                {"key": "first_name", "value": "Sarah"},
+                {"key": "timezone", "value": "Asia/Tokyo"},
+                {"key": "current_lesson", "value": "25"},
             ],
             contexts=["general_chat", "onboarding", "onboarding_name", "onboarding_consent", "schedule_setup", "lesson_review", "morning_lesson_confirmation"],
         ))

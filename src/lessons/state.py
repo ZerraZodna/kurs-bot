@@ -117,7 +117,6 @@ def record_lesson_completed(
         key=MemoryKey.LESSON_COMPLETED,
         value=str(completed),
         category=MemoryCategory.PROGRESS.value,
-        confidence=1.0,
         source=source,
     )
     

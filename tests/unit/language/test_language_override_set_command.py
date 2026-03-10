@@ -41,7 +41,6 @@ class TestLanguageOverrideSetCommand:
             user_id=user.user_id,
             key="user_language",
             value="fr",
-            confidence=0.9,
             source="test",
             category="preference"
         )

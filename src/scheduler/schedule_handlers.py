@@ -44,7 +44,6 @@ async def handle_schedule_messages(
                 user_id=user_id,
                 key=MemoryKey.SCHEDULE_REQUEST_PENDING,
                 value="false",
-                confidence=1.0,
                 source="dialogue_engine",
                 ttl_hours=1,
                 category=MemoryCategory.CONVERSATION.value,

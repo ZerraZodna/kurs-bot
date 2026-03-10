@@ -133,7 +133,6 @@ def export_user_data(session: Session, user_id: int) -> Dict[str, Any]:
                 "key": m.key,
                 "value": m.value,
                 "source": m.source,
-                "confidence": m.confidence,
                 "is_active": m.is_active,
                 "created_at": m.created_at.isoformat() if m.created_at else None,
                 "updated_at": m.updated_at.isoformat() if m.updated_at else None,

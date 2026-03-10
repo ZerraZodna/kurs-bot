@@ -1,9 +1,8 @@
 """
-AI-powered memory extraction and validation.
-Combines extraction + quality validation + conflict detection in a single Ollama call.
+AI-powered memory extraction.
+Combines extraction + conflict detection in a single Ollama call.
 
 Refactored to use separate modules:
-- types.py: Data classes (ConflictDecision, StorageDecision, ExtractedMemory)
 - judge_core.py: Helper functions for parsing and context building
 - cache.py: Persistent caching for AI judgments
 """
@@ -14,7 +13,6 @@ from typing import List, Optional, Dict, Any
 from src.config import settings
 from src.memories.prompts import MEMORY_EXTRACTION_JUDGE_PROMPT
 from src.memories.cache import DecisionCache
-from src.memories.types import StorageDecision, ConflictDecision
 from src.memories.judge_core import (
     build_context_str,
     parse_extraction_response,
@@ -93,16 +91,16 @@ class MemoryJudge:
     def _filter_and_clean_memories(
         self,
         memories: List[Dict[str, Any]],
-        min_quality: float = 0.7
+        min_quality: float = 0.0
     ) -> List[Dict[str, Any]]:
-        """Filter and clean memories by quality threshold.
+        """Filter and clean memories - just returns all with valid key/value.
         
         Args:
             memories: List of memory dicts from parsing
-            min_quality: Minimum quality_score to include
+            min_quality: Ignored - kept for backward compatibility
         
         Returns:
-            List of valid high-quality memories
+            List of valid memories
         """
         return filter_valid_memories(memories, min_quality)
     
@@ -139,7 +137,7 @@ class MemoryJudge:
             # Call Ollama once using helper
             response_text = await self._call_ollama(prompt, language=language)
             
-            # Parse response - now handles both "store" and "should_store"
+            # Parse response
             memories = self._parse_response(response_text)
             
             # Filter: only return high-quality memories

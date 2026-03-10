@@ -74,7 +74,6 @@ def parse_extraction_response(response_text: str) -> List[Dict[str, Any]]:
     try:
         data = json.loads(response_text)
         memories = data.get("memories", [])
-        # Normalize: handle both "store" and "should_store" fields
         return [_normalize_memory(m) for m in memories]
     except json.JSONDecodeError:
         pass
@@ -119,28 +118,20 @@ def parse_extraction_response(response_text: str) -> List[Dict[str, Any]]:
 
 
 def _normalize_memory(memory: Dict[str, Any]) -> Dict[str, Any]:
-    """Normalize memory dict to always have 'should_store' field.
-    
-    Handles backward compatibility with old format that used 'store'.
+    """Normalize memory dict - use cleaned_value if available.
     
     Args:
         memory: Raw memory dict from LLM
     
     Returns:
-        Normalized memory dict with 'should_store' field
+        Normalized memory dict with cleaned_value applied if present
     """
+    # Create a copy to avoid mutating the original
     normalized = dict(memory)
     
-    # Handle old format: "store" instead of "should_store"
-    if "store" in normalized and "should_store" not in normalized:
-        normalized["should_store"] = normalized["store"]
-        del normalized["store"]
-    
-    # Ensure required fields exist
-    if "should_store" not in normalized:
-        normalized["should_store"] = False
-    if "quality_score" not in normalized:
-        normalized["quality_score"] = 0.0
+    # Use cleaned_value if available
+    if "cleaned_value" in normalized and normalized["cleaned_value"]:
+        normalized["value"] = normalized["cleaned_value"]
     
     return normalized
 
@@ -195,26 +186,25 @@ def extract_json_from_response(response_text: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def filter_valid_memories(memories: List[Dict[str, Any]], min_quality: float = 0.7) -> List[Dict[str, Any]]:
-    """Filter memories by quality threshold.
+def filter_valid_memories(memories: List[Dict[str, Any]], min_quality: float = 0.0) -> List[Dict[str, Any]]:
+    """Filter memories by presence of key and value.
+    
+    Simply extract ALL memories with a key - no quality filtering needed.
+    If AI extracts it, we store it.
     
     Args:
         memories: List of memory dicts
-        min_quality: Minimum quality_score to include
+        min_quality: Ignored - kept for backward compatibility
     
     Returns:
-        List of valid memories with high quality
+        List of memories with valid key/value
     """
-    valid_memories = [
-        m for m in memories
-        if m.get("should_store") 
-        and m.get("key")
-        and m.get("quality_score", 0) >= min_quality
-    ]
+    # Normalize memories first (applies cleaned_value if available)
+    normalized_memories = [_normalize_memory(m) for m in memories]
     
-    # Use cleaned_value if available
-    for m in valid_memories:
-        if m.get("cleaned_value"):
-            m["value"] = m["cleaned_value"]
+    valid_memories = [
+        m for m in normalized_memories
+        if m.get("key") and m.get("value")
+    ]
     
     return valid_memories

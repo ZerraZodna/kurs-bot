@@ -33,9 +33,6 @@ class TestMemoryJudgeExtraction:
         assert len(memories) > 0
         goals = [m for m in memories if "goal" in m.get("key", "").lower()]
         assert len(goals) > 0
-        # MemoryJudge filters for quality_score >= 0.7
-        for m in memories:
-            assert m.get("quality_score", 0) >= 0.7
 
     @pytest.mark.asyncio
     @pytest.mark.skipif(os.getenv("TEST_USE_REAL_OLLAMA", "false").lower() != "true", reason="Only runs with real Ollama")
@@ -49,9 +46,6 @@ class TestMemoryJudgeExtraction:
         
         # Then: Should extract at least one high-quality memory
         assert len(memories) > 0
-        # MemoryJudge filters for quality_score >= 0.7
-        for m in memories:
-            assert m.get("quality_score", 0) >= 0.7
 
     @pytest.mark.asyncio
     @pytest.mark.skipif(os.getenv("TEST_USE_REAL_OLLAMA", "false").lower() != "true", reason="Only runs with real Ollama")
@@ -63,8 +57,8 @@ class TestMemoryJudgeExtraction:
         # When: Extracting memories
         memories = await judge.extract_and_judge_memories(message)
         
-        # Then: Casual greeting should not extract memories (filtered by quality)
-        # MemoryJudge returns empty list for low-quality memories
+        # Then: Casual greeting should not extract memories
+        # LLM doesn't extract memories from casual greetings
         assert len(memories) == 0
 
     def test_parse_json_response_markdown(self, judge):
@@ -72,7 +66,7 @@ class TestMemoryJudgeExtraction:
         # Given: A markdown-wrapped JSON response
         response = '''Some text before
 ```json
-{"memories": [{"store": true, "key": "goal", "value": "learn", "confidence": 0.95, "quality_score": 0.85, "should_store": true}]}
+{"memories": [{"store": true, "key": "goal", "value": "learn"}]}
 ```
 Some text after'''
         

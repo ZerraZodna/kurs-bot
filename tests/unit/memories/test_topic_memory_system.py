@@ -69,7 +69,6 @@ def test_all_topics(memory_manager, clean_test_data, test_user_id):
                 user_id=test_user_id,
                 key=key,
                 value=value,
-                confidence=0.9,
                 source="test",
                 category=category,
             )

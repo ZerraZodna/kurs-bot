@@ -401,7 +401,6 @@ class DialogueEngine:
                         "key": memory.key,
                         "value": memory.value,
                         "category": memory.category,
-                        "confidence": memory.confidence,
                         "similarity": score,
                     }
                     for memory, score in results
@@ -438,7 +437,6 @@ class DialogueEngine:
                     user_id=user_id,
                     key=MemoryKey.SCHEDULE_REQUEST_PENDING,
                     value="false",
-                    confidence=1.0,
                     source="dialogue_engine",
                     ttl_hours=1,
                     category=MemoryCategory.CONVERSATION.value,
@@ -460,7 +458,6 @@ class DialogueEngine:
                     user_id=user_id,
                     key=MemoryKey.SCHEDULE_REQUEST_PENDING,
                     value="true",
-                    confidence=1.0,
                     source="dialogue_engine",
                     ttl_hours=1,
                     category=MemoryCategory.CONVERSATION.value,
@@ -499,7 +496,6 @@ When would you like to receive them? (e.g., "9:00 AM", "morning", "evening", "8:
                     user_id=user_id,
                     key=MemoryKey.SCHEDULE_REQUEST_PENDING,
                     value="false",
-                    confidence=1.0,
                     source="dialogue_engine",
                     ttl_hours=1,
                     category=MemoryCategory.CONVERSATION.value,

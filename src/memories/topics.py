@@ -80,7 +80,6 @@ TOPIC_SCHEMAS: Dict[MemoryTopic, Set[str]] = {
 class TopicFieldValue:
     """A single value within a topic field with metadata."""
     value: Any
-    confidence: float
     source: str
     updated_at: datetime
     original_key: str  # The key used when storing (e.g., "first_name" or "name")
@@ -88,7 +87,6 @@ class TopicFieldValue:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "value": self.value,
-            "confidence": self.confidence,
             "source": self.source,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "original_key": self.original_key,
@@ -105,7 +103,6 @@ class TopicField:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "value": self.current.value,
-            "confidence": self.current.confidence,
             "updated_at": self.current.updated_at.isoformat() if self.current.updated_at else None,
             "source": self.current.source,
             "original_key": self.current.original_key,

@@ -54,19 +54,14 @@ class ContextOptimizer:
     def format_memory_list(memories: List[dict], max_items: int = 5) -> str:
         """Format a list of memory dicts for inclusion in a prompt.
 
-        Each memory is expected to be a dict with keys `value` and
-        `confidence` (0.0-1.0). Returns up to `max_items` lines with
-        confidence shown as a percentage.
+        Each memory is expected to be a dict with key `value`.
+        Returns up to `max_items` lines.
         """
         if not memories:
             return ""
         lines = []
         for m in memories[:max_items]:
             value = m.get("value", "")
-            conf = m.get("confidence", None)
-            if isinstance(conf, (int, float)) and conf is not None:
-                pct = int(round(conf * 100))
-                lines.append(f"{value} — {pct}%")
-            else:
-                lines.append(f"{value}")
+            lines.append(f"{value}")
         return "\n".join(lines)
+

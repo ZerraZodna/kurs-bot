@@ -48,7 +48,6 @@ def _seed_user(db_session) -> int:
         category="profile",
         key="favorite_color",
         value="blue",
-        confidence=0.9,
         is_active=True,
         source="test",
         created_at=datetime.datetime.utcnow(),

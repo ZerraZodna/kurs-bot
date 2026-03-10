@@ -75,7 +75,6 @@ class TestPromptBuilder:
             user_id=test_user.user_id,
             key=MemoryKey.LEARNING_GOAL,
             value="Learn Python programming",
-            confidence=0.95,
             category=MemoryCategory.GOALS,
         )
 
@@ -232,27 +231,27 @@ class TestContextOptimizer:
         assert isinstance(truncated, str)
 
     def test_format_memory_list(self):
-        """Given: A list of memories with confidence scores
+        """Given: A list of memories
         When: Formatting for prompt
-        Then: Should include values and confidence percentages."""
+        Then: Should include values."""
         memories = [
-            {"value": "First goal", "confidence": 1.0},
-            {"value": "Second goal", "confidence": 0.8},
-            {"value": "Third goal", "confidence": 0.6},
+            {"value": "First goal"},
+            {"value": "Second goal"},
+            {"value": "Third goal"},
         ]
 
         formatted = ContextOptimizer.format_memory_list(memories, max_items=3)
 
         assert "First goal" in formatted
-        assert "80%" in formatted  # Confidence for second goal
-        assert "60%" in formatted  # Confidence for third goal
+        assert "Second goal" in formatted
+        assert "Third goal" in formatted
 
     def test_format_memory_list_max_items(self):
         """Given: A list of memories exceeding max_items
         When: Formatting with max_items limit
         Then: Should only include specified number of items."""
         memories = [
-            {"value": f"Goal {i}", "confidence": 1.0}
+            {"value": f"Goal {i}"}
             for i in range(10)
         ]
 
@@ -404,3 +403,4 @@ class TestConversationHistory:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+

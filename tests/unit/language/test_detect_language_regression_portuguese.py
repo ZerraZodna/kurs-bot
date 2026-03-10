@@ -38,7 +38,6 @@ class TestDetectLanguageRegressionPortuguese:
             user_id=user.user_id,
             key="user_language",
             value="en",
-            confidence=0.7,
             source="test",
             category="preference"
         )

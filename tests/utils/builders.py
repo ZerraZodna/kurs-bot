@@ -18,7 +18,6 @@ class MemoryBuilder:
             .with_key("goal")
             .with_value("Learn Python")
             .with_category("fact")
-            .with_confidence(0.9)
             .build()
     """
     
@@ -28,7 +27,6 @@ class MemoryBuilder:
         self._key = "test_key"
         self._value = "test_value"
         self._category = "fact"
-        self._confidence = 1.0
         self._is_active = True
         self._archived_at: Optional[datetime.datetime] = None
         self._created_at: Optional[datetime.datetime] = None
@@ -44,10 +42,6 @@ class MemoryBuilder:
     
     def with_category(self, category: str) -> "MemoryBuilder":
         self._category = category
-        return self
-    
-    def with_confidence(self, confidence: float) -> "MemoryBuilder":
-        self._confidence = confidence
         return self
     
     def inactive(self) -> "MemoryBuilder":
@@ -74,7 +68,6 @@ class MemoryBuilder:
             key=self._key,
             value=self._value,
             category=self._category,
-            confidence=self._confidence,
             is_active=self._is_active,
             archived_at=self._archived_at,
             created_at=self._created_at or datetime.datetime.now(datetime.timezone.utc),
@@ -94,7 +87,6 @@ class MemoryBuilder:
             builder._key = f"{self._key}_{i}"
             builder._value = f"{self._value}_{i}"
             builder._category = self._category
-            builder._confidence = self._confidence
             builder._is_active = self._is_active
             builder._archived_at = self._archived_at
             builder._source = self._source
