@@ -13,6 +13,7 @@ class User(Base):
     phone_number = Column(String(32))
     email = Column(String(128))
     timezone = Column(String(64), nullable=True, default="Europe/Oslo")
+    lesson = Column(Integer, nullable=True)
     first_name = Column(String(64))
     last_name = Column(String(64))
     opted_in = Column(Boolean, default=True, nullable=False)

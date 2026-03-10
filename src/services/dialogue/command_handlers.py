@@ -25,6 +25,7 @@ from src.services.gdpr_service import (
 from src.services.gdpr_verification import create_verification, verify_code
 from src.models.database import PromptTemplate, SessionLocal
 from src.models.schedule import Schedule
+from src.models.user import User
 from src.language.prompt_registry import get_prompt_registry
 
 logger = logging.getLogger(__name__)
@@ -315,15 +316,39 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
         if not matched_trigger:
             return None
 
-        # If no query provided or user asked for '*', list all memories as before
+        # If no query provided or user asked for '*', list all memories and user table data
         if not query_tail or query_tail.strip() == "*":
             rows = (
                 MemoryHandler(session)
                 .list_active_memories(user_id=user_id, order_ascending=True)
             )
-            if not rows:
+
+            user = session.query(User).filter(User.user_id == user_id).first()
+
+            if not rows and not user:
                 return "You have no memories stored."
-            lines = _format_mem_lines(rows)
+
+            lines = _format_mem_lines(rows) if rows else ["Memory", "(none)"]
+
+            # Include user-table fields to reflect DB-backed state (e.g., users.lesson)
+            lines.append("")
+            lines.append("User table data")
+            if user:
+                created_at = user.created_at.strftime("%Y-%m-%d %H:%M") if user.created_at else "-"
+                last_active_at = user.last_active_at.strftime("%Y-%m-%d %H:%M") if user.last_active_at else "-"
+                lines.append(f"user_id={user.user_id}")
+                lines.append(f"external_id={user.external_id or ''}")
+                lines.append(f"channel={user.channel or ''}")
+                lines.append(f"timezone={user.timezone or ''}")
+                lines.append(f"lesson={user.lesson if user.lesson is not None else ''}")
+                lines.append(f"first_name={user.first_name or ''}")
+                lines.append(f"last_name={user.last_name or ''}")
+                lines.append(f"email={user.email or ''}")
+                lines.append(f"created_at={created_at}")
+                lines.append(f"last_active_at={last_active_at}")
+            else:
+                lines.append("(no user row found)")
+
             return "<pre>\n" + "\n".join(lines) + "\n</pre>"
 
         # Otherwise run a semantic search for the provided query tail and list matching memories
