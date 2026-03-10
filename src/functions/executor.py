@@ -851,12 +851,41 @@ class FunctionExecutor:
     async def _handle_confirm_yes(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle confirm_yes function."""
         from src.memories.constants import MemoryCategory, MemoryKey
+        from src.models.database import Lesson
         
         user_id = context.get("user_id")
         confirmation_context = params.get("context", "general")
         memory_manager = context.get("memory_manager")
         
         try:
+            # Special handling for lesson repeat context
+            if confirmation_context == "lesson_repeat" and memory_manager:
+                # Get the lesson that was offered for repeat
+                offered_memories = memory_manager.get_memory(user_id, MemoryKey.LESSON_REPEAT_OFFERED)
+                if offered_memories:
+                    lesson_id_str = offered_memories[0].get("value")
+                    try:
+                        lesson_id = int(lesson_id_str)
+                        session = context.get("session")
+                        if session:
+                            lesson = session.query(Lesson).filter_by(lesson_id=lesson_id).first()
+                            if lesson:
+                                # Clear the offered memory after use
+                                memory_manager.archive_memories(
+                                    user_id, 
+                                    [offered_memories[0].get("memory_id")]
+                                )
+                                return {
+                                    "ok": True,
+                                    "confirmed": True,
+                                    "context": confirmation_context,
+                                    "lesson_id": lesson_id,
+                                    "title": lesson.title,
+                                    "content": lesson.content,
+                                }
+                    except (ValueError, TypeError) as e:
+                        logger.warning(f"Invalid lesson_id in lesson_repeat_offered: {lesson_id_str}")
+            
             # Store confirmation
             memory_manager.store_memory(
                 user_id=user_id,

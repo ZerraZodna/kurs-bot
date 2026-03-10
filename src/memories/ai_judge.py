@@ -12,7 +12,7 @@ import logging
 from typing import List, Optional, Dict, Any
 
 from src.config import settings
-from src.memories.prompts import MEMORY_EXTRACTION_JUDGE_PROMPT, STORAGE_EVALUATION_PROMPT, MEMORY_RELEVANCE_PROMPT
+from src.memories.prompts import MEMORY_EXTRACTION_JUDGE_PROMPT
 from src.memories.cache import DecisionCache
 from src.memories.types import StorageDecision, ConflictDecision
 from src.memories.judge_core import (
@@ -102,129 +102,6 @@ class MemoryJudge:
         except Exception as e:
             logger.error(f"Error in extract_and_judge: {e}")
             return []
-    
-    async def evaluate_storage(
-        self,
-        user_id: int,
-        proposed_key: str,
-        proposed_value: str,
-        user_message: str,
-        existing_memories: List[Any]
-    ) -> StorageDecision:
-        """
-        AI decides: Should we store this? What conflicts exist? What action?
-        Uses persistent caching.
-        """
-        # Check cache for parsed object (identity check)
-        cache_key = f"{user_id}:{proposed_key}:{proposed_value}:{user_message}"
-        cached_object = self._cache.get_object(cache_key)
-        if cached_object:
-            logger.debug(f"MemoryJudge cache hit for {proposed_key}")
-            return cached_object
-        
-        # Check serialized cache and parse if exists
-        cached = self._cache.get(cache_key)
-        if cached:
-            logger.debug(f"MemoryJudge cache hit for {proposed_key}")
-            decision = StorageDecision.parse(cached)
-            # Store the parsed object for future identity checks
-            self._cache.set(cache_key, cached, decision)
-            return decision
-        
-        memory_context = format_memories_for_prompt(existing_memories)
-        
-        prompt = STORAGE_EVALUATION_PROMPT.format(
-            user_message=user_message,
-            proposed_key=proposed_key,
-            proposed_value=proposed_value,
-            memory_context=memory_context
-        )
-        
-        try:
-            from src.services.dialogue.ollama_client import call_ollama
-            from src.config import settings
-            
-            model = getattr(settings, "OLLAMA_CHAT_RAG_MODEL", None) or settings.OLLAMA_MODEL
-            response_text = await call_ollama(prompt, model=model)
-            
-            # Parse JSON from response
-            data = extract_json_from_response(response_text)
-            if data:
-                decision = StorageDecision.parse(data)
-                # Cache the decision (both serialized and parsed object)
-                self._cache.set(cache_key, {
-                    "should_store": decision.should_store,
-                    "quality_score": decision.quality_score,
-                    "issues": decision.issues,
-                    "cleaned_value": decision.cleaned_value,
-                    "conflicts": [
-                        {
-                            "existing_memory_id": c.existing_memory_id,
-                            "reason": c.reason,
-                            "action": c.action,
-                            "existing_value": c.existing_value
-                        }
-                        for c in decision.conflicts
-                    ],
-                    "reasoning": decision.reasoning
-                }, decision)
-                logger.info(f"MemoryJudge: {proposed_key} → quality={decision.quality_score}, store={decision.should_store}")
-                return decision
-            
-            # Fallback if parse failed
-            return StorageDecision(
-                should_store=True,
-                quality_score=0.5,
-                issues=["AI judge parse failed, allowing with caution"],
-                cleaned_value=None,
-                conflicts=[],
-                reasoning="Parse error, fallback to allow"
-            )
-                
-        except Exception as e:
-            logger.error(f"AI judge call failed: {e}")
-            return StorageDecision(
-                should_store=True,
-                quality_score=0.5,
-                issues=[f"AI judge error: {e}"],
-                cleaned_value=None,
-                conflicts=[],
-                reasoning="AI judge unavailable, fallback to allow"
-            )
-    
-    async def find_relevant_memories(
-        self,
-        query: str,
-        memories: List[Any],
-        context: Optional[str] = None
-    ) -> List[int]:
-        """AI selects relevant memories for a query."""
-        if not memories:
-            return []
-        
-        memory_context = format_memories_for_prompt(memories)
-        
-        prompt = MEMORY_RELEVANCE_PROMPT.format(
-            query=query,
-            context=context or "None",
-            memory_context=memory_context
-        )
-        
-        try:
-            from src.services.dialogue.ollama_client import call_ollama
-            from src.config import settings
-            
-            model = getattr(settings, "OLLAMA_CHAT_RAG_MODEL", None) or settings.OLLAMA_MODEL
-            response_text = await call_ollama(prompt, model=model)
-            
-            data = extract_json_from_response(response_text)
-            if data:
-                return data.get("selected_ids", [])
-            
-        except Exception as e:
-            logger.error(f"Memory retrieval AI call failed: {e}")
-        
-        return [m.memory_id for m in memories]
     
     def _parse_extraction_response(self, response_text: str) -> List[Dict[str, Any]]:
         """Parse JSON response from Ollama extraction.

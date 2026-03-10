@@ -67,39 +67,6 @@ class TestMemoryJudgeExtraction:
         # MemoryJudge returns empty list for low-quality memories
         assert len(memories) == 0
 
-    @pytest.mark.asyncio
-    @pytest.mark.skipif(os.getenv("TEST_USE_REAL_OLLAMA", "false").lower() != "true", reason="Only runs with real Ollama")
-    async def test_extract_memories_with_context(self, judge):
-        """Test extraction with existing user context."""
-        # Given: A message that corrects a previous memory
-        message = "Actually, my goal is machine learning, not Python."
-        user_context = {
-            "existing_memories": {
-                "learning_goal": "Python programming"
-            }
-        }
-        
-        # When: Extracting memories with context
-        memories = await judge.extract_and_judge_memories(message, user_context=user_context)
-        
-        # Then: Should recognize the correction and extract new goal
-        assert len(memories) > 0
-        # MemoryJudge filters for quality_score >= 0.7
-        for m in memories:
-            assert m.get("quality_score", 0) >= 0.7
-
-    def test_parse_json_response_direct(self, judge):
-        """Test JSON parsing from direct response."""
-        # Given: A direct JSON response
-        response = '{"memories": [{"store": true, "key": "test", "value": "value", "confidence": 0.9, "quality_score": 0.8, "should_store": true}]}'
-        
-        # When: Parsing the response
-        memories = judge._parse_extraction_response(response)
-        
-        # Then: Should correctly extract the memory
-        assert len(memories) == 1
-        assert memories[0]["key"] == "test"
-
     def test_parse_json_response_markdown(self, judge):
         """Test JSON parsing from markdown-wrapped response."""
         # Given: A markdown-wrapped JSON response

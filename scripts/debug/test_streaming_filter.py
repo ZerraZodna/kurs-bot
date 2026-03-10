@@ -9,68 +9,76 @@ from src.integrations.telegram_stream import StreamingFilter
 
 
 async def test_streaming_with_filter(user_id: int, text: str):
-    """Test the streaming path that goes through StreamingFilter."""
+    """Test the streaming path that goes through StreamingFilter.
+    
+    This test simulates what telegram.py does:
+    1. Get the streaming generator from process_message_for_telegram
+    2. Pass it through StreamingFilter to clean up for Telegram display
+    3. Get remaining_for_functions for function execution
+    4. Call post_hook with the remaining content (includes functions JSON)
+    """
     db = SessionLocal()
     try:
         dialogue = DialogueEngine(db)
         
-        # Use process_message_for_telegram which returns streaming context
+        # Make ONE call to get the streaming response
         result = await dialogue.process_message_for_telegram(
             user_id=user_id,
             text=text,
             session=db,
-            chat_id=123456,  # Dummy chat_id for testing
+            chat_id=123456,
             include_history=True,
             history_turns=4,
         )
         
         if result["type"] == "stream":
             print("✅ Streaming path activated!")
-            print("\n--- Raw tokens from Ollama (before filter) ---")
             
-            raw_tokens = []
-            async for token in result["generator"]:
-                raw_tokens.append(token)
-                print(f"RAW: {repr(token[:100])}")
+            # Get the raw generator and pass it through StreamingFilter
+            raw_generator = result["generator"]
+            stream_filter = StreamingFilter(raw_generator)
+            filtered_stream = stream_filter.filter_stream()
             
-            print(f"\n--- Total raw tokens: {len(raw_tokens)} ---")
-            print(f"--- Raw response length: {len(''.join(raw_tokens))} ---")
+            # Collect filtered tokens for Telegram display
+            filtered_tokens = []
+            async for token in filtered_stream:
+                filtered_tokens.append(token)
+                print(f"FILTERED: {repr(token[:1000])}")
             
-            # Now test the StreamingFilter
-            print("\n--- Testing StreamingFilter ---")
+            full_response = ''.join(filtered_tokens)
+            print(f"\n--- Full response for Telegram (length={len(full_response)}) ---")
+            print(f"First 2000 chars: {repr(full_response[:2000])}")
             
-            # Re-create generator for filter test
-            result2 = await dialogue.process_message_for_telegram(
-                user_id=user_id,
-                text=text,
-                session=db,
-                chat_id=123456,
-                include_history=True,
-                history_turns=4,
-            )
+            # Get remaining content for function processing
+            # Pass full_response so we can extract functions from it
+            remaining = stream_filter.get_remaining_for_functions()
+            print(f"\n--- Remaining for functions ---")
+            print(f"Remaining: {repr(remaining[:200] if remaining else None)}")
             
-            if result2["type"] == "stream":
-                raw_generator = result2["generator"]
-                stream_filter = StreamingFilter(raw_generator)
-                filtered_stream = stream_filter.filter_stream()
-                
-                filtered_tokens = []
-                async for token in filtered_stream:
-                    filtered_tokens.append(token)
-                    print(f"FILTERED: {repr(token[:100])}")
-                
-                print(f"\n--- Total filtered tokens: {len(filtered_tokens)} ---")
-                print(f"--- Filtered response length: {len(''.join(filtered_tokens))} ---")
-                
-                # Get remaining content for functions
-                remaining = stream_filter.get_remaining_for_functions()
-                print(f"\n--- Remaining for functions: {repr(remaining[:200] if remaining else None)} ---")
-                
-                # Run post_hook
-                full_response = ''.join(filtered_tokens)
-                print("\n--- Running post_hook (trigger matching) ---")
-                diagnostics = await result2["post_hook"](full_response)
-                print(f"Diagnostics keys: {diagnostics.keys() if diagnostics else 'None'}")
+            # THE FIX: Use remaining_for_functions (includes functions JSON) for post_hook
+            # This is what telegram.py does - it passes the functions to post_hook
+            function_parse_text = remaining if remaining else full_response
+            
+            print(f"\n--- Running post_hook ---")
+            print(f"Passing to post_hook (length={len(function_parse_text)}): {repr(function_parse_text[:200])}")
+            
+            diagnostics = await result["post_hook"](function_parse_text)
+            
+            print(f"\n--- Diagnostics ---")
+            print(f"Keys: {diagnostics.keys() if diagnostics else 'None'}")
+            print(f"structured_intent_used: {diagnostics.get('structured_intent_used')}")
+            print(f"dispatched_actions: {diagnostics.get('dispatched_actions')}")
+            print(f"execution_result: {diagnostics.get('execution_result')}")
+            
+            if diagnostics.get('execution_result'):
+                print("\n✅ Function executed successfully!")
+                results = diagnostics['execution_result'].results
+                for r in results:
+                    print(f"  - {r.function_name}: {r.success}")
+                    if r.result:
+                        print(f"    Result: {r.result}")
+            else:
+                print("\n❌ No function executed!")
                 
         else:
             print(f"❌ Non-streaming response: {result['text'][:200]}...")
@@ -82,6 +90,6 @@ async def test_streaming_with_filter(user_id: int, text: str):
 if __name__ == '__main__':
     init_db()
     user_id = int(sys.argv[1]) if len(sys.argv) > 1 else 1
-    text = sys.argv[2] if len(sys.argv) > 2 else "Please explain"
+    text = sys.argv[2] if len(sys.argv) > 2 else "Send me today´s lesson"
     asyncio.run(test_streaming_with_filter(user_id, text))
 

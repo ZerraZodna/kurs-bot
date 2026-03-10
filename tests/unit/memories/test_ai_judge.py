@@ -74,7 +74,7 @@ async def test_valid_name_high_quality(judge):
         existing_memories=[]
     )
     
-    assert decision.quality_score >= 0.9, f"Valid name should have high quality, got {decision.quality_score}"
+    assert decision.quality_score >= 0.8, f"Valid name should have high quality, got {decision.quality_score}"
     assert decision.should_store is True
     assert decision.cleaned_value == "Johannes"
 

@@ -247,6 +247,7 @@ async def stream_ollama(
         "stream": True,
         "temperature": float(temp),
         "think": False,
+        "format": "json",  # Force JSON output for consistent function calling
     }
 
     logger.info(

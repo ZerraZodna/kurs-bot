@@ -215,46 +215,32 @@ class StreamingFilter:
                             continue
                     # Otherwise keep waiting for more
                     continue
-            
-            # Step 2: Check for functions boundary
-            func_pos = self._find_functions_boundary(self._buffer)
-            if func_pos != -1:
-                # Found functions boundary - everything before it is text
-                text_part = self._buffer[:func_pos]
-                # Keep for functions processing
-                self._remaining_for_functions = self._buffer[func_pos:]
-                self._functions_boundary_reached = False  # Actually we've reached it
-                
-                if text_part:
-                    # Yield the text part (with JSON unescaping)
-                    self._buffer = ""
-                    yield self._unescape_json_string(text_part)
-                continue
-            
-            # Step 3: Buffer incomplete HTML tags
+                        
+            # Step 2: Buffer incomplete HTML tags
             if self._is_incomplete_tag(self._buffer):
                 # Wait for more tokens to complete the tag
                 continue
                 
-            # Step 4: Buffer incomplete HTML entities  
+            # Step 3: Buffer incomplete HTML entities  
             if self._is_incomplete_entity(self._buffer):
                 # Wait for more tokens to complete the entity
                 continue
             
-            # Step 5: Buffer incomplete JSON escape sequences
+            # Step 4: Buffer incomplete JSON escape sequences
             # Escape sequences like \n, \\n, \t can be fragmented across tokens
             # We need to buffer until we have a complete escape sequence
             if self._is_incomplete_json_escape(self._buffer):
                 # Wait for more tokens to complete the escape sequence
                 continue
 
-            # Step 6: Check if response string has ended
+            # Step 5: Check if response string has ended
             # Once we detect closing quote + comma (e.g., '?",' or '")'), 
             # nothing more should go to Telegram - collect for functions only
             if self._is_response_string_ended(self._buffer):
                 # Response string has ended - collect everything for functions
                 self._functions_boundary_reached = True
-                self._remaining_for_functions = self._buffer
+                self._remaining_for_functions = "{" + self._buffer[3:]
+
                 # Yield what's left in buffer (the actual response text)
                 text_part = self._buffer
                 # Find where the "," starts and only yield before it
@@ -266,7 +252,7 @@ class StreamingFilter:
                 self._buffer = ""
                 continue
 
-            # Step 7: Buffer is complete - extract string value and yield (with JSON unescaping)
+            # Step 6: Buffer is complete - extract string value and yield (with JSON unescaping)
             if self._buffer:
                 yield self._unescape_json_string(self._buffer)
             self._buffer = ""

@@ -84,8 +84,7 @@ async def extract_and_store_memories(
     
     This reduces Ollama calls from 2-4+ to 1-2 per user message by:
     1. Fetching ALL existing memories upfront
-    2. Passing them to extract_and_judge_memories() for conflict detection
-    3. Using returned conflict info directly instead of calling evaluate_storage() per memory
+    2. Passing them to extract_and_judge_memories() for conflict detection and extraction / storage
 
     Args:
         memory_manager: Memory manager instance
@@ -115,9 +114,12 @@ async def extract_and_store_memories(
 
         for memory in extracted_memories:
             try:
+                # AI only returns memories that should be stored
+                # No need to check should_store
+                
                 key = memory.get("key")
                 val = memory.get("value")
-                conflicts = memory.get("conflicts", [])  # Get conflicts from extraction
+                archive_memory_ids = memory.get("archive_memory_ids", [])  # List of IDs to archive
                 memory_id = None  # Default to None
                 
                 # Route lesson state writes through the centralized helper
@@ -139,6 +141,16 @@ async def extract_and_store_memories(
                             val,
                         )
                         continue
+                    
+                    # FIX: Archive old lesson_completed memories before adding new one
+                    # This prevents multiple lesson_completed memories from accumulating
+                    existing_completed = memory_manager.get_memory(user_id, MemoryKey.LESSON_COMPLETED)
+                    for existing in existing_completed:
+                        existing_id = existing.get("memory_id")
+                        if existing_id:
+                            logger.info(f"Archiving old lesson_completed memory {existing_id} (replaced by {normalized})")
+                            memory_manager.archive_memories(user_id, [existing_id])
+                    
                     # Use centralized helper for DRY
                     from src.lessons.state import record_lesson_completed
                     record_lesson_completed(
@@ -149,21 +161,13 @@ async def extract_and_store_memories(
                     )
                     memory_id = -1  # Lesson state handled differently
                 else:
-                    # Handle conflicts from unified extraction directly
-                    # No need to call evaluate_storage() separately - conflicts detected in extraction
-                    for conflict in conflicts:
-                        action = conflict.get("action", "FLAG")
-                        existing_memory_id = conflict.get("existing_memory_id")
-                        
-                        if action == "REPLACE" and existing_memory_id:
-                            logger.info(f"Unified extraction: Archiving memory {existing_memory_id} (replaced by new {key})")
-                            memory_manager.archive_memories(user_id, [existing_memory_id])
-                        elif action == "MERGE" and existing_memory_id:
-                            logger.info(f"Unified extraction: Merging with memory {existing_memory_id}")
-                        elif action == "FLAG" and existing_memory_id:
-                            logger.warning(f"Unified extraction flagged {key}: {conflict.get('reason')}")
+                    # Handle simple conflict resolution via archive_memory_ids (list)
+                    if archive_memory_ids:
+                        for archive_id in archive_memory_ids:
+                            logger.info(f"Unified extraction: Archiving memory {archive_id} (replaced by new {key})")
+                        memory_manager.archive_memories(user_id, archive_memory_ids)
                     
-                    # Store the memory directly (conflicts already handled)
+                    # Store the memory directly (conflict already handled)
                     memory_id = memory_manager.store_memory(
                         user_id=user_id,
                         key=key,

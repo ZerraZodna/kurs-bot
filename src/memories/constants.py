@@ -82,3 +82,6 @@ class MemoryKey:
     MILESTONE = "milestone"
     PREFERRED_TONE = "preferred_tone"
     COMMUNICATION_METHOD = "communication_method"
+
+    # Lesson repeat tracking
+    LESSON_REPEAT_OFFERED = "lesson_repeat_offered"

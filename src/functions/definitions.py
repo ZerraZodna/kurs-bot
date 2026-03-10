@@ -116,6 +116,29 @@ Important: When creating multiple reminders:
     
     # Context-specific examples
     CONTEXT_EXAMPLES = { 
+        "lesson_repeat": """
+Example - User says "Yes, repeat" after being offered a repeat lesson:
+User: "Yes, repeat"
+
+{
+  "response": "Perfect! Here's Lesson {lesson_id} again.",
+  "functions": [
+    {"name": "confirm_yes", "parameters": {"context": "lesson_repeat"}},
+    {"name": "send_todays_lesson", "parameters": {"lesson_id": "{lesson_id}"}}
+  ]
+}
+
+Example - User says "yes" to repeat:
+User: "yes"
+
+{
+  "response": "Great! Sending you the lesson again.",
+  "functions": [
+    {"name": "confirm_yes", "parameters": {"context": "lesson_repeat"}},
+    {"name": "send_todays_lesson", "parameters": {}}
+  ]
+}
+""",
         "onboarding_name": """
 Example - User confirms using Telegram name:
 User: "yes"

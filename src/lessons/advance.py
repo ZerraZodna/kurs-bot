@@ -11,6 +11,7 @@ from src.models.database import Lesson
 from .handler import format_lesson_message, translate_text
 from src.memories.dialogue_helpers import get_user_language
 
+
 def is_simple_greeting(text: str) -> bool:
     cleaned = re.sub(r"[^a-zA-Z\s]", "", text or "").strip().lower()
     if not cleaned:
@@ -84,6 +85,17 @@ async def maybe_send_next_lesson(
     if previous_lesson_id:
         repeat_note = f"If you'd like to repeat Lesson {previous_lesson_id} instead, just let me know."
         message = f"{message}\n\n{repeat_note}"
+        
+        # Store what lesson was offered for repeat so we can handle "Yes, repeat" later
+        memory_manager.store_memory(
+            user_id=user_id,
+            key=MemoryKey.LESSON_REPEAT_OFFERED,
+            value=str(previous_lesson_id),
+            category=MemoryCategory.PROGRESS.value,
+            source="advance.py",
+            confidence=1.0,
+        )
+    
     if (language or "").lower() not in ["en"]:
         message = await translate_text(message, language, call_ollama)
 
@@ -92,3 +104,4 @@ async def maybe_send_next_lesson(
     set_current_lesson(memory_manager, user_id, lesson.lesson_id)
 
     return message
+
