@@ -47,7 +47,7 @@ class TestLessonRepeatOffered:
         
         # Run the function
         import asyncio
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             advance.maybe_send_next_lesson(
                 user_id=123,
                 text="hi",
