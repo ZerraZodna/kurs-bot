@@ -21,270 +21,43 @@ class FunctionDefinitions:
         "consent": "onboarding_consent",
     }
     
-    # JSON format instructions template
+    # JSON format instructions template (compact)
     JSON_FORMAT_INSTRUCTIONS = """
-You must ALWAYS respond with valid JSON in the following format:
-
-{
-  "response": "Your natural language response to the user (can be empty string if only functions needed)",
-  "functions": [
-    {
-      "name": "function_name",
-      "parameters": {
-        "param1": "value1",
-        "param2": "value2"
-      }
-    }
-  ]
-}
-
-Rules:
-1. The "response" field is required - it contains text the user will see
-2. The "functions" array contains actions to execute (can be empty [])
-3. Only use functions listed under "Available Functions" for the current context
-4. All required parameters must be included
-5. Use exact function names and parameter names as shown
-6. Return ONLY the JSON, no explanations outside the JSON
-
-CRITICAL MEMORY EXTRACTION RULE:
-When the user shares personal information (name, timezone, current lesson, preferences, etc.), you MUST call extract_memory to store it. NEVER just acknowledge the information in text - always extract and store it using the extract_memory function.
-
-Examples of when to use extract_memory:
-- User says "My name is John" → call extract_memory with key="first_name", value="John"
-- User says "I'm on lesson 25" → call extract_memory with key="current_lesson", value="25"
-- User says "Call me Sarah" → call extract_memory with key="first_name", value="Sarah"
-- User says "I'm in Tokyo" → call extract_memory with key="timezone", value="Asia/Tokyo"
+Respond with valid JSON: {"response": "text", "functions": [{"name": "fn", "parameters": {}}]}
+- "response": string (can be empty "")
+- "functions": array (can be empty [])
+- No markdown, no explanations
 """
     
-    # Multi-function example
+    # Multi-function example (compact)
     MULTI_FUNCTION_EXAMPLE = """
-Example - User asks for today's lesson:
-User: "what is todays lesson?"
+Example - Lesson request:
+{"response": "", "functions": [{"name": "send_todays_lesson", "parameters": {}}]}
 
-{
-  "response": "",
-  "functions": [
-    {"name": "send_todays_lesson", "parameters": {}}
-  ]
-}
+Example - Reminders + lesson:
+{"response": "I'll remind you throughout the day:", "functions": [
+  {"name": "create_one_time_reminder", "parameters": {"run_at": "14:30", "message": "Lesson reminder"}},
+  {"name": "create_one_time_reminder", "parameters": {"run_at": "17:00", "message": "Lesson reminder"}},
+  {"name": "send_todays_lesson", "parameters": {}}
+]}
 
-Example - User asks for the full lesson text:
-User: "what is the text?"
-
-{
-  "response": "",
-  "functions": [
-    {"name": "send_todays_lesson", "parameters": {}}
-  ]
-}
-
-Example - User asks for all the text:
-User: "all the text?"
-
-{
-  "response": "",
-  "functions": [
-    {"name": "send_todays_lesson", "parameters": {}}
-  ]
-}
-
-Example - Multiple reminders + lesson:
-User: "Remind me about today's thru the day"
-
-{
-  "response": "I'll remind you about today's lesson every 30 minutes. Here are the reminders:",
-  "functions": [
-    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T12:30:00", "message": "Lesson reminder"}},
-    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T15:00:00", "message": "Lesson reminder"}},
-    {"name": "create_one_time_reminder", "parameters": {"run_at": "2024-01-15T17:30:00", "message": "Lesson reminder"}},
-    {"name": "send_todays_lesson", "parameters": {}}
-  ]
-}
-
-CRITICAL: When the user asks for "today's lesson", "the text", "all the text", "full text", or "entire lesson", you MUST:
-1. ALWAYS call send_todays_lesson function
-2. ALWAYS set the response field to an empty string: "response": ""
-3. NEVER write any text in the response field - no introductions, no summaries, no descriptions
-4. The system will automatically display the full lesson content from the function result
-
-If you write any text in the response field, the user will see duplicate or partial content. Keep response EMPTY.
-
-Important: When creating multiple reminders:
-1. Calculate times starting from the current time (e.g., if current time is 14:15, first reminder at 14:30)
-2. Never create duplicate reminders at the same time - each reminder must have a unique timestamp
+For lesson requests: ALWAYS call send_todays_lesson, keep response empty.
 """
     
-    # Context-specific examples
+    # Context-specific examples (compact)
     CONTEXT_EXAMPLES = { 
-        "lesson_repeat": """
-Example - User says "Yes, repeat" after being offered a repeat lesson:
-User: "Yes, repeat"
-
-{
-  "response": "Perfect! Here's Lesson {lesson_id} again.",
-  "functions": [
-    {"name": "confirm_yes", "parameters": {"context": "lesson_repeat"}},
-    {"name": "send_todays_lesson", "parameters": {"lesson_id": "{lesson_id}"}}
-  ]
-}
-
-Example - User says "yes" to repeat:
-User: "yes"
-
-{
-  "response": "Great! Sending you the lesson again.",
-  "functions": [
-    {"name": "confirm_yes", "parameters": {"context": "lesson_repeat"}},
-    {"name": "send_todays_lesson", "parameters": {}}
-  ]
-}
-""",
-        "onboarding_name": """
-Example - User confirms using Telegram name:
-User: "yes"
-
-{
-  "response": "Great! I'll use your name from Telegram.",
-  "functions": [
-    {"name": "confirm_yes", "parameters": {"context": "use_telegram_name"}}
-  ]
-}
-
-Example - User declines using Telegram name:
-User: "no"
-
-{
-  "response": "No problem! What would you like me to call you?",
-  "functions": [
-    {"name": "confirm_no", "parameters": {"context": "use_telegram_name"}}
-  ]
-}
-
-Example - Extracting name from complex sentence:
-User: "My name is Johannes. Got that?"
-
-{
-  "response": "Nice to meet you, Johannes! I've noted your name.",
-  "functions": [
-    {"name": "extract_memory", "parameters": {"key": "first_name", "value": "Johannes"}}
-  ]
-}
-
-Example - Remembering name:
-User: "Remember my name is Sarah"
-
-{
-  "response": "Nice to meet you, Sarah! I've noted your name.",
-  "functions": [
-    {"name": "extract_memory", "parameters": {"key": "first_name", "value": "Sarah"}}
-  ]
-}
-""",
-        "onboarding_consent": """
-Example - User grants consent:
-User: "yes, I agree"
-
-{
-  "response": "Thank you! Your consent has been recorded. Let's continue with your setup.",
-  "functions": [
-    {"name": "confirm_yes", "parameters": {"context": "data_consent"}}
-  ]
-}
-
-Example - User declines consent:
-User: "no, I don't want that"
-
-{
-  "response": "I understand. Without consent to store your data, I cannot provide personalized service. Your information will be deleted.",
-  "functions": [
-    {"name": "confirm_no", "parameters": {"context": "data_consent"}}
-  ]
-}
-""",
-        "schedule_setup": """
-Example - Creating schedule:
-User: "Remind me every day at 9am"
-
-{
-  "response": "Perfect! I've set up a daily reminder at 9:00 AM. You'll receive your ACIM lesson at this time every day.",
-  "functions": [
-    {"name": "create_schedule", "parameters": {"time": "09:00", "message": "Time for your daily ACIM lesson"}},
-    {"name": "set_preferred_time", "parameters": {"time": "09:00"}},
-    {"name": "extract_memory", "parameters": {"key": "preferred_lesson_time", "value": "09:00"}}
-  ]
-}
-
-Example - Deleting one-time reminder:
-User: "Delete my one time reminder"
-
-{
-  "response": "I'll help you delete your one-time reminder. Let me first check what reminders you have.",
-  "functions": [
-    {"name": "query_schedule", "parameters": {}}
-  ]
-}
-
-Then after seeing the schedule list with schedule_id, the AI should call:
-{
-  "response": "One-time reminder deleted.",
-  "functions": [
-    {"name": "delete_one_time_reminder", "parameters": {"schedule_id": 123}}
-  ]
-}
-
-Example - Deleting all one-time reminders:
-User: "Delete all my one time reminders"
-
-{
-  "response": "All one-time reminders have been deleted.",
-  "functions": [
-    {"name": "delete_all_one_time_reminders", "parameters": {}}
-  ]
-}
-
-Example - Deleting all daily reminders:
-User: "Delete my daily reminders"
-
-{
-  "response": "All daily reminders have been deleted.",
-  "functions": [
-    {"name": "delete_all_daily_reminders", "parameters": {}}
-  ]
-}
-
-Example - Deleting all reminders:
-User: "Delete all my reminders"
-
-{
-  "response": "All reminders have been deleted. You won't receive any more scheduled messages unless you set new reminders.",
-  "functions": [
-    {"name": "delete_all_reminders", "parameters": {}}
-  ]
-}
-""",
-        "general_chat": """
-Example - Extracting current lesson:
-User: "I'm on lesson 25 now"
-
-{
-  "response": "Great progress! I've noted that you're on lesson 25.",
-  "functions": [
-    {"name": "extract_memory", "parameters": {"key": "current_lesson", "value": "25"}}
-  ]
-}
-
-Example - Multiple extractions with timezone:
-User: "My name is John and I'm in Tokyo, studying lesson 30"
-
-{
-  "response": "Thanks John! I've noted your details and set your timezone.",
-  "functions": [
-    {"name": "extract_memory", "parameters": {"key": "first_name", "value": "John"}},
-    {"name": "set_timezone", "parameters": {"timezone": "Asia/Tokyo"}},
-    {"name": "extract_memory", "parameters": {"key": "current_lesson", "value": "30"}}
-  ]
-}
-""",
+        "lesson_repeat": '{"response": "Great! Here\'s the lesson again.", "functions": [{"name": "confirm_yes", "parameters": {"context": "lesson_repeat"}}, {"name": "send_todays_lesson", "parameters": {}}]}',
+        "onboarding_name": '{"response": "Nice to meet you, {name}!", "functions": [{"name": "extract_memory", "parameters": {"key": "first_name", "value": "{name}"}}]}',
+        "onboarding_consent": '{"response": "Thank you!", "functions": [{"name": "confirm_yes", "parameters": {"context": "data_consent"}}]}',
+        "schedule_setup": """Schedule: create_schedule(time="09:00"), delete_all_reminders()
+Delete: delete_all_one_time_reminders(), delete_all_daily_reminders(), delete_all_reminders()
+Query: query_schedule() to list before deleting""",
+        "general_chat": """ALWAYS call set_current_lesson when user shares lesson progress:
+- "I am on lesson 29" / "I'm on lesson 29" / "currently on lesson 29" → set_current_lesson(lesson_number=29)
+- "I finished lesson 28" / "completed lesson 28" → extract_memory(key="lesson_completed", value="28")
+- "My name is John" → extract_memory(key="first_name", value="John")
+- "I'm in Oslo" / "I live in Norway" → set_timezone(timezone="Europe/Oslo")
+Multiple facts in one message → multiple function calls""",
     }
     
     def __init__(self, registry: Optional[FunctionRegistry] = None):

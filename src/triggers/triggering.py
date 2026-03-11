@@ -33,7 +33,7 @@ async def handle_triggers(
             logger.warning("Assistant response is None; skipping trigger handling")
             return diagnostics
 
-        logger.debug(f"Handling triggers for response: {response[:200]}...")
+        logger.debug(f"Handling triggers for response (FULL): {response}")
         
         # Parse the response using IntentParser
         parser = get_intent_parser()

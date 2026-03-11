@@ -86,7 +86,7 @@ Only use functions relevant to the current context.
     # Post-extraction safety pass: when True, performs a second extraction pass
     # after the main Ollama call to catch any memories that the main prompt missed.
     # Set to False to disable (main prompt should extract all memories).
-    POST_EXTRACT_MEMORIES: bool = True
+    POST_EXTRACT_MEMORIES: bool = False
 
     model_config: ConfigDict = ConfigDict(
         env_file=".env",

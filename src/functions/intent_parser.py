@@ -65,7 +65,7 @@ class IntentParser:
         json_str = self._extract_json(response_text)
         
         if not json_str:
-            logger.debug("No JSON found in response, treating as natural language")
+            logger.debug(f"No JSON found in response, treating as natural language. Full response: {response_text}")
             # No JSON found - treat as natural language only
             return self._create_fallback_result(response_text)
         

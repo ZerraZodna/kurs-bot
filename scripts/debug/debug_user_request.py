@@ -14,7 +14,9 @@ def dump_user_state(db, user_id):
     if not user:
         print("User not found")
         return
-    print("User:", {"user_id": user.user_id, "external_id": user.external_id, "timezone": user.timezone, "first_name": user.first_name})
+    
+
+    print("User:", {"user_id": user.user_id, "external_id": user.external_id, "timezone": user.timezone, "first_name": user.first_name, "lesson": user.lesson})
 
     print("\nSchedules:")
     schedules = db.query(Schedule).filter_by(user_id=user_id).all()

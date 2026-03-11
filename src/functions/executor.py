@@ -104,6 +104,9 @@ class FunctionExecutor:
         
         # Memory extraction handler
         self._handlers["extract_memory"] = self._handle_extract_memory
+
+        # Lesson state handler
+        self._handlers["set_current_lesson"] = self._handle_set_current_lesson
     
     def register_handler(self, function_name: str, handler: Callable):
         """Register a custom handler for a function."""
@@ -1007,6 +1010,25 @@ class FunctionExecutor:
             return MemoryCategory.PROGRESS.value
         else:
             return MemoryCategory.CONVERSATION.value
+
+    async def _handle_set_current_lesson(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle set_current_lesson function."""
+        from src.lessons.state import set_current_lesson
+        
+        user_id = context.get("user_id")
+        memory_manager = context.get("memory_manager")
+        lesson_number = params.get("lesson_number")
+        
+        try:
+            lesson_number = int(lesson_number)
+            if not (1 <= lesson_number <= 365):
+                return self._error_response(f"Lesson {lesson_number} out of range 1-365")
+            
+            set_current_lesson(memory_manager, user_id, lesson_number)
+            logger.info(f"set_current_lesson: user_id={user_id}, lesson={lesson_number}")
+            return self._ok_response(lesson_number=lesson_number)
+        except (ValueError, TypeError) as e:
+            return self._error_response(f"Invalid lesson number: {lesson_number}")
 
 
 # Global instance

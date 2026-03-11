@@ -166,15 +166,17 @@ class FunctionMetadata:
     def to_prompt_text(self) -> str:
         """Generate prompt text describing this function."""
         lines = [f"- {self.name}: {self.description}"]
+
+        required = [p for p in self.parameters if p.required]
+        optional = [p for p in self.parameters if not p.required]
         
-        if self.parameters:
-            lines.append("  Parameters:")
-            for param in self.parameters:
-                req_str = "required" if param.required else "optional"
-                lines.append(f"    - {param.name} ({param.type.value}, {req_str}): {param.description}")
-                if param.examples:
-                    lines.append(f"      Examples: {', '.join(str(e) for e in param.examples)}")
-        
+        if required:
+            for param in required:
+                lines.append(f"    - {param.name} ({param.type.value}): {param.description}")
+        if optional:
+            opt_names = ", ".join(f"{p.name}?" for p in optional)
+            lines.append(f"    - optional: {opt_names}")
+
         return "\n".join(lines)
 
 
@@ -194,7 +196,7 @@ class FunctionRegistry:
             parameters=[
                 ParameterSchema(
                     name="time",
-                    description="Time of day for the reminder (24-hour format)",
+                    description="24-hour format time",
                     type=ParameterType.TIME,
                     required=True,
                     examples=["09:00", "14:30", "20:00"],
@@ -226,7 +228,7 @@ class FunctionRegistry:
             parameters=[
                 ParameterSchema(
                     name="schedule_id",
-                    description="ID of the schedule to update",
+                    description="Schedule ID",
                     type=ParameterType.INTEGER,
                     required=True,
                 ),
@@ -247,7 +249,7 @@ class FunctionRegistry:
             parameters=[
                 ParameterSchema(
                     name="schedule_id",
-                    description="ID of the schedule to delete",
+                    description="Schedule ID",
                     type=ParameterType.INTEGER,
                     required=True,
                 ),
@@ -268,14 +270,14 @@ class FunctionRegistry:
             parameters=[
                 ParameterSchema(
                     name="run_at",
-                    description="ISO datetime when the reminder should fire",
+                    description="ISO datetime (e.g. 2024-01-15T09:00:00)",
                     type=ParameterType.DATETIME,
                     required=True,
                     examples=["2024-01-15T09:00:00", "2024-01-15T14:30:00"],
                 ),
                 ParameterSchema(
                     name="message",
-                    description="Reminder message",
+                    description="Message text",
                     type=ParameterType.STRING,
                     required=True,
                     examples=["Lesson reminder", "Time to review"],
@@ -290,7 +292,7 @@ class FunctionRegistry:
             parameters=[
                 ParameterSchema(
                     name="schedule_id",
-                    description="ID of the one-time reminder schedule to delete",
+                    description="Schedule ID",
                     type=ParameterType.INTEGER,
                     required=True,
                 ),
@@ -326,7 +328,7 @@ class FunctionRegistry:
             parameters=[
                 ParameterSchema(
                     name="lesson_id",
-                    description="ID of the lesson to send",
+                    description="Lesson ID",
                     type=ParameterType.INTEGER,
                     required=True,
                     examples=[1, 42, 365],
@@ -348,7 +350,7 @@ class FunctionRegistry:
             parameters=[
                 ParameterSchema(
                     name="lesson_id",
-                    description="Specific lesson ID to send (optional, defaults to today's scheduled lesson)",
+                    description="Lesson ID (optional, defaults to today's)",
                     type=ParameterType.INTEGER,
                     required=False,
                     examples=[1, 42, 365],
@@ -364,7 +366,7 @@ class FunctionRegistry:
             parameters=[
                 ParameterSchema(
                     name="timezone",
-                    description="IANA timezone name",
+                    description="Timezone (e.g. Europe/Oslo)",
                     type=ParameterType.TIMEZONE,
                     required=True,
                     examples=["Europe/Oslo", "America/New_York", "Asia/Tokyo"],
@@ -446,7 +448,7 @@ class FunctionRegistry:
             parameters=[
                 ParameterSchema(
                     name="context",
-                    description="What the user is confirming",
+                    description="Context string",
                     type=ParameterType.STRING,
                     required=False,
                     examples=["lesson_completed", "schedule_created"],
@@ -461,7 +463,7 @@ class FunctionRegistry:
             parameters=[
                 ParameterSchema(
                     name="context",
-                    description="What the user is declining",
+                    description="Context string",
                     type=ParameterType.STRING,
                     required=False,
                     examples=["not_completed", "needs_more_time"],
@@ -477,7 +479,7 @@ class FunctionRegistry:
             parameters=[
                 ParameterSchema(
                     name="key",
-                    description="Memory key/category (e.g., 'first_name', 'timezone', 'current_lesson', 'preferred_time')",
+                    description="Memory key (e.g., 'first_name', 'timezone', 'current_lesson')",
                     type=ParameterType.STRING,
                     required=True,
                     examples=["first_name", "timezone", "current_lesson", "preferred_lesson_time", "learning_goal"],
@@ -491,7 +493,7 @@ class FunctionRegistry:
                 ),
                 ParameterSchema(
                     name="ttl_hours",
-                    description="Time-to-live in hours (optional, for temporary memories)",
+                    description="Time-to-live in hours (optional)",
                     type=ParameterType.INTEGER,
                     required=False,
                     examples=[24, 168, 720],
@@ -503,6 +505,25 @@ class FunctionRegistry:
                 {"key": "current_lesson", "value": "25"},
             ],
             contexts=["general_chat", "onboarding", "onboarding_name", "onboarding_consent", "schedule_setup", "lesson_review", "morning_lesson_confirmation"],
+        ))
+        
+        # Lesson state function - dedicated function for setting current lesson
+        self.register(FunctionMetadata(
+            name="set_current_lesson",
+            description="Set the user's current ACIM lesson number. Use when user says 'I am on lesson X'.",
+            parameters=[
+                ParameterSchema(
+                    name="lesson_number",
+                    description="Lesson number (1-365)",
+                    type=ParameterType.INTEGER,
+                    required=True,
+                    examples=[1, 28, 29, 100],
+                ),
+            ],
+            examples=[
+                {"lesson_number": 29},
+            ],
+            contexts=["general_chat", "onboarding", "lesson_review"],
         ))
     
     def register(self, function: FunctionMetadata):
@@ -554,3 +575,4 @@ def reset_registry():
     """Reset the global registry (useful for testing)."""
     global _registry
     _registry = None
+
