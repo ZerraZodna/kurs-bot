@@ -143,12 +143,7 @@ class IntentParser:
         
         logger.debug(f"Validating and extracting from data: {data}")
         
-        # Check for required fields
-        if "response" not in data:
-            errors.append("Missing 'response' field")
-            response_text = ""
-        else:
-            response_text = str(data["response"]) if data["response"] is not None else ""
+
         
         # Extract functions
         functions = []
