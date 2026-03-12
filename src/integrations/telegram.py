@@ -345,8 +345,6 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
 
     await asyncio.sleep(1.0)
 
-    stream_enabled = getattr(settings, "OLLAMA_STREAM_ENABLED", True)
-    logger.info(f"[batch] stream_enabled={stream_enabled} for user_id={user_id}")
 
     # Track dialogue for memory extraction (need to keep reference)
     dialogue = None
@@ -391,11 +389,12 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
             dialogue = None
 
             # Create a separate session for dialogue processing to keep it isolated
+            stream_enabled = getattr(settings, "OLLAMA_STREAM_ENABLED", True)
             dialogue_db = SessionLocal()
             try:
                 if stream_enabled:
                     dialogue = DialogueEngine(dialogue_db)
-                    result = await dialogue.process_message_for_telegram(
+                    result = await dialogue.process_message(
                         user_id=user_id,
                         text=combined_text,
                         session=dialogue_db,
@@ -405,15 +404,10 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                     )
 
                     if result["type"] == "stream":
-                        # Stream tokens to Telegram via progressive edits
                         logger.info(f"[batch] Using STREAMING path for user_id={user_id}")
                         
-                        # Use StreamingFilter to clean up the raw LLM tokens before streaming
-                        # This handles: JSON prefix, incomplete HTML tags, HTML entities, functions boundary
                         raw_generator = result["generator"]
                         stream_filter = StreamingFilter(raw_generator)
-                        
-                        # Get the filtered stream for Telegram
                         filtered_stream = stream_filter.filter_stream()
                         
                         full_response, telegram_message_id = await send_message_streaming(
@@ -421,73 +415,39 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                             token_generator=filtered_stream,
                         )
                         
-                        logger.info(f"[batch] Streamed to Telegram, message_id={telegram_message_id}, full_response length={len(full_response)}")
+                        logger.info(f"[batch] Streamed to Telegram, message_id={telegram_message_id}")
                         
-                        if not full_response:
-                            ai_response = "[No response from LLM]"
-                            await send_message(chat_id, ai_response)
-                        else:
-                            # Get any remaining content for function processing
-                            remaining_for_functions = stream_filter.get_remaining_for_functions()
-                            
-                            # Use remaining content for function parsing if available
-                            # Otherwise use the full streamed response
-                            function_parse_text = remaining_for_functions if remaining_for_functions else full_response
-                            
-                            logger.info(f"[batch] Extracted ai_response: {full_response[:200] if full_response else 'EMPTY'}...")
-                            
-                            # Run post-response hooks to check for function calls
-                            # This runs after streaming is complete
-                            function_response_text = None
-                            has_function_results = False
-                            try:
-                                diagnostics = await result["post_hook"](full_response)
-                                # Check if there are function execution results to send
-                                if diagnostics and diagnostics.get("execution_result"):
-                                    from src.functions.response_builder import get_response_builder
-                                    from src.functions.intent_parser import get_intent_parser
-                                    
-                                    response_builder = get_response_builder()
-                                    parser = get_intent_parser()
-                                    # Parse using the remaining content (contains functions)
-                                    parse_result = parser.parse(function_parse_text)
-                                    
-                                    built_response = response_builder.build(
-                                        user_text=combined_text,
-                                        ai_response_text=parse_result.response_text if parse_result.response_text is not None else full_response,
-                                        execution_result=diagnostics["execution_result"],
-                                        include_function_results=True,
-                                    )
-                                    function_response_text = built_response.text
-                                    has_function_results = True
-                            except Exception as e:
-                                print(f"[stream post_hook error] {e}")
-                            
-                            # Set ai_response for logging
-                            ai_response = full_response
-                            
-                            # If we have function results, send the combined response once
-                            # Otherwise, the AI text was already streamed so no need to send again
-                            if has_function_results and function_response_text and function_response_text.strip():
-                                await send_message(chat_id, function_response_text)
-                            # Note: ai_response was already streamed via send_message_streaming
+                        remaining_for_functions = stream_filter.get_remaining_for_functions()
+                        function_parse_text = remaining_for_functions or full_response
+                        
+                        try:
+                            diagnostics = await result["post_hook"](full_response)
+                            if diagnostics and diagnostics.get("execution_result"):
+                                from src.functions.response_builder import get_response_builder
+                                from src.functions.intent_parser import get_intent_parser
+                                
+                                response_builder = get_response_builder()
+                                parser = get_intent_parser()
+                                parse_result = parser.parse(function_parse_text)
+                                
+                                built_response = response_builder.build(
+                                    user_text=combined_text,
+                                    ai_response_text=parse_result.response_text if parse_result.response_text is not None else full_response,
+                                    execution_result=diagnostics["execution_result"],
+                                    include_function_results=True,
+                                )
+                                if built_response.text.strip():
+                                    await send_message(chat_id, built_response.text)
+                        except Exception as e:
+                            logger.error(f"[post_hook error] {e}")
+                        
+                        ai_response = full_response
                     else:
-                        # Non-LLM response — send normally
-                        logger.info(f"[batch] Using NON-STREAMING (text) path for user_id={user_id}")
+                        logger.info(f"[batch] Text response for user_id={user_id}")
                         ai_response = result["text"]
                         await send_message(chat_id, ai_response)
-                else:
-                    # Streaming disabled — use original non-streaming path
-                    logger.info(f"[batch] OLLAMA_STREAM_ENABLED=False, using NON-STREAMING path for user_id={user_id}")
-                    dialogue = DialogueEngine(dialogue_db)
-                    ai_response = await dialogue.process_message(
-                        user_id=user_id,
-                        text=combined_text,
-                        session=dialogue_db,
-                        include_history=True,
-                        history_turns=4,
-                    )
-                    await send_message(chat_id, ai_response)
+
+                # Removed - always streaming now
             finally:
                 # Always close the dialogue session to prevent connection leaks
                 dialogue_db.close()
