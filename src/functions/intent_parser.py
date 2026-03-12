@@ -143,7 +143,8 @@ class IntentParser:
         
         logger.debug(f"Validating and extracting from data: {data}")
         
-
+        # Extract response if present (optional)
+        response_text = str(data.get("response", ""))
         
         # Extract functions
         functions = []
