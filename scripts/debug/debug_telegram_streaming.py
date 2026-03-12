@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
+import os
+import sys
+from pathlib import Path
+
+# Ensure repo root is on path for src imports
+repo_root = Path(__file__).resolve().parents[2]
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
+
 """Test script for Telegram streaming path with function calling.
+
 
 Simulates the exact Telegram streaming flow:
 1. process_message_for_telegram() → streaming generator
@@ -69,7 +79,7 @@ async def test_telegram_streaming(user_id: int, text: str):
         start_time = time.time()
         
         # Step 1: Get streaming response (simulates telegram.py)
-        result = await dialogue.process_message_for_telegram(
+        result = await dialogue.process_message(
             user_id=user_id,
             text=text,
             session=db,

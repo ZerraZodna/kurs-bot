@@ -2,6 +2,12 @@ import asyncio
 import json
 import sys
 from datetime import datetime
+from pathlib import Path
+
+# Ensure repo root is on path for src imports
+repo_root = Path(__file__).resolve().parents[2]
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
 
 from src.models.database import SessionLocal, User, Memory, Schedule, init_db
 from src.memories import MemoryManager
