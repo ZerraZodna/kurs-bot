@@ -439,8 +439,6 @@ class PromptBuilder:
             created = to_utc(user.created_at)
             days_active = (datetime.now(timezone.utc) - created).days
             parts.append(f"User since: {days_active} days ago")
-
-        parts.append(f"Lesson number: {user.lesson} ")
         
         # Add local time
         local_time = self._get_user_local_time_str(user)
