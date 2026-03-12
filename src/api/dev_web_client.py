@@ -9,6 +9,9 @@ from src.models.database import SessionLocal, User
 from src.services.dialogue_engine import DialogueEngine
 from src.memories import MemoryManager
 from src.config import settings
+import logging
+from fastapi.responses import StreamingResponse
+from src.integrations.telegram_stream import StreamingFilter
 
 router = APIRouter(prefix="/dev")
 
@@ -49,7 +52,27 @@ async def dev_message(payload: MessagePayload):
         # Use DialogueEngine to process message
         dialogue = DialogueEngine(db)
         response = await dialogue.process_message(user_id=user.user_id, text=payload.text, session=db)
-        return {"ok": True, "response": response}
+        
+        logger = logging.getLogger(__name__)
+        
+        if isinstance(response, dict) and response.get("type") == "stream":
+            raw_generator = response["generator"]
+            stream_filter = StreamingFilter(raw_generator)
+            filtered_generator = stream_filter.filter_stream()
+            
+            async def webui_stream_gen():
+                async for token in filtered_generator:
+                    yield token
+                # Run post-hook (full_text accumulation needs tee in prod)
+                try:
+                    await response["post_hook"]("")
+                except Exception as e:
+                    logger.error(f"Post-hook error: {e}")
+            
+            return StreamingResponse(webui_stream_gen(), media_type="text/plain")
+        else:
+            # Fallback to text if not stream dict
+            return {"ok": True, "response": response.get("text", str(response))}
     finally:
         db.close()
 

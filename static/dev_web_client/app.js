@@ -3,7 +3,22 @@ const userIdInput = document.getElementById('user_id')
 const textInput = document.getElementById('text')
 const sendBtn = document.getElementById('send')
 
-// Text is already HTML - just sanitize for security
+function unescapeJsonString(text) {
+  if (!text) return text
+  // Mirror Python _unescape_json_string
+  let result = text
+  result = result.replace(/\\\\/g, '\\\\')  // \\\\ -> \\ first? No, Python does \\\\ -> \\ 
+  result = result.replace(/\\\\n/g, '\\n')   // \\n -> \n (escaped newline)
+  result = result.replace(/\\n/g, '\n')      // \n -> actual newline
+  result = result.replace(/\\r/g, '\r')
+  result = result.replace(/\\t/g, '\t')
+  result = result.replace(/\\"/g, '"')
+  result = result.replace(/\\'/g, "'")
+  result = result.replace(/\\\//g, '/')
+  return result
+}
+
+let streamBuffer = ''
 
 async function appendMessage(role, text) {
   const el = document.createElement('div')
@@ -12,15 +27,11 @@ async function appendMessage(role, text) {
   const prefix = role === 'user' ? 'You: ' : 'Bot: '
 
   if (role === 'user') {
-    // keep user input as plain text to avoid injection
     el.textContent = prefix + text
   } else {
-    // Text is already HTML - just sanitize for security
     if (window.DOMPurify && typeof DOMPurify.sanitize === 'function') {
-      // Wrap prefix in a span to separate it from block-level HTML elements
       el.innerHTML = '<span class="msg-prefix">' + prefix + '</span>' + DOMPurify.sanitize(text)
     } else {
-      // fallback: plain text
       el.textContent = prefix + text
     }
   }
@@ -29,42 +40,79 @@ async function appendMessage(role, text) {
   chat.scrollTop = chat.scrollHeight
 }
 
+async function* streamReader(reader) {
+  let buffer = streamBuffer
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += new TextDecoder().decode(value)
+    
+    // Process complete lines (simulate buffering for escapes)
+    let lines = buffer.split('\n')
+    buffer = lines.pop() || ''  // last incomplete line to buffer
+    for (let line of lines) {
+      if (line.trim()) {
+        yield unescapeJsonString(line)
+      }
+    }
+  }
+  if (buffer.trim()) {
+    yield unescapeJsonString(buffer)
+  }
+  streamBuffer = ''
+}
+
 async function send() {
   const user_id = parseInt(userIdInput.value || '1')
   const text = textInput.value || ''
   if (!text) return
   
-  // Add user message immediately
-  const userEl = document.createElement('div')
-  userEl.className = 'msg user'
-  userEl.textContent = 'You: ' + text
-  chat.appendChild(userEl)
-  chat.scrollTop = chat.scrollHeight
-  
+  // Add user message
+  appendMessage('user', text)
   textInput.value = ''
+  textInput.disabled = true
+  sendBtn.disabled = true
+  sendBtn.textContent = 'Sending...'
+
+  // Create bot message container for streaming
+  const botEl = document.createElement('div')
+  botEl.className = 'msg bot streaming'
+  botEl.innerHTML = '<span class="msg-prefix">Bot: </span><span class="streaming-text"></span>'
+  const streamingText = botEl.querySelector('.streaming-text')
+  chat.appendChild(botEl)
+  chat.scrollTop = chat.scrollHeight
 
   try {
     const apiBaseRaw = (window.__DEV_API_BASE || '').trim()
     const apiBase = apiBaseRaw.endsWith('/') ? apiBaseRaw.slice(0, -1) : apiBaseRaw
-    const url = apiBase ? `${apiBase}/dev/message` : '/dev/message'
-    console.log('DEV UI fetch url:', url)
+    const url = `${apiBase}/dev/message` || '/dev/message'
+    
     const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id, text }),
     })
-    const raw = await resp.text()
-    let data
-    try { data = JSON.parse(raw) } catch (_) { data = null }
-    const body = data && typeof data === 'object'
-      ? (data.response || raw)
-      : raw
+
+    if (!resp.body) {
+      appendMessage('bot', '(no response body)')
+      return
+    }
+
+    const reader = resp.body.getReader()
+    for await (const chunk of streamReader(reader)) {
+      streamingText.textContent += chunk
+      chat.scrollTop = chat.scrollHeight
+    }
+
+    botEl.classList.remove('streaming')
     
-    // Use async appendMessage for bot response
-    await appendMessage('bot', body || '(empty response)')
   } catch (e) {
-    await appendMessage('bot', `Request failed: ${e.message} (url=${window.__DEV_API_BASE || '/'}dev/message)`)
-    console.error('DEV UI fetch error', e)
+    streamingText.textContent = `Error: ${e.message}`
+    console.error('Stream error', e)
+  } finally {
+    textInput.disabled = false
+    sendBtn.disabled = false
+    sendBtn.textContent = 'Send'
   }
 }
 
