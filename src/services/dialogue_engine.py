@@ -1,11 +1,11 @@
 import logging
-from typing import Optional
+from typing import Optional, Union
 from sqlalchemy.orm import Session
 from src.memories import MemoryManager
 from src.language.prompt_builder import PromptBuilder
 from src.memories.semantic_search import get_semantic_search_service
 from src.onboarding.service import OnboardingService
-from src.onboarding.flow import OnboardingFlow, NEEDS_AI_PROCESSING
+from src.onboarding.flow import OnboardingFlow
 from src.scheduler import api as scheduler_api
 from src.services.dialogue import (
     call_ollama,
@@ -61,7 +61,7 @@ class DialogueEngine:
         include_history: bool = True,
         history_turns: int = 4,
         include_lesson: bool = True,
-    ) -> str:
+    ) -> dict:
         """
         Process user message with full context awareness.
         """
@@ -98,8 +98,8 @@ class DialogueEngine:
         if lesson_schedule_response:
             return lesson_schedule_response
 
-        # 6. Core Dialogue (LLM Response and Triggers)
-        return await self._generate_llm_response(
+        # ALWAYS STREAM: no sync fallback
+        return await self._generate_llm_response_streaming(
             user_id, text, session, user_lang, use_rag_for_this_message, include_history, history_turns, include_lesson
         )
 
@@ -175,53 +175,6 @@ class DialogueEngine:
             pending_step_value = str(pending_step[0].get("value", "")).lower() if pending_step else None
             
             onboarding_response = await self.onboarding_flow.handle_onboarding(user_id, text, session)
-            
-            # Check if AI processing is needed for this onboarding step
-            if onboarding_response == NEEDS_AI_PROCESSING:
-                # Get user language for the LLM call
-                user_lang = get_user_language(self.memory_manager, user_id)
-                # Invoke LLM with onboarding context to process the message
-                # This enables function calling for memory extraction during onboarding
-                ai_response = await self._generate_llm_response(
-                    user_id=user_id,
-                    text=text,
-                    session=session,
-                    user_lang=user_lang,
-                    use_rag=False,
-                    include_history=True,
-                    history_turns=4,
-                    include_lesson=False,
-                )
-                
-                # After AI processing, check if the pending step was completed via function calling
-                # For example, if lesson_status was pending and current_lesson was extracted
-                if pending_step_value == "lesson_status":
-                    from src.lessons.state import get_current_lesson
-                    current_lesson = get_current_lesson(self.memory_manager, user_id)
-                    if current_lesson:
-                        # Lesson was extracted - resolve pending step and complete onboarding
-                        self.onboarding_flow._resolve_pending_step(user_id)
-                        # Check if onboarding is now complete
-                        if self.onboarding.should_show_onboarding(user_id):
-                            next_prompt = self.onboarding.get_onboarding_prompt(user_id)
-                            if next_prompt:
-                                return f"{ai_response}\n\n{next_prompt}"
-                        else:
-                            # Onboarding complete - return completion message
-                            completion = self.onboarding.get_onboarding_complete_message(user_id)
-                            return f"{ai_response}\n\n{completion}"
-                        return ai_response
-                
-                # After AI processing, check if there are more onboarding steps
-                # The AI may have extracted information (e.g., name) via function calling
-                # We need to continue the onboarding flow with the next step
-                if self.onboarding.should_show_onboarding(user_id):
-                    next_prompt = self.onboarding.get_onboarding_prompt(user_id)
-                    if next_prompt:
-                        # Combine AI response with next onboarding question
-                        return f"{ai_response}\n\n{next_prompt}"
-                
-                return ai_response
             
             return onboarding_response
         
@@ -528,7 +481,7 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
         include_history: bool = True,
         history_turns: int = 4,
         include_lesson: bool = True,
-    ):
+    ) -> dict:
         """Process a user message and return either a plain string or a streaming context.
 
         Returns a dict with:

@@ -29,7 +29,7 @@ def get_current_lesson(memory_manager: MemoryManager, user_id: int) -> Optional[
     return user.lesson
 
 
-def set_current_lesson(memory_manager: MemoryManager, user_id: int, lesson: Any) -> None:
+def set_current_lesson(memory_manager: MemoryManager, user_id: int, lesson: Any, refresh: bool = False) -> None:
     """Set current lesson in users.lesson."""
     user = memory_manager.db.query(User).filter(User.user_id == user_id).first()
     if not user:
@@ -41,12 +41,14 @@ def set_current_lesson(memory_manager: MemoryManager, user_id: int, lesson: Any)
 
     user.lesson = parsed
     memory_manager.db.commit()
+    if refresh:
+        memory_manager.db.refresh(user)
 
 
 def set_next_lesson(memory_manager: MemoryManager, user_id: int, lesson_id: int) -> None:
     """Helper: set the last sent / next lesson id for a user (used by trigger dispatcher)."""
     # Use consolidated lesson_state helper so state stays consistent.
-    set_current_lesson(memory_manager, user_id, lesson_id)
+    set_current_lesson(memory_manager, user_id, lesson_id, refresh=False)
 
 
 def has_lesson_status(memory_manager: MemoryManager, user_id: int) -> bool:

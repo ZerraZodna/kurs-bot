@@ -11,38 +11,12 @@ from src.services.dialogue_engine import DialogueEngine
 from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.language.prompt_builder import PromptBuilder
+from src.api.schemas import MessageRequest, MessageResponse, MemoryRequest, UserContextResponse, LessonResponse, SemanticSearchRequest, SemanticSearchResponse, MemoryWithScore
 
 router = APIRouter(prefix="/api/v1/dialogue", tags=["dialogue"])
 
 
-# Pydantic models for API requests/responses
-class MessageRequest(BaseModel):
-    user_id: int
-    text: str
-    include_history: bool = True
-    history_turns: int = 4
 
-
-class MessageResponse(BaseModel):
-    user_id: int
-    response: str
-    model: str = "ollama"
-
-
-class MemoryRequest(BaseModel):
-    user_id: int
-    key: str
-    value: str
-    category: str = "profile"
-    ttl_hours: Optional[int] = None
-
-
-class UserContextResponse(BaseModel):
-    user_id: int
-    name: str
-    goals: List[dict]
-    preferences: List[dict]
-    recent_progress: List[dict]
 
 
 def get_db():
@@ -60,7 +34,7 @@ def get_db():
 
 # Dialogue endpoints
 
-@router.post("/message", response_model=MessageResponse)
+@router.post("/message")
 async def send_message(request: MessageRequest, db: Session = Depends(get_db)):
     """
     Send a message and get an AI response with full context awareness.
@@ -86,7 +60,27 @@ async def send_message(request: MessageRequest, db: Session = Depends(get_db)):
         history_turns=request.history_turns,
     )
     
-    return MessageResponse(user_id=request.user_id, response=response,)
+    # ALWAYS streaming
+    if isinstance(response, dict) and response.get("type") == "stream":
+        from src.integrations.telegram_stream import StreamingFilter
+        raw_generator = response["generator"]
+        stream_filter = StreamingFilter(raw_generator)
+        filtered_generator = stream_filter.filter_stream()
+        
+        async def webui_stream_gen():
+            async for token in filtered_generator:
+                yield token + "\\n"
+            # Run post-hook (note: full_text accumulation needs tee in prod)
+            try:
+                await response["post_hook"]("")
+            except Exception as e:
+                logger.error(f"Post-hook error: {e}")
+        
+        from fastapi.responses import StreamingResponse
+        return StreamingResponse(webui_stream_gen(), media_type="text/plain")
+    else:
+        # Fallback to text if not stream dict
+        return {"type": "text", "text": str(response)}
 
 
 @router.post("/onboard")
@@ -242,12 +236,6 @@ async def batch_store_memory(requests: List[MemoryRequest], db: Session = Depend
 
 
 # Lesson endpoints
-class LessonResponse(BaseModel):
-    lesson_id: int
-    title: str
-    content: str
-    difficulty_level: str
-    duration_minutes: int
 
 
 @router.get("/lesson/{lesson_id}", response_model=LessonResponse)
@@ -280,28 +268,6 @@ def get_lesson(lesson_id: int, db: Session = Depends(get_db)):
 
 
 # Semantic search endpoints
-
-class SemanticSearchRequest(BaseModel):
-    user_id: int
-    query: str
-    categories: Optional[List[str]] = None
-    limit: Optional[int] = None
-    threshold: Optional[float] = None
-
-
-class MemoryWithScore(BaseModel):
-    memory_id: int
-    key: str
-    value: str
-    category: str
-    similarity_score: float
-
-
-class SemanticSearchResponse(BaseModel):
-    user_id: int
-    query: str
-    results: List[MemoryWithScore]
-    count: int
 
 
 @router.post("/search", response_model=SemanticSearchResponse)

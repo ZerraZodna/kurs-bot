@@ -12,6 +12,7 @@ from src.memories import MemoryManager
 from src.services.dialogue_engine import DialogueEngine
 from src.functions.executor import get_function_executor
 from src.scheduler.core import SchedulerService
+from tests.mocks.stream_consumer import consume_stream_response
 
 
 @pytest.mark.asyncio
@@ -66,15 +67,18 @@ async def test_process_message_creates_one_time_reminder(monkeypatch):
         monkeypatch.setattr("src.triggers.triggering.handle_triggers", fake_handle_triggers)
 
         # When: Call process_message which will invoke the real Ollama client and our fake trigger handler
-        resp = await dialogue.process_message(user_id, "Remind me to go out with the garbage at 12:00", db)
+        resp = await dialogue.process_message_for_telegram(user_id, "Remind me to go out with the garbage at 12:00", db, chat_id=0)
+        full_text, diagnostics = await consume_stream_response(resp)
         
         # Print the LLM response for inspection
         print("--- LLM response start ---")
-        print(resp)
+        print(full_text)
         print("--- LLM response end ---")
+        print("--- Diagnostics ---")
+        print(diagnostics)
         
         # Then: Ensure we received a non-empty response
-        assert isinstance(resp, str) and resp.strip()
+        assert isinstance(full_text, str) and full_text.strip()
 
         # Then: Verify schedule and stored message
         schedules = db.query(Schedule).filter_by(user_id=user_id).all()

@@ -3,6 +3,7 @@
 import os
 import sys
 import types
+import json
 from typing import Optional
 from unittest.mock import MagicMock, AsyncMock
 
@@ -87,19 +88,31 @@ class OllamaMock:
     Usage:
         mock = OllamaMock()
         mock.set_response("Hello", "Hi there!")
+        mock.set_stream_calls("lesson", [{"name": "extract_memory", "arguments": '{"key":"current_lesson","value":"26"}'}])
+        mock.set_stream_lesson_response("today", "Lesson 26 content here...")
         
-        with mock.patch():
-            result = await call_ollama("Hello")
-            assert result == "Hi there!"
+        ollama_mock.patch(monkeypatch)
     """
     
     def __init__(self):
         self._responses: dict = {}
+        self._stream_calls: dict = {}
+        self._stream_lessons: dict = {}
         self._default_response = "[MOCK_OLLAMA_REPLY] Default response"
     
     def set_response(self, prompt_contains: str, response: str) -> "OllamaMock":
         """Set a response for prompts containing specific text."""
         self._responses[prompt_contains.lower()] = response
+        return self
+    
+    def set_stream_calls(self, prompt_contains: str, tool_calls: list) -> "OllamaMock":
+        """Set tool_calls for stream_ollama prompts containing specific text."""
+        self._stream_calls[prompt_contains.lower()] = tool_calls
+        return self
+    
+    def set_stream_lesson_response(self, prompt_contains: str, lesson_text: str) -> "OllamaMock":
+        """Set direct lesson text stream for prompts containing specific text."""
+        self._stream_lessons[prompt_contains.lower()] = lesson_text
         return self
     
     def set_default_response(self, response: str) -> "OllamaMock":
@@ -121,8 +134,54 @@ class OllamaMock:
         
         return self._default_response
     
+    async def _mock_stream(
+        self,
+        prompt: str,
+        model: Optional[str] = None,
+        language: Optional[str] = None
+    ):
+        """Mock stream_ollama yielding Ollama JSON chunks: lesson text, tool_calls, or default."""
+        prompt_lower = prompt.lower()
+        
+# 1. Check for lesson text first (direct LLM response simulation)
+        for key, lesson_text in self._stream_lessons.items():
+            if key in prompt_lower:
+                # Yield lesson text as Ollama response tokens
+                for word in lesson_text.split():
+                    chunk = json.dumps({"response": word, "done": False})
+                    yield chunk
+                yield json.dumps({"done": True})
+                return
+        
+        # 2. Check for tool_calls
+        tool_calls = None
+        for key, calls in self._stream_calls.items():
+            if key in prompt_lower:
+                tool_calls = calls
+                break
+        
+        if tool_calls:
+            # Yield JSON with functions for intent_parser + lesson content
+            full_json = json.dumps({
+                "response": f"Lesson 26: {lesson_26.title}\\n\\n{lesson_26.content}",
+                "functions": tool_calls
+            })
+            yield full_json
+            yield json.dumps({"done": True})
+            return
+        
+        # 3. Default text stream
+        chunks = [
+            json.dumps({"response": "OK", "done": False}),
+            json.dumps({"done": True})
+        ]
+        for chunk in chunks:
+            yield chunk
+    
     def patch(self, monkeypatch):
         """Apply the mock using monkeypatch."""
         import src.services.dialogue.ollama_client as ollama_module
         monkeypatch.setattr(ollama_module, "call_ollama", self._mock_call)
+        monkeypatch.setattr(ollama_module, "stream_ollama", self._mock_stream)
         return self
+
