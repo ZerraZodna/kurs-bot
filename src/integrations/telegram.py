@@ -420,26 +420,35 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                         remaining_for_functions = stream_filter.get_remaining_for_functions()
                         function_parse_text = remaining_for_functions or full_response
                         
-                        try:
-                            diagnostics = await result["post_hook"](full_response)
-                            if diagnostics and diagnostics.get("execution_result"):
-                                from src.functions.response_builder import get_response_builder
-                                from src.functions.intent_parser import get_intent_parser
-                                
-                                response_builder = get_response_builder()
-                                parser = get_intent_parser()
-                                parse_result = parser.parse(function_parse_text)
-                                
-                                built_response = response_builder.build(
-                                    user_text=combined_text,
-                                    ai_response_text=parse_result.response_text if parse_result.response_text is not None else full_response,
-                                    execution_result=diagnostics["execution_result"],
-                                    include_function_results=True,
-                                )
-                                if built_response.text.strip():
-                                    await send_message(chat_id, built_response.text)
-                        except Exception as e:
-                            logger.error(f"[post_hook error] {e}")
+                        # DEBUG: Log what parser will see
+                        logger.info(f"[telegram DEBUG] function_parse_text len={len(function_parse_text)}: {repr(function_parse_text[:500])}...")
+                        
+                        from src.functions.intent_parser import get_intent_parser
+                        from src.functions.response_builder import get_response_builder
+                        
+                        parser = get_intent_parser()
+                        parse_result = parser.parse(function_parse_text)
+                        logger.info(f"[telegram DEBUG] parse_result: functions={len(parse_result.functions)}, success={parse_result.success}, is_fallback={parse_result.is_fallback}")
+                        
+                        # Run post_hook (handle_triggers) with correct text
+                        diagnostics = await result["post_hook"](function_parse_text)
+                        logger.info(f"[telegram DEBUG] post_hook diagnostics: execution_result={diagnostics.get('execution_result') is not None}, dispatched_actions={diagnostics.get('dispatched_actions', [])}")
+                        
+                        if parse_result.functions or diagnostics.get("execution_result"):
+                            logger.info(f"[telegram DEBUG] Executing functions: parse_result.functions={len(parse_result.functions)}, diagnostics exec={diagnostics.get('execution_result')}")
+                            
+                            response_builder = get_response_builder()
+                            built_response = response_builder.build(
+                                user_text=combined_text,
+                                ai_response_text=parse_result.response_text if parse_result.response_text is not None else full_response,
+                                execution_result=diagnostics.get("execution_result"),
+                                include_function_results=True,
+                            )
+                            if built_response.text.strip():
+                                await send_message(chat_id, built_response.text)
+                                logger.info(f"[telegram DEBUG] Sent function results: {built_response.text[:100]}...")
+                        else:
+                            logger.warning(f"[telegram DEBUG] No functions detected - parse_result.functions=[], no execution_result")
                         
                         ai_response = full_response
                     else:
