@@ -83,11 +83,6 @@ Only use functions relevant to the current context.
     DEV_WEB_CLIENT: bool = False
     # Add more config as needed
 
-    # Post-extraction safety pass: when True, performs a second extraction pass
-    # after the main Ollama call to catch any memories that the main prompt missed.
-    # Set to False to disable (main prompt should extract all memories).
-    POST_EXTRACT_MEMORIES: bool = False
-
     model_config: ConfigDict = ConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

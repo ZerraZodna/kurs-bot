@@ -338,7 +338,6 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
     """
     from src.services.dialogue_engine import DialogueEngine
     from src.services.traffic_tracker import record_traffic_event
-    from src.services.dialogue import extract_and_store_memories
 
     # Send typing indicator to show user we're processing (works for both webhook and polling)
     chat_id = int(external_id)
@@ -498,10 +497,7 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
 
             # Log outbound and mark processed using the main db session
             try:
-                # If onboarding is not required, extract and store memories from the combined text.
-                # Only do post-extraction if POST_EXTRACT_MEMORIES setting is enabled (safety pass)
-                if settings.POST_EXTRACT_MEMORIES and dialogue is not None and dialogue.onboarding and not dialogue.onboarding.should_show_onboarding(user_id):
-                    await extract_and_store_memories(dialogue.memory_manager, dialogue.memory_judge, user_id, combined_text, rag_mode=False)
+                # Memory extraction now happens in the main Ollama call via the main prompt.
 
                 log = MessageLog(
                     user_id=user_id,

@@ -15,16 +15,6 @@ class MemoryManager:
         self.memory_handler: MemoryStore = memory_store or MemoryHandler(self.db)
         # Lazy initialization of topic_manager
         self._topic_manager = None
-        # Lazy initialization of AI judge
-        self._ai_judge = None
-
-    @property
-    def ai_judge(self):
-        """Lazy initialization of AI judge for memory quality/conflict detection."""
-        if self._ai_judge is None:
-            from src.memories.ai_judge import MemoryJudge
-            self._ai_judge = MemoryJudge()
-        return self._ai_judge
 
     # Note: embedding generation scheduling and persistence removed.
     # The private helpers that generated and stored embeddings were deleted
@@ -66,13 +56,6 @@ class MemoryManager:
             category=category,
             allow_duplicates=allow_duplicates,
         )
-        
-        # Invalidate AI judge cache for this key when memory is stored
-        # This ensures fresh decisions are made on future judgments
-        try:
-            self.ai_judge.invalidate_cache_for_key(user_id, key)
-        except Exception as e:
-            logger.warning(f"Failed to invalidate cache for key {key}: {e}")
         
         # Generate embedding if needed — removed in this branch.
         # If this memory indicates a preferred lesson time, do NOT modify schedules here.

@@ -7,7 +7,6 @@ from src.lessons.handler import (
 )
 from src.memories.dialogue_helpers import (
     get_user_language,
-    extract_and_store_memories,
 )
 from src.language.language_service import detect_and_store_language
 from .pause_handler import detect_pause_request
@@ -31,7 +30,6 @@ __all__ = [
     "translate_text",
     "get_user_language",
     "detect_and_store_language",
-    "extract_and_store_memories",
     "detect_pause_request",
     "build_schedule_status_response",
     "handle_rag_mode_toggle",
