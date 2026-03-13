@@ -7,7 +7,6 @@ from .consent import Unsubscribe, ConsentLog
 from .gdpr import GdprRequest, GdprAuditLog, GdprVerification
 from .jobs import BatchLock, JobState
 from .templates import PromptTemplate
-# TriggerEmbedding removed in Phase 3 - embedding-based trigger matching replaced by function calling
 
 __all__ = [
     'User', 'Memory', 'Lesson', 'Schedule', 'MessageLog',

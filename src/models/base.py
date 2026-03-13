@@ -55,7 +55,9 @@ if is_sqlite:
         cursor = dbapi_connection.cursor()
         try:
             cursor.execute("PRAGMA busy_timeout=30000")
+            cursor.execute("PRAGMA journal_mode=WAL")
             cursor.execute("PRAGMA synchronous=NORMAL")
+
         finally:
             cursor.close()
 

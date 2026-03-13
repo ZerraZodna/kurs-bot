@@ -115,26 +115,37 @@ class IntentParser:
     
     def _attempt_json_repair(self, json_str: str) -> Optional[str]:
         """Attempt to fix common JSON formatting issues."""
-        # Try adding missing quotes around keys
+        # 1) Targeted fix for malformed leading key:
+        #    {functions"...} or {functions:...} -> {"functions":...}
         try:
-            # Replace single quotes with double quotes
-            fixed = json_str.replace("'", '"')
-            
-            # Try to parse
+            fixed = json_str.strip()
+            fixed = re.sub(r'^\{\s*([A-Za-z_][A-Za-z0-9_]*)"', r'{"\1"', fixed)
+            fixed = re.sub(r'^\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:', r'{"\1":', fixed)
+
             json.loads(fixed)
             return fixed
-        except:
+        except Exception:
             pass
-        
-        # Try to extract just the object part
+
+        # 2) Replace single quotes with double quotes (best-effort)
+        try:
+            fixed = json_str.replace("'", '"')
+            json.loads(fixed)
+            return fixed
+        except Exception:
+            pass
+
+        # 3) Try to extract just the outer object part
         try:
             start = json_str.find("{")
             end = json_str.rfind("}")
             if start != -1 and end != -1:
-                return json_str[start:end+1]
-        except:
+                fixed = json_str[start:end + 1]
+                json.loads(fixed)
+                return fixed
+        except Exception:
             pass
-        
+
         return None
     
     def _validate_and_extract(self, data: Dict[str, Any], raw_response: str) -> ParseResult:

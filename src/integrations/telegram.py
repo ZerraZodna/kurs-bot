@@ -388,11 +388,13 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
             ai_response: str
             dialogue = None
 
-            # Create a separate session for dialogue processing to keep it isolated
-            stream_enabled = getattr(settings, "OLLAMA_STREAM_ENABLED", True)
-            dialogue_db = SessionLocal()
             try:
+                stream_enabled = getattr(settings, "OLLAMA_STREAM_ENABLED", True)
+                dialogue_db = db
+
                 if stream_enabled:
+
+
                     dialogue = DialogueEngine(dialogue_db)
                     result = await dialogue.process_message(
                         user_id=user_id,
@@ -448,7 +450,23 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                                 await send_message(chat_id, built_response.text)
                                 logger.info(f"[telegram DEBUG] Sent function results: {built_response.text[:100]}...")
                         else:
-                            logger.warning(f"[telegram DEBUG] No functions detected - parse_result.functions=[], no execution_result")
+                            payload_preview = function_parse_text[:500] if function_parse_text else ""
+                            logger.warning(
+                                "[telegram FUNCTION_PARSE_FAILURE] user_id=%s functions=%s is_fallback=%s parse_errors=%s execution_result=%s dispatched_actions=%s payload_preview=%r",
+                                user_id,
+                                len(parse_result.functions),
+                                parse_result.is_fallback,
+                                parse_result.errors,
+                                diagnostics.get("execution_result") is not None,
+                                diagnostics.get("dispatched_actions", []),
+                                payload_preview,
+                            )
+                            fallback_text = (
+                                "I’m sorry — I couldn’t complete your scheduling request due to a formatting issue on my side. "
+                                "Please try again in one message, for example: "
+                                "\"Create reminders at 09:00, 10:00, and 11:00.\""
+                            )
+                            await send_message(chat_id, fallback_text)
                         
                         ai_response = full_response
                     else:
@@ -456,17 +474,19 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                         ai_response = result["text"]
                         await send_message(chat_id, ai_response)
 
-                # Removed - always streaming now
-            finally:
-                # Always close the dialogue session to prevent connection leaks
-                dialogue_db.close()
-                dialogue_db = None
+            except Exception as e:
+                logger.error(f"[telegram dialogue] Error in dialogue processing for user {user_id}: {e}")
+                ai_response = "Sorry, I encountered an error processing your message."
 
             record_traffic_event()
+
+
+
 
             # Log outbound and mark processed using the main db session
             try:
                 # Memory extraction now happens in the main Ollama call via the main prompt.
+
 
                 log = MessageLog(
                     user_id=user_id,
@@ -479,18 +499,24 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                 )
                 log.message_role = "assistant"
                 db.add(log)
+                db.flush()
+                logger.info(f"[telegram] Created outbound MessageLog id={log.message_id} content_len={len(ai_response)}")
+                db.refresh(log)
                 db.commit()
+
 
                 db.query(MessageLog).filter(
                     MessageLog.message_id.in_(message_ids)
                 ).update({MessageLog.status: "processed"}, synchronize_session=False)
+                db.flush()
                 db.commit()
             except Exception as e:
-                print("[messagelog outbound error]", e)
+                logger.error("[messagelog outbound error]", e)
                 db.rollback()
                 break
 
             await asyncio.sleep(0.5)
+
     finally:
         # Release batch lock by deleting from table
         # Always use a fresh session for lock release to ensure it's not affected by prior errors

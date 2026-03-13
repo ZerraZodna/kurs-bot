@@ -23,7 +23,6 @@ It is preserved for reference but no longer reflects the current architecture.
 - Trigger canonical data & seeding: `src/triggers/trigger_matcher.py` (STARTER)
 - CI seeding / deterministic fallback: `scripts/ci_seed_triggers.py` and `scripts/ci_trigger_data.py`
 - Trigger dispatch: `src/triggers/triggering.py` and `src/triggers/trigger_dispatcher.py`
-- Trigger DB model: `src/models/database.py` (`TriggerEmbedding`)
 - Semantic search: `src/services/semantic_search.py`
 - Fast in-memory index (optional, added): `src/services/vector_index.py`
 - Dev helpers: `scripts/debug_trigger.py` and `scripts/export_trigger_embeddings.py` (suggested exporter)

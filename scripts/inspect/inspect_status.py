@@ -10,13 +10,13 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from src.models.database import (  # noqa: E402
-    DATABASE_URL,
     Lesson,
     MessageLog,
     SessionLocal,
-    TriggerEmbedding,
     User,
 )
+from src.models.memory import Memory
+from src.config import settings
 
 
 def main() -> int:
@@ -34,15 +34,9 @@ def main() -> int:
         lessons = db.query(Lesson).count()
         messages = db.query(MessageLog).count()
 
-        try:
-            embeddings = db.query(TriggerEmbedding).count()
-        except SQLAlchemyError:
-            embeddings = 0
-
-        print(f"database_url: {DATABASE_URL}")
+        print(f"database_url: {settings.DATABASE_URL}")
         print(f"active_users: {active_users}")
         print(f"lessons: {lessons}")
-        print(f"embeddings: {embeddings}")
         print(f"messages: {messages}")
         return 0
     finally:

@@ -100,12 +100,12 @@ function runPyModule(mod, args = []) {
   const finalArgs = ['-m', mod, ...args];
   console.log('Using Python:', py);
   console.log('Running:', py + ' ' + finalArgs.join(' '));
-  runCommand(py, finalArgs);
+  runCommand(py, finalArgs, { env: { ...process.env, PYTHONPATH: repoRoot } });
 }
 
 function runScript(scriptPath, args = []) {
   const py = whichPython();
-  runCommand(py, [scriptPath, ...args]);
+  runCommand(py, [scriptPath, ...args], { env: { ...process.env, PYTHONPATH: repoRoot } });
 }
 
 // Tail helper: print last N lines of log files (non-follow)
@@ -225,7 +225,7 @@ switch (cmd) {
     const finalArgs = [...pythonFlags, '-m', 'pytest', ...pytestArgs];
     console.log('Using Python:', testPy);
     console.log('Running:', testPy + ' ' + finalArgs.join(' '));
-    runCommand(testPy, finalArgs);
+    runCommand(testPy, finalArgs, { env: { ...process.env, PYTHONPATH: repoRoot } });
     break;
   case 'run':
     if (!cmdArgs[0]) {
@@ -795,7 +795,7 @@ switch (cmd) {
     break;
   case 'exec':
     const py = whichPython();
-    runCommand(py, cmdArgs);
+    runCommand(py, cmdArgs, { env: { ...process.env, PYTHONPATH: repoRoot } });
     break;
   case 'config':
     // Ensure .env exists by copying .env.template and open in editor
