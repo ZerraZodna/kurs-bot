@@ -447,14 +447,15 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                             response_builder = get_response_builder()
                             built_response = response_builder.build(
                                 user_text=combined_text,
-                                ai_response_text=parse_result.response_text or full_response,
+                                ai_response_text="",  # Don't repeat streamed LLM response
                                 execution_result=diagnostics.get("execution_result"),
                                 include_function_results=True,
                             )
-                            await send_message(chat_id, built_response.text)
+                            if built_response.text.strip():  # Only results/error
+                                await send_message(chat_id, built_response.text)
                         elif parse_had_errors:
                             # Parser errors: undefined func / bad params
-                            error_msg = f"Sorry, invalid command. Errors: {', '.join(parse_result.errors[:2])}. Examples: 'Set daily reminder at 09:00', 'lesson 29'"
+                            error_msg = f"Sorry, invalid command.\nErrors: {chr(10).join(parse_result.errors[:2])}\nExamples: 'Set daily reminder at 09:00', 'lesson 29'"
                             logger.warning(f"[telegram PARSE_ERROR user={user_id}] {parse_result.errors}")
                             await send_message(chat_id, error_msg)
                         elif exec_had_errors:
