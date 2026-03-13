@@ -598,19 +598,20 @@ class FunctionExecutor:
         if not user_id or not memory_manager:
             return self._error_response("Missing user context")
         
-        # Explicit lesson_id override from params
+# Explicit lesson_id override from params
+        state = None
         lesson_id = params.get("lesson_id")
         if lesson_id is not None:
             try:
                 lesson_id = int(lesson_id)
+                logger.info(f"send_todays_lesson user={user_id}: explicit lesson_id={lesson_id}")
             except (ValueError, TypeError):
                 return self._error_response(f"Invalid lesson_id: {lesson_id}")
         else:
             # Compute today's lesson from state (auto-advance if needed)
             state = compute_current_lesson_state(memory_manager, user_id)
             lesson_id = state["lesson_id"]
-        
-        logger.info(f"send_todays_lesson user={user_id}: computed lesson_id={lesson_id}, advanced={state.get('advanced_by_day', False)}")
+            logger.info(f"send_todays_lesson user={user_id}: computed lesson_id={lesson_id}, advanced={state.get('advanced_by_day', False)}")
         
         try:
             lesson = self._get_lesson_by_id(lesson_id, session)
