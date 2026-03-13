@@ -438,36 +438,33 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                         diagnostics = await result["post_hook"](function_parse_text)
                         logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] post_hook=exec_result={diagnostics.get('execution_result') is not None},actions_len={len(diagnostics.get('dispatched_actions', []))},keys={list(diagnostics.keys())}")
                         
-                        # Only send function results or error if functions were detected/intended
-                        has_functions_or_exec = bool(parse_result.functions or diagnostics.get("execution_result") or diagnostics.get('dispatched_actions', []))
-                        is_pure_chat = parse_result.is_fallback  # Pure fallback = no function intent from LLM
+# Handle all cases: success, empty [], parse errors, exec fails
+                        parse_had_errors = bool(parse_result.errors and not parse_result.success)
+                        exec_had_errors = diagnostics.get('execution_result') and 'error' in str(diagnostics.get('execution_result', '')).lower()
 
-                        if has_functions_or_exec:
-                            logger.info(f"[telegram FUNCTION_ATTEMPT user={user_id}] Processing {len(parse_result.functions)} functions + exec={diagnostics.get('execution_result') is not None}")
-                            
+                        if parse_result.functions:  # Valid functions found
+                            logger.info(f"[telegram VALID_FUNCTIONS user={user_id}] Executing {len(parse_result.functions)} functions")
                             response_builder = get_response_builder()
                             built_response = response_builder.build(
                                 user_text=combined_text,
-                                ai_response_text=parse_result.response_text if parse_result.response_text is not None else full_response,
+                                ai_response_text=parse_result.response_text or full_response,
                                 execution_result=diagnostics.get("execution_result"),
                                 include_function_results=True,
                             )
-                            if built_response.text.strip():
-                                await send_message(chat_id, built_response.text)
-                                logger.info(f"[telegram FUNCTION_RESULTS user={user_id}] Sent: {built_response.text[:100]}...")
-                        elif not is_pure_chat:
-                            # Command-like input but parse failed → error
-                            logger.warning(
-                                "[telegram FUNCTION_PARSE_FAILURE] user_id=%s len=%d is_fallback=%s errors=%s",
-                                user_id, len(function_parse_text), parse_result.is_fallback, parse_result.errors
-                            )
-                            fallback_text = (
-                                f"I couldn't process your command (no functions detected). "
-                                f"Try: 'Set daily reminder at 09:00' or 'lesson 29'."
-                            )
-                            await send_message(chat_id, fallback_text)
+                            await send_message(chat_id, built_response.text)
+                        elif parse_had_errors:
+                            # Parser errors: undefined func / bad params
+                            error_msg = f"Sorry, invalid command. Errors: {', '.join(parse_result.errors[:2])}. Examples: 'Set daily reminder at 09:00', 'lesson 29'"
+                            logger.warning(f"[telegram PARSE_ERROR user={user_id}] {parse_result.errors}")
+                            await send_message(chat_id, error_msg)
+                        elif exec_had_errors:
+                            # Execution failed (but parsed OK)
+                            error_msg = "Command failed during execution. Please try again or rephrase."
+                            await send_message(chat_id, error_msg)
                         else:
-                            logger.info(f"[telegram CHAT_NO_INTENT user={user_id}] Pure chat (len={len(function_parse_text)})")
+                            # Normal: empty [] or chat
+                            log_type = "EMPTY_FUNCTIONS" if parse_result.success else "PURE_CHAT"
+                            logger.info(f"[telegram {log_type} user={user_id}] len={len(function_parse_text)}")
 
                         
                         ai_response = full_response
