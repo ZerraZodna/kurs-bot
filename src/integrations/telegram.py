@@ -422,21 +422,24 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                         remaining_for_functions = stream_filter.get_remaining_for_functions()
                         function_parse_text = remaining_for_functions or full_response
                         
-                        # DEBUG: Log what parser will see
-                        logger.info(f"[telegram DEBUG] function_parse_text len={len(function_parse_text)}: {repr(function_parse_text[:500])}...")
-                        
+# Detailed failure logging
+                        logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] user_text='{combined_text[:200]}...'")
+                        logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] function_parse_text='{function_parse_text[:1000]}...' (len={len(function_parse_text)})")
+                        logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] raw_generator_remaining='{stream_filter.get_remaining_for_functions()[:500]}...'")
+
                         from src.functions.intent_parser import get_intent_parser
                         from src.functions.response_builder import get_response_builder
-                        
+
                         parser = get_intent_parser()
                         parse_result = parser.parse(function_parse_text)
-                        logger.info(f"[telegram DEBUG] parse_result: functions={len(parse_result.functions)}, success={parse_result.success}, is_fallback={parse_result.is_fallback}")
+                        logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] parse_result=success={parse_result.success},fallback={parse_result.is_fallback},functions_len={len(parse_result.functions)},errors={getattr(parse_result,'errors',[])},response_len={len(getattr(parse_result,'response_text','') or '')}")
                         
                         # Run post_hook (handle_triggers) with correct text
                         diagnostics = await result["post_hook"](function_parse_text)
-                        logger.info(f"[telegram DEBUG] post_hook diagnostics: execution_result={diagnostics.get('execution_result') is not None}, dispatched_actions={diagnostics.get('dispatched_actions', [])}")
+                        logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] post_hook=exec_result={diagnostics.get('execution_result') is not None},actions_len={len(diagnostics.get('dispatched_actions', []))},keys={list(diagnostics.keys())}")
                         
                         if parse_result.functions or diagnostics.get("execution_result"):
+
                             logger.info(f"[telegram DEBUG] Executing functions: parse_result.functions={len(parse_result.functions)}, diagnostics exec={diagnostics.get('execution_result')}")
                             
                             response_builder = get_response_builder()
@@ -462,11 +465,12 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                                 payload_preview,
                             )
                             fallback_text = (
-                                "I’m sorry — I couldn’t complete your scheduling request due to a formatting issue on my side. "
-                                "Please try again in one message, for example: "
-                                "\"Create reminders at 09:00, 10:00, and 11:00.\""
+                                f"I couldn't process your request due to a technical issue (functions_len=0). "
+                                f"Please try: 'Set daily reminder at 09:00' or 'Create reminder at 10:00 tomorrow'. "
+                                f"DEBUG: saw {len(function_parse_text)} chars"
                             )
                             await send_message(chat_id, fallback_text)
+
                         
                         ai_response = full_response
                     else:

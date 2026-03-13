@@ -14,6 +14,7 @@ from .registry import FunctionRegistry, get_function_registry
 from .parameters import ParameterValidator
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.models.schedule import Lesson
+from src.lessons.state import compute_current_lesson_state
 
 logger = logging.getLogger(__name__)
 
@@ -587,28 +588,43 @@ class FunctionExecutor:
     async def _handle_send_todays_lesson(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle send_todays_lesson function.
         
-        If lesson_id is provided in params, use it directly.
-        Otherwise, fall back to computing from memory (same as send_next_lesson).
+        Computes today's lesson from user state, or uses explicit lesson_id if provided.
+        Uses compute_current_lesson_state for auto-advance logic (current +1 if inactive yesterday).
         """
-        lesson_id = params.get("lesson_id")
+        user_id = context.get("user_id")
         session = context.get("session")
+        memory_manager = context.get("memory_manager")
         
-        # If lesson_id is provided, use it directly (fixes issue where AI passes lesson_id but it's ignored)
+        if not user_id or not memory_manager:
+            return self._error_response("Missing user context")
+        
+        # Explicit lesson_id override from params
+        lesson_id = params.get("lesson_id")
         if lesson_id is not None:
             try:
-                lesson = self._get_lesson_by_id(lesson_id, session)
-                if not lesson:
-                    return self._error_response(f"Lesson {lesson_id} not found")
-                
-                return self._ok_response(
-                    lesson_id=lesson_id,
-                    title=lesson.title,
-                    content=lesson.content,
-                )
-            except Exception as e:
-                return self._error_response(str(e))
+                lesson_id = int(lesson_id)
+            except (ValueError, TypeError):
+                return self._error_response(f"Invalid lesson_id: {lesson_id}")
+        else:
+            # Compute today's lesson from state (auto-advance if needed)
+            state = compute_current_lesson_state(memory_manager, user_id)
+            lesson_id = state["lesson_id"]
         
-        return self._error_response(f"Lesson not found")
+        logger.info(f"send_todays_lesson user={user_id}: computed lesson_id={lesson_id}, advanced={state.get('advanced_by_day', False)}")
+        
+        try:
+            lesson = self._get_lesson_by_id(lesson_id, session)
+            if not lesson:
+                return self._error_response(f"Lesson {lesson_id} not available (check imports)")
+            
+            return self._ok_response(
+                lesson_id=lesson_id,
+                title=lesson.title,
+                content=lesson.content,
+            )
+        except Exception as e:
+            logger.exception(f"send_todays_lesson error user={user_id} lesson={lesson_id}")
+            return self._error_response(f"Failed to load lesson {lesson_id}: {str(e)}")
 
     async def _handle_set_timezone(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle set_timezone function."""
@@ -886,6 +902,7 @@ class FunctionExecutor:
     async def _handle_extract_memory(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle extract_memory function."""
         from src.memories.constants import MemoryCategory, MemoryKey
+        from src.lessons.state import set_current_lesson
         
         user_id = context.get("user_id")
         key = params.get("key")
@@ -912,6 +929,7 @@ class FunctionExecutor:
                 category=MemoryCategory.PROGRESS.value,
                 updated=True,
             )
+
         
         # For non-lesson memories, continue with existing logic
         # Determine category from key (call the helper method)
