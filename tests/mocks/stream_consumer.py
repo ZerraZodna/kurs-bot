@@ -15,7 +15,6 @@ async def consume_stream_response(response):
     
     import asyncio
     from src.integrations.telegram_stream import StreamingFilter
-    from src.triggers.triggering import handle_triggers
     from src.functions.intent_parser import get_intent_parser
     from src.functions.response_builder import get_response_builder
     

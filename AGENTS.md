@@ -8,7 +8,8 @@
 ## Project Structure & Module Organization
 - Main app code: `src/`.
 - API and webhooks: `src/api/`; business logic: `src/services/`; memory stack: `src/memories/`; scheduling: `src/scheduler/`; integrations: `src/integrations/`; data models: `src/models/`.
-- Tests: `tests/` (current pattern: `tests/test_*.py`).
+- Shared utilities: `src/core/`; function calling: `src/functions/`; language & prompts: `src/language/`; lessons: `src/lessons/`; middleware: `src/middleware/`; onboarding: `src/onboarding/`; triggers: `src/triggers/`.
+- Tests: `tests/` (current pattern: `tests/unit/*/test_*.py`, `tests/integration/test_*.py`).
 - Migrations: `migrations/`; helper scripts: `scripts/`; docs: `docs/`; task tracking: `tasks/`.
 
 ## Build, Test, and Development Commands

@@ -10,7 +10,6 @@ from .service import OnboardingService
 __all__ = [
     "detectors",
     "flow",
-    "prompts",
     "schedule_setup",
     "status",
     "user_management",

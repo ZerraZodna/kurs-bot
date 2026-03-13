@@ -154,7 +154,7 @@ def deactivate_user_schedules(user_id: int, active_only: bool = True, session=No
             return 0
         for schedule in schedules:
             schedule.is_active = False
-            session.add(schedule)
+            s.add(schedule)
         s.commit()
         return len(schedules)
 
@@ -185,12 +185,11 @@ def deactivate_user_schedules_by_type(
         
         # Filter by schedule type
         if schedule_type == "one_time":
-            # Get all schedules and filter by type
             all_schedules = query.all()
-            schedules = [s for s in all_schedules if is_one_time_schedule_type(s.schedule_type)]
+            schedules = [sched for sched in all_schedules if is_one_time_schedule_type(sched.schedule_type)]
         elif schedule_type == "daily":
             all_schedules = query.all()
-            schedules = [s for s in all_schedules if is_daily_schedule_type(s.schedule_type)]
+            schedules = [sched for sched in all_schedules if is_daily_schedule_type(sched.schedule_type)]
         else:
             schedules = []
         
@@ -199,7 +198,7 @@ def deactivate_user_schedules_by_type(
         
         for schedule in schedules:
             schedule.is_active = False
-            session.add(schedule)
+            s.add(schedule)
         s.commit()
         return len(schedules)
 
@@ -210,7 +209,7 @@ def delete_user_schedules(user_id: int, session=None) -> list[int]:
         schedules = s.query(Schedule).filter_by(user_id=user_id).all()
         if not schedules:
             return []
-        ids = [s.schedule_id for s in schedules]
+        ids = [sched.schedule_id for sched in schedules]
         # Bulk delete; use synchronize_session=False for performance
         s.query(Schedule).filter_by(user_id=user_id).delete(synchronize_session=False)
         s.commit()
