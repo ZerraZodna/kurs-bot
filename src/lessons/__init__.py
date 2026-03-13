@@ -40,7 +40,6 @@ from .state import (
     get_lesson_state,
     has_lesson_status,
     set_current_lesson,
-    set_next_lesson,
 )
 
 
@@ -62,7 +61,5 @@ __all__ = [
     'get_lesson_state',
     'has_lesson_status',
     'set_current_lesson',
-    'set_next_lesson',
-    'determine_lesson_action',
 ]
 

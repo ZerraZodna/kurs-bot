@@ -26,7 +26,7 @@ class TestFunctionRegistry:
         
         expected_functions = [
             "create_schedule", "update_schedule", "delete_schedule", "query_schedule", "create_one_time_reminder", 
-            "send_lesson", "send_next_lesson", "send_todays_lesson", 
+            "send_lesson", "send_todays_lesson", 
             "set_timezone", "set_language", "set_preferred_time", "update_profile",
             "enter_rag", "exit_rag", "confirm_yes", "confirm_no", "extract_memory"
         ]

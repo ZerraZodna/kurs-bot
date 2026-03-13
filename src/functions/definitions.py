@@ -54,7 +54,6 @@ Delete: delete_all_one_time_reminders(), delete_all_daily_reminders(), delete_al
 Query: query_schedule() to list before deleting""",
         "general_chat": """ALWAYS call set_current_lesson when user shares lesson progress:
 - "I am on lesson 29" / "I'm on lesson 29" / "currently on lesson 29" → set_current_lesson(lesson_number=29)
-- "I finished lesson 28" / "completed lesson 28" → extract_memory(key="lesson_completed", value="28")
 - "My name is John" → extract_memory(key="first_name", value="John")
 - "I'm in Oslo" / "I live in Norway" → set_timezone(timezone="Europe/Oslo")
 Multiple facts in one message → multiple function calls""",

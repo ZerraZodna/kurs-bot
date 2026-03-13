@@ -4,9 +4,12 @@ import re
 from typing import Optional
 
 from sqlalchemy.orm import Session
+from datetime import datetime, timezone
 
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.models.database import Lesson
+from src.models.user import User
+from src.lessons.state import compute_current_lesson_state
 
 from .handler import format_lesson_message, translate_text
 from src.memories.dialogue_helpers import get_user_language
@@ -46,33 +49,21 @@ async def maybe_send_next_lesson(
     memory_manager,
     call_ollama,
 ) -> Optional[str]:
-    """Possibly return today's lesson message when user sends a simple greeting.
+    """Possibly return today's lesson message when user sends a simple greeting on new day.
 
-    Behavior:
-    - If the computed state signals `need_confirmation`, return the
-      localized confirmation prompt and do not send the lesson.
-    - Only load and format the lesson when we're going to deliver it.
-    - Persist `last_sent_lesson_id` after preparing the message.
+    Sends lesson if new day (advanced_by_day) + greeting.
+    Updates last_active_at and lesson state consistently.
     """
-    context = prompt_builder.get_today_lesson_context(user_id)
-    state = context.get("state", {})
+    state = compute_current_lesson_state(memory_manager, user_id)
     language = get_user_language(memory_manager, user_id)
 
-    # Read lesson identifiers early so confirmation logic can reference them
-    lesson_id = state.get("lesson_id")
-    previous_lesson_id = state.get("previous_lesson_id")
-
-    # Only proceed to auto-send when:
-    # 1. The lesson was advanced by day (new day since last lesson) - advanced_by_day=True
-    # 2. AND the user sent a simple greeting
-    # This ensures we only send ONE lesson per day, not on every user message.
     if not state.get("advanced_by_day") or not is_simple_greeting(text):
         return None
 
+    lesson_id = state["lesson_id"]
     if not lesson_id:
         return None
 
-    # Load the lesson and format the message for the user's language.
     lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
     if not lesson:
         return None
@@ -98,9 +89,10 @@ async def maybe_send_next_lesson(
     if (language or "").lower() not in ["en"]:
         message = await translate_text(message, language, call_ollama)
 
-    # Persist current lesson
-    from src.lessons.state import set_current_lesson
-    set_current_lesson(memory_manager, user_id, lesson.lesson_id)
+    # Persist advance: update date and lesson state
+    user = session.query(User).filter(User.user_id == user_id).first()
+    user.last_active_at = datetime.now(timezone.utc)
+    session.commit()
 
     return message
 

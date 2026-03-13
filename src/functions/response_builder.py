@@ -48,7 +48,6 @@ class ResponseBuilder:
         "query_schedule": "Here are your reminders:<br><br>{details}",
         "create_one_time_reminder": "✓ One-time reminder set for {run_at}",
         "send_lesson": "📖 <strong>Lesson {lesson_id}</strong>: {title}<br><br>{content}",
-        "send_next_lesson": "📖 <strong>Lesson {lesson_id}</strong>: {title}<br><br>{content}",
         "send_todays_lesson": "📖 <strong>Lesson {lesson_id}</strong>: {title}<br><br>{content}",
         "set_timezone": "✓ Timezone set to {timezone}",
         "set_language": "✓ Language set to {language}",
@@ -68,7 +67,6 @@ class ResponseBuilder:
         "query_schedule": "I couldn't retrieve your schedules. {error}",
         "create_one_time_reminder": "I couldn't set that reminder. {error}",
         "send_lesson": "I couldn't find that lesson. {error}",
-        "send_next_lesson": "I couldn't get the next lesson. {error}",
         "send_todays_lesson": "I couldn't get today's lesson. {error}",
         "set_timezone": "I couldn't set that timezone. {error}",
         "set_language": "I couldn't set that language. {error}",
@@ -183,7 +181,7 @@ class ResponseBuilder:
             kwargs["time"] = result_data.get("time", "the specified time")
         elif result.function_name == "create_one_time_reminder":
             kwargs["run_at"] = format_datetime_for_display(result_data.get("run_at"))
-        elif result.function_name in ["send_lesson", "send_next_lesson", "send_todays_lesson"]:
+        elif result.function_name in ["send_lesson", "send_todays_lesson"]:
             kwargs["lesson_id"] = result_data.get("lesson_id", "")
             kwargs["title"] = result_data.get("title", "ACIM Lesson")
             kwargs["content"] = result_data.get("content", "")

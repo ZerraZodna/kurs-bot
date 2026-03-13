@@ -144,12 +144,7 @@ class PromptBuilder:
         if prefs_context:
             context_parts.append(f"\n-- Preferences\n{prefs_context}")
         
-        # 5. Recent Progress/Insights
-        progress_context = self._build_progress_context(user_id)
-        if progress_context:
-            context_parts.append(f"\n-- Recent Progress\n{progress_context}")
-
-        # 5b. Semantic Relevant Memories (optional)
+        # 5. Semantic Relevant Memories (optional)
         semantic_context = self._build_semantic_memory_context(relevant_memories or [])
         if semantic_context:
             context_parts.append(f"\n-- Relevant Memories\n{semantic_context}")
@@ -477,20 +472,7 @@ class PromptBuilder:
             parts.append(f"Preferred Tone: {tone[0]['value']}")
         
         return "\n".join(parts) if parts else ""
-    
-    def _build_progress_context(self, user_id: int) -> str:
-        """Retrieve recent progress and insights."""
-        lessons_completed = self.memory_manager.get_memory(user_id, MemoryKey.LESSON_COMPLETED)
         
-        parts = []
-        if lessons_completed:
-            recent = sorted(lessons_completed, key=lambda x: x['created_at'], reverse=True)[:3]
-            parts.append("Recent Lessons:")
-            for i, lesson in enumerate(recent, 1):
-                parts.append(f"  {i}. {lesson['value']}")
-        
-        return "\n".join(parts) if parts else ""
-    
     def _build_conversation_history(self, user_id: int, num_turns: int = 4) -> str:
         """Retrieve recent conversation history for multi-turn context."""
         # Query recent messages for this user, ordered by creation date

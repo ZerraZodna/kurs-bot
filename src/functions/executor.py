@@ -85,8 +85,8 @@ class FunctionExecutor:
         
         # Lesson handlers
         self._handlers["send_lesson"] = self._handle_send_lesson
-        self._handlers["send_next_lesson"] = self._handle_send_next_lesson
         self._handlers["send_todays_lesson"] = self._handle_send_todays_lesson
+        self._handlers["set_current_lesson"] = self._handle_set_current_lesson
         
         # Profile handlers
         self._handlers["set_timezone"] = self._handle_set_timezone
@@ -105,8 +105,6 @@ class FunctionExecutor:
         # Memory extraction handler
         self._handlers["extract_memory"] = self._handle_extract_memory
 
-        # Lesson state handler
-        self._handlers["set_current_lesson"] = self._handle_set_current_lesson
     
     def register_handler(self, function_name: str, handler: Callable):
         """Register a custom handler for a function."""
@@ -585,39 +583,7 @@ class FunctionExecutor:
             )
         except Exception as e:
             return self._error_response(str(e))
-    
-    async def _handle_send_next_lesson(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle send_next_lesson function."""
-        from src.lessons.api import compute_current_lesson_state
         
-        user_id = context.get("user_id")
-        memory_manager = context.get("memory_manager")
-        
-        try:
-            state = compute_current_lesson_state(
-                memory_manager=memory_manager,
-                user_id=user_id,
-            )
-            lesson_id = state.get("lesson_id")
-            
-            if not lesson_id:
-                return self._error_response("Could not determine next lesson")
-            
-            # Get lesson content using DRY helper
-            session = context.get("session")
-            lesson = self._get_lesson_by_id(lesson_id, session)
-            
-            if not lesson:
-                return self._error_response(f"Lesson {lesson_id} not found")
-            
-            return self._ok_response(
-                lesson_id=lesson_id,
-                title=lesson.title,
-                content=lesson.content,
-            )
-        except Exception as e:
-            return self._error_response(str(e))
-    
     async def _handle_send_todays_lesson(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle send_todays_lesson function.
         
@@ -642,8 +608,7 @@ class FunctionExecutor:
             except Exception as e:
                 return self._error_response(str(e))
         
-        # Fallback: compute from memory if no lesson_id provided
-        return await self._handle_send_next_lesson(params, context)
+        return self._error_response(f"Lesson not found")
 
     async def _handle_set_timezone(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle set_timezone function."""
@@ -921,7 +886,6 @@ class FunctionExecutor:
     async def _handle_extract_memory(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle extract_memory function."""
         from src.memories.constants import MemoryCategory, MemoryKey
-        from src.lessons.state import set_current_lesson, record_lesson_completed
         
         user_id = context.get("user_id")
         key = params.get("key")
@@ -948,25 +912,6 @@ class FunctionExecutor:
                 category=MemoryCategory.PROGRESS.value,
                 updated=True,
             )
-        elif key == MemoryKey.LESSON_COMPLETED:
-            # Route through centralized helper for DRY
-            try:
-                lesson_id = int(value)
-                result = record_lesson_completed(
-                    memory_manager, 
-                    user_id, 
-                    lesson_id,
-                    source="function_executor"
-                )
-                return self._ok_response(
-                    key=key,
-                    value=value,
-                    category=MemoryCategory.PROGRESS.value,
-                    updated=True,
-                    result=result,
-                )
-            except (ValueError, TypeError):
-                return self._error_response(f"Invalid lesson_id: {value}")
         
         # For non-lesson memories, continue with existing logic
         # Determine category from key (call the helper method)

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from sqlalchemy.orm import Session
+from src.lessons.state import get_current_lesson
 from src.models.database import SessionLocal, User
 from src.services.dialogue_engine import DialogueEngine
 from src.memories import MemoryManager
@@ -14,8 +15,6 @@ from src.language.prompt_builder import PromptBuilder
 from src.api.schemas import MessageRequest, MessageResponse, MemoryRequest, UserContextResponse, LessonResponse, SemanticSearchRequest, SemanticSearchResponse, MemoryWithScore
 
 router = APIRouter(prefix="/api/v1/dialogue", tags=["dialogue"])
-
-
 
 
 
@@ -168,7 +167,7 @@ async def get_user_context(user_id: int, db: Session = Depends(get_db)):
     # Gather context
     goals = memory_manager.get_memory(user_id, MemoryKey.LEARNING_GOAL)
     preferences = memory_manager.get_memory(user_id, MemoryKey.PREFERRED_TONE)
-    progress = memory_manager.get_memory(user_id, MemoryKey.LESSON_COMPLETED)
+    progress = get_current_lesson(memory_manager, user_id)
     
     name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "User"
     

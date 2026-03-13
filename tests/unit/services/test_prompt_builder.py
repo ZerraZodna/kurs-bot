@@ -272,7 +272,6 @@ class TestMemoryIntegration:
             (MemoryCategory.PROFILE, MemoryKey.FULL_NAME, "John Doe"),
             (MemoryCategory.GOALS, MemoryKey.LEARNING_GOAL, "Master AI"),
             (MemoryCategory.PREFERENCES, MemoryKey.PREFERRED_TONE, "Professional"),
-            (MemoryCategory.PROGRESS, MemoryKey.LESSON_COMPLETED, "Lesson 1"),
         ]
 
         for category, key, value in categories:

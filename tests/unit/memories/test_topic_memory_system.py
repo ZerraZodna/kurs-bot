@@ -50,7 +50,6 @@ def test_all_topics(memory_manager, clean_test_data, test_user_id):
         ],
         MemoryTopic.LESSONS: [
             (MemoryKey.LESSON_CURRENT, "42", MemoryCategory.PROGRESS.value),
-            (MemoryKey.LESSON_COMPLETED, "41", MemoryCategory.PROGRESS.value),
         ],
         MemoryTopic.SCHEDULE: [
             (MemoryKey.PREFERRED_LESSON_TIME, "08:00", MemoryCategory.PREFERENCE.value),

@@ -18,7 +18,6 @@ from src.memories.manager import MemoryManager
 from src.lessons.state import (
     get_current_lesson as _get_current_lesson,
     set_current_lesson as _set_current_lesson,
-    set_next_lesson as _set_next_lesson,
     has_lesson_status as _has_lesson_status,
     compute_current_lesson_state as _compute_current_lesson_state,
 )
@@ -76,11 +75,6 @@ def set_current_lesson(memory_manager: MemoryManager, user_id: int, lesson: Any)
     _set_current_lesson(memory_manager, user_id, lesson)
 
 
-def set_next_lesson(memory_manager: MemoryManager, user_id: int, lesson_id: int) -> None:
-    """Set the next lesson for a user (used by trigger dispatcher)."""
-    _set_next_lesson(memory_manager, user_id, lesson_id)
-
-
 def has_lesson_status(memory_manager: MemoryManager, user_id: int) -> bool:
     """Check if user has lesson status."""
     return _has_lesson_status(memory_manager, user_id)
@@ -97,7 +91,6 @@ __all__ = [
     "format_lesson_message",
     "get_current_lesson",
     "set_current_lesson",
-    "set_next_lesson",
     "has_lesson_status",
     "compute_current_lesson_state",
     "maybe_send_next_lesson",

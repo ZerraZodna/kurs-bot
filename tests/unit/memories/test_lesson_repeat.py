@@ -2,6 +2,7 @@
 
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
+from datetime import datetime, timezone, timedelta
 
 from src.memories.constants import MemoryKey, MemoryCategory
 
@@ -24,16 +25,12 @@ class TestLessonRepeatOffered:
         mock_prompt_builder = MagicMock()
         mock_call_ollama = MagicMock()
         
-        # Set up context with previous_lesson_id
-        mock_context = {
-            "state": {
-                "lesson_id": 29,
-                "previous_lesson_id": 28,
-                "advanced_by_day": True
-            }
-        }
-        mock_prompt_builder.get_today_lesson_context.return_value = mock_context
-        
+        # Configure memory_manager/db user state so compute_current_lesson_state advances by day
+        mock_user = MagicMock()
+        mock_user.lesson = 28
+        mock_user.last_active_at = datetime.now(timezone.utc) - timedelta(days=1)
+        mock_memory_manager.db.query.return_value.filter.return_value.first.return_value = mock_user
+
         # Mock the lesson
         mock_lesson = MagicMock()
         mock_lesson.lesson_id = 29
@@ -136,65 +133,3 @@ class TestConfirmYesLessonRepeat:
         
         # Should store confirmation
         mock_memory_manager.store_memory.assert_called_once()
-
-
-class TestArchiveMemoryIds:
-    """Tests for archive_memory_ids as list."""
-
-    def test_dialogue_helpers_handles_list(self):
-        """Test that dialogue_helpers handles archive_memory_ids as a list."""
-        from src.memories import dialogue_helpers
-        
-        # Test that the function can handle archive_memory_ids as list
-        # This is a basic unit test for the code path
-        
-        # The key change is that archive_memory_ids is now extracted as a list
-        # from the memory dict with default []
-        memory = {
-            "key": "first_name",
-            "value": "John",
-            "archive_memory_ids": [1, 2, 3]
-        }
-        
-        # This should work without error
-        archive_ids = memory.get("archive_memory_ids", [])
-        
-        assert isinstance(archive_ids, list)
-        assert archive_ids == [1, 2, 3]
-        
-        # Test with empty list
-        memory2 = {"key": "first_name", "value": "Jane"}
-        archive_ids2 = memory2.get("archive_memory_ids", [])
-        
-        assert isinstance(archive_ids2, list)
-        assert archive_ids2 == []
-
-
-class TestLessonCompletedConflict:
-    """Tests for lesson_completed conflict resolution."""
-
-    def test_archive_old_lesson_completed(self):
-        """Test that old lesson_completed memories are archived before new one."""
-        from src.memories import dialogue_helpers
-        
-        mock_memory_manager = MagicMock()
-        mock_memory_manager.get_memory.return_value = [
-            {"memory_id": 5, "value": "27"}
-        ]
-        
-        # Call get_memory to get existing lesson_completed
-        existing = mock_memory_manager.get_memory(123, MemoryKey.LESSON_COMPLETED)
-        
-        # Verify it returns the existing memories
-        assert len(existing) == 1
-        assert existing[0]["memory_id"] == 5
-        
-        # Simulate what happens in dialogue_helpers
-        for existing_mem in existing:
-            existing_id = existing_mem.get("memory_id")
-            if existing_id:
-                mock_memory_manager.archive_memories(123, [existing_id])
-        
-        # Verify archive was called
-        mock_memory_manager.archive_memories.assert_called_with(123, [5])
-

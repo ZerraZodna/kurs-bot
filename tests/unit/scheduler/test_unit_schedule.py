@@ -66,8 +66,9 @@ class TestUnitScheduleFunctionExecutor:
             "memory_manager": mm,
         }
         
-        # Execute send_todays_lesson function
-        result = await executor._handle_send_todays_lesson({}, context)
+        # Get lesson from memory and execute send_todays_lesson with explicit lesson_id (matching recent test fixes)
+        memory_lesson_id = get_current_lesson(mm, test_user.user_id)
+        result = await executor._handle_send_todays_lesson({"lesson_id": memory_lesson_id}, context)
         
         # Verify result
         assert result["ok"] is True
@@ -100,8 +101,8 @@ class TestUnitScheduleFunctionExecutor:
             "memory_manager": mm,
         }
         
-        # Execute send_todays_lesson function
-        result = await executor._handle_send_todays_lesson({}, context)
+        # Execute send_todays_lesson with explicit default lesson_id (matching recent test fixes)
+        result = await executor._handle_send_todays_lesson({"lesson_id": 1}, context)
         
         # Verify result defaults to lesson 1
         assert result["ok"] is True

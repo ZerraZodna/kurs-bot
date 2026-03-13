@@ -63,8 +63,6 @@ class MemoryKey:
 
     PREFERRED_LESSON_TIME = "preferred_lesson_time"
     LESSON_CURRENT = "current_lesson"
-    LESSON_COMPLETED = "lesson_completed"
-    LESSON_CONFIRMATION_PENDING = "lesson_confirmation_pending"
 
     SCHEDULE_MESSAGE = "schedule_message"
     SCHEDULE_REQUEST_PENDING = "schedule_request_pending"
@@ -96,5 +94,5 @@ class MemoryKey:
         "preferred_time", "reminder_frequency", "notification_enabled",
     })
     PROGRESS_KEYS = frozenset({
-        LESSON_COMPLETED, LESSON_CURRENT, MILESTONE, "insight",
+        LESSON_CURRENT, MILESTONE, "insight",
     })

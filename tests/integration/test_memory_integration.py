@@ -110,14 +110,6 @@ class TestCompleteWorkflow:
         db_session.add_all([msg1_user, msg1_asst])
         db_session.commit()
 
-        # Store progress
-        mm.store_memory(
-            user_id=test_user.user_id,
-            key=MemoryKey.LESSON_COMPLETED,
-            value="Python Basics",
-            category=MemoryCategory.PROGRESS,
-        )
-
         # Build second prompt - should include history
         second_prompt = pb.build_prompt(
             user_id=test_user.user_id,

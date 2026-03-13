@@ -44,26 +44,6 @@ class SchedulerService:
         return scheduler_execution._preview_build_for_no_last_sent(db, memory_manager, user_id, language)
 
     @staticmethod
-    def _handle_no_last_sent_execution(
-        db: Session,
-        memory_manager: MemoryManager,
-        schedule: Schedule,
-        user: User,
-        language: str,
-        simulate: bool,
-        messages: list,
-    ) -> None:
-        return scheduler_execution._handle_no_last_sent_execution(
-            db,
-            memory_manager,
-            schedule,
-            user,
-            language,
-            simulate,
-            messages,
-        )
-
-    @staticmethod
     def _build_schedule_message(
         db: Session,
         schedule: Schedule,

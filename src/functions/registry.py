@@ -338,13 +338,6 @@ class FunctionRegistry:
         ))
         
         self.register(FunctionMetadata(
-            name="send_next_lesson",
-            description="Send the next lesson in the sequence",
-            parameters=[],
-            contexts=["general_chat", "morning_lesson_confirmation", "lesson_review"],
-        ))
-        
-        self.register(FunctionMetadata(
             name="send_todays_lesson",
             description="Send today's scheduled lesson with full text. Use when user asks for 'today's lesson', 'the text', 'all the text', 'full text', or 'entire lesson'.",
             parameters=[
@@ -451,7 +444,7 @@ class FunctionRegistry:
                     description="Context string",
                     type=ParameterType.STRING,
                     required=False,
-                    examples=["lesson_completed", "schedule_created"],
+                    examples=["lesson_repeat", "schedule_created"],
                 ),
             ],
             contexts=["general_chat", "lesson_review", "onboarding", "onboarding_name", "onboarding_consent"],

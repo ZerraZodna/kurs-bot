@@ -8,10 +8,8 @@ from datetime import datetime, timedelta, timezone
 
 from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
-from src.lessons.state import set_next_lesson
 from src.models.database import MessageLog, Schedule, User
 from src.scheduler import SchedulerService
-from src.scheduler.memory_helpers import get_pending_confirmation
 from src.core.timezone import format_dt_in_timezone
 from src.functions.executor import get_function_executor
 from tests.fixtures.users import make_ready_user
