@@ -106,7 +106,7 @@ async def test_telegram_streaming(user_id: int, text: str):
         filtered_tokens = []
         async for token in filtered_stream:
             filtered_tokens.append(token)
-            print(f"  {repr(token.strip())} | len={len(token)}", end='', flush=True)
+            print(token)
         print("\\n📱 Stream complete\\n")
 
         full_response = ''.join(filtered_tokens)
