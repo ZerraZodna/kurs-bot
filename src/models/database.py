@@ -1,8 +1,23 @@
-from sqlalchemy.orm import sessionmaker
+from contextlib import contextmanager
+from typing import Optional
+from sqlalchemy.orm import Session, sessionmaker
 from .base import Base, engine
 
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+
+
+@contextmanager
+def get_session(session: Optional[Session] = None):
+    """Context manager for DB sessions. Uses provided session or creates/closes new one."""
+    if session is not None:
+        yield session
+    else:
+        s = SessionLocal()
+        try:
+            yield s
+        finally:
+            s.close()
 
 
 def init_db():

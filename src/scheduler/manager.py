@@ -7,7 +7,7 @@ be a thin, testable layer so the APScheduler wiring can live separately.
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 
-from src.models.database import SessionLocal, Schedule
+from src.models.database import SessionLocal, Schedule, get_session
 from src.core.timezone import to_utc
 from .domain import SCHEDULE_TYPE_DAILY
 
@@ -20,12 +20,7 @@ def create_schedule(
     next_send_time: Optional[datetime] = None,
     session=None,
 ) -> Schedule:
-    close = False
-    if session is None:
-        session = SessionLocal()
-        close = True
-
-    try:
+    with get_session(session) as s:
         now = datetime.now(timezone.utc)
 
         # Ensure next_send_time persisted as UTC-aware datetime
@@ -41,13 +36,10 @@ def create_schedule(
             is_active=True,
             created_at=now,
         )
-        session.add(sched)
-        session.commit()
-        session.refresh(sched)
+        s.add(sched)
+        s.commit()
+        s.refresh(sched)
         return sched
-    finally:
-        if close:
-            session.close()
 
 
 def update_schedule(schedule_id: int, updates: Dict[str, Any], session=None) -> Optional[Schedule]:
@@ -55,13 +47,8 @@ def update_schedule(schedule_id: int, updates: Dict[str, Any], session=None) -> 
 
     Supported update keys: `cron_expression`, `next_send_time`, `is_active`, `lesson_id`.
     """
-    close = False
-    if session is None:
-        session = SessionLocal()
-        close = True
-
-    try:
-        sched = session.query(Schedule).filter_by(schedule_id=schedule_id).first()
+    with get_session(session) as s:
+        sched = s.query(Schedule).filter_by(schedule_id=schedule_id).first()
         if not sched:
             return None
 
@@ -76,67 +63,41 @@ def update_schedule(schedule_id: int, updates: Dict[str, Any], session=None) -> 
                 changed = True
 
         if changed:
-            session.add(sched)
-            session.commit()
-            session.refresh(sched)
+            s.add(sched)
+            s.commit()
+            s.refresh(sched)
 
         return sched
-    finally:
-        if close:
-            session.close()
 
 
 def deactivate_schedule(schedule_id: int, session=None) -> bool:
     """Mark a schedule inactive. Returns True if changed, False if not found/already inactive."""
-    close = False
-    if session is None:
-        session = SessionLocal()
-        close = True
-
-    try:
-        sched = session.query(Schedule).filter_by(schedule_id=schedule_id).first()
+    with get_session(session) as s:
+        sched = s.query(Schedule).filter_by(schedule_id=schedule_id).first()
         if not sched or not sched.is_active:
             return False
         sched.is_active = False
-        session.add(sched)
-        session.commit()
+        s.add(sched)
+        s.commit()
         return True
-    finally:
-        if close:
-            session.close()
 
 
 def get_user_schedules(user_id: int, active_only: bool = True, session=None) -> List[Schedule]:
-    close = False
-    if session is None:
-        session = SessionLocal()
-        close = True
-
-    try:
-        query = session.query(Schedule).filter_by(user_id=user_id)
+    with get_session(session) as s:
+        query = s.query(Schedule).filter_by(user_id=user_id)
         if active_only:
             query = query.filter_by(is_active=True)
         return query.order_by(Schedule.created_at).all()
-    finally:
-        if close:
-            session.close()
 
 
 def find_active_daily_schedule(user_id: int, session=None) -> Optional[Schedule]:
-    close = False
-    if session is None:
-        session = SessionLocal()
-        close = True
-    try:
+    with get_session(session) as s:
         return (
-            session.query(Schedule)
+            s.query(Schedule)
             .filter_by(user_id=user_id, is_active=True, schedule_type=SCHEDULE_TYPE_DAILY)
             .order_by(Schedule.created_at)
             .first()
         )
-    finally:
-        if close:
-            session.close()
 
 
 def find_existing_one_time_reminder(
@@ -156,17 +117,12 @@ def find_existing_one_time_reminder(
     Returns:
         Existing Schedule if found, None otherwise
     """
-    close = False
-    if session is None:
-        session = SessionLocal()
-        close = True
-    
-    try:
+    with get_session(session) as s:
         from .domain import is_one_time_schedule_type
         
         # Get all active schedules for user
         schedules = (
-            session.query(Schedule)
+            s.query(Schedule)
             .filter_by(user_id=user_id, is_active=True)
             .all()
         )
@@ -185,32 +141,22 @@ def find_existing_one_time_reminder(
                 return schedule
         
         return None
-    finally:
-        if close:
-            session.close()
 
 
 def deactivate_user_schedules(user_id: int, active_only: bool = True, session=None) -> int:
     """Deactivate a user's schedules. Returns number deactivated."""
-    close = False
-    if session is None:
-        session = SessionLocal()
-        close = True
-    try:
-        query = session.query(Schedule).filter_by(user_id=user_id)
+    with get_session(session) as s:
+        query = s.query(Schedule).filter_by(user_id=user_id)
         if active_only:
             query = query.filter_by(is_active=True)
         schedules = query.all()
         if not schedules:
             return 0
-        for s in schedules:
-            s.is_active = False
-            session.add(s)
-        session.commit()
+        for schedule in schedules:
+            schedule.is_active = False
+            session.add(schedule)
+        s.commit()
         return len(schedules)
-    finally:
-        if close:
-            session.close()
 
 
 def deactivate_user_schedules_by_type(
@@ -232,12 +178,8 @@ def deactivate_user_schedules_by_type(
     """
     from .domain import is_one_time_schedule_type, is_daily_schedule_type
     
-    close = False
-    if session is None:
-        session = SessionLocal()
-        close = True
-    try:
-        query = session.query(Schedule).filter_by(user_id=user_id)
+    with get_session(session) as s:
+        query = s.query(Schedule).filter_by(user_id=user_id)
         if active_only:
             query = query.filter_by(is_active=True)
         
@@ -255,32 +197,21 @@ def deactivate_user_schedules_by_type(
         if not schedules:
             return 0
         
-        for s in schedules:
-            s.is_active = False
-            session.add(s)
-        session.commit()
+        for schedule in schedules:
+            schedule.is_active = False
+            session.add(schedule)
+        s.commit()
         return len(schedules)
-    finally:
-        if close:
-            session.close()
 
 
 def delete_user_schedules(user_id: int, session=None) -> list[int]:
     """Delete all schedules for a user and return list of deleted schedule_ids."""
-    close = False
-    if session is None:
-        session = SessionLocal()
-        close = True
-
-    try:
-        schedules = session.query(Schedule).filter_by(user_id=user_id).all()
+    with get_session(session) as s:
+        schedules = s.query(Schedule).filter_by(user_id=user_id).all()
         if not schedules:
             return []
         ids = [s.schedule_id for s in schedules]
         # Bulk delete; use synchronize_session=False for performance
-        session.query(Schedule).filter_by(user_id=user_id).delete(synchronize_session=False)
-        session.commit()
+        s.query(Schedule).filter_by(user_id=user_id).delete(synchronize_session=False)
+        s.commit()
         return ids
-    finally:
-        if close:
-            session.close()

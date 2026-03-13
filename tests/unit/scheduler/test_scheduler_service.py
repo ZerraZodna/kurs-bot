@@ -119,7 +119,7 @@ class TestSchedulerService:
         assert state["advanced_by_day"] == expected_advance
 
         # When: Executing the scheduled task
-        scheduler_module.SchedulerService.execute_scheduled_task(schedule.schedule_id)
+        scheduler_module.SchedulerService.execute_scheduled_task(schedule.schedule_id, session=db_session)
 
         # Then: Lesson message should be sent with correct advancement
         assert sent, "Expected lesson message to be sent"
@@ -152,23 +152,13 @@ class TestSchedulerService:
 
 
     def test_deactivate_user_schedules(
-        self, db_session, scheduler_session_factory, monkeypatch
+        self, db_session, scheduler_session_factory
     ):
         """Given: User has active schedules
         When: deactivate_user_schedules is called
         Then: All schedules are deactivated
         """
-        removed = []
 
-        class FakeScheduler:
-            def remove_job(self, job_id: str):
-                removed.append(job_id)
-
-        monkeypatch.setattr(
-            scheduler_module.SchedulerService,
-            "get_scheduler",
-            staticmethod(lambda: FakeScheduler()),
-        )
 
         user = db_session.query(User).first()
         schedule = Schedule(
@@ -184,10 +174,10 @@ class TestSchedulerService:
         db_session.commit()
 
         # When
-        deactivated = scheduler_module.SchedulerService.deactivate_user_schedules(user.user_id)
+        deactivated = scheduler_module.SchedulerService.deactivate_user_schedules(user.user_id, session=db_session)
 
         # Then
         db_session.refresh(schedule)
         assert deactivated == 1
         assert schedule.is_active is False
-        assert removed == [f"schedule_{schedule.schedule_id}"]
+

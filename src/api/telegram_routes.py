@@ -8,9 +8,10 @@ from sqlalchemy.exc import OperationalError
 
 from src.config import settings
 from src.integrations.telegram import TelegramHandler, process_telegram_batch
-from src.models.database import SessionLocal, User, MessageLog, BatchLock
+from src.models.database import get_session, User, MessageLog, BatchLock
 from src.services.admin_notifier import set_admin_chat_id, send_admin_notification
 from src.services.traffic_tracker import record_traffic_event
+from src.models.database import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ def _retry_db_op(op_name: str, func, attempts: int = 3, delay_seconds: float = 1
             return func()
         except OperationalError as e:
             if attempt == attempts:
-                print(f"[{op_name} error] {e}")
+                logger.error(f"[{op_name} error] {e}")
                 return None
             time.sleep(delay_seconds * attempt)
 
@@ -45,7 +46,7 @@ async def telegram_webhook(request: Request, secret_token: str):
     parsed = TelegramHandler.parse_webhook(payload)
     if not parsed:
         return {"ok": False, "reason": "Not a valid Telegram message"}
-    logging.info(
+    logger.info(
         "[telegram webhook] user_id=%s message_id=%s channel=telegram",
         parsed.get("user_id"),
         parsed.get("external_message_id"),
@@ -57,46 +58,43 @@ async def telegram_webhook(request: Request, secret_token: str):
     first_name = payload.get("message", {}).get("from", {}).get("first_name")
     last_name = payload.get("message", {}).get("from", {}).get("last_name")
 
-    db = SessionLocal()
-    db_user = db.query(User).filter_by(external_id=str(uid), channel="telegram").first()
-    if not db_user:
-        db_user = User(
-            external_id=str(uid),
-            channel="telegram",
-            first_name=first_name,
-            last_name=last_name,
-            opted_in=True
-        )
-        db.add(db_user)
-        db.commit()
-        print(f"[user added] {uid} {first_name} {last_name}")
-        name = " ".join([n for n in [first_name, last_name] if n]) or str(uid)
-        send_admin_notification(f"[INFO] New user joined: {name}.")
-    else:
-        updated = False
-        if first_name and db_user.first_name != first_name:
-            db_user.first_name = first_name
-            updated = True
-        if last_name and db_user.last_name != last_name:
-            db_user.last_name = last_name
-            updated = True
-        if updated:
+    with get_session() as db:
+        db_user = db.query(User).filter_by(external_id=str(uid), channel="telegram").first()
+        if not db_user:
+            db_user = User(
+                external_id=str(uid),
+                channel="telegram",
+                first_name=first_name,
+                last_name=last_name,
+                opted_in=True
+            )
+            db.add(db_user)
             db.commit()
-            print(f"[user updated] {uid} {first_name} {last_name}")
-    # Extract user_id before closing session
-    user_id = db_user.user_id if db_user else db.query(User).filter_by(external_id=str(uid), channel="telegram").first().user_id
-    processing_restricted = bool(getattr(db_user, "processing_restricted", False)) if db_user else False
-    is_deleted = bool(getattr(db_user, "is_deleted", False)) if db_user else False
-    is_opted_in = bool(getattr(db_user, "opted_in", True)) if db_user else True
-    db.close()
+            logger.info(f"[user added] {uid} {first_name} {last_name}")
+            name = " ".join([n for n in [first_name, last_name] if n]) or str(uid)
+            send_admin_notification(f"[INFO] New user joined: {name}.")
+        else:
+            updated = False
+            if first_name and db_user.first_name != first_name:
+                db_user.first_name = first_name
+                updated = True
+            if last_name and db_user.last_name != last_name:
+                db_user.last_name = last_name
+                updated = True
+            if updated:
+                db.commit()
+                logger.info(f"[user updated] {uid} {first_name} {last_name}")
+        user_id = db_user.user_id
+        processing_restricted = bool(getattr(db_user, "processing_restricted", False))
+        is_deleted = bool(getattr(db_user, "is_deleted", False))
+        is_opted_in = bool(getattr(db_user, "opted_in", True))
 
     if processing_restricted or is_deleted or not is_opted_in:
         return {"ok": True, "restricted": True}
 
     # Log all incoming messages to MessageLog with retry
     def _log_message():
-        db = SessionLocal()
-        try:
+        with get_session() as db:
             uid_inner = db.query(User).filter_by(external_id=str(uid), channel="telegram").first().user_id if uid else None
             log = MessageLog(
                 user_id=uid_inner,
@@ -114,20 +112,14 @@ async def telegram_webhook(request: Request, secret_token: str):
                 pass
             db.add(log)
             db.commit()
-        finally:
-            db.close()
 
-    try:
-        _retry_db_op("messagelog", _log_message, attempts=3, delay_seconds=0.1)
-    except Exception as e:
-        print("[messagelog error]", e)
+    _retry_db_op("messagelog", _log_message, attempts=3, delay_seconds=0.1)
 
     record_traffic_event()
 
     # Schedule background batch processing to allow more messages to arrive
     def _create_batch_lock():
-        db = SessionLocal()
-        try:
+        with get_session() as db:
             # Check if lock already exists and is still valid
             existing_lock = db.query(BatchLock).filter(
                 BatchLock.user_id == user_id,
@@ -144,12 +136,7 @@ async def telegram_webhook(request: Request, secret_token: str):
                 db.add(lock)
                 db.commit()
                 asyncio.create_task(process_telegram_batch(user_id, uid))
-        finally:
-            db.close()
 
-    try:
-        _retry_db_op("batch lock", _create_batch_lock, attempts=3, delay_seconds=0.1)
-    except Exception as e:
-        print("[batch lock error]", e)
+    _retry_db_op("batch lock", _create_batch_lock, attempts=3, delay_seconds=0.1)
 
     return {"ok": True}

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
-from src.models.database import Schedule, User
+from src.models.database import Schedule, User, get_session
 
 from . import jobs as schedule_jobs
 from . import manager as schedule_manager
@@ -38,21 +38,14 @@ def create_daily_schedule(
     session: Optional[Session] = None,
 ) -> Schedule:
     """Create a daily schedule for lesson delivery."""
-    close_session = False
-    if session is None:
-        from src import scheduler as _scheduler_pkg
-
-        session = _scheduler_pkg.SessionLocal()
-        close_session = True
-
-    try:
+    with get_session(session) as s:
         # Debug: trace schedule creation attempts
         logger.debug(
             f"create_daily_schedule called user={user_id} "
             f"time_str={time_str} ts={datetime.now(timezone.utc).isoformat()}"
         )
         # Compute next send time and cron expression for the user's timezone
-        tz_name = get_user_timezone_from_db(session, user_id)
+        tz_name = get_user_timezone_from_db(s, user_id)
 
         from .time_utils import compute_next_send_and_cron
 
@@ -66,7 +59,7 @@ def create_daily_schedule(
             schedule_type=schedule_type,
             cron_expression=cron_expression,
             next_send_time=next_send,
-            session=session,
+            session=s,
         )
 
         created_at = getattr(schedule, "created_at", None)
@@ -81,18 +74,12 @@ def create_daily_schedule(
             f"cron='{cron_expression}' created_at={created_str}"
         )
         # Log the actual stored DB value for next_send_time (UTC-aware expected)
-        try:
-            stored_ns = getattr(schedule, "next_send_time", None)
-            if stored_ns is not None:
-                logger.info(
-                    "Stored next_send_time (iso): %s, tzinfo=%s",
-                    stored_ns.isoformat(),
-                    getattr(stored_ns, "tzinfo", None),
-                )
-        except Exception:
-            logger.exception(
-                "Could not log stored next_send_time for schedule %s",
-                getattr(schedule, "schedule_id", None),
+        stored_ns = getattr(schedule, "next_send_time", None)
+        if stored_ns is not None:
+            logger.info(
+                "Stored next_send_time (iso): %s, tzinfo=%s",
+                stored_ns.isoformat(),
+                getattr(stored_ns, "tzinfo", None),
             )
 
         # Sync job to APScheduler
@@ -106,19 +93,11 @@ def create_daily_schedule(
             )
 
         # For logging, parse the time string into hour/minute if available
-        try:
-            hour, minute = parse_time_string(time_str)
-        except Exception:
-            hour = getattr(schedule, "next_send_time", None).hour if getattr(schedule, "next_send_time", None) else 0
-            minute = getattr(schedule, "next_send_time", None).minute if getattr(schedule, "next_send_time", None) else 0
+        hour, minute = parse_time_string(time_str)
 
         logger.info("✓ Created daily schedule for user %s at %s:%02d (%s)", user_id, hour, minute, tz_name)
 
         return schedule
-
-    finally:
-        if close_session:
-            session.close()
 
 
 def update_daily_schedule(
@@ -131,15 +110,8 @@ def update_daily_schedule(
     This avoids creating duplicate Schedule rows when a user updates their
     default reminder time.
     """
-    close_session = False
-    if session is None:
-        from src import scheduler as _scheduler_pkg
-
-        session = _scheduler_pkg.SessionLocal()
-        close_session = True
-
-    try:
-        sched = session.query(Schedule).filter_by(schedule_id=schedule_id).first()
+    with get_session(session) as s:
+        sched = s.query(Schedule).filter_by(schedule_id=schedule_id).first()
         if not sched:
             return None
 
@@ -150,7 +122,7 @@ def update_daily_schedule(
         # Compute new next_send and cron_expression using helper
         from .time_utils import compute_next_send_and_cron
 
-        tz_name = get_user_timezone_from_db(session, sched.user_id)
+        tz_name = get_user_timezone_from_db(s, sched.user_id)
 
         next_send, cron_expression = compute_next_send_and_cron(time_str, tz_name)
 
@@ -159,7 +131,7 @@ def update_daily_schedule(
             "next_send_time": next_send,
             "is_active": True,
         }
-        updated = schedule_manager.update_schedule(schedule_id, updates, session=session)
+        updated = schedule_manager.update_schedule(schedule_id, updates, session=s)
 
         # Update APScheduler job (replace existing job)
         try:
@@ -169,15 +141,7 @@ def update_daily_schedule(
             logger.warning("Could not update job %s: %s", schedule_id, e)
 
         # Ensure hour/minute are defined for logging (may not exist if parse failed)
-        try:
-            hour, minute = parse_time_string(time_str)
-        except Exception:
-            if getattr(updated, "next_send_time", None):
-                hour = getattr(updated.next_send_time, "hour", 0)
-                minute = getattr(updated.next_send_time, "minute", 0)
-            else:
-                hour = 0
-                minute = 0
+        hour, minute = parse_time_string(time_str)
 
         logger.info(
             "✓ Updated daily schedule %s for user %s to %s:%02d (%s)",
@@ -187,20 +151,14 @@ def update_daily_schedule(
             minute,
             tz_name,
         )
-        try:
-            if getattr(updated, "next_send_time", None):
-                logger.info(
-                    "Updated schedule stored next_send_time (iso): %s, tzinfo=%s",
-                    updated.next_send_time.isoformat(),
-                    getattr(updated, "next_send_time", None),
-                )
-        except Exception:
-            logger.exception("Could not log updated next_send_time for schedule %s", schedule_id)
+        stored_ns = getattr(updated, "next_send_time", None)
+        if stored_ns is not None:
+            logger.info(
+                "Updated schedule stored next_send_time (iso): %s, tzinfo=%s",
+                stored_ns.isoformat(),
+                getattr(stored_ns, "tzinfo", None),
+            )
         return updated
-
-    finally:
-        if close_session:
-            session.close()
 
 
 def create_one_time_schedule(
@@ -210,14 +168,7 @@ def create_one_time_schedule(
     session: Optional[Session] = None,
 ) -> Schedule:
     """Create a one-time reminder schedule."""
-    close_session = False
-    if session is None:
-        from src import scheduler as _scheduler_pkg
-
-        session = _scheduler_pkg.SessionLocal()
-        close_session = True
-
-    try:
+    with get_session(session) as s:
         now = datetime.now(timezone.utc)
         from src.core.timezone import to_utc
 
@@ -227,7 +178,7 @@ def create_one_time_schedule(
         existing = schedule_manager.find_existing_one_time_reminder(
             user_id=user_id,
             run_at=run_at,
-            session=session,
+            session=s,
             tolerance_seconds=60,
         )
         if existing:
@@ -246,11 +197,11 @@ def create_one_time_schedule(
             schedule_type=SCHEDULE_TYPE_ONE_TIME_REMINDER,
             cron_expression=f"once:{run_at.isoformat()}",
             next_send_time=run_at,
-            session=session,
+            session=s,
         )
 
         # Store reminder message
-        memory_manager = MemoryManager(session)
+        memory_manager = MemoryManager(s)
         payload = json.dumps({"schedule_id": schedule.schedule_id, "message": message})
         memory_manager.store_memory(
             user_id=user_id,
@@ -276,10 +227,6 @@ def create_one_time_schedule(
 
         return schedule
 
-    finally:
-        if close_session:
-            session.close()
-
 
 def get_user_schedules(user_id: int, active_only: bool = True) -> list:
     """Get all schedules for a user."""
@@ -293,22 +240,13 @@ def deactivate_user_schedules(
     session: Optional[Session] = None,
 ) -> int:
     """Deactivate all schedules for a user and remove their jobs."""
-    close_session = False
-    if session is None:
-        from src import scheduler as _scheduler_pkg
-
-        session = _scheduler_pkg.SessionLocal()
-        close_session = True
-    try:
+    with get_session(session) as s:
         from src.scheduler import deactivate_user_schedules_and_remove_jobs
 
-        count = deactivate_user_schedules_and_remove_jobs(user_id=user_id, active_only=active_only, session=session)
+        count = deactivate_user_schedules_and_remove_jobs(user_id=user_id, active_only=active_only, session=s)
         if count:
             logger.info("✓ Deactivated %s schedule(s) for user %s", count, user_id)
         return count
-    finally:
-        if close_session:
-            session.close()
 
 
 def deactivate_schedule(schedule_id: int) -> None:

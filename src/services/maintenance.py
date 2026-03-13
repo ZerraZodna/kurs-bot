@@ -5,7 +5,7 @@ from typing import Optional
 import time
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
-from src.models.database import SessionLocal, MessageLog
+from src.models.database import SessionLocal, MessageLog, get_session
 from src.memories.memory_handler import MemoryHandler
 from src.scheduler.maintenance import (
     purge_inactive_schedules as _scheduler_purge_inactive_schedules,
@@ -18,36 +18,20 @@ logger = logging.getLogger(__name__)
 
 def purge_archived_memories(days_keep: int = 365, session: Optional[Session] = None) -> int:
     """Purge archived memories older than days_keep. Returns number deleted."""
-    close_session = False
-    if session is None:
-        session = SessionLocal()
-        close_session = True
-
-    try:
+    with get_session(session) as s:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days_keep)
-        deleted = MemoryHandler(session).purge_archived_before(cutoff=cutoff)
+        deleted = MemoryHandler(s).purge_archived_before(cutoff=cutoff)
         logger.info("Purged %s archived memories older than %s days", deleted, days_keep)
         return deleted
-    finally:
-        if close_session:
-            session.close()
 
 
 def purge_expired_ttl_memories(session: Optional[Session] = None) -> int:
     """Delete memories whose TTL has expired. Returns number deleted."""
-    close_session = False
-    if session is None:
-        session = SessionLocal()
-        close_session = True
-
-    try:
+    with get_session(session) as s:
         cutoff = datetime.now(timezone.utc)
-        deleted = MemoryHandler(session).purge_expired_ttl_before(cutoff=cutoff)
+        deleted = MemoryHandler(s).purge_expired_ttl_before(cutoff=cutoff)
         logger.info("Purged %s memories with expired TTL", deleted)
         return deleted
-    finally:
-        if close_session:
-            session.close()
 
 
 def purge_expired_batch_locks() -> None:
@@ -74,22 +58,14 @@ def purge_expired_batch_locks() -> None:
 
 def purge_message_logs(days_keep: int = 30, session: Optional[Session] = None) -> int:
     """Delete message logs older than days_keep. Returns number deleted."""
-    close_session = False
-    if session is None:
-        session = SessionLocal()
-        close_session = True
-
-    try:
+    with get_session(session) as s:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days_keep)
-        q = session.query(MessageLog).filter(MessageLog.created_at < cutoff)
+        q = s.query(MessageLog).filter(MessageLog.created_at < cutoff)
         deleted = q.count()
         q.delete(synchronize_session=False)
-        session.commit()
+        s.commit()
         logger.info("Purged %s MessageLog rows older than %s days", deleted, days_keep)
         return deleted
-    finally:
-        if close_session:
-            session.close()
 
 
 def purge_inactive_schedules(days_keep: int = 7, session: Optional[Session] = None) -> int:

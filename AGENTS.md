@@ -32,8 +32,36 @@
 - Python: 4 spaces, `snake_case` for functions/variables, `PascalCase` for classes.
 - Follow existing FastAPI, Pydantic, and SQLAlchemy ORM patterns.
 - Do not add ad-hoc hard-coded command handlers without owner approval.
-- Avoid silent exception handling (`except: pass`); prefer explicit handling and logging.
 - Never expose secrets or user-specific data in code, logs, commits, or PR text.
+
+### Exception Handling Guidelines
+- **No silent swallowing:** never write bare `except: pass`. Always log or re-raise.
+- **Catch specific exceptions:** prefer `except ValueError` over `except Exception` unless you genuinely need a catch-all (e.g. protecting a critical loop from crashing).
+- **Don't wrap logging in `try/except`:** if accessing an attribute for a log message can fail, use an `if` guard or `getattr(..., default)` instead of a `try/except` that itself calls the logger.
+- **Reserve `try/except` for genuine failure boundaries:** external systems (APScheduler, HTTP calls, third-party libs) and I/O operations warrant `try/except`. Internal function calls and attribute access generally do not.
+- **Fail fast on bad input:** validate inputs at function entry rather than catching parse errors deep inside the function body. If a helper like `parse_time_string` can fail, either validate before calling or have it return `None` instead of raising.
+- **Keep `try` blocks small:** wrap only the statement(s) that can actually raise, not entire function bodies (unless it's a resource-cleanup `try/finally`).
+
+### Session / Resource Management
+- **Use context managers for DB sessions.** Do not repeat the manual `close_session = False; try/finally` pattern. Use the `get_session()` context manager (or equivalent) so cleanup is automatic:
+  ```python
+  # Good
+  with get_session(session) as s:
+      s.query(...)
+
+  # Avoid — repetitive and error-prone
+  close = False
+  if session is None:
+      session = SessionLocal()
+      close = True
+  try:
+      ...
+  finally:
+      if close:
+          session.close()
+  ```
+- When adding new functions that accept `session: Optional[Session] = None`, always use the context manager pattern.
+- The same principle applies to any resource that needs cleanup (file handles, HTTP clients, etc.).
 
 ## Testing and Pull Requests
 - Standard command: `npm test`
