@@ -67,9 +67,6 @@ Only use functions relevant to the current context.
 """
     # Ollama temperature (0.0 = deterministic, 1.0 = creative). Lower reduces hallucination.
     OLLAMA_TEMPERATURE: float = 0.2
-    # Streaming: when True, Telegram responses are streamed token-by-token via
-    # progressive message edits instead of waiting for the full LLM response.
-    OLLAMA_STREAM_ENABLED: bool = True
     # Minimum seconds between Telegram editMessageText calls during streaming.
     # 0.1 s gives ~10 edits/second — smooth without hitting Telegram rate limits.
     TELEGRAM_STREAM_UPDATE_INTERVAL: float = 0.1

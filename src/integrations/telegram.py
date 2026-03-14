@@ -331,7 +331,7 @@ def _split_text(text: str, max_len: int) -> list[str]:
 async def process_telegram_batch(user_id: int, external_id: str) -> None:
     """Batch inbound messages for a user and send one AI response.
 
-    When streaming is enabled (``OLLAMA_STREAM_ENABLED``), LLM-generated
+    Streaming is enabled, LLM-generated
     responses are streamed token-by-token to Telegram via progressive
     message edits.  Non-LLM responses (commands, onboarding, lessons, etc.)
     are sent normally as a single message.
@@ -389,99 +389,92 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
             dialogue = None
 
             try:
-                stream_enabled = getattr(settings, "OLLAMA_STREAM_ENABLED", True)
                 dialogue_db = db
 
-                if stream_enabled:
+                dialogue = DialogueEngine(dialogue_db)
+                result = await dialogue.process_message(
+                    user_id=user_id,
+                    text=combined_text,
+                    session=dialogue_db,
+                    chat_id=chat_id,
+                    include_history=True,
+                    history_turns=4,
+                )
 
-
-                    dialogue = DialogueEngine(dialogue_db)
-                    result = await dialogue.process_message(
-                        user_id=user_id,
-                        text=combined_text,
-                        session=dialogue_db,
+                if result["type"] == "stream":
+                    logger.info(f"[batch] Using STREAMING path for user_id={user_id}")
+                    
+                    raw_generator = result["generator"]
+                    stream_filter = StreamingFilter(raw_generator)
+                    filtered_stream = stream_filter.filter_stream()
+                    
+                    full_response, telegram_message_id = await send_message_streaming(
                         chat_id=chat_id,
-                        include_history=True,
-                        history_turns=4,
+                        token_generator=filtered_stream,
                     )
-
-                    if result["type"] == "stream":
-                        logger.info(f"[batch] Using STREAMING path for user_id={user_id}")
-                        
-                        raw_generator = result["generator"]
-                        stream_filter = StreamingFilter(raw_generator)
-                        filtered_stream = stream_filter.filter_stream()
-                        
-                        full_response, telegram_message_id = await send_message_streaming(
-                            chat_id=chat_id,
-                            token_generator=filtered_stream,
-                        )
-                        
-                        logger.info(f"[batch] Streamed to Telegram, message_id={telegram_message_id}")
-                        
-                        remaining_for_functions = stream_filter.get_remaining_for_functions()
-                        function_parse_text = remaining_for_functions or full_response
-                        
+                    
+                    logger.info(f"[batch] Streamed to Telegram, message_id={telegram_message_id}")
+                    
+                    remaining_for_functions = stream_filter.get_remaining_for_functions()
+                    function_parse_text = remaining_for_functions or full_response
+                    
 # Detailed failure logging
-                        logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] user_text='{combined_text[:200]}...'")
-                        logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] function_parse_text='{function_parse_text[:1000]}...' (len={len(function_parse_text)})")
-                        logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] raw_generator_remaining='{stream_filter.get_remaining_for_functions()[:500]}...'")
+                    logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] user_text='{combined_text[:200]}...'")
+                    logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] function_parse_text='{function_parse_text[:1000]}...' (len={len(function_parse_text)})")
+                    logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] raw_generator_remaining='{stream_filter.get_remaining_for_functions()[:500]}...'")
 
-                        from src.functions.intent_parser import get_intent_parser
-                        from src.functions.response_builder import get_response_builder
+                    from src.functions.intent_parser import get_intent_parser
+                    from src.functions.response_builder import get_response_builder
 
-                        parser = get_intent_parser()
-                        parse_result = parser.parse(function_parse_text)
-                        logger.info(f"[telegram PARSE_RESULT user={user_id}] success={parse_result.success},fallback={parse_result.is_fallback},functions={len(parse_result.functions)},errors={len(parse_result.errors or [])}")
-                        
-                        # Run post_hook (handle_triggers) with correct text
-                        diagnostics = await result["post_hook"](function_parse_text)
-                        logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] post_hook=exec_result={diagnostics.get('execution_result') is not None},actions_len={len(diagnostics.get('dispatched_actions', []))},keys={list(diagnostics.keys())}")
-                        
+                    parser = get_intent_parser()
+                    parse_result = parser.parse(function_parse_text)
+                    logger.info(f"[telegram PARSE_RESULT user={user_id}] success={parse_result.success},fallback={parse_result.is_fallback},functions={len(parse_result.functions)},errors={len(parse_result.errors or [])}")
+                    
+                    # Run post_hook (handle_triggers) with correct text
+                    diagnostics = await result["post_hook"](function_parse_text)
+                    logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] post_hook=exec_result={diagnostics.get('execution_result') is not None},actions_len={len(diagnostics.get('dispatched_actions', []))},keys={list(diagnostics.keys())}")
+                    
 # Handle all cases: success, empty [], parse errors, exec fails
-                        parse_had_errors = bool(parse_result.errors and not parse_result.success)
-                        exec_had_errors = diagnostics.get('execution_result') and 'error' in str(diagnostics.get('execution_result', '')).lower()
+                    parse_had_errors = bool(parse_result.errors and not parse_result.success)
+                    exec_had_errors = diagnostics.get('execution_result') and 'error' in str(diagnostics.get('execution_result', '')).lower()
 
-                        if parse_result.functions:  # Valid functions found
-                            logger.info(f"[telegram VALID_FUNCTIONS user={user_id}] Executing {len(parse_result.functions)} functions")
-                            response_builder = get_response_builder()
-                            built_response = response_builder.build(
-                                user_text=combined_text,
-                                ai_response_text="",  # Don't repeat streamed LLM response
-                                execution_result=diagnostics.get("execution_result"),
-                                include_function_results=True,
-                            )
-                            if built_response.text.strip():  # Only results/error
-                                await send_message(chat_id, built_response.text)
-                        elif parse_had_errors:
-                            # Parser errors: undefined func / bad params
-                            error_msg = f"Sorry, invalid command.\nErrors: {chr(10).join(parse_result.errors[:2])}\nExamples: 'Set daily reminder at 09:00', 'lesson 29'"
-                            logger.warning(f"[telegram PARSE_ERROR user={user_id}] {parse_result.errors}")
-                            await send_message(chat_id, error_msg)
-                        elif exec_had_errors:
-                            # Execution failed (but parsed OK)
-                            error_msg = "Command failed during execution. Please try again or rephrase."
-                            await send_message(chat_id, error_msg)
-                        else:
-                            # Normal: empty [] or chat
-                            log_type = "EMPTY_FUNCTIONS" if parse_result.success else "PURE_CHAT"
-                            logger.info(f"[telegram {log_type} user={user_id}] len={len(function_parse_text)}")
-
-                        
-                        ai_response = full_response
+                    if parse_result.functions:  # Valid functions found
+                        logger.info(f"[telegram VALID_FUNCTIONS user={user_id}] Executing {len(parse_result.functions)} functions")
+                        response_builder = get_response_builder()
+                        built_response = response_builder.build(
+                            user_text=combined_text,
+                            ai_response_text="",  # Don't repeat streamed LLM response
+                            execution_result=diagnostics.get("execution_result"),
+                            include_function_results=True,
+                        )
+                        if built_response.text.strip():  # Only results/error
+                            await send_message(chat_id, built_response.text)
+                    elif parse_had_errors:
+                        # Parser errors: undefined func / bad params
+                        error_msg = f"Sorry, invalid command.\nErrors: {chr(10).join(parse_result.errors[:2])}\nExamples: 'Set daily reminder at 09:00', 'lesson 29'"
+                        logger.warning(f"[telegram PARSE_ERROR user={user_id}] {parse_result.errors}")
+                        await send_message(chat_id, error_msg)
+                    elif exec_had_errors:
+                        # Execution failed (but parsed OK)
+                        error_msg = "Command failed during execution. Please try again or rephrase."
+                        await send_message(chat_id, error_msg)
                     else:
-                        logger.info(f"[batch] Text response for user_id={user_id}")
-                        ai_response = result["text"]
-                        await send_message(chat_id, ai_response)
+                        # Normal: empty [] or chat
+                        log_type = "EMPTY_FUNCTIONS" if parse_result.success else "PURE_CHAT"
+                        logger.info(f"[telegram {log_type} user={user_id}] len={len(function_parse_text)}")
+
+                    
+                    ai_response = full_response
+                else:
+                    logger.info(f"[batch] Text response for user_id={user_id}")
+                    ai_response = result["text"]
+                    await send_message(chat_id, ai_response)
 
             except Exception as e:
                 logger.error(f"[telegram dialogue] Error in dialogue processing for user {user_id}: {e}")
                 ai_response = "Sorry, I encountered an error processing your message."
 
             record_traffic_event()
-
-
-
 
             # Log outbound and mark processed using the main db session
             try:

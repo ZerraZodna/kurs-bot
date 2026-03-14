@@ -125,9 +125,9 @@ async def test_send_message_streaming_with_empty_generator():
 # ─── Tests for process_telegram_batch streaming integration ─────────────────────────────
 
 @pytest.mark.asyncio
-async def test_process_telegram_batch_uses_streaming_when_enabled():
+async def test_process_telegram_batch_uses_streaming():
     """
-    When OLLAMA_STREAM_ENABLED=True, process_telegram_batch should use
+    Process_telegram_batch should use
     send_message_streaming instead of accumulating and sending one message.
     
     This test verifies the code path by checking that when streaming is enabled
@@ -151,19 +151,6 @@ async def test_process_telegram_batch_uses_streaming_when_enabled():
     
     # Verify it returns a tuple with (str, Optional[int])
     # We can't check the return annotation easily, but we verified it's async
-
-
-@pytest.mark.asyncio
-async def test_process_telegram_batch_non_streaming_when_disabled():
-    """
-    When OLLAMA_STREAM_ENABLED=False, process_telegram_batch should use
-    the non-streaming path (accumulate and send one message).
-    """
-    from src.config import settings
-    
-    # Verify the setting exists and has correct default
-    assert hasattr(settings, 'OLLAMA_STREAM_ENABLED')
-    assert settings.OLLAMA_STREAM_ENABLED == True  # Default is True
 
 
 # ─── Tests for streaming interval behavior ─────────────────────────────────────────
