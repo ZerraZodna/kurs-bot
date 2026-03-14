@@ -46,14 +46,6 @@ This document summarizes how RAG (Retrieval-Augmented Generation) mode is handle
   - `EMBEDDING_DIMENSION` — embeddings are validated to match this length.
   - `SEMANTIC_SEARCH_THRESHOLD` — similarity cutoff (default 0.4).
   - `SEMANTIC_SEARCH_MAX_RESULTS` — default maximum results returned.
-  - `OLLAMA_CHAT_RAG_MODEL` — model used when RAG mode is active for chat.
-
-**Other integrations**
-- `handle_forget_commands` (in command handlers) uses `search_memories` to find and archive matching memories by semantic similarity.
-  See [src/services/dialogue/command_handlers.py](src/services/dialogue/command_handlers.py#L1-L180).
-- Trigger matching/dispatcher also interacts with embeddings (trigger embeddings table and trigger matcher code use the same embedding tools).
-
-
 
 **User-facing enable/disable message**
 - When RAG is enabled the system now returns a short, informative message to the user explaining what RAG does and how to customize it. Example:

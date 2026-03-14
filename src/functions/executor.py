@@ -94,17 +94,16 @@ class FunctionExecutor:
         self._handlers["set_language"] = self._handle_set_language
         self._handlers["set_preferred_time"] = self._handle_set_preferred_time
         self._handlers["update_profile"] = self._handle_update_profile
-        
-        # RAG handlers
-        self._handlers["enter_rag"] = self._handle_enter_rag
-        self._handlers["exit_rag"] = self._handle_exit_rag
-        
+                
         # Confirmation handlers
         self._handlers["confirm_yes"] = self._handle_confirm_yes
         self._handlers["confirm_no"] = self._handle_confirm_no
         
         # Memory extraction handler
         self._handlers["extract_memory"] = self._handle_extract_memory
+        
+        # Memory deletion handler (AI version of forget memory)
+        self._handlers["forget_memories"] = self._handle_forget_memories
 
     
     def register_handler(self, function_name: str, handler: Callable):
@@ -790,47 +789,6 @@ class FunctionExecutor:
         except Exception as e:
             return self._error_response(str(e))
     
-    async def _handle_enter_rag(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle enter_rag function."""
-        from src.memories.constants import MemoryCategory, MemoryKey
-        
-        user_id = context.get("user_id")
-        memory_manager = context.get("memory_manager")
-        
-        try:
-            memory_manager.store_memory(
-                user_id=user_id,
-                key=MemoryKey.RAG_MODE_ENABLED,
-                value="true",
-                category=MemoryCategory.CONVERSATION.value,
-                source="function_executor",
-                ttl_hours=24 * 7,  # 1 week default
-            )
-            
-            return self._ok_response(rag_mode=True)
-        except Exception as e:
-            return self._error_response(str(e))
-    
-    async def _handle_exit_rag(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle exit_rag function."""
-        from src.memories.constants import MemoryCategory, MemoryKey
-        
-        user_id = context.get("user_id")
-        memory_manager = context.get("memory_manager")
-        
-        try:
-            memory_manager.store_memory(
-                user_id=user_id,
-                key=MemoryKey.RAG_MODE_ENABLED,
-                value="false",
-                category=MemoryCategory.CONVERSATION.value,
-                source="function_executor",
-            )
-            
-            return self._ok_response(rag_mode=False)
-        except Exception as e:
-            return self._error_response(str(e))
-    
     async def _handle_confirm_yes(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle confirm_yes function."""
         from src.memories.constants import MemoryCategory, MemoryKey
@@ -993,6 +951,50 @@ class FunctionExecutor:
             return self._ok_response(lesson_number=lesson_number)
         except (ValueError, TypeError) as e:
             return self._error_response(f"Invalid lesson number: {lesson_number}")
+
+    async def _handle_forget_memories(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle forget_memories function - AI callable semantic memory deletion."""
+        from src.memories.semantic_search import get_semantic_search_service
+        
+        user_id = context.get("user_id")
+        query_text = params.get("query_text")
+        session = context.get("session")
+        memory_manager = context.get("memory_manager")
+        
+        if not query_text or not query_text.strip():
+            return self._error_response("query_text is required")
+        
+        if not memory_manager:
+            return self._error_response("Missing memory_manager in context")
+        
+        try:
+            search_service = get_semantic_search_service()
+            with Session(bind=session.get_bind()) as search_session:
+                results = await search_service.search_memories(
+                    user_id=user_id,
+                    query_text=query_text,
+                    session=search_session,
+                    limit=10,  # Reasonable default limit
+                )
+                memory_ids = [memory.memory_id for memory, _ in results]
+            
+            if not memory_ids:
+                return self._error_response("No matching memories found")
+            
+            archived_count = memory_manager.archive_memories(user_id, memory_ids)
+            
+            logger.info(f"forgot {archived_count} memories for user {user_id} matching '{query_text}'")
+            
+            return self._ok_response(
+                query_text=query_text,
+                found_count=len(memory_ids),
+                archived_count=archived_count,
+            )
+            
+        except Exception as e:
+            logger.exception(f"Error in forget_memories user={user_id} query={query_text}")
+            return self._error_response(f"Failed to forget memories: {str(e)}")
+
 
 
 # Global instance

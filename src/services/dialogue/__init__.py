@@ -14,11 +14,8 @@ from src.scheduler.schedule_query_handler import build_schedule_status_response
 from src.scheduler.schedule_handlers import handle_schedule_messages
 from src.lessons.advance import maybe_send_next_lesson
 from .command_handlers import (
-    handle_rag_mode_toggle,
     handle_rag_prompt_command,
     parse_rag_prefix,
-    is_rag_mode_enabled,
-    handle_forget_commands,
     handle_list_memories,
     handle_gdpr_commands,
 )
@@ -32,11 +29,8 @@ __all__ = [
     "detect_and_store_language",
     "detect_pause_request",
     "build_schedule_status_response",
-    "handle_rag_mode_toggle",
     "handle_rag_prompt_command",
     "parse_rag_prefix",
-    "is_rag_mode_enabled",
-    "handle_forget_commands",
     "handle_list_memories",
     "handle_gdpr_commands",
     "handle_schedule_messages",

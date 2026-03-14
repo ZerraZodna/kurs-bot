@@ -31,120 +31,12 @@ from src.language.prompt_registry import get_prompt_registry
 logger = logging.getLogger(__name__)
 
 
-def handle_rag_mode_toggle(text: str, memory_manager, user_id: int) -> Optional[str]:
-    text_lower = text.strip().lower()
-    # Normalize: accept both 'rag_mode' and 'rag mode' (and plain 'rag')
-    normalized = text_lower.replace("_", " ").strip()
-
-    # Accept 'rag', 'rag mode', 'rag_mode', and 'ragmode' as aliases
-    if normalized in ("rag_mode", "rag mode", "rag", "ragmode"):
-        rag_mode_memory = memory_manager.get_memory(user_id, MemoryKey.RAG_MODE_ENABLED)
-        is_on = bool(rag_mode_memory and rag_mode_memory[0].get("value") == "true")
-        return f"RAG mode is {'on' if is_on else 'off'}."
-
-    # Support commands like 'rag_mode on', 'rag mode on', 'rag on', and also 'rag:on' via parse fallback
-    mode_cmd = ""
-    if normalized.startswith("rag mode "):
-        mode_cmd = normalized[len("rag mode "):].strip()
-    elif normalized.startswith("rag "):
-        mode_cmd = normalized[len("rag "):].strip()
-    elif normalized.startswith("ragmode "):
-        mode_cmd = normalized[len("ragmode "):].strip()
-    # Also allow 'rag: on' or 'ragmode: on' style (colon)
-    elif text_lower.startswith("rag:") or text_lower.startswith("ragmode:"):
-        mode_cmd = text_lower.split(":", 1)[1].strip()
-
-    if not mode_cmd:
-        return None
-
-    if mode_cmd == "on":
-        memory_manager.store_memory(
-            user_id=user_id,
-            key=MemoryKey.RAG_MODE_ENABLED,
-            value="true",
-            source="user_command",
-            category=MemoryCategory.CONVERSATION.value,
-        )
-        return (
-            "RAG mode enabled. I will use semantic search over your memories for future messages.\n\n"
-            "You can customize RAG behavior:\n"
-            "- Use `rag_prompt list` to view available prompt templates.\n"
-            "- Use `rag_prompt select <key>` to pick a template from the library.\n"
-            "- Use `rag_prompt custom <text>` to set a personal RAG system prompt.\n"
-            "- Use `list memories` or `list memories <query>` to list or search your stored memories while RAG is active.\n\n"
-            "Tip: prefix a single message with `rag:` to use RAG only for that message."
-        )
-    if mode_cmd == "off":
-        memory_manager.store_memory(
-            user_id=user_id,
-            key=MemoryKey.RAG_MODE_ENABLED,
-            value="false",
-            source="user_command",
-            category=MemoryCategory.CONVERSATION.value,
-        )
-        return "RAG mode disabled. Back to standard workflow."
-
-    return None
-
-
 def parse_rag_prefix(text: str) -> Tuple[str, bool]:
     text_lower = text.strip().lower()
     if text_lower.startswith("rag:") or text_lower.startswith("rag "):
         stripped = text[4:].lstrip(": ").strip()
         return stripped, True
     return text, False
-
-
-def is_rag_mode_enabled(memory_manager, user_id: int) -> bool:
-    rag_mode_memory = memory_manager.get_memory(user_id, MemoryKey.RAG_MODE_ENABLED)
-    return bool(rag_mode_memory and rag_mode_memory[0].get("value") == "true")
-
-
-async def handle_forget_commands(
-    text: str,
-    memory_manager,
-    session: Session,
-    user_id: int,
-    rag_mode_enabled: bool = False,
-) -> Optional[str]:
-    """Handle forget/erase/delete commands for memories.
-    
-    Only active when RAG mode is enabled to avoid conflicts with
-    schedule deletion commands in normal ACIM study mode.
-    """
-    # Only process memory deletion commands when in RAG mode
-    if not rag_mode_enabled:
-        return None
-        
-    text_lower = text.strip().lower()
-    forget_prefixes = ("forget ", "erase ", "delete ", "remove ")
-    if text_lower in {"forget", "erase", "delete", "remove"}:
-        return "Tell me what to forget (e.g., 'forget my grandfather')."
-    if text_lower.startswith(forget_prefixes):
-        query_text = text.split(" ", 1)[1].strip()
-        if not query_text:
-            return "Tell me what to forget (e.g., 'forget my grandfather')."
-        memory_ids = []
-        try:
-            search_service = get_semantic_search_service()
-            search_session = Session(bind=session.get_bind())
-            try:
-                results = await search_service.search_memories(
-                    user_id=user_id,
-                    query_text=query_text,
-                    session=search_session,
-                )
-                memory_ids = [memory.memory_id for memory, _ in results]
-            finally:
-                search_session.close()
-        except Exception as ex:
-            logger.warning(f"Semantic search failed for forget: {ex}")
-        archived = memory_manager.archive_memories(user_id, memory_ids)
-        if archived == 0:
-            return "I couldn't find any matching memories to forget."
-        return f"Forgot {archived} memory item(s) related to: {query_text}."
-    return None
-
 
 def _execute_verified_request(session: Session, user_id: int, verification) -> str:
     request_type = verification.request_type
@@ -386,29 +278,18 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
                 raise exc["e"]
             return result.get("value")
 
-        try:
-            search_service = get_semantic_search_service()
-            search_session = Session(bind=session.get_bind())
-            try:
-                results = _run_coro_sync(
-                    search_service.search_memories(
-                        user_id=user_id, query_text=query_tail, session=search_session, limit=20
-                    )
+        search_service = get_semantic_search_service()
+        with Session(bind=session.get_bind()) as search_session:
+            results = _run_coro_sync(
+                search_service.search_memories(
+                    user_id=user_id, query_text=query_tail, session=search_session, limit=20
                 )
-            finally:
-                search_session.close()
-            if not results:
-                return "No results for query"
-            mems = [m for (m, s) in results]
-            lines = _format_mem_lines(mems)
-            return "<pre>\n" + "\n".join(lines) + "\n</pre>"
-        except Exception as e:
-            logger.exception("Semantic search failed for list memories: %s", e)
-            # Include exception text to help debugging in dev environments
-            try:
-                return f"Failed to perform semantic search for memories: {e}"
-            except Exception:
-                return "Failed to perform semantic search for memories."
+            )
+        if not results:
+            return "No results for query"
+        mems = [m for (m, s) in results]
+        lines = _format_mem_lines(mems)
+        return "<pre>\n" + "\n".join(lines) + "\n</pre>"
     except Exception as e:
         logger.exception("Failed to build memory list: %s", e)
         return "Failed to list memories."

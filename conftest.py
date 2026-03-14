@@ -222,7 +222,6 @@ def pytest_configure(config):
 
     overrides = {
         "OLLAMA_MODEL": choose_model("TEST_OLLAMA_MODEL"),
-        "OLLAMA_CHAT_RAG_MODEL": choose_model("TEST_OLLAMA_CHAT_RAG_MODEL"),
         "NON_ENGLISH_OLLAMA_MODEL": choose_model("TEST_NON_ENGLISH_OLLAMA_MODEL"),
     }
     changed = False

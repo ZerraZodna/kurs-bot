@@ -53,11 +53,10 @@ class ResponseBuilder:
         "set_language": "✓ Language set to {language}",
         "set_preferred_time": "✓ Preferred time set to {time}",
         "update_profile": "✓ Profile updated: {key}",
-        "enter_rag": "✓ RAG mode enabled",
-        "exit_rag": "✓ RAG mode disabled",
         "confirm_yes": "✓ Confirmed",
         "confirm_no": "✓ Noted",
         "extract_memory": "✓ Remembered: {key}",
+        "forget_memories": "🗑️ Forgot {archived_count} memories matching '{query_text}'",
     }
     
     ERROR_TEMPLATES = {
@@ -72,11 +71,10 @@ class ResponseBuilder:
         "set_language": "I couldn't set that language. {error}",
         "set_preferred_time": "I couldn't set that time. {error}",
         "update_profile": "I couldn't update your profile. {error}",
-        "enter_rag": "I couldn't enable RAG mode. {error}",
-        "exit_rag": "I couldn't disable RAG mode. {error}",
         "confirm_yes": "",
         "confirm_no": "",
         "extract_memory": "I couldn't store that information. {error}",
+        "forget_memories": "Couldn't forget memories matching '{query_text}'. {error}",
     }
     
     def __init__(self):

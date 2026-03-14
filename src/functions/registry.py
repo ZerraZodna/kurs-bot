@@ -418,22 +418,7 @@ class FunctionRegistry:
             ],
             contexts=["general_chat", "onboarding", "onboarding_name"],
         ))
-        
-        # RAG functions
-        self.register(FunctionMetadata(
-            name="enter_rag",
-            description="Enable RAG (Retrieval Augmented Generation) mode",
-            parameters=[],
-            contexts=["general_chat"],
-        ))
-        
-        self.register(FunctionMetadata(
-            name="exit_rag",
-            description="Disable RAG mode",
-            parameters=[],
-            contexts=["general_chat"],
-        ))
-        
+                
         # Confirmation functions
         self.register(FunctionMetadata(
             name="confirm_yes",
@@ -500,7 +485,7 @@ class FunctionRegistry:
             contexts=["general_chat", "onboarding", "onboarding_name", "onboarding_consent", "schedule_setup", "lesson_review", "morning_lesson_confirmation"],
         ))
         
-        # Lesson state function - dedicated function for setting current lesson
+# Lesson state function - dedicated function for setting current lesson
         self.register(FunctionMetadata(
             name="set_current_lesson",
             description="Set the user's current ACIM lesson number. Use when user says 'I am on lesson X'.",
@@ -517,6 +502,26 @@ class FunctionRegistry:
                 {"lesson_number": 29},
             ],
             contexts=["general_chat", "onboarding", "lesson_review"],
+        ))
+
+        # Memory deletion function - AI callable version to forget memory
+        self.register(FunctionMetadata(
+            name="forget_memories",
+            description="Forget (archive) user memories matching a semantic description. Use when user wants to remove personal memories.",
+            parameters=[
+                ParameterSchema(
+                    name="query_text",
+                    description="Description of memories to forget/search for (e.g. 'my grandfather', 'test memory')",
+                    type=ParameterType.STRING,
+                    required=True,
+                    examples=["my childhood", "test data", "grandmother story"],
+                ),
+            ],
+            examples=[
+                {"query_text": "test memories"},
+                {"query_text": "personal family information"},
+            ],
+            contexts=["general_chat", "rag"],
         ))
     
     def register(self, function: FunctionMetadata):

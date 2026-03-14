@@ -70,7 +70,6 @@ class MemoryKey:
     DELETE_SCHEDULES_TYPE_PENDING = "delete_schedules_type_pending"
     TRIGGER_AUDIT = "trigger_audit"
 
-    RAG_MODE_ENABLED = "rag_mode_enabled"
     SELECTED_RAG_PROMPT_KEY = "selected_rag_prompt_key"
     CUSTOM_RAG_PROMPT = "custom_rag_prompt"
     ONBOARDING_STEP_PENDING = "onboarding_step_pending"

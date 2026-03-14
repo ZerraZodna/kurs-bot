@@ -20,26 +20,25 @@ def create_schedule(
     next_send_time: Optional[datetime] = None,
     session=None,
 ) -> Schedule:
-    with get_session(session) as s:
-        now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
 
-        # Ensure next_send_time persisted as UTC-aware datetime
-        if next_send_time is not None:
-            next_send_time = to_utc(next_send_time)
+    # Ensure next_send_time persisted as UTC-aware datetime
+    if next_send_time is not None:
+        next_send_time = to_utc(next_send_time)
 
-        sched = Schedule(
-            user_id=user_id,
-            lesson_id=lesson_id,
-            schedule_type=schedule_type,
-            cron_expression=cron_expression,
-            next_send_time=next_send_time,
-            is_active=True,
-            created_at=now,
-        )
-        s.add(sched)
-        s.commit()
-        s.refresh(sched)
-        return sched
+    sched = Schedule(
+        user_id=user_id,
+        lesson_id=lesson_id,
+        schedule_type=schedule_type,
+        cron_expression=cron_expression,
+        next_send_time=next_send_time,
+        is_active=True,
+        created_at=now,
+    )
+    session.add(sched)
+    session.commit()
+    session.refresh(sched)
+    return sched
 
 
 def update_schedule(schedule_id: int, updates: Dict[str, Any], session=None) -> Optional[Schedule]:

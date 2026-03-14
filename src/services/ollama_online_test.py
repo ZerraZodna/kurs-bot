@@ -105,7 +105,6 @@ def run_ollama_checks(settings) -> Tuple[bool, List[Dict]]:
     models = {
         "OLLAMA_MODEL": getattr(settings, "OLLAMA_MODEL", None),
         "NON_ENGLISH_OLLAMA_MODEL": getattr(settings, "NON_ENGLISH_OLLAMA_MODEL", None),
-        "OLLAMA_CHAT_RAG_MODEL": getattr(settings, "OLLAMA_CHAT_RAG_MODEL", None),
     }
 
     # Build explicit model table

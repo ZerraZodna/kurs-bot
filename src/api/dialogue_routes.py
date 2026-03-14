@@ -1,7 +1,7 @@
 """
 API routes for context-aware dialogue endpoints
 """
-
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
@@ -16,7 +16,7 @@ from src.api.schemas import MessageRequest, MessageResponse, MemoryRequest, User
 
 router = APIRouter(prefix="/api/v1/dialogue", tags=["dialogue"])
 
-
+logger = logging.getLogger(__name__)
 
 def get_db():
     """Dependency for database session."""
@@ -67,6 +67,7 @@ async def send_message(request: MessageRequest, db: Session = Depends(get_db)):
         filtered_generator = stream_filter.filter_stream()
         
         async def webui_stream_gen():
+            full_text = ""
             async for token in filtered_generator:
                 yield token + "\\n"
             # Run post-hook (note: full_text accumulation needs tee in prod)

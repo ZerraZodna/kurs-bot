@@ -124,23 +124,16 @@ class DialogueEngine:
 
     def _setup_rag_configuration(self, user_id: int, text: str) -> tuple[str, bool, Optional[str]]:
         """Detect and configure RAG mode for the current message."""
-        from src.services.dialogue import handle_rag_mode_toggle, parse_rag_prefix, is_rag_mode_enabled
+        from src.services.dialogue import parse_rag_prefix
         
-        rag_toggle_response = handle_rag_mode_toggle(text, self.memory_manager, user_id)
-        if rag_toggle_response:
-            return text, False, rag_toggle_response
-
         text, use_rag = parse_rag_prefix(text)
-
-        if not use_rag and self.memory_manager:
-            use_rag = is_rag_mode_enabled(self.memory_manager, user_id)
         
         return text, use_rag, None
 
     async def _handle_commands(self, user_id: int, text: str, session: Session, use_rag: bool) -> Optional[str]:
         """Handle various specialized commands."""
         from src.services.dialogue import (
-            handle_list_memories, handle_rag_prompt_command, handle_forget_commands
+            handle_list_memories, handle_rag_prompt_command
         )
         
         if use_rag:
@@ -151,12 +144,6 @@ class DialogueEngine:
             prompt_cmd_response = handle_rag_prompt_command(text, self.memory_manager, user_id)
             if prompt_cmd_response:
                 return prompt_cmd_response
-
-        forget_response = await handle_forget_commands(
-            text, self.memory_manager, session, user_id, use_rag
-        )
-        if forget_response:
-            return forget_response
 
         return None
 
@@ -273,12 +260,12 @@ class DialogueEngine:
         if is_english:
             gen = stream_ollama(
                 prompt,
-                model=settings.OLLAMA_CHAT_RAG_MODEL if use_rag else None,
+                model=None,
                 language=user_lang,
             )
             return {"type": "stream", "generator": gen, "post_hook": post_hook}
         else:
-            response = await self.call_ollama(prompt, settings.OLLAMA_CHAT_RAG_MODEL if use_rag else None, user_lang)
+            response = await self.call_ollama(prompt, None, user_lang)
             if response is None:
                 response = "[No response from LLM]"
             response_text = extract_response_text(response)
@@ -317,12 +304,9 @@ class DialogueEngine:
         relevant_memories = []
         try:
             search_service = get_semantic_search_service()
-            search_session = Session(bind=session.get_bind())
-            try:
+            with Session(bind=session.get_bind()) as search_session:
                 results = await search_service.search_memories(user_id=user_id, query_text=text, session=search_session)
                 relevant_memories = [{"memory_id": m.memory_id, "key": m.key, "value": m.value, "category": m.category, "similarity": s} for m, s in results]
-            finally:
-                search_session.close()
         except Exception as ex:
             logger.warning(f"Semantic search failed: {ex}")
         return relevant_memories
