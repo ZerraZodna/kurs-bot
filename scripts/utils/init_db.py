@@ -71,52 +71,6 @@ def _ensure_repo_root_on_path() -> None:
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
 
-
-def seed_triggers() -> None:
-    """Seed the default triggers using the core seeder coroutine.
-
-    This mirrors the previous `scripts/utils/seed_triggers.py` behavior but
-    is now available directly from this script.
-    """
-    _ensure_repo_root_on_path()
-    from src.triggers.trigger_matcher import seed_triggers as _seed_coroutine
-
-    asyncio.run(_seed_coroutine())
-
-
-def reset_trigger_embeddings() -> int:
-    """Delete all rows in `trigger_embeddings` and re-seed STARTER.
-
-    Returns 0 on success, non-zero on failure. Mirrors
-    `scripts/utils/reset_trigger_embeddings.py` behavior.
-    """
-    _ensure_repo_root_on_path()
-    try:
-        from src.models.database import SessionLocal, TriggerEmbedding
-        from src.triggers.trigger_matcher import seed_triggers as _seed_coroutine
-
-        db = SessionLocal()
-        try:
-            num = db.query(TriggerEmbedding).count()
-            if num > 0:
-                print(f"Deleting {num} existing trigger_embeddings rows...")
-                db.query(TriggerEmbedding).delete()
-                db.commit()
-                print("Deleted existing trigger embeddings.")
-            else:
-                print("No existing trigger embeddings found; seeding starter set.")
-        finally:
-            db.close()
-
-        print("Seeding STARTER trigger embeddings using current embedding backend...")
-        asyncio.run(_seed_coroutine())
-        print("✅ Re-seeded trigger embeddings from STARTER")
-        return 0
-    except Exception as e:
-        print(f"❌ Failed to reset triggers: {e}")
-        return 1
-
-
 def init_db(database_url: str, yes: bool = False, lessons: Optional[str] = None) -> None:
     """Initialize the specified database and seed defaults."""
     # Export DATABASE_URL for downstream imports
@@ -135,77 +89,6 @@ def init_db(database_url: str, yes: bool = False, lessons: Optional[str] = None)
         if database_url.startswith('sqlite:///'):
             db_path_info = Path(database_url.replace('sqlite:///', ''))
 
-    # If an existing sqlite DB is present, verify embeddings dimension to avoid
-    # accidental mismatches (e.g. switching embedding model dims).
-    expected_dim = None
-    try:
-        expected_dim = int(os.environ.get('EMBEDDING_DIMENSION') or 0)
-    except Exception:
-        expected_dim = 0
-
-    def _scan_db_for_mismatched_dims(path: Path, expected: int):
-        if expected <= 0:
-            return []
-        import sqlite3
-        import numpy as _np
-
-        mismatches = []
-        conn = sqlite3.connect(str(path))
-        c = conn.cursor()
-        c.execute("SELECT name, type FROM sqlite_master WHERE type IN ('table','view')")
-        for name, _typ in c.fetchall():
-            try:
-                cols_info = c.execute(f"PRAGMA table_info({name})").fetchall()
-            except Exception:
-                continue
-            blob_cols = [r[1] for r in cols_info if r[2] and r[2].upper().startswith('BLOB') or ('embed' in (r[1] or '').lower())]
-            for col in blob_cols:
-                try:
-                    row = c.execute(f"SELECT {col} FROM {name} WHERE {col} IS NOT NULL LIMIT 1").fetchone()
-                except Exception:
-                    row = None
-                if row and row[0]:
-                    try:
-                        arr = _np.frombuffer(row[0], dtype=_np.float32)
-                        if arr.shape[0] != expected:
-                            mismatches.append((name, col, int(arr.shape[0])))
-                    except Exception:
-                        # non-numeric blob or unexpected format
-                        mismatches.append((name, col, None))
-        conn.close()
-        return mismatches
-
-    if db_path_info and db_path_info.exists():
-        # load .env if present to pick up EMBEDDING_DIMENSION when not in env
-        repo_root = Path(__file__).resolve().parents[2]
-        dotenv = repo_root / '.env'
-        data = load_dotenv(dotenv)
-        if not expected_dim and 'EMBEDDING_DIMENSION' in data:
-            try:
-                expected_dim = int(data['EMBEDDING_DIMENSION'])
-            except Exception:
-                expected_dim = expected_dim or 0
-
-        # allow caller to override check via environment flag
-        allow_mismatch = os.environ.get('ALLOW_EMBEDDING_DIM_MISMATCH', '').lower() in ('1','true','yes')
-        # If a user passed CLI flags, they will be handled by main() wrapper which
-        # may set ALLOW_EMBEDDING_DIM_MISMATCH in env before calling init_db.
-        if expected_dim and not allow_mismatch:
-            mism = _scan_db_for_mismatched_dims(db_path_info, expected_dim)
-            if mism:
-                msg_lines = [f"Found {len(mism)} embedding dimension mismatch(es):"]
-                for t, c, l in mism:
-                    msg_lines.append(f" - table {t}, column {c}: stored_dim={l} expected={expected_dim}")
-                msg_lines.append('')
-                msg_lines.append('To proceed and overwrite the DB anyway, re-run with the environment variable ALLOW_EMBEDDING_DIM_MISMATCH=1 or pass --allow-dim-mismatch to the CLI.')
-                raise SystemExit('\n'.join(msg_lines))
-
-        if not yes:
-            raise SystemExit(0)
-        backup_path = db_path_info.with_suffix('.db.backup')
-        db_path_info.rename(backup_path)
-        print(f'📦 Backed up existing database to {backup_path}')
-
     print('🗄️  Creating database schema...')
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
@@ -214,14 +97,6 @@ def init_db(database_url: str, yes: bool = False, lessons: Optional[str] = None)
     print('\n📝 Next steps:')
     print('1. Restart your uvicorn server')
     print('2. Send a message via Telegram to create your first user')
-
-    # Seed trigger embeddings
-    try:
-        print('\n✨ Seeding default trigger embeddings...')
-        seed_triggers()
-        print('✅ Trigger embeddings seeded')
-    except Exception as e:
-        print(f'⚠️  Failed to seed trigger embeddings: {e}')
 
     # Seed prompt templates
     try:
@@ -253,38 +128,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument('--db', help='Database to initialize. Accepts prod/dev, relative path, or full DATABASE_URL')
     parser.add_argument('--yes', '-y', action='store_true', help='Auto-confirm recreate without prompt')
     parser.add_argument('--lessons', help='Path to ACIM lessons PDF to import (optional)')
-    parser.add_argument('--build-index', action='store_true', help='If set and EMBEDDING_BACKEND=local, build hnswlib index from lessons')
-    parser.add_argument('--seed-triggers', action='store_true', help='Seed trigger embeddings and exit')
-    parser.add_argument('--reset-trigger-embeddings', action='store_true', help='Delete trigger embeddings and re-seed STARTER then exit')
     ns = parser.parse_args(argv)
-    if ns.seed_triggers:
-        seed_triggers()
-        return 0
-    if ns.reset_trigger_embeddings:
-        return reset_trigger_embeddings()
     database_url = resolve_database_url(ns.db)
     init_db(database_url, yes=ns.yes, lessons=ns.lessons)
-    # optionally build a local hnswlib index
-    if ns.build_index:
-        # determine backend and index path from env or .env
-        env = os.environ.copy()
-        repo_root = Path(__file__).resolve().parents[2]
-        dotenv = repo_root / '.env'
-        data = load_dotenv(dotenv)
-        for k, v in data.items():
-            if k not in env:
-                env[k] = v
-        backend = env.get('EMBEDDING_BACKEND', 'local')
-        index_path = env.get('HNSWLIB_INDEX_PATH', 'src/data/emb_index.bin')
-        if backend != 'local':
-            print('⚠️  EMBEDDING_BACKEND is not set to "local" — skipping index build.')
-        else:
-            builder = repo_root / 'scripts' / 'utils' / 'embeddings_local.py'
-            if not builder.exists():
-                print('⚠️  embeddings_local.py not found under scripts/utils/ — cannot build index')
-            else:
-                print(f'🔨 Building local hnswlib index at {index_path} (this may take a while)')
-                subprocess.run([sys.executable, str(builder), '--out', str(index_path)], env=env)
     return 0
 
 

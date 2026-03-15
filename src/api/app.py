@@ -108,21 +108,7 @@ async def lifespan(app: FastAPI):
         )
     apply_logging_redaction()
     verify_secrets_config()
-    # Ensure embedding backend requirements in production: fail-fast if
-    # EMBEDDING_BACKEND=local is expected to use real embeddings but the
-    # sentence-transformers package is not installed. CI/test runs should set
-    # TEST_USE_REAL_OLLAMA=False so this check is skipped there.
-    try:
-        embedding_backend = getattr(settings, "EMBEDDING_BACKEND", "local")
-        test_real = getattr(settings, "TEST_USE_REAL_OLLAMA", True)
-        if str(embedding_backend).lower() == "local" and bool(test_real):
-            try:
-                import sentence_transformers  # type: ignore
-            except Exception:
-                raise RuntimeError("EMBEDDING_BACKEND=local requires sentence-transformers")
-    except Exception:
-        # Re-raise to stop startup; caller/lifespan will log the exception.
-        raise
+
     # Helper functions for Ollama health checks and model discovery
     def _strip_api(path: str) -> str:
         try:
@@ -182,26 +168,6 @@ async def lifespan(app: FastAPI):
             logging.debug("Ollama diagnostics: %s", diagnostics)
     except Exception:
         logging.exception("Error while running Ollama checks")
-
-    # If embedding backend uses Ollama, explicitly confirm local Ollama is present
-    embedding_backend = getattr(settings, "EMBEDDING_BACKEND", "local")
-    if str(embedding_backend).lower() == "ollama":
-        local = getattr(settings, "LOCAL_OLLAMA_URL", None)
-        if local:
-            b = local
-            if "/api" in b:
-                b = b.rsplit("/api", 1)[0]
-            try:
-                logging.info(f"Checking local Ollama for embeddings at {b}")
-                resp = httpx.get(f"{b}/api/tags", timeout=2.0)
-                if resp.status_code == 200:
-                    logging.info(f"Local Ollama available for embeddings at {b}")
-                else:
-                    logging.error(f"Local Ollama responded {resp.status_code} at {b}; embeddings may fail")
-            except Exception as e:
-                logging.error(f"Local Ollama for embeddings not reachable at {b}: {e}")
-        else:
-            logging.error("Embedding backend is set to 'ollama' but LOCAL_OLLAMA_URL is not configured")
 
     yield
 

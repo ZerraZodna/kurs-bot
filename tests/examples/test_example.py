@@ -275,15 +275,3 @@ class TestWithSetup:
         """Test should have access to setup data."""
         assert self.test_data["key"] == "value"
 
-
-# Example of async test
-@pytest.mark.asyncio
-class TestAsyncExample:
-    """Example async tests."""
-    
-    async def test_async_operation(self, mock_embedding_service):
-        """Async tests should work with async fixtures."""
-        # mock_embedding_service is an async mock
-        result = await mock_embedding_service.generate_embedding("test")
-        assert result is not None
-        assert len(result) == mock_embedding_service.embedding_dimension

@@ -16,9 +16,7 @@ class MemoryManager:
         # Lazy initialization of topic_manager
         self._topic_manager = None
 
-    # Note: embedding generation scheduling and persistence removed.
-    # The private helpers that generated and stored embeddings were deleted
-    # to avoid persisting per-memory embedding bytes.
+
 
     def get_memory(self, user_id: int, key: str) -> List[MemoryRecord]:
         return self.memory_handler.get_memory(user_id=user_id, key=key)

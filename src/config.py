@@ -21,14 +21,8 @@ class Settings(BaseSettings):
     # Optional API key for Ollama Cloud / authenticated Ollama endpoints
     OLLAMA_API_KEY: str = ""
 
-    # Embedding settings for semantic search
-    OLLAMA_EMBED_URL: str = "http://localhost:11434/api/embed"
-    OLLAMA_EMBED_MODEL: str = "embeddinggemma:latest"
-    # Embedding backend: 'ollama' or 'local'
-    EMBEDDING_BACKEND: str = "local"
-    # Default dimension for the embedding model (embeddinggemma produces 768-dim embeddings)
-    EMBEDDING_DIMENSION: int = 768
-    SEMANTIC_SEARCH_THRESHOLD: float = 0.5
+    # Semantic search (keyword-only post-removal)
+    SEMANTIC_SEARCH_THRESHOLD: float = 0.3
     SEMANTIC_SEARCH_MAX_RESULTS: int = 5
     # When True (default), production expects real embedding infra (Ollama or sentence-transformers).
     # Set to False in CI/.env.template to enable lightweight test-mode embeddings.

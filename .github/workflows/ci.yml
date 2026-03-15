@@ -16,10 +16,6 @@ jobs:
       TEST_USE_REAL_OLLAMA: '0'
       # Mark CI as test environment so background threads stay off and test DB is enforced
       IS_TEST_ENV: '1'
-      # Use the lightweight test embedding backend in CI to avoid pulling
-      # large local models during GitHub runs; tests rely on deterministic
-      # precomputed trigger embeddings seeded earlier.
-      EMBEDDING_BACKEND: 'none'
       # Set to 'true' to skip pre-downloading large SentenceTransformer model
       SKIP_MODEL_PRECACHE: 'true'
       # Function calling migration complete - no trigger embeddings needed

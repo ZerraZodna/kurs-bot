@@ -198,7 +198,6 @@ def pytest_configure(config):
 
     Usage (example):
       TEST_OLLAMA_MODEL="qwen3:test" \
-        TEST_OLLAMA_CHAT_RAG_MODEL="llama3.2:test" \
         TEST_NON_ENGLISH_OLLAMA_MODEL="gpt-oss:test" \
         pytest tests/...
 

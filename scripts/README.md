@@ -42,5 +42,3 @@ Notes:
 
 # New prompts
 $env:PYTHONPATH='.'; python .\scripts\utils\seed_prompt_templates.py
-# Reset triggers after changing from Local to Ollama for Embeddings
-$env:PYTHONPATH='.'; python .\scripts\utils\reset_trigger_embeddings.py
