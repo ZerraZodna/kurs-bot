@@ -2,7 +2,6 @@ fastapi
 uvicorn
 sqlalchemy
 alembic
-python-telegram-bot
 # Mail not implemented (yet)
 #sendgrid
 pytest
