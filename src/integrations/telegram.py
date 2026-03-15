@@ -161,38 +161,65 @@ async def edit_message(chat_id: int, message_id: int, text: str) -> Optional[dic
         "parse_mode": "HTML",
     }
     async with httpx.AsyncClient() as client:
-        try:
-            r = await client.post(url, json=payload, timeout=10.0)
-            r.raise_for_status()
-            return r.json()
-        except httpx.HTTPStatusError as e:
-            resp = e.response
-            # Telegram returns 400 if the text hasn't actually changed — ignore
-            if resp is not None and resp.status_code == 400:
+        max_retries = settings.TELEGRAM_EDIT_MAX_RETRIES
+        base_backoff = settings.TELEGRAM_BACKOFF_BASE_S
+        
+        for attempt in range(max_retries + 1):
+            try:
+                r = await client.post(url, json=payload, timeout=10.0)
+                r.raise_for_status()
+                return r.json()
+            except httpx.HTTPStatusError as e:
+                resp = e.response
+                if resp is None:
+                    if attempt < max_retries:
+                        await asyncio.sleep(base_backoff * (2 ** attempt))
+                        continue
+                    logger.warning("[telegram] editMessageText final fail after %d retries: no resp", max_retries + 1)
+                    return None
+                
+                status = resp.status_code
                 body = ""
                 try:
                     body = resp.text
-                except Exception:
+                except:
                     pass
-                if "message is not modified" in body.lower():
+                
+                # Ignore "message not modified"
+                if status == 400 and "message is not modified" in body.lower():
                     return None
-                # Fallback: send plain text without parse_mode
-                fallback = {
-                    "chat_id": chat_id,
-                    "message_id": message_id,
-                    "text": text,
-                }
-                try:
-                    r = await client.post(url, json=fallback, timeout=10.0)
-                    r.raise_for_status()
-                    return r.json()
-                except Exception:
-                    return None
-            logger.warning("[telegram] editMessageText error %s", e)
-            return None
-        except Exception as e:
-            logger.warning("[telegram] editMessageText exception: %s", e)
-            return None
+                
+                # Rate limit or bad request - backoff and retry
+                if status in (400, 429) and attempt < max_retries:
+                    backoff = base_backoff * (2 ** attempt)
+                    logger.warning("[telegram] editMessageText retry %d/%d after %.1fs (status=%d): %s", 
+                                 attempt + 1, max_retries, backoff, status, body[:100])
+                    await asyncio.sleep(backoff)
+                    continue
+                
+                # HTML error fallback (no parse_mode)
+                if status == 400:
+                    fallback = {
+                        "chat_id": chat_id,
+                        "message_id": message_id,
+                        "text": text,
+                    }
+                    try:
+                        r = await client.post(url, json=fallback, timeout=10.0)
+                        r.raise_for_status()
+                        return r.json()
+                    except Exception:
+                        pass
+                
+                # Final fail
+                logger.warning("[telegram] editMessageText final fail after %d retries: %d %s", max_retries + 1, status, body[:100])
+                return None
+            except Exception as e:
+                if attempt < max_retries:
+                    await asyncio.sleep(base_backoff * (2 ** attempt))
+                    continue
+                logger.warning("[telegram] editMessageText final exception after %d retries: %s", max_retries + 1, e)
+                return None
 
 
 async def send_message_streaming(
@@ -429,7 +456,13 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
 
                     parser = get_intent_parser()
                     parse_result = parser.parse(function_parse_text)
+                    
+                    # RAW functions logging before any processing
+                    fn_names = [f.get('name', 'NO_NAME') for f in parse_result.functions]
+                    fn_details = [f"{f.get('name', 'NO_NAME')} (len={len(f.get('name', ''))})" for f in parse_result.functions]
+                    logger.info(f"[telegram RAW_FUNCTIONS user={user_id}] functions_count={len(parse_result.functions)}, names={fn_names}, details={fn_details}")
                     logger.info(f"[telegram PARSE_RESULT user={user_id}] success={parse_result.success},fallback={parse_result.is_fallback},functions={len(parse_result.functions)},errors={len(parse_result.errors or [])}")
+
                     
                     # Direct executor call (no post_hook)
                     diagnostics = {}

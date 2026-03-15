@@ -59,9 +59,11 @@ Only use functions relevant to the current context.
 """
     # Ollama temperature (0.0 = deterministic, 1.0 = creative). Lower reduces hallucination.
     OLLAMA_TEMPERATURE: float = 0.2
-    # Minimum seconds between Telegram editMessageText calls during streaming.
-    # 0.1 s gives ~10 edits/second — smooth without hitting Telegram rate limits.
-    TELEGRAM_STREAM_UPDATE_INTERVAL: float = 0.1
+# Minimum seconds between Telegram editMessageText calls during streaming.
+    # 0.5s = ~2 edits/sec - safe for Telegram limits (1/sec recommended).
+    TELEGRAM_STREAM_UPDATE_INTERVAL: float = 0.5
+    TELEGRAM_EDIT_MAX_RETRIES: int = 3
+    TELEGRAM_BACKOFF_BASE_S: float = 1.0
     # Telegram long-polling (alternative to ngrok/webhook for local dev)
     USE_TELEGRAM_LONG_POLLING: bool = False
     TELEGRAM_POLL_TIMEOUT: int = 25

@@ -16,9 +16,9 @@ Version: 1.0.0
 
 from .registry import FunctionRegistry, FunctionMetadata, ParameterSchema
 from .definitions import FunctionDefinitions
-from .intent_parser import IntentParser, ParseResult
-from .executor import FunctionExecutor
-from .response_builder import ResponseBuilder
+from .intent_parser import IntentParser, ParseResult, get_intent_parser
+from .executor import FunctionExecutor, get_function_executor
+from .response_builder import ResponseBuilder, get_response_builder
 
 __all__ = [
     "FunctionRegistry",
@@ -27,8 +27,11 @@ __all__ = [
     "FunctionDefinitions",
     "IntentParser",
     "ParseResult",
+    "get_intent_parser",
     "FunctionExecutor",
+    "get_function_executor",
     "ResponseBuilder",
+    "get_response_builder",
 ]
 
 __version__ = "1.0.0"
