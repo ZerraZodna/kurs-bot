@@ -21,10 +21,25 @@ from tests.fixtures.database import db_session
 
 
 @pytest.fixture
-def client():
-    """Create a test client for the API."""
+def client(db_engine):
+    """Create a test client for the API with test DB dependency override."""
+    from src.api.gdpr_routes import get_db
+    from sqlalchemy.orm import sessionmaker
+    TestSessionLocal = sessionmaker(bind=db_engine, autoflush=False, autocommit=False, future=True)
+    def override_get_db():
+        db = TestSessionLocal()
+        try:
+            yield db
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+    app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as c:
         yield c
+    app.dependency_overrides.clear()
 
 
 def _seed_user(db_session) -> int:

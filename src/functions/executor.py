@@ -167,6 +167,10 @@ class FunctionExecutor:
             function_name = func_call.get("name")
             parameters = func_call.get("parameters", {})
             
+            # Early logging of RAW function name before any processing/redaction
+            logger.info(f"[executor] Processing function call: name='{function_name}' (len={len(function_name) if function_name else 0})")
+
+            
             # Validate function exists
             if not self.registry.is_valid_function(function_name):
                 result = ExecutionResult(
@@ -195,16 +199,21 @@ class FunctionExecutor:
             # Execute the function
             try:
                 exec_start = time.time()
+                logger.info(f"[executor] Looking for handler: '{function_name}'")
                 handler = self._handlers.get(function_name)
                 
                 if handler is None:
+                    logger.warning(f"[executor] No handler found for known function '{function_name}' (len={len(function_name)}). Skipping.")
+
                     result = ExecutionResult(
                         function_name=function_name,
                         success=False,
-                        error=f"No handler registered for function: {function_name}",
+                        error=f"No handler registered for valid function '{function_name}'. Check registry/handlers alignment.",
+                        execution_time_ms=0.0,
                     )
                 else:
                     # Call the handler
+                    logger.debug(f"[executor] Calling handler for '{function_name}'")
                     handler_result = await handler(parameters, context)
                     exec_time = (time.time() - exec_start) * 1000
                     
@@ -215,6 +224,7 @@ class FunctionExecutor:
                         execution_time_ms=exec_time,
                     )
                     logger.info(f"Executed {function_name} in {exec_time:.2f}ms")
+
                 
                 batch_result.results.append(result)
                 

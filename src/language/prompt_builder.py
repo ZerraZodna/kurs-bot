@@ -553,60 +553,7 @@ Always transition smoothly to the next onboarding question."""
             return "morning_lesson_confirmation"
         
         return "general_chat"
-    
-    def _detect_context_from_memory(self, user_id: int) -> Optional[str]:
-        """Detect context based on recent memories."""
-        # Check for recent schedule-related memories
-        recent_memories = self.memory_manager.get_memory(user_id, "recent_context")
-        if recent_memories:
-            for mem in recent_memories:
-                value = str(mem.get("value", "")).lower()
-                if any(word in value for word in ["schedule", "reminder", "time"]):
-                    return "schedule_setup"
-                if any(word in value for word in ["lesson", "complete", "done"]):
-                    return "lesson_review"
-        
-        return None
-    
-    def _detect_context_from_message(self, user_input: str) -> Optional[str]:
-        """Detect context based on user message content."""
-        text_lower = user_input.lower()
-        
-        # Schedule-related
-        if any(word in text_lower for word in ["schedule", "remind", "time", "daily", "every day"]):
-            return "schedule_setup"
-        
-        # Lesson-related
-        if any(word in text_lower for word in ["lesson", "complete", "done", "finished"]):
-            return "lesson_review"
-        
-        # Morning confirmation
-        if any(word in text_lower for word in ["next lesson", "today's lesson", "send me"]):
-            return "morning_lesson_confirmation"
-        
-        # Onboarding indicators
-        if any(word in text_lower for word in ["my name is", "i am", "i'm from", "call me"]):
-            return "onboarding"
-        
-        return None
-    
-    def detect_context_type(self, user_id: int, user_input: str) -> str:
-        """Detect the appropriate context type for the conversation."""
-        # Priority: message content > memory state > user state
-        
-        # 1. Check message content first
-        msg_context = self._detect_context_from_message(user_input)
-        if msg_context:
-            return msg_context
-        
-        # 2. Check recent memory
-        memory_context = self._detect_context_from_memory(user_id)
-        if memory_context:
-            return memory_context
-        
-        # 3. Check user state
-        return self._detect_context_from_state(user_id)
-    
+                
     def build_onboarding_prompt(self, system_prompt: str) -> str:
         """Build initial onboarding prompt for new users."""
         return f"""{system_prompt}

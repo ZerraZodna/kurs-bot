@@ -23,15 +23,25 @@ from tests.mocks.ollama_mock import register_fake_ollama
 
 register_fake_ollama()
 
-# Auto-import fixture modules
+# Import all models first to populate Base.metadata registry
+from src.models.database import Base, User, Memory, MessageLog, Lesson, Schedule, Unsubscribe, ConsentLog, GdprRequest, GdprAuditLog, GdprVerification, BatchLock, JobState, PromptTemplate
+
+# Model imports populate registry before fixtures load
+from src.models.database import Base, User, Memory, MessageLog, Lesson, Schedule, Unsubscribe, ConsentLog, GdprRequest, GdprAuditLog, GdprVerification, BatchLock, JobState, PromptTemplate
+
+# Auto-import fixture modules (after model registry populated)
 pytest_plugins = [
     "tests.fixtures.database",
     "tests.fixtures.users", 
     "tests.fixtures.services",
 ]
 
-# Ensure test database is initialized for every test to guarantee isolation.
-from src.models.database import Base
+# Ensure all models are registered for test DB schema creation
+from src.models.database import (
+    User, Memory, MessageLog, Lesson, Schedule, Unsubscribe, 
+    ConsentLog, GdprRequest, GdprAuditLog, GdprVerification,
+    BatchLock, JobState, PromptTemplate
+)
 from sqlalchemy import inspect, text
 
 
@@ -139,6 +149,9 @@ def ensure_test_db(db_engine, monkeypatch):
     monkeypatch.setattr("src.services.maintenance.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("src.middleware.consent.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("src.language.prompt_registry.SessionLocal", TestSessionLocal)
+    
+    # Skip app startup lessons import in tests
+    monkeypatch.setattr("src.api.app.ensure_lessons_imported", lambda: None, raising=False)
     
     repo_root = Path(__file__).resolve().parents[1]
     
