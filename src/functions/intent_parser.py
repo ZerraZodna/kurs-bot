@@ -9,7 +9,7 @@ import json
 import re
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any
 from .registry import FunctionRegistry, get_function_registry
 
 logger = logging.getLogger(__name__)

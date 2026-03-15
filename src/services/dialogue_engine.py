@@ -176,7 +176,6 @@ class DialogueEngine:
             onboarding_service=self.onboarding,
             schedule_request_handler=self._handle_schedule_request,
             call_ollama=self.call_ollama,
-            use_rag_for_this_message=use_rag,
         )
         if schedule_response:
             return schedule_response

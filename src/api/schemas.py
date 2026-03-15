@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, List
-from sqlalchemy import JSON
+
 
 
 # Dialogue endpoints

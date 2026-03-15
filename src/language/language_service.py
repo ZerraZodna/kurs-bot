@@ -10,7 +10,7 @@ The implementation intentionally avoids old ad-hoc mappings and string conversio
 """
 
 from typing import Optional
-from collections import Counter
+
 import re
 
 from langdetect import detect_langs

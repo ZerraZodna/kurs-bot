@@ -41,7 +41,6 @@ async def test_remind_me_next_two_hours_does_not_short_circuit():
         onboarding_service=mock_onboarding_service,
         schedule_request_handler=mock_schedule_request_handler,
         call_ollama=mock_call_ollama,
-        use_rag_for_this_message=False,
     )
     
     # The function should return None, allowing the message to flow through
@@ -83,7 +82,6 @@ async def test_remind_me_in_duration_does_not_short_circuit():
             onboarding_service=mock_onboarding_service,
             schedule_request_handler=mock_schedule_request_handler,
             call_ollama=mock_call_ollama,
-            use_rag_for_this_message=False,
         )
         
         assert result is None, (
@@ -117,7 +115,6 @@ async def test_explicit_daily_schedule_with_time_still_works():
             onboarding_service=mock_onboarding_service,
             schedule_request_handler=mock_schedule_request_handler,
             call_ollama=mock_call_ollama,
-            use_rag_for_this_message=False,
         )
         
         # This should return a response (not None) because it's an explicit daily schedule
@@ -149,7 +146,6 @@ async def test_pause_request_still_works():
             onboarding_service=mock_onboarding_service,
             schedule_request_handler=mock_schedule_request_handler,
             call_ollama=mock_call_ollama,
-            use_rag_for_this_message=False,
         )
         
         assert result is not None

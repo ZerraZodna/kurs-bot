@@ -26,7 +26,6 @@ async def handle_schedule_messages(
     onboarding_service,
     schedule_request_handler: Callable[[int, str, Session], Optional[str]],
     call_ollama,
-    use_rag_for_this_message: bool = False,
 ) -> Optional[str]:
     # NOTE: We no longer pre-process schedule queries or one-time reminder keywords here.
     # Schedule queries, one-time reminders, and schedule changes should be handled by the

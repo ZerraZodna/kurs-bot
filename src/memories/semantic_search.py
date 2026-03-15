@@ -29,7 +29,6 @@ class SemanticSearchService:
         limit: Optional[int] = None,
         threshold: Optional[float] = None,
         categories: Optional[List[str]] = None,
-        query_embedding: Optional[List[float]] = None,  # Ignored post-removal
     ) -> List[Tuple[MemoryEntity, float]]:
         """
         Keyword search for relevant memories.

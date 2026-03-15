@@ -12,7 +12,7 @@ from src.services.dialogue_engine import DialogueEngine
 from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.language.prompt_builder import PromptBuilder
-from src.api.schemas import MessageRequest, MessageResponse, MemoryRequest, UserContextResponse, LessonResponse, SemanticSearchRequest, SemanticSearchResponse, MemoryWithScore
+from src.api.schemas import MessageRequest, MemoryRequest, UserContextResponse, LessonResponse, SemanticSearchRequest, SemanticSearchResponse, MemoryWithScore
 
 router = APIRouter(prefix="/api/v1/dialogue", tags=["dialogue"])
 
