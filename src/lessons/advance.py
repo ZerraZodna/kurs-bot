@@ -57,8 +57,12 @@ async def maybe_send_next_lesson(
     state = compute_current_lesson_state(memory_manager, user_id)
     language = get_user_language(memory_manager, user_id)
 
-    if not state.get("advanced_by_day") or not is_simple_greeting(text):
+    if not state.get("advanced_by_day"):
         return None
+
+    # TODO: Removed greeting trigger per user request - let "Hi" reach LLM chat
+    # Original: or not is_simple_greeting(text)
+    return None
 
     lesson_id = state["lesson_id"]
     if not lesson_id:
