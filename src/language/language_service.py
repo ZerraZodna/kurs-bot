@@ -131,7 +131,7 @@ async def detect_and_store_language(
                         key=MemoryKey.USER_LANGUAGE,
                         value=chosen,
                         source="user_override",
-                        category=MemoryCategory.PREFERENCE.value,
+                        category=MemoryCategory.PREFERENCES.value,
                     )
                 except Exception:
                     pass
@@ -161,7 +161,7 @@ async def detect_and_store_language(
             key=MemoryKey.USER_LANGUAGE,
             value=chosen,
             source="dialogue_engine_language_detection",
-            category=MemoryCategory.PREFERENCE.value,
+            category=MemoryCategory.PREFERENCES.value,
         )
     except Exception:
         pass

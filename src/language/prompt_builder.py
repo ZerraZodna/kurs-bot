@@ -78,7 +78,6 @@ class PromptBuilder:
         include_lesson: bool = True,
         include_conversation_history: bool = True,
         history_turns: int = 4,
-        max_context_tokens: int = 2000,
         relevant_memories: Optional[List[Dict[str, Any]]] = None,
         context_type: str = "general_chat",
         include_functions: bool = True,
@@ -133,12 +132,7 @@ class PromptBuilder:
         profile_context = self._build_profile_context(user)
         if profile_context:
             context_parts.append(f"\n-- User Profile\n{profile_context}")
-        
-        # 3. Goals & Learning Progress
-        goals_context = self._build_goals_context(user_id)
-        if goals_context:
-            context_parts.append(f"\n-- Current Goals\n{goals_context}")
-        
+                
         # 4. User Preferences
         prefs_context = self._build_preferences_context(user_id)
         if prefs_context:
@@ -193,6 +187,8 @@ class PromptBuilder:
         ):
             return True
 
+        if re.search(r'\\btoday\\b.*?(?:lesson|leksjon)|lesson\\s+for\\s+today|today\'?s?\\s+lesson', normalized, re.I):
+            return True
         today_words = {"today", "todays", "idag", "dagens"}
         has_today_word = bool(tokens & today_words) or ("i dag" in normalized)
         return has_today_word
@@ -439,30 +435,9 @@ class PromptBuilder:
         local_time = self._get_user_local_time_str(user)
         if local_time:
             parts.append(local_time)
-        
-        # Add structured AI context
-        ai_context = self.memory_manager.topic_manager.get_ai_context(
-            user.user_id, 
-            topics=[MemoryTopic.IDENTITY, MemoryTopic.GOALS, MemoryTopic.PREFERENCES]
-        )
-        if ai_context:
-            import json
-            parts.append(f"\n== Structured User Context ==\n<pre>{json.dumps(ai_context, indent=2, default=str)}</pre>")
-        
-        return "\n".join(parts) if parts else ""
-    
-    def _build_goals_context(self, user_id: int) -> str:
-        """Retrieve user goals and learning objectives."""
-        goals = self.memory_manager.get_memory(user_id, MemoryKey.LEARNING_GOAL)
-        
-        parts = []
-        if goals:
-            parts.append("Learning Goals:")
-            for i, g in enumerate(goals[:3], 1):  # Top 3 goals
-                parts.append(f"  {i}. {g['value']}")
                 
         return "\n".join(parts) if parts else ""
-    
+        
     def _build_preferences_context(self, user_id: int) -> str:
         """Retrieve user communication and learning preferences."""
         tone = self.memory_manager.get_memory(user_id, MemoryKey.PREFERRED_TONE)

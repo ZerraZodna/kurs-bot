@@ -8,7 +8,7 @@ from src.models.database import SessionLocal
 from src.integrations.telegram import send_message
 
 from .core import SchedulerService
-from . import jobs, manager, message_utils, time_utils
+from . import jobs, manager, time_utils
 
 __all__ = [
     "SchedulerService",
@@ -16,7 +16,6 @@ __all__ = [
     "send_message",
     "jobs",
     "manager",
-    "message_utils",
     "time_utils",
 ]
 
@@ -71,10 +70,3 @@ def deactivate_user_schedules_and_remove_jobs(user_id: int, active_only: bool = 
 
     return count
 
-__all__ = [
-    "core",
-    "jobs",
-    "manager",
-    "message_utils",
-    "time_utils",
-]

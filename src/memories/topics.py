@@ -16,9 +16,6 @@ from enum import Enum
 class MemoryTopic(str, Enum):
     """Top-level memory topics."""
     IDENTITY = "identity"
-    LESSONS = "lessons"
-    SCHEDULE = "schedule"
-    GOALS = "goals"
     PREFERENCES = "preferences"
 
 
@@ -35,44 +32,18 @@ CANONICAL_KEY_MAP: Dict[str, tuple[MemoryTopic, str]] = {
     "birth_date": (MemoryTopic.IDENTITY, "birth_date"),
     "personal_background": (MemoryTopic.IDENTITY, "background"),
     "background": (MemoryTopic.IDENTITY, "background"),
-    
-    # Lessons topic
-    "current_lesson": (MemoryTopic.LESSONS, "current_lesson"),
-    "lesson_current": (MemoryTopic.LESSONS, "current_lesson"),
-    "lesson": (MemoryTopic.LESSONS, "current_lesson"),
-    "lesson_number": (MemoryTopic.LESSONS, "current_lesson"),
-    "lesson_completed": (MemoryTopic.LESSONS, "completed_lessons"),
-    "completed_lesson": (MemoryTopic.LESSONS, "completed_lessons"),
-    "last_sent_lesson_id": (MemoryTopic.LESSONS, "last_sent_lesson_id"),
-    "lesson_state": (MemoryTopic.LESSONS, "state"),
-    
-    # Schedule topic
-    "preferred_lesson_time": (MemoryTopic.SCHEDULE, "preferred_time"),
-    "lesson_time": (MemoryTopic.SCHEDULE, "preferred_time"),
-    "reminder_time": (MemoryTopic.SCHEDULE, "preferred_time"),
-    "preferred_time": (MemoryTopic.SCHEDULE, "preferred_time"),
         
     # Preferences topic
+    "preferred_lesson_time": (MemoryTopic.PREFERENCES, "preferred_lesson_time"),
+    "lesson_time": (MemoryTopic.PREFERENCES, "preferred_lesson_time"),
+    "reminder_time": (MemoryTopic.PREFERENCES, "preferred_lesson_time"),
+        
     "learning_style": (MemoryTopic.PREFERENCES, "learning_style"),
     "preferred_tone": (MemoryTopic.PREFERENCES, "preferred_tone"),
     "tone": (MemoryTopic.PREFERENCES, "preferred_tone"),
     "user_language": (MemoryTopic.PREFERENCES, "language"),
     "language": (MemoryTopic.PREFERENCES, "language"),
     "data_consent": (MemoryTopic.PREFERENCES, "data_consent"),
-}
-
-
-# Topic schemas define expected fields for each topic
-TOPIC_SCHEMAS: Dict[MemoryTopic, Set[str]] = {
-    MemoryTopic.IDENTITY: {
-        "name", "last_name", "email", "phone", "birth_date", "background"
-    },
-    MemoryTopic.LESSONS: {
-        "current_lesson", "completed_lessons", "last_sent_lesson_id", "state"
-    },
-    MemoryTopic.SCHEDULE: {
-        "preferred_time"
-    },
 }
 
 

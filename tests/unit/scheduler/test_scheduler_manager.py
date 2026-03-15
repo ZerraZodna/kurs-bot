@@ -57,8 +57,8 @@ class TestSchedulerManager:
         
         # Then: Deactivation should succeed
         assert ok is True
-        s = db_session.query(Schedule).filter_by(schedule_id=sched.schedule_id).first()
-        assert s.is_active is False
+        updated_schedule = db_session.query(Schedule).filter_by(schedule_id=sched.schedule_id).first()
+        assert updated_schedule.is_active is False
 
     def test_find_active_daily_and_deactivate_user(
         self, db_session: Session, test_user

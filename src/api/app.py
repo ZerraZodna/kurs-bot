@@ -119,13 +119,7 @@ async def lifespan(app: FastAPI):
             try:
                 import sentence_transformers  # type: ignore
             except Exception:
-                logging.error(
-                    "EMBEDDING_BACKEND=local requires 'sentence-transformers' installed in production."
-                )
-                logging.error(
-                    "Install sentence-transformers or set EMBEDDING_BACKEND=ollama/CLOUD and configure OLLAMA_EMBED_URL."
-                )
-                raise RuntimeError("Missing 'sentence-transformers' for local embeddings in production")
+                raise RuntimeError("EMBEDDING_BACKEND=local requires sentence-transformers")
     except Exception:
         # Re-raise to stop startup; caller/lifespan will log the exception.
         raise

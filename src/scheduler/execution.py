@@ -12,12 +12,13 @@ from typing import Callable, Optional
 from sqlalchemy.orm import Session
 
 from src.memories import MemoryManager
-from src.memories.constants import MemoryCategory, MemoryKey
 from src.models.database import Lesson, Schedule, User, get_session
+from src.scheduler.message_utils import send_outbound_message
 
 from .domain import is_one_time_schedule_type, job_id_for_schedule
 from .memory_helpers import get_schedule_message, get_user_language
-from .message_utils import format_lesson_message, send_outbound_message
+from src.lessons import format_lesson_message
+from src.lessons.delivery import get_lesson_or_import, build_lesson_preview, deliver_lesson
 
 logger = logging.getLogger(__name__)
 
@@ -36,46 +37,8 @@ def _parse_lesson_int(value) -> Optional[int]:
 
 
 def _load_lesson(db: Session, lesson_id: int) -> Optional[Lesson]:
-    lesson = db.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
-    if lesson:
-        return lesson
-    try:
-        from src.lessons.importer import ensure_lessons_available
-
-        if ensure_lessons_available(db):
-            return db.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
-    except Exception:
-        return None
-    return None
-
-
-def _preview_build_for_no_last_sent(
-    db: Session,
-    memory_manager: MemoryManager,
-    user_id: int,
-    language: str,
-) -> Optional[str]:
-    """Build the preview message when no lesson has been sent yet.
-
-    If the user has a reported current lesson (numeric), return a
-    confirmation prompt. Otherwise return Lesson 1 text or None.
-    """
-    from src.lessons.state import get_current_lesson
-
-    cur = get_current_lesson(memory_manager, user_id)
-    lesson_id = _parse_lesson_int(cur)
-    if lesson_id is not None:
-        next_id = (lesson_id % 365) + 1
-        # Always auto-advance without asking for confirmation
-        lesson = _load_lesson(db, next_id)
-        if lesson:
-            return format_lesson_message(lesson, language)
-
-    lesson = _load_lesson(db, 1)
-    if lesson:
-        return format_lesson_message(lesson, language)
-    return None
-
+    """Delegates to lessons.delivery.get_lesson_or_import."""
+    return get_lesson_or_import(db, lesson_id)
 
 def _build_schedule_message(
     db: Session,
@@ -93,11 +56,11 @@ def _build_schedule_message(
     
     last_sent = get_current_lesson(memory_manager, schedule.user_id)
     if not last_sent:
-        return _preview_build_for_no_last_sent(db, memory_manager, schedule.user_id, language)
+        return build_lesson_preview(db, memory_manager, schedule.user_id, language)
 
     next_id = (last_sent % 365) + 1
     # Always auto-advance without asking for confirmation
-    lesson = _load_lesson(db, next_id)
+    lesson = get_lesson_or_import(db, next_id)
     if lesson:
         return format_lesson_message(lesson, language)
 
@@ -171,25 +134,26 @@ def run_recovery_check(
                 message = _build_schedule_message(db, schedule, memory_manager)
                 if not message:
                     continue
-            message = f"{message}\n\n{apology}"
-            send_outbound_message(db, user, message)
 
-            if is_one_time_schedule_type(schedule.schedule_type):
-                schedule.last_sent_at = now
-                schedule.next_send_time = None
-                schedule.is_active = False
-                try:
-                    from . import jobs as schedule_jobs
+                message = f"{message}\n\n{apology}"
+                send_outbound_message(db, user, message)
 
-                    schedule_jobs.remove_job_for_schedule(schedule.schedule_id)
-                except Exception as e:
-                    logger.warning("Could not remove job %s: %s", job_id_for_schedule(schedule.schedule_id), e)
-            else:
-                schedule.last_sent_at = now
-                schedule.next_send_time = now + timedelta(days=1)
+                if is_one_time_schedule_type(schedule.schedule_type):
+                    schedule.last_sent_at = now
+                    schedule.next_send_time = None
+                    schedule.is_active = False
+                    try:
+                        from . import jobs as schedule_jobs
 
-            db.commit()
-            recovered += 1
+                        schedule_jobs.remove_job_for_schedule(schedule.schedule_id)
+                    except Exception as e:
+                        logger.warning("Could not remove job %s: %s", job_id_for_schedule(schedule.schedule_id), e)
+                else:
+                    schedule.next_send_time = schedule.last_sent_at + timedelta(days=1)
+                    schedule.last_sent_at = now
+
+                db.commit()
+                recovered += 1
         except Exception as e:
             logger.error("Recovery check failed: %s", e)
             db.rollback()
@@ -299,37 +263,16 @@ def _execute_lesson_schedule(
     messages: list = []
     language = get_user_language(memory_manager, schedule.user_id)
 
-    from datetime import datetime, timezone
+    from src.lessons.state import compute_current_lesson_state
 
-    from src.lessons.state import (compute_current_lesson_state,
-                                   get_current_lesson)
-    
     state = compute_current_lesson_state(memory_manager, schedule.user_id)
-    lesson_id = state["lesson_id"]
-    advanced_by_day = state["advanced_by_day"]
-    previous_lesson_id = state["previous_lesson_id"]
-    
-    lesson = _load_lesson(db, lesson_id)
-    if lesson:
-        message = format_lesson_message(lesson, language)
-        send_outbound_message(db, user, message)
-        from src.lessons.state import set_current_lesson
-        set_current_lesson(memory_manager, schedule.user_id, lesson_id)
-        if simulate:
-            messages.append(message)
-        
-        # Update last_active_at and record progress on delivery (advance or repeat)
-        user.last_active_at = datetime.now(timezone.utc)
-        return messages
+    logger.debug(
+        "Lesson state for user %s before delivery: lesson_id=%s advanced_by_day=%s previous_lesson_id=%s",
+        schedule.user_id,
+        state.get("lesson_id"),
+        state.get("advanced_by_day"),
+        state.get("previous_lesson_id"),
+    )
 
-    # Fallback: repeat current lesson
-    current_lesson_id = get_current_lesson(memory_manager, schedule.user_id)
-    if current_lesson_id:
-        lesson = _load_lesson(db, current_lesson_id)
-        if lesson:
-            message = format_lesson_message(lesson, language)
-            send_outbound_message(db, user, message)
-            if simulate:
-                messages.append(message)
-                
+    messages = deliver_lesson(db, schedule.user_id, None, memory_manager, simulate, language)
     return messages

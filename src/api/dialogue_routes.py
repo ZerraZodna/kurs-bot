@@ -70,11 +70,7 @@ async def send_message(request: MessageRequest, db: Session = Depends(get_db)):
             full_text = ""
             async for token in filtered_generator:
                 yield token + "\\n"
-            # Run post-hook (note: full_text accumulation needs tee in prod)
-            try:
-                await response["post_hook"]("")
-            except Exception as e:
-                logger.error(f"Post-hook error: {e}")
+            await response["post_hook"](full_text)
         
         from fastapi.responses import StreamingResponse
         return StreamingResponse(webui_stream_gen(), media_type="text/plain")
@@ -166,7 +162,6 @@ async def get_user_context(user_id: int, db: Session = Depends(get_db)):
     memory_manager = MemoryManager(db)
     
     # Gather context
-    goals = memory_manager.get_memory(user_id, MemoryKey.LEARNING_GOAL)
     preferences = memory_manager.get_memory(user_id, MemoryKey.PREFERRED_TONE)
     progress = get_current_lesson(memory_manager, user_id)
     
@@ -175,7 +170,6 @@ async def get_user_context(user_id: int, db: Session = Depends(get_db)):
     return UserContextResponse(
         user_id=user_id,
         name=name,
-        goals=goals,
         preferences=preferences,
         recent_progress=progress[:5] if progress else [],
     )

@@ -65,29 +65,6 @@ class TestPromptBuilder:
         assert test_user.first_name in prompt
         assert test_user.channel in prompt
 
-    def test_build_prompt_with_goals(self, db_session: Session, prompt_builder: PromptBuilder,
-                                    test_user: User, memory_manager: MemoryManager):
-        """Given: A user with learning goals stored
-        When: Building a prompt
-        Then: Should include learning goals in the prompt."""
-        # Store a goal
-        memory_manager.store_memory(
-            user_id=test_user.user_id,
-            key=MemoryKey.LEARNING_GOAL,
-            value="Learn Python programming",
-            category=MemoryCategory.GOALS,
-        )
-
-        prompt = prompt_builder.build_prompt(
-            user_id=test_user.user_id,
-            user_input="Help me learn",
-            system_prompt="You are a teacher.",
-            include_conversation_history=False,
-        )
-
-        assert "Learning Goals" in prompt
-        assert "Python" in prompt
-
     def test_build_prompt_with_conversation_history(self, db_session: Session,
                                                    prompt_builder: PromptBuilder,
                                                    test_user: User):
@@ -263,30 +240,6 @@ class TestContextOptimizer:
 
 class TestMemoryIntegration:
     """Test memory manager with prompt builder."""
-
-    def test_memory_categories(self, db_session: Session, memory_manager: MemoryManager, test_user: User):
-        """Given: Memories stored in different categories
-        When: Retrieving memories
-        Then: Should return memories from all categories."""
-        categories = [
-            (MemoryCategory.PROFILE, MemoryKey.FULL_NAME, "John Doe"),
-            (MemoryCategory.GOALS, MemoryKey.LEARNING_GOAL, "Master AI"),
-            (MemoryCategory.PREFERENCES, MemoryKey.PREFERRED_TONE, "Professional"),
-        ]
-
-        for category, key, value in categories:
-            memory_manager.store_memory(
-                user_id=test_user.user_id,
-                key=key,
-                value=value,
-                category=category,
-            )
-
-        # Verify retrieval
-        for category, key, value in categories:
-            memories = memory_manager.get_memory(test_user.user_id, key)
-            assert len(memories) > 0
-            assert value in memories[0]["value"]
 
     def test_memory_conflict_resolution(self, memory_manager: MemoryManager, test_user: User):
         """Given: Two memories with the same key but different values

@@ -35,14 +35,6 @@ class TestCompleteWorkflow:
             category=MemoryCategory.PROFILE,
         )
 
-        # 2. Store learning goals
-        mm.store_memory(
-            user_id=test_user.user_id,
-            key=MemoryKey.LEARNING_GOAL,
-            value="Master Python basics",
-            category=MemoryCategory.GOALS,
-        )
-
         # 3. Store preferences
         mm.store_memory(
             user_id=test_user.user_id,
@@ -59,11 +51,9 @@ class TestCompleteWorkflow:
 
         # 5. Verify all memories stored
         profile = mm.get_memory(test_user.user_id, MemoryKey.FULL_NAME)
-        goals = mm.get_memory(test_user.user_id, MemoryKey.LEARNING_GOAL)
         prefs = mm.get_memory(test_user.user_id, MemoryKey.PREFERRED_TONE)
 
         assert len(profile) > 0
-        assert len(goals) > 0
         assert len(prefs) > 0
 
     def test_conversation_with_context_buildup(self, db_session: Session, test_user: User):
@@ -72,23 +62,6 @@ class TestCompleteWorkflow:
         Then: Context should accumulate across turns."""
         mm = MemoryManager(db_session)
         pb = PromptBuilder(db_session, mm)
-
-        # Setup user context
-        mm.store_memory(
-            user_id=test_user.user_id,
-            key=MemoryKey.LEARNING_GOAL,
-            value="Learn Python",
-            category=MemoryCategory.GOALS,
-        )
-
-        # Simulate first message
-        first_prompt = pb.build_prompt(
-            user_id=test_user.user_id,
-            user_input="What is Python?",
-            system_prompt="You are a Python tutor.",
-        )
-        assert "Learning Goals" in first_prompt
-        assert "Python" in first_prompt
 
         # Log first exchange
         msg1_user = MessageLog(
@@ -120,36 +93,8 @@ class TestCompleteWorkflow:
         )
 
         # Should include both goals and history
-        assert "Learning Goals" in second_prompt
         assert "Recent Conversation" in second_prompt
         assert "What is Python?" in second_prompt
-
-    def test_memory_conflict_during_conversation(self, db_session: Session, test_user: User):
-        """Given: A user updating their preferences
-        When: Storing conflicting memories
-        Then: Newer memory should take precedence."""
-        mm = MemoryManager(db_session)
-
-        # User initially says they want to learn web dev
-        mid1 = mm.store_memory(
-            user_id=test_user.user_id,
-            key="preferred_topic",
-            value="Web development",
-            category=MemoryCategory.GOALS,
-        )
-
-        # Later changes mind to AI
-        mid2 = mm.store_memory(
-            user_id=test_user.user_id,
-            key="preferred_topic",
-            value="Artificial intelligence",
-            category=MemoryCategory.GOALS,
-        )
-
-        # Should have newer goal active
-        memories = mm.get_memory(test_user.user_id, "preferred_topic")
-        assert len(memories) == 1
-        assert "Artificial intelligence" in memories[0]["value"]
 
     def test_prompt_optimization_with_multiple_contexts(self, db_session: Session, test_user: User):
         """Given: Multiple memories with different values
@@ -222,36 +167,6 @@ class TestCompleteWorkflow:
 
         # Should have all sections but truncated
         assert "profile" in truncated
-
-    def test_ttl_memory_filtering(self, db_session: Session, test_user: User):
-        """Given: Memories with and without TTL
-        When: Retrieving memories
-        Then: Both persistent and temporary memories should be accessible."""
-        mm = MemoryManager(db_session)
-
-        # Store persistent memory
-        mm.store_memory(
-            user_id=test_user.user_id,
-            key="permanent_goal",
-            value="Learn forever",
-            category=MemoryCategory.GOALS,
-        )
-
-        # Store temporary memory
-        mm.store_memory(
-            user_id=test_user.user_id,
-            key="temporary_state",
-            value="Currently learning chapter 3",
-            category=MemoryCategory.CONVERSATION,
-            ttl_hours=1,
-        )
-
-        # Both should be retrievable now
-        temp = mm.get_memory(test_user.user_id, "temporary_state")
-        assert len(temp) > 0
-
-        perm = mm.get_memory(test_user.user_id, "permanent_goal")
-        assert len(perm) > 0
 
 
 class TestErrorHandling:

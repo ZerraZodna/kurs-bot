@@ -771,7 +771,6 @@ class FunctionExecutor:
             "first_name": MemoryKey.FIRST_NAME,
             "email": "email",
             "background": MemoryKey.PERSONAL_BACKGROUND,
-            "goals": MemoryKey.LEARNING_GOAL,
         }
         
         memory_key = key_mapping.get(key, key)
@@ -926,8 +925,6 @@ class FunctionExecutor:
         # Use centralized key sets from MemoryKey (DRY)
         if key in MemoryKey.PROFILE_KEYS:
             return MemoryCategory.PROFILE.value
-        elif key in MemoryKey.PREFERENCE_KEYS:
-            return MemoryCategory.PREFERENCES.value
         elif key in MemoryKey.PROGRESS_KEYS:
             return MemoryCategory.PROGRESS.value
         else:
@@ -967,34 +964,29 @@ class FunctionExecutor:
         if not memory_manager:
             return self._error_response("Missing memory_manager in context")
         
-        try:
-            search_service = get_semantic_search_service()
-            with Session(bind=session.get_bind()) as search_session:
-                results = await search_service.search_memories(
-                    user_id=user_id,
-                    query_text=query_text,
-                    session=search_session,
-                    limit=10,  # Reasonable default limit
-                )
-                memory_ids = [memory.memory_id for memory, _ in results]
-            
-            if not memory_ids:
-                return self._error_response("No matching memories found")
-            
-            archived_count = memory_manager.archive_memories(user_id, memory_ids)
-            
-            logger.info(f"forgot {archived_count} memories for user {user_id} matching '{query_text}'")
-            
-            return self._ok_response(
+        from src.models.database import Session
+        search_service = get_semantic_search_service()
+        with Session(bind=session.get_bind()) as search_session:
+            results = await search_service.search_memories(
+                user_id=user_id,
                 query_text=query_text,
-                found_count=len(memory_ids),
-                archived_count=archived_count,
+                session=search_session,
+                limit=10,  # Reasonable default limit
             )
-            
-        except Exception as e:
-            logger.exception(f"Error in forget_memories user={user_id} query={query_text}")
-            return self._error_response(f"Failed to forget memories: {str(e)}")
-
+            memory_ids = [memory.memory_id for memory, _ in results]
+        
+        if not memory_ids:
+            return self._error_response("No matching memories found")
+        
+        archived_count = memory_manager.archive_memories(user_id, memory_ids)
+        
+        logger.info(f"forgot {archived_count} memories for user {user_id} matching '{query_text}'")
+        
+        return self._ok_response(
+            query_text=query_text,
+            found_count=len(memory_ids),
+            archived_count=archived_count,
+        )
 
 
 # Global instance

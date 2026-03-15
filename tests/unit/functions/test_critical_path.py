@@ -88,7 +88,7 @@ class TestIntentParser:
             "response": "I'll set up your schedule for 9:00 AM.",
             "functions": [
                 {"name": "create_schedule", "parameters": {"time": "09:00"}},
-                {"name": "extract_memory", "parameters": {"key": "preferred_time", "value": "09:00"}}
+                {"name": "extract_memory", "parameters": {"key": "preferred_lesson_time", "value": "09:00"}}
             ]
         })
         
@@ -366,7 +366,7 @@ class TestResponseBuilder:
                 ExecutionResult(
                     function_name="extract_memory",
                     success=True,
-                    result={"key": "preferred_time", "value": "09:00"}
+                    result={"key": "preferred_lesson_time", "value": "09:00"}
                 )
             ],
             all_succeeded=True

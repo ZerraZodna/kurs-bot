@@ -121,63 +121,7 @@ class TopicManager:
         if field:
             return field.current.value
         return None
-    
-    def store_topic_field(
-        self, 
-        user_id: int, 
-        key: str,  # Can be any synonym
-        value: Any,
-        source: str = "dialogue_engine",
-        category: str = MemoryCategory.PROFILE.value,
-    ) -> int:
-        """Store a memory, resolving the key to its canonical topic/field.
-        
-        The key can be any synonym (e.g., "first_name", "name", "full_name").
-        It will be stored with the original key but resolved to canonical field
-        for retrieval.
-        """
-        # Resolve to canonical
-        resolved = resolve_canonical_key(key)
-        if resolved:
-            topic, canonical_field = resolved
-            logger.debug(f"Resolved key '{key}' to topic={topic.value}, field={canonical_field}")
-        else:
-            # Unknown key - store as-is
-            logger.warning(f"Unknown key '{key}', storing without topic resolution")
-        
-        # Store with the original key (preserves what AI/user said)
-        # The retrieval logic will resolve it to canonical field
-        return self.memory_manager.store_memory(
-            user_id=user_id,
-            key=key,  # Store with original key
-            value=str(value),
-            source=source,
-            category=category,
-            allow_duplicates=False,  # Will archive old value, keep history via conflict_group_id
-        )
-    
-    def get_all_topics(self, user_id: int) -> Dict[MemoryTopic, TopicData]:
-        """Retrieve all topics with their data for a user."""
-        return {
-            topic: self.get_topic(user_id, topic)
-            for topic in MemoryTopic
-        }
-    
-    def get_ai_context(self, user_id: int, topics: Optional[List[MemoryTopic]] = None) -> Dict[str, Any]:
-        """Generate AI-friendly structured context for specified topics.
-        
-        Returns a nested dict suitable for injection into prompts.
-        """
-        if topics is None:
-            topics = list(MemoryTopic)
-        
-        context = {}
-        for topic in topics:
-            topic_data = self.get_topic(user_id, topic)
-            if topic_data.fields:  # Only include non-empty topics
-                context[topic.value] = topic_data.to_dict()["fields"]
-        
-        return context
+            
     
     def get_name(self, user_id: int) -> str:
         """Get the user's name with proper temporal resolution.

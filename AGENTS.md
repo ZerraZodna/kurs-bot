@@ -22,12 +22,14 @@
 - On this machine, prefer `npm test` / `node ./scripts/venv.js test` (see `tasks/lessons.md`).
 
 ## Engineering Workflow (All Contributors)
-- Plan first for non-trivial work. Write short checklist in `tasks/todo.md`
+- Plan first for non-trivial work that has MORE than 7 steps. Write short checklist in `tasks/todo.md`
 - Before creating implementation plans, thoroughly read relevant code files to understand: 
   Existing functions and infrastructure
   Current implementation patterns
   What's already built vs. what needs to be built
   Don't design new solutions until you've checked if existing code already handles the use case.
+  The fix is to be DRY
+  If it is a straight forward fix (one or two steps), just go ahead and fix it if it is a bug fix
 
 ## Coding Style & Safety Rules
 - Python: 4 spaces, `snake_case` for functions/variables, `PascalCase` for classes.

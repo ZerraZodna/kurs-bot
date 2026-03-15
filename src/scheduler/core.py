@@ -32,7 +32,8 @@ class SchedulerService:
 
     @staticmethod
     def _parse_lesson_int(value) -> Optional[int]:
-        return scheduler_execution._parse_lesson_int(value)
+        from src.lessons.delivery import _parse_lesson_int
+        return _parse_lesson_int(value)
 
     @staticmethod
     def _preview_build_for_no_last_sent(
@@ -41,7 +42,8 @@ class SchedulerService:
         user_id: int,
         language: str,
     ) -> Optional[str]:
-        return scheduler_execution._preview_build_for_no_last_sent(db, memory_manager, user_id, language)
+        from src.lessons.delivery import build_lesson_preview
+        return build_lesson_preview(db, memory_manager, user_id, language)
 
     @staticmethod
     def _build_schedule_message(
@@ -49,7 +51,8 @@ class SchedulerService:
         schedule: Schedule,
         memory_manager: MemoryManager,
     ) -> Optional[str]:
-        return scheduler_execution._build_schedule_message(db, schedule, memory_manager)
+        from src.scheduler.execution import _build_schedule_message
+        return _build_schedule_message(db, schedule, memory_manager)
 
     @staticmethod
     def run_recovery_check() -> int:

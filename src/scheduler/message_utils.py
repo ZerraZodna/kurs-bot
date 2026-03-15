@@ -12,14 +12,6 @@ from src.services.traffic_tracker import record_traffic_event
 
 logger = logging.getLogger(__name__)
 
-
-def format_lesson_message(lesson: Lesson, language: str) -> str:
-    text = f"Lesson {lesson.lesson_id}: {lesson.title}\n\n{lesson.content}"
-    if language.lower() in ["en"]:
-        return text
-    return translate_text_sync(text, language)
-
-
 def translate_text_sync(text: str, language: str) -> str:
     print("Translate to lng=%s", str)
     try:

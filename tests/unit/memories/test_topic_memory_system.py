@@ -48,12 +48,9 @@ def test_all_topics(memory_manager, clean_test_data, test_user_id):
             ("email", "alice@example.com", MemoryCategory.PROFILE.value),
             ("background", "Software engineer", MemoryCategory.PROFILE.value),
         ],
-        MemoryTopic.LESSONS: [
-            (MemoryKey.LESSON_CURRENT, "42", MemoryCategory.PROGRESS.value),
-        ],
-        MemoryTopic.SCHEDULE: [
-            (MemoryKey.PREFERRED_LESSON_TIME, "08:00", MemoryCategory.PREFERENCE.value),
-            ("timezone", "Europe/Oslo", MemoryCategory.PREFERENCE.value),
+        MemoryTopic.PREFERENCES: [
+            (MemoryKey.PREFERRED_LESSON_TIME, "08:00", MemoryCategory.PREFERENCES.value),
+            ("timezone", "Europe/Oslo", MemoryCategory.PREFERENCES.value),
         ],
         MemoryTopic.PREFERENCES: [
             ("learning_style", "Visual learner", MemoryCategory.PREFERENCES.value),
@@ -126,28 +123,6 @@ def test_temporal_resolution(memory_manager, clean_test_data, test_user_id):
 
     name = tm.get_name(test_user_id)
     assert name == "NewestName", f"Expected 'NewestName' but got '{name}'"
-
-
-def test_ai_context(memory_manager, clean_test_data, test_user_id):
-    """Test AI-friendly context generation."""
-    mm = memory_manager
-    tm = mm.topic_manager
-
-    # Store diverse memories across different topics
-    mm.store_memory(test_user_id, MemoryKey.FIRST_NAME, "Bob", category=MemoryCategory.PROFILE.value)
-    mm.store_memory(test_user_id, MemoryKey.LESSON_CURRENT, "15", category=MemoryCategory.PROGRESS.value)
-    mm.store_memory(test_user_id, MemoryKey.LEARNING_GOAL, "Spiritual growth", category=MemoryCategory.GOALS.value)
-    mm.store_memory(test_user_id, "learning_style", "Visual learner", category=MemoryCategory.PREFERENCES.value)
-
-    # Get AI context
-    ai_context = tm.get_ai_context(test_user_id)
-
-    # Verify structure
-    assert "identity" in ai_context, "identity topic not present"
-    assert "name" in ai_context.get("identity", {}), "identity.name not present"
-    assert "lessons" in ai_context, "lessons topic not present"
-    assert "preferences" in ai_context, "preferences topic not present"
-    assert "learning_style" in ai_context.get("preferences", {}), "preferences.learning_style not present"
 
 
 def test_keyword_memory(memory_manager, clean_test_data, test_user_id):

@@ -8,8 +8,6 @@ from enum import Enum
 class MemoryCategory(str, Enum):
     FACT = "fact"
     PROFILE = "profile"
-    GOALS = "goals"
-    PREFERENCE = "preference"
     PREFERENCES = "preferences"
     PROGRESS = "progress"
     INSIGHTS = "insights"
@@ -32,10 +30,7 @@ class MemoryCategory(str, Enum):
         # Handle common aliases
         aliases = {
             "preferences": cls.PREFERENCES.value,
-            "pref": cls.PREFERENCE.value,
-            "goal": cls.GOALS.value,
-            "goals": cls.GOALS.value,
-            "learning_goal": cls.GOALS.value,
+            "pref": cls.PREFERENCES.value,
             "profile": cls.PROFILE.value,
             "fact": cls.FACT.value,
             "facts": cls.FACT.value,
@@ -57,7 +52,6 @@ class MemoryKey:
     FULL_NAME = "full_name"
     USER_LANGUAGE = "user_language"
     LANGUAGE = "language"
-    LEARNING_GOAL = "learning_goal"
     DATA_CONSENT = "data_consent"
     PERSONAL_BACKGROUND = "personal_background"
 
@@ -76,7 +70,6 @@ class MemoryKey:
     ONBOARDING_COMPLETE_MESSAGE_SENT = "onboarding_complete_message_sent"
     PENDING_LESSON_DELIVERY = "pending_lesson_delivery"
 
-    MILESTONE = "milestone"
     PREFERRED_TONE = "preferred_tone"
     COMMUNICATION_METHOD = "communication_method"
 
@@ -89,9 +82,6 @@ class MemoryKey:
         FULL_NAME, FIRST_NAME, NAME, USER_LANGUAGE,
         PREFERRED_LESSON_TIME, PERSONAL_BACKGROUND,
     })
-    PREFERENCE_KEYS = frozenset({
-        "preferred_time", "reminder_frequency", "notification_enabled",
-    })
     PROGRESS_KEYS = frozenset({
-        LESSON_CURRENT, MILESTONE, "insight",
+        LESSON_CURRENT, "insight",
     })

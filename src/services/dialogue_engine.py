@@ -302,13 +302,9 @@ class DialogueEngine:
     async def _get_relevant_memories(self, user_id: int, text: str, session: Session) -> list:
         """Retrieve relevant memories."""
         relevant_memories = []
-        try:
-            search_service = get_semantic_search_service()
-            with Session(bind=session.get_bind()) as search_session:
-                results = await search_service.search_memories(user_id=user_id, query_text=text, session=search_session)
-                relevant_memories = [{"memory_id": m.memory_id, "key": m.key, "value": m.value, "category": m.category, "similarity": s} for m, s in results]
-        except Exception as ex:
-            logger.warning(f"Semantic search failed: {ex}")
+        search_service = get_semantic_search_service()
+        results = await search_service.search_memories(user_id=user_id, query_text=text, session=session)
+        relevant_memories = [{"memory_id": m.memory_id, "key": m.key, "value": m.value, "category": m.category, "similarity": s} for m, s in results]
         return relevant_memories
 
     async def _handle_schedule_request(self, user_id: int, text: str, session: Session) -> Optional[str]:
