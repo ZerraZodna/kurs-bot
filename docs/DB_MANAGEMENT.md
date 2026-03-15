@@ -85,7 +85,6 @@ python scripts/reset_recipes.py restore
 | `memory` | User memories/facts | 🗑️ Cleared |
 | `message_log` | Chat history | 🗑️ Cleared |
 | `schedules` | Lesson schedules | 🗑️ Cleared |
-| `unsubscribe` | Unsubscribe tracking | 🗑️ Cleared |
 | `lessons` | ACIM lessons | 🔒 **Preserved** |
 
 ## Script Details

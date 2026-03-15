@@ -9,7 +9,9 @@ Central location for all test database setup and configuration.
 import os
 os.environ.setdefault("IS_TEST_ENV", "1")
 from pathlib import Path
-
+import time
+from pathlib import Path
+import pytest
 def _load_dotenv_if_present():
     repo_root = Path(__file__).resolve().parent
     env_path = repo_root / '.env'
@@ -26,217 +28,121 @@ def _load_dotenv_if_present():
                 k, v = line.split('=', 1)
                 k = k.strip()
                 v = v.strip().strip('"')
-                # Do not overwrite environment variables explicitly set
                 if k and os.getenv(k) is None:
                     os.environ[k] = v
     except Exception:
-        # Best-effort: do not fail pytest startup if .env can't be read
         pass
-
 
 _load_dotenv_if_present()
 import sys
 import types
 from typing import Optional
-# Insert an import-time stub for the Ollama client so early imports during
-# pytest collection cannot trigger real Ollama/model initialization when
-# TEST_USE_REAL_OLLAMA is not set truthy. This prevents import-order races
-# where other modules bind `call_ollama` before test fixtures run.
+
+# Fake Ollama for fast collection
 _test_use_real = os.getenv("TEST_USE_REAL_OLLAMA")
 if not _test_use_real or str(_test_use_real).strip().lower() not in ("1", "true", "yes", "y"):
     mod_name = "src.services.dialogue.ollama_client"
     if mod_name not in sys.modules:
         _fake = types.ModuleType(mod_name)
-
         async def _fake_call_ollama(prompt: str, model: Optional[str] = None, language: Optional[str] = None) -> str:
-            short = (prompt[:160] + "...") if prompt and len(prompt) > 160 else (prompt or "")
+            short = (prompt[:160] + "..." ) if len(prompt) > 160 else prompt
             return f"[MOCK_OLLAMA_REPLY] model={model or 'default'} lang={language or 'en'} text={short}"
-
         async def _fake_stream_ollama(prompt: str, model: Optional[str] = None, language: Optional[str] = None, temperature=None):
-            short = (prompt[:160] + "...") if prompt and len(prompt) > 160 else (prompt or "")
+            short = (prompt[:160] + "..." ) if len(prompt) > 160 else prompt
             yield f"[MOCK_OLLAMA_STREAM] model={model or 'default'} lang={language or 'en'} text={short}"
-
-        setattr(_fake, "call_ollama", _fake_call_ollama)
-        setattr(_fake, "stream_ollama", _fake_stream_ollama)
+        _fake.call_ollama = _fake_call_ollama
+        _fake.stream_ollama = _fake_stream_ollama
         sys.modules[mod_name] = _fake
         # Ensure the package exposes attributes that tests may monkeypatch
-        try:
-            import importlib
-
-            pkg = importlib.import_module("src.services.dialogue")
-            try:
-                setattr(pkg, "ollama_client", _fake)
-                setattr(pkg, "call_ollama", _fake.call_ollama)
-            except Exception:
-                pass
-        except Exception:
-            # If the package cannot be imported now, leave the fake submodule
-            # in sys.modules so a later import will resolve to it.
-            pass
-
-import time
-from pathlib import Path
-import pytest
-
-# Test database configuration is handled by db_engine fixture in tests/fixtures/database.py
-# This uses temporary file-based SQLite databases per worker for parallel test safety
+        import importlib
+        pkg = importlib.import_module("src.services.dialogue")
+        setattr(pkg, "ollama_client", _fake)
+        setattr(pkg, "call_ollama", _fake.call_ollama)
 
 
-@pytest.fixture(scope="session", autouse=True)
-def setup_test_environment():
-    """
-    Setup test environment and cleanup after tests.
-    - Uses temporary file-based SQLite database for parallel test safety
-    - Database is managed by db_engine fixture in tests/fixtures/database.py
-    """
-    # Database is handled by db_engine fixture - see tests/fixtures/database.py
-    print(f"🧪 Using temporary file-based test database for parallel execution safety")
+# pytest plugins (DB fixtures imported here trigger db_engine)
+pytest_plugins = [
+    "tests.fixtures.database",
+    "tests.fixtures.users", 
+    "tests.fixtures.services",
+]
 
-    # Ensure schema exists in test DB
-    try:
-        # Prevent background threads (lifespan) from starting during tests
-        os.environ.setdefault("IS_TEST_ENV", "1")
-        # Always mock FAISS in tests - the codebase uses numpy-based similarity
-        # instead of native FAISS, so we provide a lightweight Python stub.
-        try:
-            import sys, types, numpy as _np
+from src.models.database import Base
 
-            if "faiss" not in sys.modules:
-                import importlib.machinery
-                fake_faiss = types.ModuleType("faiss")
-                fake_faiss.__spec__ = importlib.machinery.ModuleSpec("faiss", None, is_package=False)
-
-                class _IndexFlatIP:
-                    def __init__(self, dim):
-                        self.d = dim
-                        self._mat = _np.zeros((0, dim), dtype=_np.float32)
-                        self._ids = _np.array([], dtype=_np.int64)
-
-                    def add_with_ids(self, mat, ids):
-                        try:
-                            mat = _np.asarray(mat, dtype=_np.float32)
-                            ids = _np.asarray(ids, dtype=_np.int64)
-                            if self._mat.size == 0:
-                                self._mat = mat.copy()
-                                self._ids = ids.copy()
-                            else:
-                                self._mat = _np.vstack([self._mat, mat])
-                                self._ids = _np.concatenate([self._ids, ids])
-                        except Exception:
-                            pass
-
-                    def search(self, q, top_k):
-                        q = _np.asarray(q, dtype=_np.float32)
-                        if q.ndim == 1:
-                            q = q.reshape(1, -1)
-                        if self._mat.size == 0:
-                            return _np.zeros((q.shape[0], 0)), _np.full((q.shape[0], 0), -1, dtype=_np.int64)
-                        norms = _np.linalg.norm(self._mat, axis=1)
-                        norms[norms == 0] = 1.0
-                        mat_norm = self._mat / norms[:, None]
-                        q_norm = q / (_np.linalg.norm(q, axis=1)[:, None] + 1e-12)
-                        scores = mat_norm.dot(q_norm.T)
-                        D = _np.zeros((q.shape[0], top_k), dtype=_np.float32)
-                        I = _np.full((q.shape[0], top_k), -1, dtype=_np.int64)
-                        for qi in range(q.shape[0]):
-                            row = scores[:, qi]
-                            order = _np.argsort(-row)[:top_k]
-                            D[qi, : len(order)] = row[order]
-                            I[qi, : len(order)] = self._ids[order]
-                        return D, I
-
-                class _IndexIDMap:
-                    def __init__(self, index):
-                        self._inner = index
-                        try:
-                            self.d = getattr(index, "d", None)
-                        except Exception:
-                            self.d = None
-
-                    def add_with_ids(self, mat, ids):
-                        return self._inner.add_with_ids(mat, ids)
-
-                    def search(self, q, top_k):
-                        return self._inner.search(q, top_k)
-
-                fake_faiss.IndexFlatIP = _IndexFlatIP
-                fake_faiss.IndexIDMap = _IndexIDMap
-                sys.modules["faiss"] = fake_faiss
-        except Exception:
-            pass
-        from src.models.database import init_db
-
-        init_db()
-    except Exception as e:
-        print(f"⚠️  Could not initialize test DB schema: {e}")
-
+@pytest.fixture(scope="module", autouse=True)
+def module_db_setup(db_engine):
+    """Module-scoped DB schema creation (once per test file/module)."""
+    Base.metadata.create_all(db_engine)
     yield
+    # Temp DB cleaned by fixture, no drop_all needed
 
-    # Database cleanup handled by db_engine fixture
-    print("\n✅ Test session complete")
+@pytest.fixture(scope="function", autouse=True)
+def truncate_test_tables(db_engine):
+    """Fast per-test cleanup: DELETE FROM key tables (100x faster than drop_all). Safe if tables missing."""
+    from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError
+    with db_engine.connect() as conn:
+        for table in ["schedule", "message_log", "memory", "user"]:
+            try:
+                conn.execute(text(f"DELETE FROM {table}"))
+            except OperationalError:
+                pass  # Table not exists OK
+        conn.commit()
 
+@pytest.fixture(autouse=True)
+def block_external_http():
+    """Block accidental Ollama calls unless TEST_USE_REAL_OLLAMA=1."""
+    if os.getenv("TEST_USE_REAL_OLLAMA"):
+        yield
+        return
+    orig_request = None
+    try:
+        import httpx
+        LOCAL = "localhost:11434"
+        CLOUD = "ollama.com"
+        def is_ollama_url(u): 
+            s = str(u)
+            return LOCAL in s or CLOUD in s
+        orig_request = httpx.request
+        def blocked_request(method, url, *args, **kwargs):
+            if is_ollama_url(url):
+                raise RuntimeError("Blocked Ollama HTTP in tests (set TEST_USE_REAL_OLLAMA=1)")
+            return orig_request(method, url, *args, **kwargs)
+        httpx.request = blocked_request
+    except Exception:
+        pass
+    yield
+    try:
+        import httpx
+        if orig_request:
+            httpx.request = orig_request
+    except:
+        pass
 
 def pytest_collection_modifyitems(config, items):
-    """Skip manual tests that are intended to be run interactively.
-
-    The file `tests/test_embeddings_manual.py` is a manual/interactive script
-    that defines an async test function without pytest decorators. Skip it
-    during automated test runs.
-    """
-    for item in list(items):
-        try:
-            name = item.fspath.basename
-        except Exception:
-            continue
-        if name == "test_embeddings_manual.py":
-            import pytest as _pytest
-            item.add_marker(_pytest.mark.skip(reason="Manual test - skipped in CI"))
-
+    serial_items = [i for i in items if i.get_closest_marker("serial")]
+    other_items = [i for i in items if not i.get_closest_marker("serial")]
+    items[:] = other_items + serial_items
 
 def pytest_configure(config):
-    """Allow overriding Ollama model settings for tests via environment variables.
-
-    Usage (example):
-      TEST_OLLAMA_MODEL="qwen3:test" \
-        TEST_NON_ENGLISH_OLLAMA_MODEL="gpt-oss:test" \
-        pytest tests/...
-
-    This function copies any `TEST_*` overrides into the corresponding
-    runtime env var and reloads `src.config` so `settings` picks them up.
-    """
-    # Default all test models to `llama3.2:3b` unless a TEST_* override is provided.
     defaults_model = "llama3.2:3b"
-
-    def choose_model(test_env_name: str) -> str:
-        # Respect explicit TEST_* overrides except for placeholder names
-        # often used in examples (e.g. 'llama3.2:test'). Treat those as
-        # not provided and fall back to the canonical test model.
-        val = os.getenv(test_env_name)
-        if not val:
-            return defaults_model
-        # Ignore placeholder model names that end with ':test'
-        if val.strip().endswith(":test"):
-            return defaults_model
-        return val
-
     overrides = {
-        "OLLAMA_MODEL": choose_model("TEST_OLLAMA_MODEL"),
-        "NON_ENGLISH_OLLAMA_MODEL": choose_model("TEST_NON_ENGLISH_OLLAMA_MODEL"),
+        "OLLAMA_MODEL": os.getenv("TEST_OLLAMA_MODEL", defaults_model),
+        "NON_ENGLISH_OLLAMA_MODEL": os.getenv("TEST_NON_ENGLISH_OLLAMA_MODEL", defaults_model),
     }
     changed = False
     for k, v in overrides.items():
-        if v:
-            os.environ[k] = v
-            changed = True
-    # Always apply the test defaults (or user-provided TEST_*) to ensure tests
-    # run with a consistent model selection.
+        if v.endswith(":test"):
+            v = defaults_model
+        os.environ[k] = v
+        changed = True
     if changed:
         try:
             import importlib
             import src.config as cfg
             importlib.reload(cfg)
-            applied = [k for k, v in overrides.items() if v]
-            print(f"🔧 Test overrides applied: {', '.join(applied)}")
-        except Exception as e:
-            print(f"⚠️ Could not reload src.config after env override: {e}")
+            print("🔧 Test Ollama model overrides applied")
+        except:
+            pass
+
 

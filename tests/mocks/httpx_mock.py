@@ -5,14 +5,6 @@ from typing import Any, Dict, Optional
 from unittest.mock import MagicMock, AsyncMock
 
 
-def _get_embedding_dim() -> int:
-    """Get embedding dimension from environment or default."""
-    try:
-        return int(os.getenv("EMBEDDING_DIMENSION", "384") or 384)
-    except Exception:
-        return 384
-
-
 class DummyResponse:
     """Mock HTTPX response for testing."""
     
@@ -22,9 +14,6 @@ class DummyResponse:
         status_code: int = 200,
         text: str = ""
     ):
-        self._json = json_data if json_data is not None else {
-            "embeddings": [[0.0] * _get_embedding_dim()]
-        }
         self.status_code = status_code
         self._text = text
     

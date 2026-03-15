@@ -28,18 +28,7 @@ from src.services.gdpr_service import (
 )
 
 
-@pytest.fixture(scope="function")
-def db_session():
-    """Create an in-memory database session for testing."""
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    yield session
-    session.close()
-
-
-def _create_user(session):
+def _create_user(db_session):
     """Helper to create a test user."""
     user = User(
         external_id="gdpr-1",
@@ -51,8 +40,8 @@ def _create_user(session):
         opted_in=True,
         created_at=datetime.datetime.utcnow(),
     )
-    session.add(user)
-    session.commit()
+    db_session.add(user)
+    db_session.commit()
     return user
 
 
@@ -102,21 +91,6 @@ def _create_schedule(session, user_id: int):
     session.commit()
     return schedule
 
-
-def _create_unsubscribe(session, user_id: int):
-    """Helper to create a test unsubscribe record."""
-    unsubscribe = Unsubscribe(
-        user_id=user_id,
-        channel="test",
-        reason="user request",
-        compliance_required=False,
-        unsubscribed_at=datetime.datetime.utcnow(),
-    )
-    session.add(unsubscribe)
-    session.commit()
-    return unsubscribe
-
-
 def test_gdpr_export_restrict_rectify_erase(db_session):
     """Given: A user with memories, messages, schedules, and unsubscribes
     When: GDPR operations are performed (export, restrict, rectify, erase)
@@ -127,7 +101,6 @@ def test_gdpr_export_restrict_rectify_erase(db_session):
     memory = _create_memory(db_session, user.user_id)
     _create_message(db_session, user.user_id)
     _create_schedule(db_session, user.user_id)
-    _create_unsubscribe(db_session, user.user_id)
 
     record_consent(
         db_session,

@@ -6,8 +6,7 @@ Uses temporary file-based SQLite databases per worker for parallel test safety.
 The application engine is not used - instead we create a dedicated test engine
 to ensure complete isolation from any production or development databases.
 
-Test isolation is provided by the ensure_test_db autouse fixture in
-tests/conftest.py, which drops and recreates all tables before each test.
+Test isolation provided by conftest.py truncate_test_tables per test + module create_all.
 
 For parallel test execution with pytest-xdist, each worker gets its own
 temporary database file to avoid SQLite file locking issues.
@@ -20,6 +19,14 @@ from typing import Generator
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+
+@pytest.fixture(scope="module", autouse=True)
+def module_db_session(db_engine):
+    """Module-scoped SessionLocal monkeypatch for test isolation."""
+    from _pytest.monkeypatch import MonkeyPatch
+    mp = MonkeyPatch()
+    TestSessionLocal = sessionmaker(bind=db_engine, autoflush=False, autocommit=False, future=True)
+    mp.setattr("src.models.database.SessionLocal", TestSessionLocal)
 
 from src.models.database import Base
 from src.models import User
@@ -68,27 +75,13 @@ def db_engine(tmp_path_factory) -> Generator:
 
 
 @pytest.fixture(scope="function")
-def db_session(db_engine, monkeypatch) -> Generator[Session, None, None]:
-    """Function-scoped database session with worker-aware isolation.
+def db_session() -> Generator[Session, None, None]:
+    """Function-scoped DB session (SessionLocal already module-patched for test DB). 
 
-    Uses the engine from db_engine fixture so that when running with
-    pytest-xdist, each worker uses its own database file.
-    
-    Also patches the global SessionLocal so that any code that uses it
-    directly (like SchedulerService operations) will also use the worker-
-    specific database.
-    
-    Isolation is provided by the ensure_test_db autouse fixture in
-    tests/conftest.py which drops and recreates all tables before each test.
-    """
-    # Create a session using the worker-specific engine
-    TestSessionLocal = sessionmaker(bind=db_engine, autoflush=False, autocommit=False, future=True)
-    
-    # Patch the global SessionLocal so that any code using it directly
-    # (like SchedulerService) will use the worker-specific database
-    monkeypatch.setattr("src.models.database.SessionLocal", TestSessionLocal)
-    
-    session = TestSessionLocal()
+    Uses worker-specific engine via module monkeypatch.
+    Isolation via conftest truncate_test_tables + module_db_setup."""
+    from src.models.database import SessionLocal
+    session = SessionLocal()
     try:
         yield session
     finally:

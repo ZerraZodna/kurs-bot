@@ -24,7 +24,6 @@ class Settings(BaseSettings):
     # Semantic search (keyword-only post-removal)
     SEMANTIC_SEARCH_THRESHOLD: float = 0.3
     SEMANTIC_SEARCH_MAX_RESULTS: int = 5
-    # When True (default), production expects real embedding infra (Ollama or sentence-transformers).
     # Set to False in CI/.env.template to enable lightweight test-mode embeddings.
     TEST_USE_REAL_OLLAMA: bool = True
     # Trigger matcher defaults

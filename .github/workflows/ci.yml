@@ -16,8 +16,6 @@ jobs:
       TEST_USE_REAL_OLLAMA: '0'
       # Mark CI as test environment so background threads stay off and test DB is enforced
       IS_TEST_ENV: '1'
-      # Set to 'true' to skip pre-downloading large SentenceTransformer model
-      SKIP_MODEL_PRECACHE: 'true'
       # Function calling migration complete - no trigger embeddings needed
       FUNCTION_CALLING_ENABLED: 'true'
     
@@ -32,24 +30,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Install only the project requirements for CI; avoid heavy ML packages
-          # unless explicitly enabled via SKIP_MODEL_PRECACHE=false and other
-          # opt-in flags.
+          # Install project requirements for CI
           pip install --no-cache-dir -r requirements.txt
-      - name: Pre-download SentenceTransformer model (optional)
-        if: ${{ env.SKIP_MODEL_PRECACHE != 'true' }}
-        run: |
-          python - <<'PY'
-          import os
-          from huggingface_hub import snapshot_download
-          model_name = "all-MiniLM-L6-v2"
-          repo_id = f"sentence-transformers/{model_name}"
-          out_dir = os.path.join('src', 'data', 'models', model_name.replace('/', '_'))
-          os.makedirs(out_dir, exist_ok=True)
-          print(f"Downloading HF snapshot '{repo_id}' into {out_dir}")
-          snapshot_download(repo_id=repo_id, cache_dir=out_dir, local_dir=out_dir, allow_patterns=["*"], resume_download=True)
-          print("Saved model snapshot to local cache")
-          PY
+      # No model pre-download needed (embeddings removed)
       - name: Prepare env
         run: |
           if [ -f .env.template ]; then

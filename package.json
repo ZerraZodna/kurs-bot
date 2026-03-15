@@ -15,10 +15,10 @@
     "import_lessons": "node ./scripts/venv.js run scripts/utils/import_acim_lessons.py --pdf \"src/data/Sparkly ACIM lessons-extracted.pdf\"",
     "config": "node ./scripts/venv.js config",
     "update": "node ./scripts/venv.js update",
-    "test": "node ./scripts/venv.js test -- -n auto -q && node ./scripts/venv.js test -- -m serial -n 0 -q",
+    "test":"node ./scripts/venv.js test -- -n auto -q",
     "test:fast": "node ./scripts/venv.js test -- -n 4 -q",
     "test:serial": "node ./scripts/venv.js test -- -n 0 -q",
-    "test:only-serial": "node ./scripts/venv.js test -- -m serial -q",
+
     "test:warning_as_error": "node ./scripts/venv.js test -- --maxfail=3 -v -W error",
     "start": "node ./scripts/venv.js start",
     "start:ngrok": "node ./scripts/venv.js ngrok",

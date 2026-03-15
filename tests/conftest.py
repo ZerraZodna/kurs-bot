@@ -34,31 +34,10 @@ pytest_plugins = [
 from src.models.database import Base
 
 
-def pytest_collection_modifyitems(config, items):
-    """Move serial-marked tests to the end so xdist runs them in worker gw0.
-    
-    This ensures tests marked with @pytest.mark.serial run in the main worker,
-    which is necessary for tests that use global state like APScheduler.
-    """
-    serial_items = [i for i in items if i.get_closest_marker("serial")]
-    other_items = [i for i in items if not i.get_closest_marker("serial")]
-    items[:] = other_items + serial_items
 
 
-@pytest.fixture(autouse=True)
-def check_serial_marker(request):
-    """Skip serial tests when running in parallel workers (not main).
-    
-    This ensures tests marked with @pytest.mark.serial only run in the main
-    worker when using pytest-xdist, avoiding race conditions with global
-    state like APScheduler and TriggerMatcher singletons.
-    """
-    # Check if running with xdist and not in main worker
-    worker_id = os.environ.get("PYTEST_XDIST_WORKER", "main")
-    serial_marker = request.node.get_closest_marker("serial")
-    
-    if serial_marker and worker_id != "main":
-        pytest.skip(f"Skipping serial test '{request.node.name}' in worker {worker_id}")
+
+
 
 
 # Prevent accidental outbound HTTP requests to Ollama during tests unless
