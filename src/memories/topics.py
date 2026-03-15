@@ -95,13 +95,7 @@ class TopicData:
                 for name, field in self.fields.items()
             }
         }
-    
-    def get_field_value(self, field_name: str) -> Optional[Any]:
-        """Get the current value of a field, or None if not present."""
-        if field_name in self.fields:
-            return self.fields[field_name].current.value
-        return None
-    
+        
     def get_all_fields(self) -> Dict[str, Any]:
         """Get all field values as a simple dict for easy iteration."""
         return {
@@ -134,8 +128,3 @@ def get_all_keys_for_topic(topic: MemoryTopic) -> List[str]:
         if t == topic:
             keys.append(key)
     return keys
-
-
-def get_all_fields_for_topic(topic: MemoryTopic) -> Set[str]:
-    """Get all canonical field names for a topic."""
-    return TOPIC_SCHEMAS.get(topic, set())

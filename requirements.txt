@@ -3,7 +3,8 @@ uvicorn
 sqlalchemy
 alembic
 python-telegram-bot
-sendgrid
+# Mail not implemented (yet)
+#sendgrid
 pytest
 pytest-cov
 pytest-asyncio
@@ -14,5 +15,4 @@ langdetect
 ollama
 pydantic_core==2.41.5
 pydantic-settings
-numpy
 pymupdf

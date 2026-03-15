@@ -40,7 +40,7 @@ def _should_force_run() -> bool:
     return is_today_lowest_traffic()
 
 
-def run_downtime_monitor(poll_seconds: int = 60) -> None:
+def run_downtime_monitor(poll_seconds: int = 300) -> None:
     """Monitor downtime, recover missed schedules, and run GDPR cleanup when due."""
     while True:
         try:
@@ -61,7 +61,7 @@ def run_downtime_monitor(poll_seconds: int = 60) -> None:
             # Recovery check for missed schedules
             missed = SchedulerService.run_recovery_check()
             if missed:
-                logger.info("Recovered %s missed schedule(s)", missed)
+                logger.info("Recovery triggered: recovered %s missed schedule(s)", missed)
 
             # GDPR daily job
             if _gdpr_due():

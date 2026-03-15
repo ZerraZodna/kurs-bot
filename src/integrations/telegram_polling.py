@@ -6,14 +6,13 @@ import asyncio
 import logging
 from typing import Set, Optional
 
-import httpx
+from telegram.error import TelegramError
 
 from src.config import settings
 from src.integrations.telegram import (
     TelegramHandler,
     send_typing_action,
-    TELEGRAM_BOT_TOKEN,
-    API_BASE,
+    bot,
 )
 from src.models.database import SessionLocal, User, MessageLog, BatchLock
 from src.services.admin_notifier import send_admin_notification
@@ -26,11 +25,10 @@ _processed_updates: Set[int] = set()
 
 async def poll_updates(offset: int = 0) -> list[dict]:
     """Fetch updates from Telegram using long-polling."""
-    if not TELEGRAM_BOT_TOKEN:
+    if not settings.TELEGRAM_BOT_TOKEN:
         logger.error("[polling] TELEGRAM_BOT_TOKEN not configured")
         return []
 
-    url = f"{API_BASE}/getUpdates"
     payload = {
         "timeout": settings.TELEGRAM_POLL_TIMEOUT,
         "offset": offset,
@@ -38,22 +36,17 @@ async def poll_updates(offset: int = 0) -> list[dict]:
         "allowed_updates": settings.TELEGRAM_POLL_ALLOWED_UPDATES,
     }
 
-    async with httpx.AsyncClient() as client:
-        try:
-            r = await client.post(url, json=payload, timeout=settings.TELEGRAM_POLL_TIMEOUT + 5)
-            r.raise_for_status()
-            data = r.json()
-
-            if data.get("ok"):
-                return data.get("result", [])
-            else:
-                logger.error(f"[polling] API error: {data}")
-                return []
-        except httpx.TimeoutException:
-            return []
-        except Exception as e:
-            logger.error(f"[polling] Error fetching updates: {e}")
-            return []
+    try:
+        updates = await bot.get_updates(**payload)
+        return [update.to_dict() for update in updates]
+    except TelegramError as e:
+        logger.error(f"[polling] API error: {e}")
+        return []
+    except asyncio.TimeoutError:
+        return []
+    except Exception as e:
+        logger.error(f"[polling] Error fetching updates: {e}")
+        return []
 
 
 async def _ensure_user(user_id: str, first_name: Optional[str], last_name: Optional[str]) -> Optional[int]:

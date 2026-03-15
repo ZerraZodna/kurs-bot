@@ -200,13 +200,15 @@ def get_user_schedules(
     Returns:
         List of Schedule objects
     """
+    from src.models.database import get_session
     from . import manager as schedule_manager
     
-    return schedule_manager.get_user_schedules(
-        user_id=user_id,
-        active_only=active_only,
-        session=session,
-    )
+    with get_session(session) as s:
+        return schedule_manager.get_user_schedules(
+            user_id=user_id,
+            session=s,
+            active_only=active_only,
+        )
 
 
 def find_active_daily_schedule(

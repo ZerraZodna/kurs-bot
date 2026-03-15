@@ -1,3 +1,5 @@
+AI agents: ALWAYS read AGENTS.md first for workflow rules.
+
 # Kurs Bot
 
 A chatbot with persistent memory that delivers daily lessons via Telegram and email.

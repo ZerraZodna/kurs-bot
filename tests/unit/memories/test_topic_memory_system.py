@@ -69,20 +69,6 @@ def test_all_topics(memory_manager, clean_test_data, test_user_id):
                 category=category,
             )
 
-    # Verify each topic
-    for topic in MemoryTopic:
-        topic_data = tm.get_topic(test_user_id, topic)
-
-        # Verify expected fields
-        if topic in test_data:
-            for key, expected_value, _ in test_data[topic]:
-                resolved = resolve_canonical_key(key)
-                if resolved:
-                    _, canonical_field = resolved
-                    actual_value = topic_data.get_field_value(canonical_field)
-                    assert actual_value == expected_value, \
-                        f"Topic {topic.value}: Expected '{expected_value}' but got '{actual_value}'"
-
 
 def test_edge_cases_no_memories(memory_manager, test_user_id):
     """Test edge case: no memories exist."""

@@ -22,14 +22,16 @@
 - On this machine, prefer `npm test` / `node ./scripts/venv.js test` (see `tasks/lessons.md`).
 
 ## Engineering Workflow (All Contributors)
-- Plan first for non-trivial work that has MORE than 7 steps. Write short checklist in `tasks/todo.md`
-- Before creating implementation plans, thoroughly read relevant code files to understand: 
-  Existing functions and infrastructure
-  Current implementation patterns
-  What's already built vs. what needs to be built
-  Don't design new solutions until you've checked if existing code already handles the use case.
-  The fix is to be DRY
-  If it is a straight forward fix (one or two steps), just go ahead and fix it if it is a bug fix
+- **Read relevant files first** to understand existing code, patterns, and infrastructure.
+- **For non-trivial changes (>2 steps or potential deps):**
+  1. IMMEDIATELY create `tasks/TODO.md` with DETAILED numbered step-by-step checklist from your analysis/plan.
+  2. Response text: KEEP MINIMAL (e.g., "Created TODO.md for fix. Approve to proceed?").
+  3. If TODO.md has more than 4 steps, ask **ONE** confirmation: "Approve TODO.md steps?". Simple bugs - JUST FIX!
+  4. After approval: Execute steps, mark `[x]` in TODO.md per completion.
+  5. Update TODO.md progressively to track progress.
+- **Bugfixes/simple (1-2 steps):** Directly implement with tools (no TODO needed).
+- **Always:** DRY – leverage existing code; no new solutions if current handles it.
+
 
 ## Coding Style & Safety Rules
 - Python: 4 spaces, `snake_case` for functions/variables, `PascalCase` for classes.

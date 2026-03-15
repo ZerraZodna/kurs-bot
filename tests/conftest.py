@@ -17,10 +17,10 @@ from typing import Optional
 import pytest
 
 # Register fake modules at import time to prevent real initialization
-from tests.mocks.faiss_mock import register_fake_faiss
+
 from tests.mocks.ollama_mock import register_fake_ollama
 
-register_fake_faiss()
+
 register_fake_ollama()
 
 # Auto-import fixture modules

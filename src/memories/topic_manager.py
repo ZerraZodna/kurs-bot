@@ -19,7 +19,6 @@ from src.memories.topics import (
     TopicFieldValue,
     resolve_canonical_key,
     get_all_keys_for_topic,
-    get_all_fields_for_topic,
     CANONICAL_KEY_MAP,
 )
 from src.memories.constants import MemoryCategory
@@ -105,24 +104,7 @@ class TopicManager:
             )
         
         return topic_data
-    
-    def get_field(self, user_id: int, canonical_field: str) -> Optional[TopicField]:
-        """Get a specific canonical field across all topics."""
-        # Find which topic this field belongs to
-        for topic in MemoryTopic:
-            if canonical_field in get_all_fields_for_topic(topic):
-                topic_data = self.get_topic(user_id, topic)
-                return topic_data.fields.get(canonical_field)
-        return None
-    
-    def get_field_value(self, user_id: int, canonical_field: str) -> Optional[Any]:
-        """Get the current value of a specific field."""
-        field = self.get_field(user_id, canonical_field)
-        if field:
-            return field.current.value
-        return None
-            
-    
+        
     def get_name(self, user_id: int) -> str:
         """Get the user's name with proper temporal resolution.
         

@@ -228,10 +228,11 @@ def create_one_time_schedule(
         return schedule
 
 
-def get_user_schedules(user_id: int, active_only: bool = True) -> list:
+def get_user_schedules(user_id: int, active_only: bool = True, session: Optional[Session] = None) -> list:
     """Get all schedules for a user."""
     # Delegate to manager for pure-DB access
-    return schedule_manager.get_user_schedules(user_id, active_only=active_only)
+    with get_session(session) as s:
+        return schedule_manager.get_user_schedules(user_id=user_id, session=s, active_only=active_only)
 
 
 def deactivate_user_schedules(

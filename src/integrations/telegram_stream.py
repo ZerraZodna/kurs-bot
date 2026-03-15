@@ -32,7 +32,7 @@ class StreamingFilter:
     HTML_TAGS = {'b', 'strong', 'i', 'em', 'u', 's', 'code', 'pre', 'a', 'span'}
     
     # HTML entities that should be buffered until complete
-    HTML_ENTITIES = {'nbsp', 'amp', 'lt', 'gt', 'quot', 'apos', 'copy', 'reg', 'trade', 'mdash', 'ndash', 'lsquo', 'rsquo', 'ldquo', 'rdquo'}
+    HTML_ENTITIES: set[str] = {'nbsp', 'amp', 'lt', 'gt', 'quot', 'apos', 'copy', 'reg', 'trade', 'mdash', 'ndash', 'lsquo', 'rsquo', 'ldquo', 'rdquo'}
     
     def __init__(self, token_generator: AsyncIterator[str]):
         """Initialize the filter with a raw token generator.
