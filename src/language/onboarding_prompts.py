@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import Dict
 
+import textwrap
+
+
 
 def get_lesson_1_welcome_message(language: str, name: str) -> str:
 	messages = {

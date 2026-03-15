@@ -194,7 +194,7 @@ class PDFReader:
     def __enter__(self) -> 'PDFReader':
         return self
     
-    def __exit__(self, exc_type, exc_val) -> None:
+    def __exit__(self, exc_type, exc_val, exec_err) -> None:
         self.close()
 
 

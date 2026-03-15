@@ -86,11 +86,8 @@ def create_daily_schedule(
         try:
             schedule_jobs.sync_job_for_schedule(schedule)
         except Exception as e:
-            logger.warning(
-                "Could not add job for schedule %s: %s",
-                getattr(schedule, "schedule_id", None),
-                e,
-            )
+            logger.exception("Could not add job for schedule %s: %s", getattr(schedule, "schedule_id", None), e)
+
 
         # For logging, parse the time string into hour/minute if available
         hour, minute = parse_time_string(time_str)
@@ -138,7 +135,8 @@ def update_daily_schedule(
             if updated:
                 schedule_jobs.sync_job_for_schedule(updated)
         except Exception as e:
-            logger.warning("Could not update job %s: %s", schedule_id, e)
+            logger.exception("Could not update job %s: %s", schedule_id, e)
+
 
         # Ensure hour/minute are defined for logging (may not exist if parse failed)
         hour, minute = parse_time_string(time_str)
@@ -250,17 +248,17 @@ def deactivate_user_schedules(
         return count
 
 
-def deactivate_schedule(schedule_id: int) -> None:
+def deactivate_schedule(schedule_id: int, session: Optional[Session] = None) -> None:
     """Deactivate a schedule and remove from APScheduler."""
-    # Delegate DB change to manager and remove job via jobs module
-    try:
-        changed = schedule_manager.deactivate_schedule(schedule_id)
-        if changed:
-            try:
-                schedule_jobs.remove_job_for_schedule(schedule_id)
-            except Exception as e:
-                logger.warning("Could not remove job %s: %s", job_id_for_schedule(schedule_id), e)
-            logger.info("✓ Deactivated schedule %s", schedule_id)
-    except Exception:
-        # Ensure we don't bubble DB exceptions here
-        logger.exception("Error deactivating schedule %s", schedule_id)
+    with get_session(session) as s:
+        try:
+            changed = schedule_manager.deactivate_schedule(schedule_id, session=s)
+            if changed:
+                try:
+                    schedule_jobs.remove_job_for_schedule(schedule_id)
+                except Exception as e:
+                    logger.exception("Could not remove job %s: %s", job_id_for_schedule(schedule_id), e)
+                logger.info("✓ Deactivated schedule %s", schedule_id)
+        except Exception as e:
+            logger.exception("Error deactivating schedule %s: %s", schedule_id, e)
+

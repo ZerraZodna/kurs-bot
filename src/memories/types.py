@@ -20,11 +20,7 @@ class ExtractedMemory:
     value: str
     cleaned_value: Optional[str] = None
     reasoning: str = ""
-    
-    def __post_init__(self):
-        if self.conflicts is None:
-            self.conflicts = []
-    
+        
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ExtractedMemory":
         

@@ -18,12 +18,6 @@ Usage:
     # Lesson delivery functions
     from src.lessons import maybe_send_next_lesson, get_current_lesson, set_current_lesson
 """
-from __future__ import annotations
-
-import argparse
-import sys
-from pathlib import Path
-from typing import Optional
 
 # PDF import functions
 from .pdf_extractor import extract_formatted_text

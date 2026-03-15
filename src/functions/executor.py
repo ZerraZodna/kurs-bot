@@ -719,7 +719,7 @@ class FunctionExecutor:
             # Store in memory
             memory_manager.store_memory(
                 user_id=user_id,
-                key=MemoryKey.PREFERRED_LANGUAGE,
+                key=MemoryKey.USER_LANGUAGE,
                 value=normalized_lang,
                 category=MemoryCategory.PROFILE.value,
                 source="function_executor",

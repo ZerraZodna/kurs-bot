@@ -41,8 +41,8 @@ CANONICAL_KEY_MAP: Dict[str, tuple[MemoryTopic, str]] = {
     "learning_style": (MemoryTopic.PREFERENCES, "learning_style"),
     "preferred_tone": (MemoryTopic.PREFERENCES, "preferred_tone"),
     "tone": (MemoryTopic.PREFERENCES, "preferred_tone"),
-    "user_language": (MemoryTopic.PREFERENCES, "language"),
-    "language": (MemoryTopic.PREFERENCES, "language"),
+    "user_language": (MemoryTopic.PREFERENCES, "user_language"),
+    "language": (MemoryTopic.PREFERENCES, "user_language"),
     "data_consent": (MemoryTopic.PREFERENCES, "data_consent"),
 }
 
