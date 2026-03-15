@@ -44,4 +44,4 @@ jobs:
             echo ".env.template not found, skipping copy"
           fi
       - name: Run tests
-        run: pytest -q
+        run: pytest -n auto -q
