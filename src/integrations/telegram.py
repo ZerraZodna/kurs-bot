@@ -424,15 +424,27 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                     logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] raw_generator_remaining='{stream_filter.get_remaining_for_functions()[:500]}...'")
 
                     from src.functions.intent_parser import get_intent_parser
+                    from src.functions import get_function_executor
                     from src.functions.response_builder import get_response_builder
 
                     parser = get_intent_parser()
                     parse_result = parser.parse(function_parse_text)
                     logger.info(f"[telegram PARSE_RESULT user={user_id}] success={parse_result.success},fallback={parse_result.is_fallback},functions={len(parse_result.functions)},errors={len(parse_result.errors or [])}")
                     
-                    # Run post_hook (handle_triggers) with correct text
-                    diagnostics = await result["post_hook"](function_parse_text)
-                    logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] post_hook=exec_result={diagnostics.get('execution_result') is not None},actions_len={len(diagnostics.get('dispatched_actions', []))},keys={list(diagnostics.keys())}")
+                    # Direct executor call (no post_hook)
+                    diagnostics = {}
+                    if parse_result.functions:
+                        executor = get_function_executor()
+                        execution_context = {
+                            "user_id": user_id,
+                            "session": dialogue_db,
+                            "memory_manager": dialogue.memory_manager,
+                            "original_text": combined_text,
+                        }
+                        execution_result = await executor.execute_all(parse_result.functions, execution_context, continue_on_error=True)
+                        diagnostics["execution_result"] = execution_result
+                        diagnostics["dispatched_actions"] = [r.function_name for r in execution_result.results if r.success]
+                    logger.info(f"[telegram EXEC_RESULT user={user_id}] exec_result={diagnostics.get('execution_result') is not None},actions_len={len(diagnostics.get('dispatched_actions', []))},keys={list(diagnostics.keys())}")
                     
 # Handle all cases: success, empty [], parse errors, exec fails
                     parse_had_errors = bool(parse_result.errors and not parse_result.success)

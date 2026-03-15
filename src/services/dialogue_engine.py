@@ -242,14 +242,28 @@ class DialogueEngine:
         is_english = not user_lang or user_lang.lower() == "en"
 
         async def post_hook(full_response_text: str):
-            from src.triggers.triggering import handle_triggers
-            return await handle_triggers(
-                response=full_response_text,
-                original_text=text,
-                session=session,
-                memory_manager=self.memory_manager,
-                user_id=user_id,
-            )
+            from src.functions import get_intent_parser, get_function_executor
+            parser = get_intent_parser()
+            parse_result = parser.parse(full_response_text)
+            diagnostics = {}
+            if parse_result.response_text:
+                diagnostics["response_text"] = parse_result.response_text
+            if parse_result.functions:
+                executor = get_function_executor()
+                execution_context = {
+                    "user_id": user_id,
+                    "session": session,
+                    "memory_manager": self.memory_manager,
+                    "original_text": text,
+                }
+                execution_result = await executor.execute_all(
+                    parse_result.functions, execution_context, continue_on_error=True
+                )
+                diagnostics["execution_result"] = execution_result
+                diagnostics["dispatched_actions"] = [
+                    r.function_name for r in execution_result.results if r.success
+                ]
+            return diagnostics
 
         def extract_response_text(full_response_text: str) -> str:
             from src.functions.intent_parser import get_intent_parser

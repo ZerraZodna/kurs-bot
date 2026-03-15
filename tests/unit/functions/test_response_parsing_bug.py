@@ -66,7 +66,7 @@ class TestResponseParsingBug:
         """
         # This is a conceptual test showing what happens:
         # 1. LLM returns: {"response": "Hello", "functions": [...]}
-        # 2. handle_triggers parses it correctly
+        # 2. executor parses/executes it correctly
         # 3. But the method returns the raw JSON string, not "Hello"
         
         raw_llm_response = '''{
