@@ -32,6 +32,7 @@ pytest_plugins = [
 
 # Ensure test database is initialized for every test to guarantee isolation.
 from src.models.database import Base
+from sqlalchemy import inspect, text
 
 
 
@@ -141,17 +142,20 @@ def ensure_test_db(db_engine, monkeypatch):
     
     repo_root = Path(__file__).resolve().parents[1]
     
-    try:
-        Base.metadata.drop_all(bind=db_engine)
-        Base.metadata.create_all(bind=db_engine)
-
-        if str(repo_root) not in sys.path:
-            sys.path.insert(0, str(repo_root))
-    except SystemExit:
-        raise
-    except Exception as e:
-        print(f"Warning: failed to initialize test DB or seed triggers: {e}")
-
+    # Truncate tables if exist (faster than drop/create_all, avoids SQLite state issues)
+    inspector = inspect(db_engine)
+    if inspector.has_table("users"):
+        for table in Base.metadata.tables.values():
+            with db_engine.connect() as conn:
+                conn.execute(table.delete())
+                conn.commit()
+        with db_engine.connect() as conn:
+            conn.execute(text("VACUUM"))
+            conn.commit()
+        print("Truncated test DB tables")
+    else:
+        Base.metadata.create_all(bind=db_engine, checkfirst=True)
+    
     yield
 
 

@@ -66,8 +66,7 @@ def db_engine(tmp_path_factory) -> Generator:
         connect_args={"check_same_thread": False},
     )
     
-    # Create schema for this worker
-    Base.metadata.create_all(engine)
+    # Schema creation moved to ensure_test_db fixture for per-test isolation
     
     yield engine
     
