@@ -4,8 +4,8 @@ Uses users.lesson for current lesson state memory for completion history.
 """
 
 from typing import Optional, Dict, Any
-from datetime import date
-
+from datetime import date, datetime, timezone
+from src.core.timezone import to_utc
 from src.memories.manager import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.models.user import User
@@ -52,9 +52,6 @@ def has_lesson_status(memory_manager: MemoryManager, user_id: int) -> bool:
 
 def compute_current_lesson_state(memory_manager: MemoryManager, user_id: int, today: Optional[date] = None) -> Dict[str, Any]:
     """Compute lesson state from users.lesson and last_active_at for daily advancement."""
-    from datetime import date, datetime, timezone
-    from src.models.user import User
-    
     lesson_id = get_current_lesson(memory_manager, user_id)
 
     if lesson_id is None:
@@ -71,14 +68,11 @@ def compute_current_lesson_state(memory_manager: MemoryManager, user_id: int, to
     # Use UTC-aware today by default
     if today is None:
         today = datetime.now(timezone.utc).date()
-    today_date = today
     
     if last_active:
-        if hasattr(last_active, 'date'):
-            last_active_date = last_active.date()
-        else:
-            last_active_date = last_active
-        if last_active_date < today_date:
+        # Ensure consistent date comparison using timezone utils
+        last_active_date = to_utc(last_active).date()
+        if last_active_date < today:
             previous_id = lesson_id
             proposed_id = min(int(lesson_id) + 1, 365)
             return {
@@ -107,3 +101,4 @@ def get_lesson_state(memory_manager: MemoryManager, user_id: int) -> Dict[str, A
         "last_sent_lesson_id": cur,
         "updated_at": None,
     }
+

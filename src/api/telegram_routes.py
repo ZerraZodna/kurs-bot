@@ -29,7 +29,7 @@ def _retry_db_op(op_name: str, func, attempts: int = 3, delay_seconds: float = 1
             time.sleep(delay_seconds * attempt)
 
 
-@router.post("/webhook/telegram/{secret_token}")
+@router.post("/webhook/telegram/{secret_token}")  # Webhook route - unused with polling (ngrok unsupported)"
 async def telegram_webhook(request: Request, secret_token: str):
     # Validate secret token from config
     if secret_token != settings.TELEGRAM_BOT_TOKEN.split(":")[1]:
