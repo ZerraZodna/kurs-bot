@@ -5,7 +5,7 @@ This module centralizes timezone helpers for reuse across packages.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from typing import Optional, Tuple
 
 from zoneinfo import ZoneInfo
@@ -230,6 +230,35 @@ def resolve_timezone_name(tz_name: Optional[str]) -> Optional[str]:
 
     # Not resolved
     return None
+
+
+def utc_now() -> datetime:
+    """Return current UTC datetime (timezone-aware). Use everywhere instead of datetime.now(timezone.utc)."""
+    return datetime.now(timezone.utc)
+
+
+def utc_date_now() -> date:
+    """Return current UTC date (naive). Central point for date comparisons."""
+    return utc_now().date()
+
+
+def utc_date(dt: datetime) -> date:
+    """Convert datetime to UTC date."""
+    if dt is None:
+        return utc_date_now()
+    return to_utc(dt).date()
+
+
+def date_is_past(dt: datetime) -> bool:
+    """Check if given datetime's date is before today (UTC). Central date comparison."""
+    return utc_date(dt) < utc_date_now()
+
+
+def utc_now_plus(minutes: int = 0, hours: int = 0, days: int = 0) -> datetime:
+    """UTC now + timedelta. Central timedelta helper."""
+    from datetime import timedelta
+    td = timedelta(minutes=minutes, hours=hours, days=days)
+    return utc_now() + td
 
 
 def format_datetime_for_display(iso_string: Optional[str]) -> str:

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime, timedelta, timezone
-
+from datetime import timedelta
 from src.config import settings
+from src.core.timezone import utc_now
 from src.scheduler.job_state import get_state_datetime, set_state_datetime
 from src.services.traffic_tracker import get_last_message_at, is_today_lowest_traffic
 from src.services.maintenance import perform_maintenance
@@ -18,22 +18,18 @@ _DOWNTIME_NOTIFIED_KEY = "last_downtime_notified_at"
 _GDPR_RUN_KEY = "last_gdpr_run_at"
 
 
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
 def _is_idle(min_minutes: int = 20) -> bool:
     last_msg = get_last_message_at()
     if not last_msg:
         return True
-    return (_utc_now() - last_msg) >= timedelta(minutes=min_minutes)
+    return (utc_now() - last_msg) >= timedelta(minutes=min_minutes)
 
 
 def _gdpr_due() -> bool:
     last_run = get_state_datetime(_GDPR_RUN_KEY)
     if not last_run:
         return True
-    return (_utc_now() - last_run) >= timedelta(hours=24)
+    return (utc_now() - last_run) >= timedelta(hours=24)
 
 
 def _should_force_run() -> bool:
@@ -44,7 +40,7 @@ def run_downtime_monitor(poll_seconds: int = 300) -> None:
     """Monitor downtime, recover missed schedules, and run GDPR cleanup when due."""
     while True:
         try:
-            now = _utc_now()
+            now = utc_now()
 
             # Downtime detection (offline -> online)
             last_heartbeat = get_state_datetime(_HEARTBEAT_KEY)
@@ -67,9 +63,9 @@ def run_downtime_monitor(poll_seconds: int = 300) -> None:
             if _gdpr_due():
                 if _is_idle(min_minutes=20) or _should_force_run():
                     perform_maintenance(days_keep=settings.MEMORY_ARCHIVE_RETENTION_DAYS)
-                    set_state_datetime(_GDPR_RUN_KEY, _utc_now())
+                    set_state_datetime(_GDPR_RUN_KEY, utc_now())
                     send_admin_notification(
-                        f"[INFO] GDPR cleanup completed at {_utc_now().strftime('%Y-%m-%d %H:%M')}"
+                        f"[INFO] GDPR cleanup completed at {utc_now().strftime('%Y-%m-%d %H:%M')}"
                     )
 
         except Exception as e:

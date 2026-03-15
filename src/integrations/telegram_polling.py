@@ -103,19 +103,19 @@ async def _log_message(user_id: int, parsed: dict) -> None:
 
 async def _trigger_batch(user_id: int, external_id: str) -> None:
     """Trigger batch processing for user."""
-    from datetime import datetime, timedelta, timezone
+    from src.core.timezone import utc_now, utc_now_plus
 
     db = SessionLocal()
     try:
         existing = db.query(BatchLock).filter(
             BatchLock.user_id == user_id,
-            BatchLock.expires_at > datetime.now(timezone.utc).replace(tzinfo=None),
+            BatchLock.expires_at > utc_now(),
         ).first()
         if not existing:
             lock = BatchLock(
                 user_id=user_id,
                 channel="telegram",
-                expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=3),
+                expires_at=utc_now_plus(minutes=3),
             )
             db.add(lock)
             db.commit()

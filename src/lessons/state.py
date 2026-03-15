@@ -5,7 +5,7 @@ Uses users.lesson for current lesson state memory for completion history.
 
 from typing import Optional, Dict, Any
 from datetime import date, datetime, timezone
-from src.core.timezone import to_utc
+from src.core.timezone import date_is_past, to_utc
 from src.memories.manager import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.models.user import User
@@ -65,22 +65,16 @@ def compute_current_lesson_state(memory_manager: MemoryManager, user_id: int, to
     user = memory_manager.db.query(User).filter(User.user_id == user_id).first()
     last_active = getattr(user, 'last_active_at', None)
     
-    # Use UTC-aware today by default
-    if today is None:
-        today = datetime.now(timezone.utc).date()
-    
-    if last_active:
-        # Ensure consistent date comparison using timezone utils
-        last_active_date = to_utc(last_active).date()
-        if last_active_date < today:
-            previous_id = lesson_id
-            proposed_id = min(int(lesson_id) + 1, 365)
-            return {
-                "lesson_id": proposed_id,
-                "progress_note": None,
-                "advanced_by_day": True,
-                "previous_lesson_id": previous_id
-            }
+    # Centralized date comparison via timezone utils
+    if date_is_past(last_active):
+        previous_id = lesson_id
+        proposed_id = min(int(lesson_id) + 1, 365)
+        return {
+            "lesson_id": proposed_id,
+            "progress_note": None,
+            "advanced_by_day": True,
+            "previous_lesson_id": previous_id
+        }
 
     return {
         "lesson_id": int(lesson_id),

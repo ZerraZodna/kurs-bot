@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from datetime import datetime, timedelta, timezone
+#from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy.exc import OperationalError
@@ -12,6 +12,7 @@ from src.models.database import get_session, User, MessageLog, BatchLock
 from src.services.admin_notifier import set_admin_chat_id, send_admin_notification
 from src.services.traffic_tracker import record_traffic_event
 from src.models.database import SessionLocal
+from src.core.timezone import utc_now, utc_now_plus
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +124,7 @@ async def telegram_webhook(request: Request, secret_token: str):
             # Check if lock already exists and is still valid
             existing_lock = db.query(BatchLock).filter(
                 BatchLock.user_id == user_id,
-                BatchLock.expires_at > datetime.now(timezone.utc).replace(tzinfo=None)
+                BatchLock.expires_at > utc_now()
             ).first()
 
             if not existing_lock:
@@ -131,7 +132,7 @@ async def telegram_webhook(request: Request, secret_token: str):
                 lock = BatchLock(
                     user_id=user_id,
                     channel="telegram",
-                    expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=3)
+                    expires_at=utc_now_plus(minutes=3)
                 )
                 db.add(lock)
                 db.commit()

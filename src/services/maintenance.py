@@ -12,6 +12,7 @@ from src.scheduler.maintenance import (
     purge_job_states as _scheduler_purge_job_states,
 )
 from src.config import settings
+from src.core.timezone import utc_now, utc_now_plus
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ def purge_expired_batch_locks() -> None:
                 from src.models.database import BatchLock
 
                 deleted = db.query(BatchLock).filter(
-                    BatchLock.expires_at < datetime.now(timezone.utc).replace(tzinfo=None)
+                    BatchLock.expires_at < utc_now()
                 ).delete(synchronize_session=False)
                 if deleted:
                     logger.info("Purged %s expired batch locks", deleted)
