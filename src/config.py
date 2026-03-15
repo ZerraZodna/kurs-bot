@@ -8,7 +8,6 @@ class Settings(BaseSettings):
     # Telegram bot token left empty by default; test CI should provide via .env_template
     TELEGRAM_BOT_TOKEN: str = ""
     ADMIN_TELEGRAM_USERNAME: str = ""
-    SLACK_BOT_TOKEN: str = ""
     SENDGRID_API_KEY: str = ""
     # Ollama endpoints: allow separate URLs for local and cloud deployments.
     # - `LOCAL_OLLAMA_URL` should point at a local Ollama HTTP API (include /api/generate)

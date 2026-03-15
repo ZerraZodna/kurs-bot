@@ -1,6 +1,6 @@
 # Kurs Bot
 
-A chatbot with persistent memory that delivers daily lessons via Telegram, Slack, SMS, and email.
+A chatbot with persistent memory that delivers daily lessons via Telegram and email.
 
 ## Prerequisites
 
@@ -103,7 +103,6 @@ TELEGRAM_BOT_TOKEN=      # Get from @BotFather
 API_AUTH_TOKEN=          # For API authentication
 
 # Optional
-SLACK_BOT_TOKEN=         # Slack bot token
 SENDGRID_API_KEY=        # For email
 OLLAMA_BASE_URL=         # Default: http://localhost:11434
 DATABASE_URL=            # SQLite (dev) / SQL Server (prod)
@@ -120,7 +119,7 @@ DATABASE_URL=            # SQLite (dev) / SQL Server (prod)
 ```
 src/
 ├── api/          # FastAPI routes & webhooks
-├── integrations/ # Telegram, Slack, email adapters
+├── integrations/ # Telegram, email adapters
 ├── lessons/      # ACIM lesson delivery engine
 ├── memories/     # Persistent memory & RAG
 └── models/       # SQLAlchemy ORM

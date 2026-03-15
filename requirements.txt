@@ -1,10 +1,8 @@
 fastapi
 uvicorn
 sqlalchemy
-pyodbc
 alembic
 python-telegram-bot
-slack-sdk
 sendgrid
 pytest
 pytest-cov
@@ -13,10 +11,8 @@ pytest-xdist
 httpx
 apscheduler
 langdetect
-pypdf
-pdfplumber
 ollama
 pydantic_core==2.41.5
-numpy
 pydantic-settings
+numpy
 pymupdf

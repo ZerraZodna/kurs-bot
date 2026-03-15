@@ -5,7 +5,6 @@
 | Vendor | Purpose | Data Categories | Region | DPA/SCC Status | Notes |
 |---|---|---|---|---|---|
 | Telegram | Messaging delivery | Identifiers, message content | Global | TBD | Webhook processing |
-| Slack | Messaging delivery | Identifiers, message content | Global | TBD | Optional integration |
 | SendGrid | Email delivery | Email, message content | Global | TBD | Optional integration |
 | Hosting provider | App hosting | All | TBD | TBD | Fill in provider |
 

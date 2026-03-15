@@ -74,7 +74,7 @@ core.timezone
 ┌─────────────────────────────────────────────────────────────┐
 │                   External Integrations                     │
 │  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐     │
-│  │  Telegram    │   │    Slack     │   │     Email    │     │
+│  │  Telegram    │   │              │   │     Email    │     │
 │  └──────┬───────┘   └──────┬───────┘   └──────┬───────┘     │
 └─────────┼──────────────────┼──────────────────┼─────────────┘
           │                  │                  │
@@ -271,7 +271,7 @@ This section documents where personal data is stored, logged, and transmitted th
 ### Personal Data Flows (High Level)
 
 1. **Inbound Message**
-        - Source: Telegram, Slack, Email, Twilio, etc.
+        - Source: Telegram, Email, etc.
         - Data: external user id, message content, metadata
         - Stored in: Users (external_id/channel), MessageLog (content/status)
 
@@ -293,9 +293,7 @@ This section documents where personal data is stored, logged, and transmitted th
 
 ### Integrations That Receive/Send Personal Data
 - **Telegram**: Inbound messages and outbound replies include user id and message content
-- **Slack**: Same data types for workspace users
 - **Email**: Address and message content
-- **Twilio**: Phone number and message content
 
 For further details, see the GDPR documentation in the `docs/` directory.
 

@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 def verify_secrets_config() -> None:
     _check("TELEGRAM_BOT_TOKEN", settings.TELEGRAM_BOT_TOKEN, required=False)
-    _check("SLACK_BOT_TOKEN", settings.SLACK_BOT_TOKEN, required=False)
     _check("SENDGRID_API_KEY", settings.SENDGRID_API_KEY, required=False)
     _check("GDPR_ADMIN_TOKEN", settings.GDPR_ADMIN_TOKEN, required=True)
     _check("API_AUTH_TOKEN", settings.API_AUTH_TOKEN, required=False)
