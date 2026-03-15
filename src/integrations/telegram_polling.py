@@ -109,13 +109,13 @@ async def _trigger_batch(user_id: int, external_id: str) -> None:
     try:
         existing = db.query(BatchLock).filter(
             BatchLock.user_id == user_id,
-            BatchLock.expires_at > datetime.now(timezone.utc),
+            BatchLock.expires_at > datetime.now(timezone.utc).replace(tzinfo=None),
         ).first()
         if not existing:
             lock = BatchLock(
                 user_id=user_id,
                 channel="telegram",
-                expires_at=datetime.now(timezone.utc) + timedelta(minutes=3),
+                expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=3),
             )
             db.add(lock)
             db.commit()

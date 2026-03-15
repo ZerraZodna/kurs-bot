@@ -28,7 +28,7 @@ def purge_archived_memories(days_keep: int = 365, session: Optional[Session] = N
 def purge_expired_ttl_memories(session: Optional[Session] = None) -> int:
     """Delete memories whose TTL has expired. Returns number deleted."""
     with get_session(session) as s:
-        cutoff = datetime.now(timezone.utc)
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None)
         deleted = MemoryHandler(s).purge_expired_ttl_before(cutoff=cutoff)
         logger.info("Purged %s memories with expired TTL", deleted)
         return deleted
@@ -43,7 +43,7 @@ def purge_expired_batch_locks() -> None:
                 from src.models.database import BatchLock
 
                 deleted = db.query(BatchLock).filter(
-                    BatchLock.expires_at < datetime.now(timezone.utc)
+                    BatchLock.expires_at < datetime.now(timezone.utc).replace(tzinfo=None)
                 ).delete(synchronize_session=False)
                 if deleted:
                     logger.info("Purged %s expired batch locks", deleted)
@@ -59,7 +59,7 @@ def purge_expired_batch_locks() -> None:
 def purge_message_logs(days_keep: int = 30, session: Optional[Session] = None) -> int:
     """Delete message logs older than days_keep. Returns number deleted."""
     with get_session(session) as s:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days_keep)
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days_keep)
         q = s.query(MessageLog).filter(MessageLog.created_at < cutoff)
         deleted = q.count()
         q.delete(synchronize_session=False)

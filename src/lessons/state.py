@@ -73,15 +73,20 @@ def compute_current_lesson_state(memory_manager: MemoryManager, user_id: int, to
         today = datetime.now(timezone.utc).date()
     today_date = today
     
-    if last_active and last_active.date() < today_date:
-        previous_id = lesson_id
-        proposed_id = min(int(lesson_id) + 1, 365)
-        return {
-            "lesson_id": proposed_id,
-            "progress_note": None,
-            "advanced_by_day": True,
-            "previous_lesson_id": previous_id
-        }
+    if last_active:
+        if hasattr(last_active, 'date'):
+            last_active_date = last_active.date()
+        else:
+            last_active_date = last_active
+        if last_active_date < today_date:
+            previous_id = lesson_id
+            proposed_id = min(int(lesson_id) + 1, 365)
+            return {
+                "lesson_id": proposed_id,
+                "progress_note": None,
+                "advanced_by_day": True,
+                "previous_lesson_id": previous_id
+            }
 
     return {
         "lesson_id": int(lesson_id),
