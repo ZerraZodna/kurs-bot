@@ -9,7 +9,6 @@ from src.middleware.logging_redaction import apply_logging_redaction
 from src.services.security_checks import verify_secrets_config
 from src.models.database import SessionLocal, Lesson, Base, engine
 from src.config import settings
-from src.services.downtime_monitor import run_downtime_monitor
 from src.scheduler import SchedulerService
 from src.api.dialogue_routes import router as dialogue_router
 from src.api.gdpr_routes import router as gdpr_router
@@ -69,9 +68,6 @@ async def lifespan(app: FastAPI):
     if not getattr(settings, "IS_TEST_ENV", False):
         t = threading.Thread(target=nightly_memory_purge, daemon=True)
         t.start()
-
-        t2 = threading.Thread(target=run_downtime_monitor, daemon=True)
-        t2.start()
         
         # Start Telegram long-polling if enabled
         polling_task = start_polling_task()
