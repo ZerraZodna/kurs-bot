@@ -29,6 +29,10 @@ jobs:
           python -m pip install --upgrade pip
           # Install project requirements for CI
           pip install -r requirements.txt
+      - name: Lint
+        run: |
+          ruff check . --output-format=github
+          ruff format --check .
       # No model pre-download needed (embeddings removed)
       - name: Prepare env
         run: |
