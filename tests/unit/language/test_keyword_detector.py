@@ -1,4 +1,3 @@
-import pytest
 
 from src.language.keyword_detector import detect_language
 

@@ -2,10 +2,10 @@
 Tests for duplicate reminder prevention in the scheduler.
 """
 import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
-from src.scheduler.manager import find_existing_one_time_reminder, create_schedule
+from src.scheduler.manager import find_existing_one_time_reminder
 from src.scheduler.operations import create_one_time_schedule
 from src.scheduler.domain import SCHEDULE_TYPE_ONE_TIME_REMINDER
 

@@ -128,7 +128,7 @@ def parse_lessons_from_text(full_text: str) -> List[Tuple[int, str, str]]:
     out = []
     if lessons_raw:
         first_header_line = headers[0][0]
-        for idx, (hl, lid) in enumerate(headers):
+        for _idx, (hl, lid) in enumerate(headers):
             val = lid[0] if isinstance(lid, tuple) else lid
             if val == 1:
                 first_header_line = hl

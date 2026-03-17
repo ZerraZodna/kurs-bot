@@ -5,9 +5,8 @@ operations.py, then converted again in jobs.py. This test verifies the bug
 and will pass once the fix is applied.
 """
 
-import pytest
 from datetime import datetime, timezone, timedelta
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from zoneinfo import ZoneInfo
 
 
@@ -172,8 +171,6 @@ class TestDateTriggerBehavior:
         at the expected moment.
         """
         from apscheduler.triggers.date import DateTrigger
-        from apscheduler.schedulers.background import BackgroundScheduler
-        import time
         
         # Create a UTC time 2 seconds in the future
         future_utc = datetime.now(timezone.utc) + timedelta(seconds=2)

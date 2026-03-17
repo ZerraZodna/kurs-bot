@@ -5,13 +5,11 @@ Refactored to use new test fixtures from tests/fixtures/
 
 import datetime
 
-import pytest
 from sqlalchemy.orm import Session
 
 from src.models.database import Memory
 from src.memories import MemoryManager
 from src.services.maintenance import purge_archived_memories
-from tests.utils.assertions import assert_memory_stored
 
 
 class TestMemoryManager:

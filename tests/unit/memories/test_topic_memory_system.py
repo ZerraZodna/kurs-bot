@@ -2,12 +2,11 @@
 
 import pytest
 import random
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 from src.models.database import init_db, SessionLocal, Memory
 from src.memories.manager import MemoryManager
-from src.memories.topic_manager import TopicManager
-from src.memories.topics import MemoryTopic, resolve_canonical_key
+from src.memories.topics import MemoryTopic
 from src.memories.constants import MemoryCategory, MemoryKey
 
 

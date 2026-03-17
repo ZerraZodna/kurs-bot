@@ -153,8 +153,8 @@ class DialogueEngine:
             and self.onboarding.should_show_onboarding(user_id)
             and not use_rag
         ):
-            from src.memories.constants import MemoryKey
-            pending_step = self.memory_manager.get_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING)
+            # from src.memories.constants import MemoryKey
+            # pending_step = self.memory_manager.get_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING)
             onboarding_response = await self.onboarding_flow.handle_onboarding(user_id, text, session)
             return onboarding_response
         

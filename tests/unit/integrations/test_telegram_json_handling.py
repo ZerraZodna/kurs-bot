@@ -2,7 +2,7 @@
 Test to verify what gets passed to send_message when AI returns JSON.
 """
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock
 import asyncio
 
 
@@ -37,9 +37,9 @@ def test_json_response_extraction():
     print(f"\n{'='*60}")
     print("JSON RESPONSE TEST:")
     print(f"{'='*60}")
-    print(f"Raw AI response (full_response):")
+    print("Raw AI response (full_response):")
     print(f"  {ai_json_response[:80]}...")
-    print(f"\nExtracted response_text:")
+    print("\nExtracted response_text:")
     print(f"  '{extracted}'")
     print(f"{'='*60}")
     
@@ -72,9 +72,9 @@ def test_empty_response_with_function():
     print(f"\n{'='*60}")
     print("EMPTY RESPONSE WITH FUNCTION TEST:")
     print(f"{'='*60}")
-    print(f"Raw AI response (full_response):")
+    print("Raw AI response (full_response):")
     print(f"  {ai_json_response[:60]}...")
-    print(f"\nExtracted response_text:")
+    print("\nExtracted response_text:")
     print(f"  '{extracted}'")
     print(f"Length: {len(extracted)}")
     print(f"{'='*60}")
@@ -104,9 +104,9 @@ async def test_telegram_batch_with_json_response():
     print(f"\n{'='*60}")
     print("TELEGRAM BATCH SIMULATION:")
     print(f"{'='*60}")
-    print(f"Accumulated full_response:")
+    print("Accumulated full_response:")
     print(f"  {full_response[:80]}...")
-    print(f"\nExtracted ai_response:")
+    print("\nExtracted ai_response:")
     print(f"  '{ai_response}'")
     print(f"{'='*60}")
     
@@ -157,9 +157,9 @@ async def test_telegram_batch_with_empty_response():
     print(f"\n{'='*60}")
     print("EMPTY RESPONSE TEST:")
     print(f"{'='*60}")
-    print(f"Accumulated full_response:")
+    print("Accumulated full_response:")
     print(f"  {full_response[:60]}...")
-    print(f"\nExtracted ai_response:")
+    print("\nExtracted ai_response:")
     print(f"  '{ai_response}'")
     print(f"Should send message: {should_send}")
     print(f"{'='*60}")

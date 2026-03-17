@@ -1,11 +1,9 @@
-import pytest
 from datetime import datetime, timezone, timedelta
 
-from src.models.database import SessionLocal, User, Schedule, init_db
-from src.memories import MemoryManager
+from src.models.database import SessionLocal, User, Schedule
 from src.scheduler import SchedulerService
 from src.scheduler import manager as schedule_manager
-from src.core.timezone import format_dt_in_timezone, to_utc, parse_local_time_to_utc
+from src.core.timezone import format_dt_in_timezone, to_utc
 
 
 def _create_test_user(db, timezone_name=None):

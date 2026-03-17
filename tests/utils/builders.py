@@ -7,7 +7,7 @@ import datetime
 from typing import List, Optional, Any, Dict
 from sqlalchemy.orm import Session
 
-from src.models.database import Memory, Schedule, MessageLog, User, Lesson
+from src.models.database import Memory, Schedule, MessageLog, Lesson
 
 
 class MemoryBuilder:

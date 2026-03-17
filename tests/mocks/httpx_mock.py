@@ -2,7 +2,7 @@
 
 import os
 from typing import Any, Dict, Optional
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock
 
 
 class DummyResponse:

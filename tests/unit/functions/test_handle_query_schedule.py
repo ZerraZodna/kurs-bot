@@ -10,10 +10,10 @@ This test file covers the query_schedule function handler which:
 import pytest
 import json
 from datetime import datetime, timezone
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from src.functions.executor import FunctionExecutor
-from src.models.database import User, Schedule
+from src.models.database import Schedule
 from src.memories import MemoryManager
 from src.memories.constants import MemoryKey, MemoryCategory
 

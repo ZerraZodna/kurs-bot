@@ -5,12 +5,11 @@ Migrated from tests/test_prompt_builder.py to use new test fixtures.
 """
 
 import pytest
-from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
-from src.models.database import User, Memory, MessageLog
+from src.models.database import User, MessageLog
 from src.memories import MemoryManager
 from src.language.prompt_builder import PromptBuilder
-from src.services.context_utils import ContextOptimizer, MemoryKey, MemoryCategory
+from src.services.context_utils import ContextOptimizer
 
 
 @pytest.fixture

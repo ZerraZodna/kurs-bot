@@ -3,8 +3,8 @@ Test to confirm the bug where full JSON response with function calls
 is sent to Telegram instead of just the response text.
 """
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from src.functions.intent_parser import IntentParser, ParseResult
+from unittest.mock import MagicMock
+from src.functions.intent_parser import IntentParser
 
 
 class TestResponseParsingBug:
@@ -88,9 +88,9 @@ class TestResponseParsingBug:
         print(f"\n{'='*60}")
         print("BUG DEMONSTRATION:")
         print(f"{'='*60}")
-        print(f"Raw LLM response (CURRENTLY sent to Telegram):")
+        print("Raw LLM response (CURRENTLY sent to Telegram):")
         print(f"  {raw_llm_response[:80]}...")
-        print(f"\nParsed response_text (SHOULD be sent to Telegram):")
+        print("\nParsed response_text (SHOULD be sent to Telegram):")
         print(f"  {parsed.response_text}")
         print(f"{'='*60}")
 

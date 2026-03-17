@@ -141,7 +141,7 @@ async def detect_and_store_language(
     try:
         code, conf, meta = keyword_detect(user_message)
     except Exception:
-        code, conf, meta = None, 0.0, {}
+        code = None
 
     if code:
         code = code.lower()

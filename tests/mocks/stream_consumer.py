@@ -1,4 +1,3 @@
-import asyncio
 
 async def consume_stream_response(response):
     """
@@ -13,7 +12,6 @@ async def consume_stream_response(response):
     if not isinstance(response, dict) or response.get('type') != 'stream':
         return str(response), None
     
-    import asyncio
     from src.integrations.telegram_stream import StreamingFilter
     from src.functions.intent_parser import get_intent_parser
     from src.functions.response_builder import get_response_builder

@@ -52,7 +52,7 @@ def extract_formatted_text(pdf_path: Path) -> str:
     doc = fitz.open(str(pdf_path))
     text_runs = []
 
-    for page_num, page in enumerate(doc, start=1):
+    for _page_num, page in enumerate(doc, start=1):
         page_text_runs = []
         blocks = page.get_text('dict').get('blocks', [])
         for b in blocks:

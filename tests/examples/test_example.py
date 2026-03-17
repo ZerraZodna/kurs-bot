@@ -11,7 +11,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 # Import fixtures (they're automatically available via conftest.py)
-from src.models.database import User, Memory
+from src.models.database import User
 from src.memories import MemoryManager
 
 # Import utilities

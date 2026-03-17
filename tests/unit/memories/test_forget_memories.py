@@ -1,10 +1,9 @@
 """
-Unit tests for _handle_forget_memories in FunctionExecutor.
+ Unit tests for _handle_forget_memories in FunctionExecutor.
 
 Tests semantic memory deletion via AI function call.
 """
 import pytest
-import datetime
 from unittest.mock import Mock, AsyncMock, MagicMock
 from typing import List, Tuple
 from sqlalchemy import create_engine
@@ -35,7 +34,7 @@ async def test_handle_forget_memories_success():
 
     # Mock semantic search service
     fake_search_service = Mock()
-    fake_memories: List[Tuple[Memory, float]] = [
+    fake_memories: List[Tuple] = [
         (MagicMock(memory_id=1), 0.95),
         (MagicMock(memory_id=2), 0.90),
         (MagicMock(memory_id=3), 0.85),

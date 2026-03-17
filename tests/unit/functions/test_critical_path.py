@@ -6,14 +6,14 @@ Tests key functions without requiring full database setup.
 import pytest
 import json
 from datetime import datetime
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 # Import the modules we're testing
-from src.functions.registry import FunctionRegistry, get_function_registry, ParameterType
-from src.functions.intent_parser import IntentParser, ParseResult, get_intent_parser
+from src.functions.registry import FunctionRegistry, get_function_registry
+from src.functions.intent_parser import IntentParser, get_intent_parser
 from src.functions.parameters import ParameterValidator
 from src.functions.executor import FunctionExecutor, ExecutionResult, BatchExecutionResult
-from src.functions.response_builder import ResponseBuilder, BuiltResponse
+from src.functions.response_builder import ResponseBuilder
 
 
 class TestFunctionRegistry:

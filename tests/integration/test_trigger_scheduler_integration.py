@@ -4,15 +4,11 @@ Integration tests for trigger-driven scheduler.
 Migrated from tests/test_trigger_scheduler_integration.py to use new test fixtures.
 """
 
-import asyncio
-import re
 import pytest
-from pathlib import Path
 
 from src.models.database import User
 from src.services.dialogue_engine import DialogueEngine
 from src.scheduler import SchedulerService
-from src.config import settings
 from src.functions.executor import get_function_executor
 
 @pytest.mark.asyncio

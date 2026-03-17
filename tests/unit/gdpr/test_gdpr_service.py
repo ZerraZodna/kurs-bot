@@ -4,17 +4,12 @@ Migrated tests for GDPR service.
 """
 import datetime
 
-import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 from src.models.database import (
-    Base,
     User,
     Memory,
     MessageLog,
     Schedule,
-    Unsubscribe,
 )
 from src.services.maintenance import purge_expired_ttl_memories
 from src.services.gdpr_service import (

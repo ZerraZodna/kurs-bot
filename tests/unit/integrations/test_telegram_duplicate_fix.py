@@ -10,7 +10,7 @@ The fix: Run post_hook FIRST, then decide what to send:
 """
 from typing import Optional
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 
 async def mock_generator(tokens):

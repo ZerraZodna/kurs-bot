@@ -2,9 +2,7 @@
 Test to confirm the bug where asking about "today's lesson" 
 returns JSON with function calls instead of natural language response.
 """
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from src.functions.intent_parser import IntentParser, ParseResult
+from src.functions.intent_parser import IntentParser
 
 
 class TestTodaysLessonJsonBug:
@@ -68,9 +66,9 @@ class TestTodaysLessonJsonBug:
         print(f"\n{'='*60}")
         print("BUG DEMONSTRATION - Today's Lesson:")
         print(f"{'='*60}")
-        print(f"Raw LLM response (CURRENTLY sent to user):")
+        print("Raw LLM response (CURRENTLY sent to user):")
         print(f"  {raw_llm_response}")
-        print(f"\nParsed response_text (SHOULD be sent to user):")
+        print("\nParsed response_text (SHOULD be sent to user):")
         print(f"  {result.response_text}")
         print(f"{'='*60}")
     

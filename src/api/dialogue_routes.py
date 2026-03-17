@@ -180,7 +180,6 @@ async def delete_memory(user_id: int, key: str, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    memory_manager = MemoryManager(db)
     # Note: This implementation archives memories; modify as needed
     # For now, we'll just return a success response
     

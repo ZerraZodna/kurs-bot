@@ -1,10 +1,9 @@
 """Unit tests for lesson repeat and memory conflict resolution."""
 
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
-from datetime import datetime, timezone, timedelta
+from unittest.mock import MagicMock
 
-from src.memories.constants import MemoryKey, MemoryCategory
+from src.memories.constants import MemoryKey
 
 
 class TestLessonRepeatOffered:

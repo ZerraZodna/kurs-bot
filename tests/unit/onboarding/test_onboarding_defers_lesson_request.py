@@ -6,7 +6,6 @@ Simplified onboarding flow: Name -> Consent
 import pytest
 import os
 
-from src.models.database import Schedule
 from src.services.dialogue_engine import DialogueEngine
 from src.memories import MemoryManager
 from src.lessons.state import get_current_lesson

@@ -4,7 +4,6 @@ Migrated tests for RAG list memories.
 """
 import datetime
 
-import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 

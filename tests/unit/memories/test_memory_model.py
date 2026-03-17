@@ -5,7 +5,6 @@ Migrated from tests/test_memory_model.py to use new test fixtures.
 
 import datetime
 
-import pytest
 from sqlalchemy.orm import Session
 
 from src.models.database import Memory, User

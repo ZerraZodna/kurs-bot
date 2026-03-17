@@ -4,7 +4,7 @@ Provides standardized assertion functions for common test scenarios.
 These make tests more readable and reduce duplication.
 """
 
-from typing import Optional, List, Any
+from typing import Optional, List
 from sqlalchemy.orm import Session
 
 from src.models.database import Memory, Schedule, MessageLog, User

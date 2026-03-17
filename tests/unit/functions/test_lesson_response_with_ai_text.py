@@ -6,8 +6,7 @@ send_todays_lesson, the final response includes the full lesson content
 from the function result, not just the AI's introductory text.
 """
 
-import pytest
-from src.functions.response_builder import ResponseBuilder, BuiltResponse
+from src.functions.response_builder import ResponseBuilder
 from src.functions.executor import ExecutionResult, BatchExecutionResult
 
 

@@ -113,13 +113,13 @@ def db_session_with_user(db_session) -> Generator[Session, None, None]:
 
 
 @pytest.fixture(scope="function")
-def clean_db() -> Generator[None, None, None]:
+def clean_db(db_engine) -> Generator[None, None, None]:
     """Ensures database is clean before test runs.
 
     Drops and recreates all tables for a completely fresh state.
     Use sparingly as it's slower than the default per-test isolation.
     """
-    Base.metadata.drop_all(_app_engine)
-    Base.metadata.create_all(_app_engine)
+    Base.metadata.drop_all(db_engine)
+    Base.metadata.create_all(db_engine)
     yield
 

@@ -57,7 +57,7 @@ def _strip_unsupported_tags(text: str) -> str:
         return match.group(1) or ''
     
     # Match opening tags with content: <unsupported>content</unsupported>
-    pattern = r'<(/?)(?!/?(?:' + '|'.join(supported_tags) + r')\b)(\w+)[^>]*>([^<]*)'
+    # pattern = r'<(/?)(?!/?(?:' + '|'.join(supported_tags) + r')\b)(\w+)[^>]*>([^<]*)'
     
     # Use a different approach: find each tag and check if supported
     result = []
@@ -74,7 +74,7 @@ def _strip_unsupported_tags(text: str) -> str:
             tag = text[i:end+1]
             
             # Check if it's a closing tag
-            is_closing = tag.startswith('</')
+            # is_closing = tag.startswith('</')
             
             # Extract tag name
             tag_name = re.sub(r'[</>]', '', tag).lower()

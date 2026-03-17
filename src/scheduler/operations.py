@@ -167,7 +167,7 @@ def create_one_time_schedule(
 ) -> Schedule:
     """Create a one-time reminder schedule."""
     with get_session(session) as s:
-        now = utc_now()
+        # now = utc_now()
         from src.core.timezone import to_utc
 
         run_at = to_utc(run_at)

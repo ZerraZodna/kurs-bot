@@ -1,11 +1,8 @@
 """Unit tests for UserFactory test utility."""
 
-import pytest
 from sqlalchemy.orm import Session
 
-from src.models.database import User
 from src.memories import MemoryManager
-from src.onboarding.service import OnboardingService
 
 
 class TestUserFactory:

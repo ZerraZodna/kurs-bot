@@ -10,13 +10,8 @@ Tests the flow where:
 import pytest
 
 from src.models.database import Lesson
-from src.services.dialogue_engine import DialogueEngine
 from src.memories import MemoryManager
 from src.lessons.state import get_current_lesson, set_current_lesson
-from unittest.mock import AsyncMock
-from tests.fixtures.users import make_ready_user
-from tests.mocks.ollama_mock import OllamaMock
-from tests.mocks.stream_consumer import consume_stream_response
 
 
 def _ensure_lesson(session, lesson_id: int, title: str, content: str):

@@ -17,7 +17,6 @@ from src.models.database import (
     Unsubscribe,
 )
 from src.services.gdpr_service import record_consent
-from tests.fixtures.database import db_session
 
 
 @pytest.fixture

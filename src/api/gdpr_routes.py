@@ -113,7 +113,7 @@ async def gdpr_export(
     try:
         data = export_user_data(db, request.user_id)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     return data
 
@@ -131,7 +131,7 @@ async def gdpr_export_get(
     try:
         data = export_user_data(db, user_id)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     return data
 
@@ -145,7 +145,7 @@ async def gdpr_restrict(
     try:
         restrict_processing(db, request.user_id, request.reason, request.actor)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     return {"status": "restricted", "user_id": request.user_id}
 
@@ -159,7 +159,7 @@ async def gdpr_object(
     try:
         object_to_processing(db, request.user_id, request.reason, request.actor)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     return {"status": "objected", "user_id": request.user_id}
 
@@ -178,7 +178,7 @@ async def gdpr_rectify(
         )
         rectify_user(db, request.user_id, request.updates, memory_updates, request.actor)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     return {"status": "rectified", "user_id": request.user_id}
 
@@ -192,7 +192,7 @@ async def gdpr_erase(
     try:
         erase_user_data(db, request.user_id, request.reason, request.actor)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     return {"status": "erased", "user_id": request.user_id}
 
@@ -208,7 +208,7 @@ async def gdpr_clean(
 
         clean_user_data(db, request.user_id, request.reason, request.actor)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     return {"status": "cleaned", "user_id": request.user_id}
 
@@ -222,7 +222,7 @@ async def gdpr_withdraw_consent(
     try:
         withdraw_consent(db, request.user_id, request.scope, request.actor, request.reason)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     return {"status": "withdrawn", "user_id": request.user_id}
 

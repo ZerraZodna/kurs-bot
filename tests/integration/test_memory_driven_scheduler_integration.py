@@ -8,8 +8,6 @@ import pytest
 from src.models.database import User, Schedule
 from src.memories import MemoryManager
 from src.memories.constants import MemoryKey
-from src.services.dialogue_engine import DialogueEngine
-from src.scheduler import SchedulerService
 from src.functions.executor import get_function_executor
 
 

@@ -66,7 +66,7 @@ class ParameterValidator:
             (r"^(\d{1,2})\s*(am|pm)$", "H AM/PM"),
         ]
         
-        for pattern, desc in patterns:
+        for pattern, _desc in patterns:
             match = re.match(pattern, time_str, re.IGNORECASE)
             if match:
                 groups = match.groups()

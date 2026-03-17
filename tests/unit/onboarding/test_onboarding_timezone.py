@@ -8,13 +8,10 @@ These tests verify that:
 """
 
 import pytest
-from datetime import datetime, timezone
-from unittest.mock import patch, MagicMock
 
 from src.memories import MemoryManager
 from src.onboarding import OnboardingService
 from src.onboarding import schedule_setup
-from src.onboarding.flow import OnboardingFlow
 from src.models.database import User, Schedule
 from src.scheduler.domain import SCHEDULE_TYPE_DAILY
 

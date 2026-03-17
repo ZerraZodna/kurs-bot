@@ -28,7 +28,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           # Install project requirements for CI
-          pip install --no-cache-dir -r requirements.txt
+          pip install -r requirements.txt
       # No model pre-download needed (embeddings removed)
       - name: Prepare env
         run: |

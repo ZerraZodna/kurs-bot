@@ -3,7 +3,6 @@
 Refactored to use new test fixtures from tests/fixtures/
 """
 
-import pytest
 from sqlalchemy.orm import Session
 
 from src.models.database import User

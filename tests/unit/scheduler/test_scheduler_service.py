@@ -8,8 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.lessons.state import set_current_lesson
-from src.models.database import Base, User, Lesson, Schedule, Memory, MessageLog
-from src.memories.constants import MemoryKey
+from src.models.database import Base, User, Lesson, Schedule, MessageLog
 from src import scheduler as scheduler_module
 
 
@@ -83,7 +82,6 @@ class TestSchedulerService:
 
         monkeypatch.setattr(scheduler_module, "send_message", fake_send_message)
 
-        from datetime import timedelta
 
         # Given: User with active daily schedule
         user = db_session.query(User).first()
@@ -105,7 +103,7 @@ class TestSchedulerService:
 
         # Given: Last sent lesson is 1
         from src.memories import MemoryManager
-        from src.lessons.state import get_current_lesson, compute_current_lesson_state, set_current_lesson
+        from src.lessons.state import get_current_lesson, compute_current_lesson_state
 
         mm = MemoryManager(db_session)
         set_current_lesson(mm, user.user_id, 1)

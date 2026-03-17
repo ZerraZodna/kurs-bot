@@ -163,7 +163,7 @@ class OllamaMock:
         if tool_calls:
             # Yield JSON with functions for intent_parser + lesson content
             full_json = json.dumps({
-                "response": f"Lesson 26: {lesson_26.title}\\n\\n{lesson_26.content}",
+"Forgiveness"
                 "functions": tool_calls
             })
             yield full_json

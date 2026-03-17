@@ -124,7 +124,7 @@ def get_topic_for_key(key: str) -> Optional[MemoryTopic]:
 def get_all_keys_for_topic(topic: MemoryTopic) -> List[str]:
     """Get all key synonyms that map to a given topic."""
     keys = []
-    for key, (t, field) in CANONICAL_KEY_MAP.items():
+    for key, (t, _field) in CANONICAL_KEY_MAP.items():
         if t == topic:
             keys.append(key)
     return keys

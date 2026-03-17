@@ -4,10 +4,9 @@ Refactored to use new test fixtures from tests/fixtures/
 """
 
 import datetime
-import pytest
 from sqlalchemy.orm import Session
 
-from src.models.database import User, Lesson, Schedule
+from src.models.database import Schedule
 from src.scheduler import manager
 
 

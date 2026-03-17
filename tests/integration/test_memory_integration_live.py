@@ -3,13 +3,9 @@ Migrated live integration tests for memory with real Ollama.
  migrated from tests/test_memory_integration_live.py
 """
 import pytest
-import httpx
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from src.models.database import Base, User, Memory
-from src.services.dialogue_engine import DialogueEngine
-from src.config import settings
-from tests.fixtures.users import make_ready_user
+from src.models.database import Base, User
 
 
 @pytest.fixture(scope="function")

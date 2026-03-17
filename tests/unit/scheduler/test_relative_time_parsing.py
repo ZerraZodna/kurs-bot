@@ -7,7 +7,6 @@ is scheduled correctly in their local timezone, not UTC.
 import pytest
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
-from unittest.mock import MagicMock, patch
 
 
 class TestRelativeTimeParsing:
@@ -155,11 +154,11 @@ class TestRelativeTimeParsing:
         buggy_oslo = buggy_result.astimezone(oslo_tz)  # 16:14 Oslo
         correct_oslo = correct_result.astimezone(oslo_tz)  # 15:14 Oslo
         
-        print(f"\nBug scenario:")
+        print("\nBug scenario:")
         print(f"  Bug base (treated as UTC): {buggy_base}")
         print(f"  Bug result (UTC): {buggy_result}")
         print(f"  Bug result (Oslo): {buggy_oslo}")
-        print(f"\nCorrect scenario:")
+        print("\nCorrect scenario:")
         print(f"  Correct base (UTC): {correct_base}")
         print(f"  Correct result (UTC): {correct_result}")
         print(f"  Correct result (Oslo): {correct_oslo}")

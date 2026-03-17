@@ -1,6 +1,5 @@
 """Tests for the StreamingFilter class."""
 import pytest
-from unittest.mock import AsyncMock
 from src.integrations.telegram_stream import StreamingFilter
 
 

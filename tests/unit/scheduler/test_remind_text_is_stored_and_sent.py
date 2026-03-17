@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 
 import pytest
 
-from src.models.database import SessionLocal, User, init_db, Memory, Schedule
+from src.models.database import SessionLocal, Schedule
 from src.memories import MemoryManager
 from src.functions.executor import get_function_executor
 

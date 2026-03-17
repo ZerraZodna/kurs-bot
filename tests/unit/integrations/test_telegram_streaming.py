@@ -7,8 +7,7 @@ The streaming feature sends LLM responses to users in real-time by:
 3. Running post-hook (function calling) after streaming completes
 """
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
-from typing import Optional
+from unittest.mock import patch
 
 
 async def mock_token_generator(tokens: list[str]):
@@ -162,7 +161,6 @@ async def test_streaming_respects_min_update_interval():
     and only update Telegram at most every N seconds.
     """
     from src.integrations.telegram import send_message_streaming
-    import time
     
     with patch('src.integrations.telegram.send_message') as mock_send:
         with patch('src.integrations.telegram.edit_message') as mock_edit:
@@ -198,8 +196,7 @@ if __name__ == "__main__":
             ("test_send_message_streaming_returns_full_text", test_send_message_streaming_returns_full_text),
             ("test_send_message_streaming_edits_message_progressive", test_send_message_streaming_edits_message_progressive),
             ("test_send_message_streaming_with_empty_generator", test_send_message_streaming_with_empty_generator),
-            ("test_process_telegram_batch_uses_streaming_when_enabled", test_process_telegram_batch_uses_streaming_when_enabled),
-            ("test_process_telegram_batch_non_streaming_when_disabled", test_process_telegram_batch_non_streaming_when_disabled),
+
             ("test_streaming_respects_min_update_interval", test_streaming_respects_min_update_interval),
         ]
         

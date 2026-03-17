@@ -19,13 +19,13 @@ select = [
 ]
 ignore = [
     "B008",   # function call in default argument (FastAPI Depends pattern)
-    "F811",   # redefinition — some test fixtures trigger this
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = [
     "DTZ",    # datetime strictness relaxed in tests
     "B",      # bugbear relaxed in tests
+    "F841",   # unused variable in tests
 ]
 "migrations/**/*.py" = [
     "F",      # migrations are auto-generated
@@ -35,6 +35,9 @@ ignore = [
 "src/services/traffic_tracker.py" = ["DTZ007"]
 # Intentional re-exports for backward compatibility
 "src/models/database.py" = ["F401"]
+"src/scheduler/maintenance.py" = ["F401"]
+"src/scheduler/manager.py" = ["F401"]
+"src/api/telegram_routes.py" = ["F401"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]

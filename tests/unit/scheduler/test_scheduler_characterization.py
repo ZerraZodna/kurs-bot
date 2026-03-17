@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
-from src.models.database import MessageLog, Schedule, User
+from src.models.database import Schedule, User
 from src.scheduler import SchedulerService
 from src.core.timezone import format_dt_in_timezone
 from src.functions.executor import get_function_executor

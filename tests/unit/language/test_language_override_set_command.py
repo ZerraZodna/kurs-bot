@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 from src.models.database import User
 from src.memories import MemoryManager
 from src.services.dialogue_engine import DialogueEngine
-from tests.fixtures.users import make_ready_user
 
 
 class TestLanguageOverrideSetCommand:

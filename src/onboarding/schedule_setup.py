@@ -57,7 +57,7 @@ def create_auto_schedule(db: Session, user_id: int) -> bool:
         except Exception:
             lesson_id = None
 
-        schedule = scheduler_api.create_daily_schedule(
+        scheduler_api.create_daily_schedule(
             user_id=user_id,
             lesson_id=lesson_id,
             time_str="07:30",
