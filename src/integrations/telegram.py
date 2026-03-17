@@ -20,31 +20,31 @@ API_BASE = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
 def sanitize_html_for_telegram(text: str) -> str:
     """Sanitize HTML to Telegram-supported format.
-    
+
     Converts unsupported tags (<ul>, <li>, <br>) to plain text
     while preserving supported formatting tags (<b>, <i>, <em>, <u>, etc).
-    
+
     Telegram supports: <b>, <strong>, <i>, <em>, <u>, <s>, <code>, <pre>, <a>
     Unsupported (converted): <ul>, <li>, <br>
     """
     if not text:
         return text
-    
+
     # Step 1: Convert <ul><li> items to bullet points with dashes
     # First handle <li> content and prepend with dash
     text = re.sub(r"<li>(.*?)</li>", r"- \1\n", text, flags=re.DOTALL)
     # Remove <ul> tags
     text = re.sub(r"</?ul[^>]*>", "", text, flags=re.IGNORECASE)
-    
+
     # Step 2: Convert <br> to newlines
     text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
-    
+
     # Step 3: Strip unsupported HTML tags but keep their content
     text = _strip_unsupported_tags(text)
-    
+
     # Clean up excessive newlines
     text = re.sub(r"\n{3,}", "\n\n", text)
-    
+
     return text.strip()
 
 
@@ -52,16 +52,16 @@ def _strip_unsupported_tags(text: str) -> str:
     """Remove HTML tags that Telegram doesn't support, keeping their content."""
     # List of tags Telegram supports
     supported_tags = ["b", "strong", "i", "em", "u", "s", "code", "pre", "a"]
-    
+
     # Pattern to match any tag not in supported list
     # This matches <tag> or </tag> where tag is not in supported list
     def replace_tag(match):
         # Return just the content between tags
         return match.group(1) or ""
-    
+
     # Match opening tags with content: <unsupported>content</unsupported>
     # pattern = r'<(/?)(?!/?(?:' + '|'.join(supported_tags) + r')\b)(\w+)[^>]*>([^<]*)'
-    
+
     # Use a different approach: find each tag and check if supported
     result = []
     i = 0
@@ -73,29 +73,29 @@ def _strip_unsupported_tags(text: str) -> str:
                 result.append(text[i])
                 i += 1
                 continue
-            
-            tag = text[i:end+1]
-            
+
+            tag = text[i : end + 1]
+
             # Check if it's a closing tag
             # is_closing = tag.startswith('</')
-            
+
             # Extract tag name
             tag_name = re.sub(r"[</>]", "", tag).lower()
             # Handle self-closing tags and attributes
             tag_name = re.split(r"[\s>]", tag_name)[0]
-            
+
             if tag_name in supported_tags:
                 # Keep the tag
                 result.append(tag)
             else:
                 # Skip the tag but keep content (handled separately)
                 pass
-            
+
             i = end + 1
         else:
             result.append(text[i])
             i += 1
-    
+
     return "".join(result)
 
 
@@ -122,23 +122,21 @@ class TelegramHandler:
             "timestamp": datetime.fromtimestamp(msg.get("date", 0), timezone.utc),
         }
 
+
 async def send_typing_action(chat_id: int) -> bool:
     """Send typing indicator to Telegram chat.
-    
+
     Args:
         chat_id: Telegram chat ID
-        
+
     Returns:
         True if successful, False otherwise
     """
     if not TELEGRAM_BOT_TOKEN:
         return False
-    
+
     url = f"{API_BASE}/sendChatAction"
-    payload = {
-        "chat_id": chat_id,
-        "action": "typing"
-    }
+    payload = {"chat_id": chat_id, "action": "typing"}
     async with httpx.AsyncClient() as client:
         try:
             r = await client.post(url, json=payload, timeout=10.0)
@@ -152,10 +150,10 @@ async def edit_message(chat_id: int, message_id: int, text: str) -> Optional[dic
     """Edit an existing Telegram message with new text."""
     if not TELEGRAM_BOT_TOKEN:
         return None
-    
+
     # Sanitize HTML to Telegram-supported format
     text = sanitize_html_for_telegram(text)
-    
+
     url = f"{API_BASE}/editMessageText"
     payload = {
         "chat_id": chat_id,
@@ -166,7 +164,7 @@ async def edit_message(chat_id: int, message_id: int, text: str) -> Optional[dic
     async with httpx.AsyncClient() as client:
         max_retries = settings.TELEGRAM_EDIT_MAX_RETRIES
         base_backoff = settings.TELEGRAM_BACKOFF_BASE_S
-        
+
         for attempt in range(max_retries + 1):
             try:
                 r = await client.post(url, json=payload, timeout=10.0)
@@ -176,30 +174,36 @@ async def edit_message(chat_id: int, message_id: int, text: str) -> Optional[dic
                 resp = e.response
                 if resp is None:
                     if attempt < max_retries:
-                        await asyncio.sleep(base_backoff * (2 ** attempt))
+                        await asyncio.sleep(base_backoff * (2**attempt))
                         continue
                     logger.warning("[telegram] editMessageText final fail after %d retries: no resp", max_retries + 1)
                     return None
-                
+
                 status = resp.status_code
                 body = ""
                 try:
                     body = resp.text
-                except:
+                except Exception:
                     pass
-                
+
                 # Ignore "message not modified"
                 if status == 400 and "message is not modified" in body.lower():
                     return None
-                
+
                 # Rate limit or bad request - backoff and retry
                 if status in (400, 429) and attempt < max_retries:
-                    backoff = base_backoff * (2 ** attempt)
-                    logger.warning("[telegram] editMessageText retry %d/%d after %.1fs (status=%d): %s", 
-                                 attempt + 1, max_retries, backoff, status, body[:100])
+                    backoff = base_backoff * (2**attempt)
+                    logger.warning(
+                        "[telegram] editMessageText retry %d/%d after %.1fs (status=%d): %s",
+                        attempt + 1,
+                        max_retries,
+                        backoff,
+                        status,
+                        body[:100],
+                    )
                     await asyncio.sleep(backoff)
                     continue
-                
+
                 # HTML error fallback (no parse_mode)
                 if status == 400:
                     fallback = {
@@ -213,13 +217,15 @@ async def edit_message(chat_id: int, message_id: int, text: str) -> Optional[dic
                         return r.json()
                     except Exception:
                         pass
-                
+
                 # Final fail
-                logger.warning("[telegram] editMessageText final fail after %d retries: %d %s", max_retries + 1, status, body[:100])
+                logger.warning(
+                    "[telegram] editMessageText final fail after %d retries: %d %s", max_retries + 1, status, body[:100]
+                )
                 return None
             except Exception as e:
                 if attempt < max_retries:
-                    await asyncio.sleep(base_backoff * (2 ** attempt))
+                    await asyncio.sleep(base_backoff * (2**attempt))
                     continue
                 logger.warning("[telegram] editMessageText final exception after %d retries: %s", max_retries + 1, e)
                 return None
@@ -298,10 +304,10 @@ async def send_message(chat_id: int, text: str) -> Optional[dict]:
     if not TELEGRAM_BOT_TOKEN:
         print("[telegram] TELEGRAM_BOT_TOKEN not set")
         return None
-    
+
     # Sanitize HTML to Telegram-supported format
     text = sanitize_html_for_telegram(text)
-    
+
     url = f"{API_BASE}/sendMessage"
     async with httpx.AsyncClient() as client:
         # Telegram hard limit is 4096 chars; stay below to be safe
@@ -312,7 +318,7 @@ async def send_message(chat_id: int, text: str) -> Optional[dict]:
             payload = {
                 "chat_id": chat_id,
                 "text": chunk,
-                "parse_mode": "HTML"  # Use HTML instead of MarkdownV2
+                "parse_mode": "HTML",  # Use HTML instead of MarkdownV2
             }
             try:
                 r = await client.post(url, json=payload, timeout=10.0)
@@ -329,10 +335,7 @@ async def send_message(chat_id: int, text: str) -> Optional[dict]:
                 print(f"[telegram] HTTPStatusError {getattr(resp, 'status_code', None)}; body={body}")
                 # Fallback: send plain text without parse_mode to avoid HTML errors
                 if resp is not None and resp.status_code == 400:
-                    fallback_payload = {
-                        "chat_id": chat_id,
-                        "text": chunk
-                    }
+                    fallback_payload = {"chat_id": chat_id, "text": chunk}
                     r = await client.post(url, json=fallback_payload, timeout=10.0)
                     r.raise_for_status()
                     last_response = r.json()
@@ -375,7 +378,6 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
 
     await asyncio.sleep(1.0)
 
-
     # Track dialogue for memory extraction (need to keep reference)
     dialogue = None
 
@@ -388,11 +390,17 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
             combined_text = ""
 
             try:
-                unprocessed = db.query(MessageLog).filter(
-                    MessageLog.user_id == user_id,
-                    MessageLog.direction == "inbound",
-                    MessageLog.status == "delivered",
-                ).order_by(MessageLog.created_at).all()
+                unprocessed = (
+                    db
+                    .query(MessageLog)
+                    .filter(
+                        MessageLog.user_id == user_id,
+                        MessageLog.direction == "inbound",
+                        MessageLog.status == "delivered",
+                    )
+                    .order_by(MessageLog.created_at)
+                    .all()
+                )
 
                 if not unprocessed:
                     break
@@ -404,9 +412,9 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                 combined_text = "\n".join([m.content for m in unprocessed if m.content])
 
                 # Claim messages
-                db.query(MessageLog).filter(
-                    MessageLog.message_id.in_(message_ids)
-                ).update({MessageLog.status: "processing"}, synchronize_session=False)
+                db.query(MessageLog).filter(MessageLog.message_id.in_(message_ids)).update(
+                    {MessageLog.status: "processing"}, synchronize_session=False
+                )
                 db.commit()
             except Exception as e:
                 print("[batch collection error]", e)
@@ -433,25 +441,29 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
 
                 if result["type"] == "stream":
                     logger.info(f"[batch] Using STREAMING path for user_id={user_id}")
-                    
+
                     raw_generator = result["generator"]
                     stream_filter = StreamingFilter(raw_generator)
                     filtered_stream = stream_filter.filter_stream()
-                    
+
                     full_response, telegram_message_id = await send_message_streaming(
                         chat_id=chat_id,
                         token_generator=filtered_stream,
                     )
-                    
+
                     logger.info(f"[batch] Streamed to Telegram, message_id={telegram_message_id}")
-                    
+
                     remaining_for_functions = stream_filter.get_remaining_for_functions()
                     function_parse_text = remaining_for_functions or full_response
-                    
-# Detailed failure logging
+
+                    # Detailed failure logging
                     logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] user_text='{combined_text[:200]}...'")
-                    logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] function_parse_text='{function_parse_text[:1000]}...' (len={len(function_parse_text)})")
-                    logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] raw_generator_remaining='{stream_filter.get_remaining_for_functions()[:500]}...'")
+                    logger.info(
+                        f"[telegram FUNCTION_FAILURE user={user_id}] function_parse_text='{function_parse_text[:1000]}...' (len={len(function_parse_text)})"
+                    )
+                    logger.info(
+                        f"[telegram FUNCTION_FAILURE user={user_id}] raw_generator_remaining='{stream_filter.get_remaining_for_functions()[:500]}...'"
+                    )
 
                     from src.functions import get_function_executor
                     from src.functions.intent_parser import get_intent_parser
@@ -459,14 +471,19 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
 
                     parser = get_intent_parser()
                     parse_result = parser.parse(function_parse_text)
-                    
+
                     # RAW functions logging before any processing
                     fn_names = [f.get("name", "NO_NAME") for f in parse_result.functions]
-                    fn_details = [f"{f.get('name', 'NO_NAME')} (len={len(f.get('name', ''))})" for f in parse_result.functions]
-                    logger.info(f"[telegram RAW_FUNCTIONS user={user_id}] functions_count={len(parse_result.functions)}, names={fn_names}, details={fn_details}")
-                    logger.info(f"[telegram PARSE_RESULT user={user_id}] success={parse_result.success},fallback={parse_result.is_fallback},functions={len(parse_result.functions)},errors={len(parse_result.errors or [])}")
+                    fn_details = [
+                        f"{f.get('name', 'NO_NAME')} (len={len(f.get('name', ''))})" for f in parse_result.functions
+                    ]
+                    logger.info(
+                        f"[telegram RAW_FUNCTIONS user={user_id}] functions_count={len(parse_result.functions)}, names={fn_names}, details={fn_details}"
+                    )
+                    logger.info(
+                        f"[telegram PARSE_RESULT user={user_id}] success={parse_result.success},fallback={parse_result.is_fallback},functions={len(parse_result.functions)},errors={len(parse_result.errors or [])}"
+                    )
 
-                    
                     # Direct executor call (no post_hook)
                     diagnostics = {}
                     if parse_result.functions:
@@ -477,17 +494,28 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                             "memory_manager": dialogue.memory_manager,
                             "original_text": combined_text,
                         }
-                        execution_result = await executor.execute_all(parse_result.functions, execution_context, continue_on_error=True)
+                        execution_result = await executor.execute_all(
+                            parse_result.functions, execution_context, continue_on_error=True
+                        )
                         diagnostics["execution_result"] = execution_result
-                        diagnostics["dispatched_actions"] = [r.function_name for r in execution_result.results if r.success]
-                    logger.info(f"[telegram EXEC_RESULT user={user_id}] exec_result={diagnostics.get('execution_result') is not None},actions_len={len(diagnostics.get('dispatched_actions', []))},keys={list(diagnostics.keys())}")
-                    
-# Handle all cases: success, empty [], parse errors, exec fails
+                        diagnostics["dispatched_actions"] = [
+                            r.function_name for r in execution_result.results if r.success
+                        ]
+                    logger.info(
+                        f"[telegram EXEC_RESULT user={user_id}] exec_result={diagnostics.get('execution_result') is not None},actions_len={len(diagnostics.get('dispatched_actions', []))},keys={list(diagnostics.keys())}"
+                    )
+
+                    # Handle all cases: success, empty [], parse errors, exec fails
                     parse_had_errors = bool(parse_result.errors and not parse_result.success)
-                    exec_had_errors = diagnostics.get("execution_result") and "error" in str(diagnostics.get("execution_result", "")).lower()
+                    exec_had_errors = (
+                        diagnostics.get("execution_result")
+                        and "error" in str(diagnostics.get("execution_result", "")).lower()
+                    )
 
                     if parse_result.functions:  # Valid functions found
-                        logger.info(f"[telegram VALID_FUNCTIONS user={user_id}] Executing {len(parse_result.functions)} functions")
+                        logger.info(
+                            f"[telegram VALID_FUNCTIONS user={user_id}] Executing {len(parse_result.functions)} functions"
+                        )
                         response_builder = get_response_builder()
                         built_response = response_builder.build(
                             user_text=combined_text,
@@ -511,7 +539,6 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                         log_type = "EMPTY_FUNCTIONS" if parse_result.success else "PURE_CHAT"
                         logger.info(f"[telegram {log_type} user={user_id}] len={len(function_parse_text)}")
 
-                    
                     ai_response = full_response
                 else:
                     logger.info(f"[batch] Text response for user_id={user_id}")
@@ -528,7 +555,6 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
             try:
                 # Memory extraction now happens in the main Ollama call via the main prompt.
 
-
                 log = MessageLog(
                     user_id=user_id,
                     direction="outbound",
@@ -536,19 +562,20 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                     external_message_id=None,
                     content=ai_response,
                     status="sent",
-                    error_message=None
+                    error_message=None,
                 )
                 log.message_role = "assistant"
                 db.add(log)
                 db.flush()
-                logger.info(f"[telegram] Created outbound MessageLog id={log.message_id} content_len={len(ai_response)}")
+                logger.info(
+                    f"[telegram] Created outbound MessageLog id={log.message_id} content_len={len(ai_response)}"
+                )
                 db.refresh(log)
                 db.commit()
 
-
-                db.query(MessageLog).filter(
-                    MessageLog.message_id.in_(message_ids)
-                ).update({MessageLog.status: "processed"}, synchronize_session=False)
+                db.query(MessageLog).filter(MessageLog.message_id.in_(message_ids)).update(
+                    {MessageLog.status: "processed"}, synchronize_session=False
+                )
                 db.flush()
                 db.commit()
             except Exception as e:
@@ -573,8 +600,7 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
         finally:
             if lock_db is not None:
                 lock_db.close()
-        
+
         # Close the main db session
         if db is not None:
             db.close()
-

@@ -4,6 +4,7 @@ Provides the scheduler façade and exposes SchedulerService and related
 utilities (jobs, manager, time utilities, helpers) for use by the
 application.
 """
+
 from src.integrations.telegram import send_message
 from src.models.database import SessionLocal
 
@@ -26,6 +27,7 @@ def delete_user_schedules_and_remove_jobs(user_id: int, session=None) -> list[in
     Returns list of deleted schedule_ids.
     """
     from . import manager as _manager
+
     try:
         from . import jobs as _jobs
     except Exception:
@@ -48,6 +50,7 @@ def deactivate_user_schedules_and_remove_jobs(user_id: int, active_only: bool = 
     Returns number of schedules deactivated.
     """
     from . import manager as _manager
+
     try:
         from . import jobs as _jobs
     except Exception:
@@ -69,4 +72,3 @@ def deactivate_user_schedules_and_remove_jobs(user_id: int, active_only: bool = 
                 pass
 
     return count
-

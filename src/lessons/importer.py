@@ -3,6 +3,7 @@
 Provides a single entrypoint so import logic isn't duplicated across
 dialogue handlers and scheduler codepaths.
 """
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ def ensure_lessons_available(session) -> bool:
 
         # Use the refactored import from src.lessons
         from src.lessons import main as import_main
-        
+
         try:
             rc = import_main([])
             if rc == 0:

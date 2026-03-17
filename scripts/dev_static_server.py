@@ -3,6 +3,7 @@
 
 Usage: dev_static_server.py --port 3000 --directory <static_dir> --api-port 8000
 """
+
 import argparse
 import http.client
 import http.server
@@ -59,6 +60,7 @@ def run(port, directory, api_port):
     handler.api_port = api_port
     # Serve files from directory
     import os
+
     os.chdir(directory)
     with http.server.ThreadingHTTPServer(("0.0.0.0", port), handler) as httpd:
         print(f"Serving HTTP on 0.0.0.0 port {port} (http://0.0.0.0:{port}/) ...")

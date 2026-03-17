@@ -3,6 +3,7 @@
 
 Tests semantic memory deletion via AI function call.
 """
+
 from typing import List, Tuple
 from unittest.mock import AsyncMock, MagicMock, Mock
 
@@ -42,20 +43,17 @@ async def test_handle_forget_memories_success():
         (MagicMock(memory_id=3), 0.85),
     ]
     fake_search_service.search_memories = AsyncMock(return_value=fake_memories)
-    
+
     # Mock the service getter
     with pytest.MonkeyPatch().context() as m:
         m.setattr("src.memories.semantic_search.get_semantic_search_service", lambda: fake_search_service)
-        
+
         # Mock archive_memories to return success count
         context["memory_manager"].archive_memories = Mock(return_value=3)
-        
+
         # Call the handler
-        result = await executor._handle_forget_memories(
-            params={"query_text": "test query"},
-            context=context
-        )
-    
+        result = await executor._handle_forget_memories(params={"query_text": "test query"}, context=context)
+
     # Assertions
     assert result["ok"] is True
     assert result["query_text"] == "test query"
@@ -82,15 +80,12 @@ async def test_handle_forget_memories_no_matches():
 
     fake_search_service = Mock()
     fake_search_service.search_memories = AsyncMock(return_value=[])
-    
+
     with pytest.MonkeyPatch().context() as m:
         m.setattr("src.memories.semantic_search.get_semantic_search_service", lambda: fake_search_service)
-        
-        result = await executor._handle_forget_memories(
-            params={"query_text": "no matches"},
-            context=context
-        )
-    
+
+        result = await executor._handle_forget_memories(params={"query_text": "no matches"}, context=context)
+
     assert result["ok"] is False
     assert result["error"] == "No matching memories found"
 
@@ -110,11 +105,8 @@ async def test_handle_forget_memories_missing_query_text():
         "memory_manager": Mock(),
     }
 
-    result = await executor._handle_forget_memories(
-        params={},
-        context=context
-    )
-    
+    result = await executor._handle_forget_memories(params={}, context=context)
+
     assert result["ok"] is False
     assert result["error"] == "query_text is required"
 
@@ -134,10 +126,7 @@ async def test_handle_forget_memories_missing_memory_manager():
         # No memory_manager
     }
 
-    result = await executor._handle_forget_memories(
-        params={"query_text": "test"},
-        context=context
-    )
-    
+    result = await executor._handle_forget_memories(params={"query_text": "test"}, context=context)
+
     assert result["ok"] is False
     assert "memory_manager" in result["error"]

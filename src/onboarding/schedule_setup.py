@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def check_existing_schedule(db: Session, user_id: int) -> Optional[tuple]:
     """
     Check if user already has an active schedule.
-    
+
     Returns:
         (hour, minute) tuple if schedule exists, None otherwise
     """
@@ -31,7 +31,7 @@ def check_existing_schedule(db: Session, user_id: int) -> Optional[tuple]:
 def create_auto_schedule(db: Session, user_id: int) -> bool:
     """
     Auto-create daily schedule at 07:30 AM for onboarding completion.
-    
+
     Returns:
         True if schedule created, False if already exists or error
     """
@@ -65,7 +65,7 @@ def create_auto_schedule(db: Session, user_id: int) -> bool:
             schedule_type=SCHEDULE_TYPE_DAILY,
             session=db,
         )
-        
+
         # Store memory about the auto-created schedule so AI knows about it
         memory_manager.store_memory(
             user_id=user_id,
@@ -75,7 +75,7 @@ def create_auto_schedule(db: Session, user_id: int) -> bool:
             source="onboarding_auto_schedule",
             allow_duplicates=False,
         )
-        
+
         logger.info(f"✓ Auto-created daily schedule at 07:30 AM for user {user_id}")
         return True
 

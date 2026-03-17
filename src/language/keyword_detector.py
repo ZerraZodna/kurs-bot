@@ -3,6 +3,7 @@
 This detector is intentionally simple and deterministic so it can run
 without native dependencies. It returns a tuple (code, confidence, meta).
 """
+
 from __future__ import annotations
 
 import re

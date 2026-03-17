@@ -6,8 +6,8 @@ from typing import Any, Dict
 
 
 def get_onboarding_status_dict(
-        has_consent: bool,
-        declined_consent: bool = False,
+    has_consent: bool,
+    declined_consent: bool = False,
 ) -> Dict[str, Any]:
     """
     Build onboarding status dictionary for minimal onboarding.

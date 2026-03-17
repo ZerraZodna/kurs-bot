@@ -44,9 +44,7 @@ class MemoryHandler(MemoryStore):
 
     def list_active_by_key(self, user_id: int, key: str) -> List[MemoryEntity]:
         return (
-            self.db.query(Memory)
-            .filter(Memory.user_id == user_id, Memory.key == key, Memory.is_active == True)
-            .all()
+            self.db.query(Memory).filter(Memory.user_id == user_id, Memory.key == key, Memory.is_active == True).all()
         )
 
     def list_active_memories(
@@ -69,7 +67,8 @@ class MemoryHandler(MemoryStore):
     ) -> List[MemoryEntity]:
         like_pattern = f"%{query_text.strip()}%"
         rows = (
-            self.build_active_query(session=self.db, user_id=user_id, categories=categories)
+            self
+            .build_active_query(session=self.db, user_id=user_id, categories=categories)
             .filter(Memory.value.ilike(like_pattern))
             .all()
         )
@@ -90,11 +89,7 @@ class MemoryHandler(MemoryStore):
         return self.db.query(Memory).filter(Memory.user_id == user_id).all()
 
     def get_user_memory_by_id(self, user_id: int, memory_id: int) -> Optional[MemoryEntity]:
-        return (
-            self.db.query(Memory)
-            .filter(Memory.memory_id == memory_id, Memory.user_id == user_id)
-            .first()
-        )
+        return self.db.query(Memory).filter(Memory.memory_id == memory_id, Memory.user_id == user_id).first()
 
     @staticmethod
     def _is_expired(ttl_expires_at: Optional[datetime], now_utc: datetime) -> bool:
@@ -122,11 +117,7 @@ class MemoryHandler(MemoryStore):
         """Fetch active, non-expired memories for a key."""
         now = utc_now()
         rows = self.list_active_by_key(user_id=user_id, key=key)
-        return [
-            self._to_public_dict(row)
-            for row in rows
-            if not self._is_expired(row.ttl_expires_at, now)
-        ]
+        return [self._to_public_dict(row) for row in rows if not self._is_expired(row.ttl_expires_at, now)]
 
     def store_memory(
         self,
@@ -141,11 +132,12 @@ class MemoryHandler(MemoryStore):
         """Store a memory row with conflict handling and return memory_id."""
         # Validate and normalize category for consistency
         from src.memories.constants import MemoryCategory
+
         validated_category = MemoryCategory.normalize(category)
         if validated_category != category:
             logger.debug(f"Category '{category}' normalized to '{validated_category}' for key '{key}'")
         category = validated_category
-        
+
         now = utc_now()
         value_hash = self.hash_value(value)
         ttl = now + timedelta(hours=ttl_hours) if ttl_hours else None
@@ -154,7 +146,8 @@ class MemoryHandler(MemoryStore):
         init_db()
 
         existing = (
-            self.db.query(Memory)
+            self.db
+            .query(Memory)
             .filter(
                 Memory.user_id == user_id,
                 Memory.key == key,
@@ -233,7 +226,8 @@ class MemoryHandler(MemoryStore):
             return 0
         now = utc_now()
         updated = (
-            self.db.query(Memory)
+            self.db
+            .query(Memory)
             .filter(
                 Memory.user_id == user_id,
                 Memory.memory_id.in_(memory_ids),
@@ -246,11 +240,7 @@ class MemoryHandler(MemoryStore):
 
     def delete_user_memories(self, user_id: int, commit: bool = False) -> int:
         """Hard-delete all memory rows for a user."""
-        deleted = (
-            self.db.query(Memory)
-            .filter(Memory.user_id == user_id)
-            .delete(synchronize_session=False)
-        )
+        deleted = self.db.query(Memory).filter(Memory.user_id == user_id).delete(synchronize_session=False)
         if commit:
             self.db.commit()
         return int(deleted or 0)

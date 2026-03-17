@@ -20,9 +20,7 @@ class RedactionFilter(logging.Filter):
         if isinstance(record.msg, str):
             record.msg = redact_text(record.msg)
         if record.args:
-            record.args = tuple(
-                redact_text(a) if isinstance(a, str) else a for a in record.args
-            )
+            record.args = tuple(redact_text(a) if isinstance(a, str) else a for a in record.args)
         return True
 
 

@@ -128,7 +128,7 @@ async def _call_local_http(model: str, prompt: str, temperature: Optional[float]
 
 def _cloud_call_sync(host_base: str, api_key: Optional[str], model: str, prompt: str, temperature: float = 0.2) -> Any:
     """Sync wrapper executed in a thread: use official `OllamaClient` to call cloud."""
-    client = OllamaClient(host=host_base, headers={"Authorization": f"Bearer {api_key}" } if api_key else None)
+    client = OllamaClient(host=host_base, headers={"Authorization": f"Bearer {api_key}"} if api_key else None)
     messages = [{"role": "user", "content": prompt}]
     # Use non-streaming chat for simplicity, forward temperature
     try:
@@ -169,11 +169,7 @@ async def stream_ollama(
 
     # Determine cloud vs local
     raw_url = CLOUD_OLLAMA_URL
-    is_cloud = (
-        isinstance(chosen_model, str)
-        and str(chosen_model).lower().endswith("cloud")
-        and _is_cloud_url(raw_url)
-    )
+    is_cloud = isinstance(chosen_model, str) and str(chosen_model).lower().endswith("cloud") and _is_cloud_url(raw_url)
 
     temp = OLLAMA_TEMPERATURE if temperature is None else temperature
     timeout = OLLAMA_LONG_TIMEOUT if "gpt-oss" in chosen_model.lower() else OLLAMA_TIMEOUT
@@ -200,9 +196,7 @@ async def stream_ollama(
         _token_count = 0
         try:
             async with httpx.AsyncClient() as client:
-                async with client.stream(
-                    "POST", raw_url, json=payload, headers=headers, timeout=timeout
-                ) as resp:
+                async with client.stream("POST", raw_url, json=payload, headers=headers, timeout=timeout) as resp:
                     resp.raise_for_status()
                     async for line in resp.aiter_lines():
                         if not line.strip():
@@ -284,7 +278,9 @@ async def stream_ollama(
             yield "[Sorry, I couldn't process your request right now.]"
 
 
-async def call_ollama(prompt: str, model: Optional[str] = None, language: Optional[str] = None, temperature: Optional[float] = None) -> str:
+async def call_ollama(
+    prompt: str, model: Optional[str] = None, language: Optional[str] = None, temperature: Optional[float] = None
+) -> str:
     """Top-level async method to call Ollama (cloud or local) and return text.
 
     Behavior summary:
@@ -338,7 +334,9 @@ async def call_ollama(prompt: str, model: Optional[str] = None, language: Option
             loop = asyncio.get_running_loop()
             try:
                 temp = OLLAMA_TEMPERATURE if temperature is None else temperature
-                out = await loop.run_in_executor(None, _cloud_call_sync, host_base, api_key, chosen_model, prompt, float(temp))
+                out = await loop.run_in_executor(
+                    None, _cloud_call_sync, host_base, api_key, chosen_model, prompt, float(temp)
+                )
                 text = _extract_chat_text(out)
                 if text:
                     return text

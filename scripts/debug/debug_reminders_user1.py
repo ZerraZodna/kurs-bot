@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import asyncio
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Ensure repo root is on path for src imports
@@ -14,17 +14,19 @@ from src.services.dialogue_engine import DialogueEngine
 
 
 def dump_user_state(db, user_id: int):
-    print(f"\n{'='*80}")
-    print(f"=== User {user_id} state inspection ({datetime.now().isoformat()}) ===")
-    print(f"{'='*80}")
-    
+    print(f"\n{'=' * 80}")
+({datetime.now(tz=timezone.utc).isoformat()})
+    print(f"{'=' * 80}")
+
     user = db.query(User).filter_by(user_id=user_id).first()
     if not user:
         print("❌ User not found")
         return
-    
-    print(f"👤 User: id={user.user_id}, external_id={user.external_id}, name={user.first_name}, timezone={user.timezone}, current_lesson={user.lesson}")
-    
+
+    print(
+        f"👤 User: id={user.user_id}, external_id={user.external_id}, name={user.first_name}, timezone={user.timezone}, current_lesson={user.lesson}"
+    )
+
     print("\n📅 Schedules/Reminders:")
     schedules = db.query(Schedule).filter_by(user_id=user_id).order_by(Schedule.created_at.desc()).all()
     if not schedules:
@@ -34,15 +36,21 @@ def dump_user_state(db, user_id: int):
             status = "✅ ACTIVE" if s.is_active else "⏸️ INACTIVE"
             next_time = s.next_send_time.isoformat() if s.next_send_time else "None"
             lesson_title = s.lesson.title if s.lesson else "None"
-            print(f"  {status} [{s.schedule_type}] id={s.schedule_id}, cron='{s.cron_expression}', next={next_time}, lesson='{lesson_title}'")
-    
+            print(
+                f"  {status} [{s.schedule_type}] id={s.schedule_id}, cron='{s.cron_expression}', next={next_time}, lesson='{lesson_title}'"
+            )
+
     print("\n🧠 Relevant Memories (schedule-related, recent 50):")
     relevant_keys = ["schedule_message", "schedule_request_pending", "preferred_daily_time"]
-    mems = db.query(Memory).filter(
-        Memory.user_id == user_id,
-        Memory.key.in_(relevant_keys)
-    ).order_by(Memory.created_at.desc()).limit(50).all()
-    
+    mems = (
+        db
+        .query(Memory)
+        .filter(Memory.user_id == user_id, Memory.key.in_(relevant_keys))
+        .order_by(Memory.created_at.desc())
+        .limit(50)
+        .all()
+    )
+
     all_mems = db.query(Memory).filter_by(user_id=user_id).order_by(Memory.created_at.desc()).limit(20).all()
     if mems:
         for m in mems:
@@ -55,8 +63,8 @@ def dump_user_state(db, user_id: int):
             print(f"    [{m.category}] {m.key}: {preview}")
     else:
         print("  (no memories)")
-    
-    print(f"{'='*80}\n")
+
+    print(f"{'=' * 80}\n")
 
 
 async def debug_reminders_query(user_id: int = 1, query: str = "What are my reminders"):
@@ -65,34 +73,34 @@ async def debug_reminders_query(user_id: int = 1, query: str = "What are my remi
     try:
         # Pre-query state
         dump_user_state(db, user_id)
-        
+
         print(f"\n🚀 Invoking DialogueEngine.process_message(user_id={user_id}, text='{query}')")
         print("   (Live Ollama streaming ~20-40s)...\n")
-        
+
         dialogue = DialogueEngine(db)
-        start_time = datetime.now()
-        
+start_time = datetime.now(tz=timezone.utc)
+
         response = await dialogue.process_message(user_id, query, db)
-        
+
         elapsed = datetime.now() - start_time
         print(f"⏱️  Initial process_message in {elapsed.total_seconds():.1f}s\n")
-        
+
         full_response = ""
         diagnostics = None
-        
+
         if isinstance(response, dict) and response.get("type") == "stream":
             print("📡 Streaming response detected - consuming generator & calling post_hook...\n")
-            
+
             # Consume the stream (like telegram_stream.py)
             async for token in response["generator"]:
                 full_response += token
                 print(f"🔤 Token: {repr(token)}", end="", flush=True)
             print("\n📄 Full streamed response collected.\n")
-            
+
             print(f"📝 Full response preview (len={len(full_response)}):")
             print(repr(full_response[:1000]) + ("..." if len(full_response) > 1000 else ""))
             print()
-            
+
             # Call post_hook with full_response (executes functions!)
             print("🔧 Calling post_hook for function execution...\n")
             post_start = datetime.now()
@@ -103,7 +111,7 @@ async def debug_reminders_query(user_id: int = 1, query: str = "What are my remi
             print("📄 Non-stream response:")
             print(response)
             full_response = str(response)
-        
+
         # Print diagnostics from post_hook
         print("📊 Diagnostics (from post_hook):")
         print("-" * 60)
@@ -117,7 +125,9 @@ async def debug_reminders_query(user_id: int = 1, query: str = "What are my remi
                 print("Functions executed:")
                 for r in exec_result.results:
                     status = "✅" if r.success else "❌"
-                    print(f"  {status} {r.function_name}: {getattr(r, 'result', 'N/A') or getattr(r, 'error', 'no output')}")
+                    print(
+                        f"  {status} {r.function_name}: {getattr(r, 'result', 'N/A') or getattr(r, 'error', 'no output')}"
+                    )
                     if "get_user_schedules" in r.function_name or "schedule" in r.function_name.lower():
                         print("     🎯 REMINDER FUNCTION!")
             else:
@@ -125,13 +135,13 @@ async def debug_reminders_query(user_id: int = 1, query: str = "What are my remi
         else:
             print("(no diagnostics returned)")
         print("-" * 60 + "\n")
-        
+
         # Post-query state (functions should have run)
         print("\n🏁 Post-query state:")
         dump_user_state(db, user_id)
-        
+
         print("\n✅ Debug complete! Check diagnostics for schedule functions (get_user_schedules etc.).")
-        
+
     finally:
         db.close()
 
@@ -140,12 +150,11 @@ if __name__ == "__main__":
     # CLI: python -m scripts.debug.debug_reminders_user1 [user_id] [query]
     user_id = int(sys.argv[1]) if len(sys.argv) > 1 else 1
     query = sys.argv[2] if len(sys.argv) > 2 else "What are my reminders"
-    
+
     print(f"Debug script for user {user_id}: '{query}'")
     print("Initializing DB...\n")
-    
+
     # Ensure DB tables exist
     init_db()
-    
-    asyncio.run(debug_reminders_query(user_id, query))
 
+    asyncio.run(debug_reminders_query(user_id, query))

@@ -20,6 +20,7 @@ from src.services.dialogue import (
 
 logger = logging.getLogger(__name__)
 
+
 class DialogueEngine:
     def __init__(self, db: Optional[Session] = None, memory_manager: Optional[MemoryManager] = None):
         if db is None:
@@ -36,10 +37,11 @@ class DialogueEngine:
     def memory_judge(self):
         """Expose MemoryJudge from memory_manager for memory extraction."""
         return self.memory_manager.ai_judge
-    
+
     async def call_ollama(self, prompt: str, model: Optional[str] = None, language: Optional[str] = None) -> str:
         """Delegate to dialogue.ollama_client with optional language hint."""
         from src.services.dialogue import call_ollama
+
         return await call_ollama(prompt, model, language)
 
     async def process_message(
@@ -54,11 +56,11 @@ class DialogueEngine:
     ) -> Dict[str, any]:
         """
         Unified message processing - ALWAYS returns streaming-ready response.
-        
+
         Returns dict:
         - {"type": "text", "text": str} for early responses (commands, onboarding, etc.)
         - {"type": "stream", "generator": AsyncIterator[str], "post_hook": callable} for LLM
-        
+
         chat_id optional for Telegram-specific context if needed.
         """
         user = session.query(User).filter_by(user_id=user_id).first()
@@ -103,11 +105,13 @@ class DialogueEngine:
 
     async def _detect_and_store_language(self, user_id: int, text: str) -> str:
         from src.services.dialogue import detect_and_store_language
+
         return await detect_and_store_language(self.memory_manager, user_id, text)
 
     async def _check_user_restrictions(self, user_id: int, text: str, user: User, session: Session) -> Optional[str]:
         """Handle GDPR commands and check if user is deleted or restricted."""
         from src.services.dialogue import handle_gdpr_commands
+
         gdpr_response = await handle_gdpr_commands(
             text=text,
             session=session,
@@ -126,15 +130,15 @@ class DialogueEngine:
     def _setup_rag_configuration(self, user_id: int, text: str) -> tuple[str, bool, Optional[str]]:
         """Detect and configure RAG mode for the current message."""
         from src.services.dialogue import parse_rag_prefix
-        
+
         text, use_rag = parse_rag_prefix(text)
-        
+
         return text, use_rag, None
 
     async def _handle_commands(self, user_id: int, text: str, session: Session, use_rag: bool) -> Optional[str]:
         """Handle various specialized commands."""
         from src.services.dialogue import handle_list_memories, handle_rag_prompt_command
-        
+
         if use_rag:
             list_memories = handle_list_memories(text, self.memory_manager, session, user_id)
             if list_memories:
@@ -148,23 +152,19 @@ class DialogueEngine:
 
     async def _handle_onboarding_stage(self, user_id: int, text: str, session: Session, use_rag: bool) -> Optional[str]:
         """Handle onboarding flow."""
-        if (
-            self.onboarding_flow
-            and self.onboarding.should_show_onboarding(user_id)
-            and not use_rag
-        ):
+        if self.onboarding_flow and self.onboarding.should_show_onboarding(user_id) and not use_rag:
             # from src.memories.constants import MemoryKey
             # pending_step = self.memory_manager.get_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING)
             onboarding_response = await self.onboarding_flow.handle_onboarding(user_id, text, session)
             return onboarding_response
-        
+
         return None
 
     async def _handle_lesson_and_schedule_stage(
         self, user_id: int, text: str, session: Session, user_lang: str, include_lesson: bool, use_rag: bool
     ) -> Optional[str]:
         from src.services.dialogue import handle_schedule_messages, maybe_send_next_lesson
-        
+
         schedule_response = await handle_schedule_messages(
             user_id=user_id,
             text=text,
@@ -189,7 +189,7 @@ class DialogueEngine:
             )
             if auto_message:
                 return auto_message
-        
+
         return None
 
     async def _generate_streaming_response(
@@ -239,6 +239,7 @@ class DialogueEngine:
 
         async def post_hook(full_response_text: str):
             from src.functions import get_function_executor, get_intent_parser
+
             parser = get_intent_parser()
             parse_result = parser.parse(full_response_text)
             diagnostics = {}
@@ -256,13 +257,12 @@ class DialogueEngine:
                     parse_result.functions, execution_context, continue_on_error=True
                 )
                 diagnostics["execution_result"] = execution_result
-                diagnostics["dispatched_actions"] = [
-                    r.function_name for r in execution_result.results if r.success
-                ]
+                diagnostics["dispatched_actions"] = [r.function_name for r in execution_result.results if r.success]
             return diagnostics
 
         def extract_response_text(full_response_text: str) -> str:
             from src.functions.intent_parser import get_intent_parser
+
             parser = get_intent_parser()
             parse_result = parser.parse(full_response_text)
             return parse_result.response_text if parse_result.response_text is not None else full_response_text
@@ -285,28 +285,30 @@ class DialogueEngine:
 
             async def post_hook_translated(full_translated: str):
                 await post_hook(response)
+
             return {"type": "stream", "generator": gen, "post_hook": post_hook_translated}
 
     def _detect_context_type(self, user_id: int, text: str, use_rag: bool) -> str:
         """Detect conversation context type for function availability."""
         if use_rag:
             return "rag"
-        
+
         from src.functions.definitions import FunctionDefinitions
         from src.memories.constants import MemoryKey
+
         pending_step = self.memory_manager.get_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING)
         if pending_step:
             step_value = str(pending_step[0].get("value", "")).lower()
             if step_value in FunctionDefinitions.ONBOARDING_STAGE_MAP:
                 return FunctionDefinitions.ONBOARDING_STAGE_MAP[step_value]
-        
+
         if self.onboarding and self.onboarding.should_show_onboarding(user_id):
             return "onboarding"
-        
+
         schedule_keywords = ["schedule", "reminder", "time", "daily", "lesson time"]
         if any(kw in text.lower() for kw in schedule_keywords):
             return "schedule_setup"
-        
+
         return "general_chat"
 
     async def _get_relevant_memories(self, user_id: int, text: str, session: Session) -> list:
@@ -314,14 +316,17 @@ class DialogueEngine:
         relevant_memories = []
         search_service = get_semantic_search_service()
         results = await search_service.search_memories(user_id=user_id, query_text=text, session=session)
-        relevant_memories = [{"memory_id": m.memory_id, "key": m.key, "value": m.value, "category": m.category, "similarity": s} for m, s in results]
+        relevant_memories = [
+            {"memory_id": m.memory_id, "key": m.key, "value": m.value, "category": m.category, "similarity": s}
+            for m, s in results
+        ]
         return relevant_memories
 
     async def _handle_schedule_request(self, user_id: int, text: str, session: Session) -> Optional[str]:
         """Handle explicit schedule requests (unchanged helper)."""
         from src.scheduler.schedule_query_handler import build_schedule_status_response
         from src.services.dialogue import get_user_language, translate_text
-        
+
         schedules = scheduler_api.get_user_schedules(user_id, session=session)
         if schedules:
             tz_name = get_user_timezone_from_db(self.db.object_session, user_id)
@@ -357,9 +362,15 @@ When would you like to receive them? (e.g., "9:00 AM", "morning", "evening", "8:
 
         time_str = time_memories[0]["value"]
         try:
-            schedule = scheduler_api.create_daily_schedule(user_id=user_id, lesson_id=None, time_str=time_str, session=session)
+            schedule = scheduler_api.create_daily_schedule(
+                user_id=user_id, lesson_id=None, time_str=time_str, session=session
+            )
             tz_name = get_user_timezone_from_db(self.db.object_session, user_id)
-            time_display = f"{format_dt_in_timezone(schedule.next_send_time, tz_name)[0]:%H:%M}" if schedule.next_send_time else f"{scheduler_api.parse_time_string(time_str)[0]:02d}:{scheduler_api.parse_time_string(time_str)[1]:02d}"
+            time_display = (
+                f"{format_dt_in_timezone(schedule.next_send_time, tz_name)[0]:%H:%M}"
+                if schedule.next_send_time
+                else f"{scheduler_api.parse_time_string(time_str)[0]:02d}:{scheduler_api.parse_time_string(time_str)[1]:02d}"
+            )
 
             name_memories = self.memory_manager.get_memory(user_id, MemoryKey.FIRST_NAME)
             name = name_memories[0]["value"] if name_memories else "friend"
@@ -388,4 +399,3 @@ Your first lesson will arrive tomorrow at {time_display}. 🙏"""
     def get_onboarding_prompt(self) -> str:
         """Return onboarding prompt sequence for new users."""
         return self.prompt_builder.build_onboarding_prompt(settings.SYSTEM_PROMPT)
-

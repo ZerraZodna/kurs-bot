@@ -48,22 +48,22 @@ class TestOnboardingTimezoneHandling:
         assert schedule.next_send_time is not None
         utc_hour = schedule.next_send_time.hour
         utc_minute = schedule.next_send_time.minute
-        
+
         # Should be either 05:30 (CEST/summer) or 06:30 (CET/winter)
         assert utc_minute == 30, f"Minutes should be 30, got {utc_minute}"
         assert utc_hour in (5, 6), f"Hour should be 5 or 6 (CEST/CET), got {utc_hour}"
 
         # CRITICAL: Verify user sees 07:30 (local time), not 06:30 (UTC)
         from src.scheduler.schedule_query_handler import build_schedule_status_response
+
         response = build_schedule_status_response([schedule], "Europe/Oslo")
-        
+
         print(f"\nSchedule query response for Oslo user:\n{response}\n")
-        
+
         # User should see 07:30, not 06:30 or 05:30
         assert "07:30" in response, f"User should see 07:30 local time. Got: {response}"
         assert "06:30" not in response, f"User should NOT see 06:30 UTC. Got: {response}"
         assert "05:30" not in response, f"User should NOT see 05:30 UTC. Got: {response}"
-
 
     def test_create_auto_schedule_infers_from_norwegian_language(self, db_session):
         """Given: A Norwegian user with no timezone but Norwegian language
@@ -84,7 +84,7 @@ class TestOnboardingTimezoneHandling:
 
         schedule = db_session.query(Schedule).filter_by(user_id=user_id).first()
         assert schedule is not None
-        
+
         # Should be 05:30 or 06:30 UTC (07:30 Oslo time)
         utc_hour = schedule.next_send_time.hour
         assert utc_hour in (5, 6), f"Expected Oslo time conversion, got UTC hour {utc_hour}"
@@ -136,7 +136,7 @@ class TestOnboardingTimezoneHandling:
 
         # Create first schedule
         schedule_setup.create_auto_schedule(db_session, user_id)
-        
+
         # Count schedules
         count_before = db_session.query(Schedule).filter_by(user_id=user_id).count()
         assert count_before == 1
@@ -158,13 +158,13 @@ class TestOnboardingTimezoneHandling:
         user = db_session.query(User).filter_by(user_id=user_id).first()
         user.timezone = "Europe/Oslo"
         db_session.commit()
-        
+
         # Expire and refresh to simulate new session
         db_session.expire(user)
-        
+
         # When: Query user again
         user_refreshed = db_session.query(User).filter_by(user_id=user_id).first()
-        
+
         # Then: Timezone should still be set
         assert user_refreshed.timezone == "Europe/Oslo"
 
@@ -177,7 +177,7 @@ class TestEnsureUserTimezoneBug:
         When: get_user_timezone_from_db is called
         Then: Should return Europe/Oslo from DB, not UTC from language inference."""
         from src.core.timezone import get_user_timezone_from_db
-        
+
         # Given: User with Oslo timezone in DB but English language
         user_id = create_test_user(db_session, "test_tz_db_not_lang", "Test")
         user = db_session.query(User).filter_by(user_id=user_id).first()
@@ -189,8 +189,9 @@ class TestEnsureUserTimezoneBug:
         result_tz = get_user_timezone_from_db(db_session, user_id, default="UTC")
 
         # Then: Should return Europe/Oslo from DB, not UTC
-        assert result_tz == "Europe/Oslo", \
+        assert result_tz == "Europe/Oslo", (
             f"Expected Europe/Oslo from DB, got {result_tz}. Bug: language overrides DB timezone!"
+        )
 
     def test_ensure_user_timezone_with_norwegian_user_english_language(self, db_session):
         """Given: Norwegian user with Oslo timezone but English UI language
@@ -198,7 +199,7 @@ class TestEnsureUserTimezoneBug:
         Then: Should display 07:30 (Oslo time), not 07:30 UTC."""
         from src.core.timezone import get_user_timezone_from_db
         from src.scheduler.schedule_query_handler import build_schedule_status_response
-        
+
         # Given: Norwegian user with Oslo timezone but English language
         user_id = create_test_user(db_session, "test_no_user_en_lang", "Test")
         user = db_session.query(User).filter_by(user_id=user_id).first()
@@ -208,10 +209,12 @@ class TestEnsureUserTimezoneBug:
 
         # Create schedule at 07:30 Oslo time
         from src.scheduler.time_utils import compute_next_send_and_cron
+
         next_send_utc, cron = compute_next_send_and_cron("07:30", "Europe/Oslo")
-        
+
         from src.scheduler import manager as schedule_manager
         from src.scheduler.domain import SCHEDULE_TYPE_DAILY
+
         schedule = schedule_manager.create_schedule(
             user_id=user_id,
             lesson_id=1,
@@ -223,14 +226,14 @@ class TestEnsureUserTimezoneBug:
 
         # When: Get timezone (simulating "List reminders" flow)
         tz_name = get_user_timezone_from_db(db_session, user_id, default="UTC")
-        
+
         # Then: Should use Oslo timezone, not UTC
         assert tz_name == "Europe/Oslo", f"Bug: Got {tz_name} instead of Europe/Oslo"
 
         # And: Schedule display should show 07:30, not 06:30 or 05:30
         response = build_schedule_status_response([schedule], tz_name)
         print(f"\nSchedule response for Norwegian user with English language:\n{response}\n")
-        
+
         assert "07:30" in response, f"User should see 07:30 Oslo time. Got: {response}"
         assert "06:30" not in response, f"User should NOT see 06:30 UTC. Got: {response}"
 
@@ -255,7 +258,7 @@ class TestTimezoneConversionEdgeCases:
         assert result is True
         schedule = db_session.query(Schedule).filter_by(user_id=user_id).first()
         assert schedule is not None
-        
+
         # 07:30 Pacific = 15:30 UTC (or 14:30 during DST)
         utc_hour = schedule.next_send_time.hour
         assert utc_hour in (14, 15), f"Expected Pacific time conversion, got UTC hour {utc_hour}"
@@ -277,7 +280,7 @@ class TestTimezoneConversionEdgeCases:
         assert result is True
         schedule = db_session.query(Schedule).filter_by(user_id=user_id).first()
         assert schedule is not None
-        
+
         # 07:30 Eastern = 12:30 UTC (or 11:30 during DST)
         utc_hour = schedule.next_send_time.hour
         assert utc_hour in (11, 12), f"Expected Eastern time conversion, got UTC hour {utc_hour}"

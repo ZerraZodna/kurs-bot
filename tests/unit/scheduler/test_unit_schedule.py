@@ -24,7 +24,6 @@ def _ensure_lesson(session, lesson_id: int, title: str, content: str):
     return session.query(Lesson).filter_by(lesson_id=lesson_id).first()
 
 
-
 class TestUnitScheduleFunctionExecutor:
     """Tests for FunctionExecutor handling of send_todays_lesson with lesson memory."""
 
@@ -32,12 +31,11 @@ class TestUnitScheduleFunctionExecutor:
     def executor(self):
         """Create a FunctionExecutor instance."""
         from src.functions.executor import FunctionExecutor
+
         return FunctionExecutor()
 
     @pytest.mark.asyncio
-    async def test_send_todays_lesson_uses_memory_lesson(
-        self, executor, db_session, test_user
-    ):
+    async def test_send_todays_lesson_uses_memory_lesson(self, executor, db_session, test_user):
         """Given: User has lesson 26 in memory
         When: send_todays_lesson function is called
         Then: Returns lesson 26 content
@@ -45,26 +43,26 @@ class TestUnitScheduleFunctionExecutor:
         # Set up memory with current lesson
         mm = MemoryManager(db_session)
         set_current_lesson(mm, test_user.user_id, 26)
-        
+
         # Ensure lesson 26 exists
         _ensure_lesson(
-            db_session, 
-            lesson_id=26, 
-            title="Lesson 26", 
-            content="Myriad forms the holy Son of God appears.\n\nLesson 26 content."
+            db_session,
+            lesson_id=26,
+            title="Lesson 26",
+            content="Myriad forms the holy Son of God appears.\n\nLesson 26 content.",
         )
-        
+
         # Create context
         context = {
             "user_id": test_user.user_id,
             "session": db_session,
             "memory_manager": mm,
         }
-        
+
         # Get lesson from memory and execute send_todays_lesson with explicit lesson_id (matching recent test fixes)
         memory_lesson_id = get_current_lesson(mm, test_user.user_id)
         result = await executor._handle_send_todays_lesson({"lesson_id": memory_lesson_id}, context)
-        
+
         # Verify result
         assert result["ok"] is True
         assert result["lesson_id"] == 26
@@ -72,33 +70,26 @@ class TestUnitScheduleFunctionExecutor:
         assert "content" in result
 
     @pytest.mark.asyncio
-    async def test_send_todays_lesson_defaults_to_lesson_1_when_no_memory(
-        self, executor, db_session, test_user
-    ):
+    async def test_send_todays_lesson_defaults_to_lesson_1_when_no_memory(self, executor, db_session, test_user):
         """Given: User has no lesson in memory
         When: send_todays_lesson function is called
         Then: Returns lesson 1 (default)
         """
         # No memory set - fresh user
         mm = MemoryManager(db_session)
-        
+
         # Ensure lesson 1 exists
-        _ensure_lesson(
-            db_session, 
-            lesson_id=1, 
-            title="Lesson 1", 
-            content="Nothing I see means anything."
-        )
-        
+        _ensure_lesson(db_session, lesson_id=1, title="Lesson 1", content="Nothing I see means anything.")
+
         context = {
             "user_id": test_user.user_id,
             "session": db_session,
             "memory_manager": mm,
         }
-        
+
         # Execute send_todays_lesson with explicit default lesson_id (matching recent test fixes)
         result = await executor._handle_send_todays_lesson({"lesson_id": 1}, context)
-        
+
         # Verify result defaults to lesson 1
         assert result["ok"] is True
         assert result["lesson_id"] == 1
@@ -106,4 +97,3 @@ class TestUnitScheduleFunctionExecutor:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

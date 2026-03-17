@@ -53,11 +53,12 @@ def test_name_temporal_resolution(clean_test_data, test_user_id):
     )
 
     # Manually set created_at to be older
-    mem = db.query(Memory).filter(
-        Memory.user_id == test_user_id,
-        Memory.key == MemoryKey.FIRST_NAME,
-        Memory.value == "Dev"
-    ).first()
+    mem = (
+        db
+        .query(Memory)
+        .filter(Memory.user_id == test_user_id, Memory.key == MemoryKey.FIRST_NAME, Memory.value == "Dev")
+        .first()
+    )
     if mem:
         mem.created_at = datetime(2026, 2, 26, 16, 19, 0, tzinfo=timezone.utc)
         db.commit()
@@ -72,11 +73,12 @@ def test_name_temporal_resolution(clean_test_data, test_user_id):
     )
 
     # Manually set created_at to be newer
-    mem = db.query(Memory).filter(
-        Memory.user_id == test_user_id,
-        Memory.key == MemoryKey.NAME,
-        Memory.value == "Johannes"
-    ).first()
+    mem = (
+        db
+        .query(Memory)
+        .filter(Memory.user_id == test_user_id, Memory.key == MemoryKey.NAME, Memory.value == "Johannes")
+        .first()
+    )
     if mem:
         mem.created_at = datetime(2026, 3, 2, 15, 44, 0, tzinfo=timezone.utc)
         db.commit()

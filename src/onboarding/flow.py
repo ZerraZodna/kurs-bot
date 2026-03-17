@@ -22,6 +22,7 @@ NEEDS_AI_PROCESSING = "NEEDS_AI_PROCESSING"
 class OnboardingStep(Enum):
     CONSENT = "consent"
 
+
 class OnboardingFlow:
     def __init__(self, memory_manager, onboarding_service, call_ollama):
         self.memory_manager = memory_manager
@@ -127,7 +128,7 @@ class OnboardingFlow:
         - Name is now skipped - using Telegram name from DB
         - Consent is asked immediately for new users
         - Onboarding completes after consent is given
-        
+
         Returns:
             Onboarding response or None if not in onboarding flow
         """
@@ -171,4 +172,3 @@ class OnboardingFlow:
 
         # Return next onboarding prompt (should not reach here with simplified flow)
         return self.onboarding.get_onboarding_prompt(user_id)
-

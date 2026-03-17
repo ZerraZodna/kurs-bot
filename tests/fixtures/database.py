@@ -25,9 +25,11 @@ from sqlalchemy.orm import Session, sessionmaker
 def module_db_session(db_engine):
     """Module-scoped SessionLocal monkeypatch for test isolation."""
     from _pytest.monkeypatch import MonkeyPatch
+
     mp = MonkeyPatch()
     TestSessionLocal = sessionmaker(bind=db_engine, autoflush=False, autocommit=False, future=True)
     mp.setattr("src.models.database.SessionLocal", TestSessionLocal)
+
 
 from src.models import User
 from src.models.database import Base
@@ -44,12 +46,12 @@ def db_engine(tmp_path_factory) -> Generator:
 
     When running with pytest-xdist, each worker gets its own temporary
     database file to avoid SQLite file locking issues.
-    
+
     Always creates a temporary database, even for the main worker, to ensure
     test isolation and avoid issues with the application database.
     """
     worker_id = os.environ.get("PYTEST_XDIST_WORKER", "main")
-    
+
     # Always create a worker-specific database for isolation
     # This ensures tests don't interfere with each other or the application DB
     if worker_id == "main" and not os.environ.get("PYTEST_XDIST_WORKER"):
@@ -58,28 +60,29 @@ def db_engine(tmp_path_factory) -> Generator:
     else:
         # Running with xdist (or simulated via environment variable)
         db_dir = tmp_path_factory.mktemp(f"db_{worker_id}")
-    
+
     db_path = db_dir / "test.db"
-    
+
     engine = create_engine(
         f"sqlite:///{db_path}",
         connect_args={"check_same_thread": False},
     )
-    
+
     # Schema creation moved to ensure_test_db fixture for per-test isolation
-    
+
     yield engine
-    
+
     engine.dispose()
 
 
 @pytest.fixture(scope="function")
 def db_session() -> Generator[Session, None, None]:
-    """Function-scoped DB session (SessionLocal already module-patched for test DB). 
+    """Function-scoped DB session (SessionLocal already module-patched for test DB).
 
     Uses worker-specific engine via module monkeypatch.
     Isolation via conftest truncate_test_tables + module_db_setup."""
     from src.models.database import SessionLocal
+
     session = SessionLocal()
     try:
         yield session
@@ -122,4 +125,3 @@ def clean_db(db_engine) -> Generator[None, None, None]:
     Base.metadata.drop_all(db_engine)
     Base.metadata.create_all(db_engine)
     yield
-

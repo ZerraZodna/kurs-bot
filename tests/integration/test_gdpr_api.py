@@ -2,6 +2,7 @@
 Migrated integration tests for GDPR API.
  migrated from tests/test_gdpr_api.py
 """
+
 import datetime
 
 import pytest
@@ -25,7 +26,9 @@ def client(db_engine):
     from sqlalchemy.orm import sessionmaker
 
     from src.api.gdpr_routes import get_db
+
     TestSessionLocal = sessionmaker(bind=db_engine, autoflush=False, autocommit=False, future=True)
+
     def override_get_db():
         db = TestSessionLocal()
         try:
@@ -36,6 +39,7 @@ def client(db_engine):
             raise
         finally:
             db.close()
+
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as c:
         yield c
@@ -160,6 +164,7 @@ def test_gdpr_export_restrict_rectify_erase_api(client, db_session):
 
     # Then: User should be restricted - create new session to see API changes
     from src.models.database import SessionLocal
+
     verify_session = SessionLocal()
     try:
         user = verify_session.query(User).filter_by(user_id=user_id).first()
@@ -238,6 +243,7 @@ def test_gdpr_object_and_withdraw_consent_api(client, db_session):
 
     # Then: User should be restricted - create new session to see API changes
     from src.models.database import SessionLocal
+
     verify_session = SessionLocal()
     try:
         user = verify_session.query(User).filter_by(user_id=user_id).first()
@@ -265,4 +271,3 @@ def test_gdpr_privacy_notice_public(client):
     response = client.get("/gdpr/privacy-notice")
     assert response.status_code == 200
     assert "Privacy Notice" in response.json().get("content", "")
-

@@ -28,15 +28,20 @@ if getattr(settings, "IS_TEST_ENV", False) or any("pytest" in str(a) for a in sy
         # Ensure there's a sensible default for tests when none provided
         DATABASE_URL = DATABASE_URL or "sqlite:///./src/data/test.db"
 
-engine = create_engine(
-    DATABASE_URL,
-    pool_size=10, max_overflow=20,
-    connect_args={"check_same_thread": False, "timeout": 30} if is_sqlite else {},
-    future=True,
-) if not is_sqlite else create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False, "timeout": 30},
-    future=True,
+engine = (
+    create_engine(
+        DATABASE_URL,
+        pool_size=10,
+        max_overflow=20,
+        connect_args={"check_same_thread": False, "timeout": 30} if is_sqlite else {},
+        future=True,
+    )
+    if not is_sqlite
+    else create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False, "timeout": 30},
+        future=True,
+    )
 )
 
 # Log/print which database URL is in use when the module is imported so
@@ -51,6 +56,7 @@ except Exception:
 
 # SQLite connection pragmas
 if is_sqlite:
+
     @event.listens_for(engine, "connect")
     def _set_sqlite_pragma(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
@@ -61,5 +67,6 @@ if is_sqlite:
 
         finally:
             cursor.close()
+
 
 Base = declarative_base()

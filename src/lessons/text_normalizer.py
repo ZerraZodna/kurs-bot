@@ -1,4 +1,5 @@
 """Text normalization functions for ACIM lessons."""
+
 from __future__ import annotations
 
 import re
@@ -10,7 +11,7 @@ def _normalize_sentence_spacing(text: str) -> str:
     # Add missing space after punctuation when next token starts a new word/quote.
     s = re.sub(r'([\.,!?])(?=[A-Za-z""])', r"\1 ", s)
     # Add missing space after closing quotes before a letter.
-    s = re.sub(r'([''"])(?=[A-Za-z])', r"\1 ", s)
+    s = re.sub(r"([" '"])(?=[A-Za-z])', r"\1 ", s)
     # Collapse accidental multi-spaces introduced during repair.
     s = re.sub(r" {2,}", " ", s)
     return s
@@ -44,4 +45,3 @@ def _normalize_lesson_content_header(content: str, lesson_id: int) -> str:
     )
 
     return txt
-

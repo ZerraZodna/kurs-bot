@@ -2,6 +2,7 @@
 Migrated tests for RAG list memories.
  migrated from tests/test_rag_list_memories.py
 """
+
 import datetime
 
 from sqlalchemy import create_engine
@@ -62,13 +63,13 @@ def test_rag_list_memories_personal_assistant(monkeypatch):
 
     # When: Simulate RAG input with query to trigger semantic search (fixes test)
     stripped, is_rag = parse_rag_prefix("rag list memories acim")
-    
+
     # Then: It should be recognized as RAG
     assert is_rag is True
 
     # When: Call the handler
     out = handle_list_memories(stripped, None, session, user_id=1)
-    
+
     # Then: It should return the memory
     assert out is not None
     assert "Personal Assistant" in out

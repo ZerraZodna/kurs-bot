@@ -5,6 +5,7 @@ Revises: add_gdpr_tables
 Create Date: 2026-02-04 12:30:00.000000
 
 """
+
 import sqlalchemy as sa
 from alembic import op
 

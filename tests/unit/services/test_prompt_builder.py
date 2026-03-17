@@ -65,9 +65,9 @@ class TestPromptBuilder:
         assert test_user.first_name in prompt
         assert test_user.channel in prompt
 
-    def test_build_prompt_with_conversation_history(self, db_session: Session,
-                                                   prompt_builder: PromptBuilder,
-                                                   test_user: User):
+    def test_build_prompt_with_conversation_history(
+        self, db_session: Session, prompt_builder: PromptBuilder, test_user: User
+    ):
         """Given: A user with conversation history
         When: Building a prompt with conversation history
         Then: Should include recent conversation turns."""
@@ -227,10 +227,7 @@ class TestContextOptimizer:
         """Given: A list of memories exceeding max_items
         When: Formatting with max_items limit
         Then: Should only include specified number of items."""
-        memories = [
-            {"value": f"Goal {i}"}
-            for i in range(10)
-        ]
+        memories = [{"value": f"Goal {i}"} for i in range(10)]
 
         formatted = ContextOptimizer.format_memory_list(memories, max_items=3)
         lines = formatted.strip().split("\n")
@@ -320,10 +317,15 @@ class TestConversationHistory:
         db_session.commit()
 
         # Verify both messages are logged
-        messages = db_session.query(MessageLog).filter_by(
-            user_id=test_user.user_id,
-            conversation_thread_id=thread_id,
-        ).all()
+        messages = (
+            db_session
+            .query(MessageLog)
+            .filter_by(
+                user_id=test_user.user_id,
+                conversation_thread_id=thread_id,
+            )
+            .all()
+        )
 
         assert len(messages) == 2
         assert messages[0].message_role == "user"
@@ -355,4 +357,3 @@ class TestConversationHistory:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

@@ -47,13 +47,14 @@ def infer_timezone_from_language(language: Optional[str]) -> str:
 
 def get_user_timezone_from_db(session, user_id: int, default: str = "Europe/Oslo") -> str:
     """Get user's timezone from DB, inferring from language if needed.
-    
+
     Order of resolution:
     1. User.timezone if explicitly set
     2. Inferred from User.language if available
     3. Default (UTC)
     """
     from src.models.database import User  # Import here to avoid circular imports
+
     try:
         user = session.query(User).filter_by(user_id=user_id).first()
         if user:
@@ -138,6 +139,7 @@ def parse_local_time_to_utc(time_str: str, tz_name: str, now_utc: Optional[datet
     or named times (morning/evening). The returned datetime is timezone-aware UTC.
     """
     from datetime import timedelta
+
     # import parser from scheduler to reuse parsing rules
     try:
         from src.scheduler.time_utils import parse_time_string
@@ -253,25 +255,26 @@ def date_is_past(dt: datetime) -> bool:
 def utc_now_plus(minutes: int = 0, hours: int = 0, days: int = 0) -> datetime:
     """UTC now + timedelta. Central timedelta helper."""
     from datetime import timedelta
+
     td = timedelta(minutes=minutes, hours=hours, days=days)
     return utc_now() + td
 
 
 def format_datetime_for_display(iso_string: Optional[str]) -> str:
     """Format an ISO8601 datetime string for user display.
-    
+
     Converts '2026-03-02T15:14:00' to '2026-03-02 15:14' format.
     Handles timezone suffixes and returns a user-friendly string.
-    
+
     Args:
         iso_string: ISO8601 datetime string (e.g., '2026-03-02T15:14:00' or '2026-03-02T15:14:00+00:00')
-        
+
     Returns:
         Formatted string for display (e.g., '2026-03-02 15:14'), or original string if parsing fails
     """
     if not iso_string:
         return "unknown"
-    
+
     try:
         # Parse the ISO string
         dt = datetime.fromisoformat(iso_string.replace("Z", "+00:00"))

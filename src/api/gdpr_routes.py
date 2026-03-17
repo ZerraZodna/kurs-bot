@@ -171,11 +171,7 @@ async def gdpr_rectify(
     _admin: None = Depends(require_gdpr_admin),
 ) -> Dict[str, Any]:
     try:
-        memory_updates = (
-            [item.model_dump() for item in request.memory_updates]
-            if request.memory_updates
-            else None
-        )
+        memory_updates = [item.model_dump() for item in request.memory_updates] if request.memory_updates else None
         rectify_user(db, request.user_id, request.updates, memory_updates, request.actor)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

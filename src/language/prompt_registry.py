@@ -6,6 +6,7 @@ Prototype implementation:
 - If the user has a custom prompt stored under memory key `custom_rag_prompt`, use that.
 - Otherwise fall back to `settings.SYSTEM_PROMPT_RAG`.
 """
+
 import logging
 from typing import Optional
 

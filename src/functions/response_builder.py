@@ -19,13 +19,14 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BuiltResponse:
     """Final built response with text and metadata."""
+
     text: str
     has_function_results: bool = False
     successful_functions: List[str] = field(default_factory=list)
     failed_functions: List[str] = field(default_factory=list)
     follow_up_prompt: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
         return {
@@ -40,7 +41,7 @@ class BuiltResponse:
 
 class ResponseBuilder:
     """Builds responses combining natural language with function results."""
-    
+
     # Templates for different result types
     SUCCESS_TEMPLATES = {
         "create_schedule": "✓ Daily reminder set for {time}",
@@ -59,7 +60,7 @@ class ResponseBuilder:
         "extract_memory": "✓ Remembered: {key}",
         "forget_memories": "🗑️ Forgot {archived_count} memories matching '{query_text}'",
     }
-    
+
     ERROR_TEMPLATES = {
         "create_schedule": "I couldn't set up that schedule. {error}",
         "update_schedule": "I couldn't update the schedule. {error}",
@@ -77,11 +78,11 @@ class ResponseBuilder:
         "extract_memory": "I couldn't store that information. {error}",
         "forget_memories": "Couldn't forget memories matching '{query_text}'. {error}",
     }
-    
+
     def __init__(self):
         self.success_templates = self.SUCCESS_TEMPLATES.copy()
         self.error_templates = self.ERROR_TEMPLATES.copy()
-    
+
     def build(
         self,
         user_text: str,
@@ -91,35 +92,35 @@ class ResponseBuilder:
     ) -> BuiltResponse:
         """
         Build a final response combining AI text and function results.
-        
+
         Args:
             user_text: Original user message
             ai_response_text: Natural language response from AI
             execution_result: Results from executing functions
             include_function_results: Whether to append function result summaries
-            
+
         Returns:
             BuiltResponse with final text and metadata
         """
         successful = execution_result.get_successful_results()
         failed = execution_result.get_failed_results()
-        
+
         # Start with AI's natural language response
         final_text = ai_response_text.strip() if ai_response_text else ""
-        
+
         # Build function result summaries if needed
         if include_function_results and (successful or failed):
             function_summaries = self._build_function_summaries(successful, failed)
-            
+
             # Append to AI response if not empty
             if function_summaries:
                 if final_text:
                     final_text += "\n\n"
                 final_text += function_summaries
-        
+
         # Determine follow-up prompt if needed
         follow_up = self._determine_follow_up(successful, failed, user_text)
-        
+
         # Build metadata
         metadata = {
             "total_functions": len(execution_result.results),
@@ -127,7 +128,7 @@ class ResponseBuilder:
             "failed_count": len(failed),
             "execution_time_ms": execution_result.total_execution_time_ms,
         }
-        
+
         return BuiltResponse(
             text=final_text,
             has_function_results=bool(successful or failed),
@@ -136,7 +137,7 @@ class ResponseBuilder:
             follow_up_prompt=follow_up,
             metadata=metadata,
         )
-    
+
     def _build_function_summaries(
         self,
         successful: List[ExecutionResult],
@@ -144,7 +145,7 @@ class ResponseBuilder:
     ) -> str:
         """Build human-readable summary of function results."""
         parts = []
-        
+
         # Group successful results by type
         if successful:
             success_parts = []
@@ -152,28 +153,28 @@ class ResponseBuilder:
                 summary = self._format_success_result(result)
                 if summary:
                     success_parts.append(summary)
-            
+
             if success_parts:
                 parts.extend(success_parts)
-        
+
         # Add failed results
         if failed:
             for result in failed:
                 summary = self._format_error_result(result)
                 if summary:
                     parts.append(summary)
-        
+
         return "\n".join(parts) if parts else ""
-    
+
     def _format_success_result(self, result: ExecutionResult) -> Optional[str]:
         """Format a successful function result."""
         template = self.success_templates.get(result.function_name)
         if not template:
             return None
-        
+
         # Extract relevant fields from result
         result_data = result.result or {}
-        
+
         # Build format kwargs
         kwargs = {}
         if result.function_name in ["create_schedule", "update_schedule", "set_preferred_time"]:
@@ -197,24 +198,22 @@ class ResponseBuilder:
             schedules = result_data.get("schedules", [])
             # Get user's timezone for display
             tz_name = result_data.get("timezone", "UTC")
-            
+
             if schedules:
                 details = []
                 for s in schedules:
                     schedule_type = s.get("schedule_type", "reminder")
                     time_display = self._format_cron_expression(
-                        s.get("cron_expression", ""),
-                        s.get("next_send_time"),
-                        tz_name
+                        s.get("cron_expression", ""), s.get("next_send_time"), tz_name
                     )
-                    
+
                     # Map schedule types to friendly display names
                     type_display_map = {
                         "one_time_reminder": "Remind once",
                         "daily": "Daily reminder",
                     }
                     type_display = type_display_map.get(schedule_type, schedule_type.replace("_", " "))
-                    
+
                     # For one-time reminders, show the message if available
                     if schedule_type == "one_time_reminder":
                         message = s.get("message", "")
@@ -225,11 +224,11 @@ class ResponseBuilder:
                     else:
                         status = "active" if s.get("is_active") else "inactive"
                         details.append(f"  - {type_display} at {time_display} ({status})")
-                
+
                 kwargs["details"] = "\n".join(details)
             else:
                 kwargs["details"] = "No active reminders found."
-            
+
             # Add timezone to output if available
             tz_name = result_data.get("timezone", "")
             if tz_name:
@@ -240,28 +239,28 @@ class ResponseBuilder:
         except KeyError:
             # Fallback if template formatting fails
             return f"✓ {result.function_name} completed"
-    
+
     def _format_error_result(self, result: ExecutionResult) -> Optional[str]:
         """Format a failed function result."""
         template = self.error_templates.get(result.function_name)
         if not template:
             return f"⚠ {result.function_name} failed: {result.error}"
-        
+
         kwargs = {"error": result.error or "Unknown error"}
-        
+
         try:
             return template.format(**kwargs)
         except KeyError:
             return f"⚠ {result.function_name} failed: {result.error}"
-    
+
     def _format_cron_expression(self, cron_expr: str, next_send_time: Any = None, tz_name: str = "UTC") -> str:
         """Format a cron expression or special time format into human-readable time.
-        
+
         Args:
             cron_expr: The cron expression (e.g., "0 7 * * *") or special format (e.g., "once:2024-01-15T07:00:00")
             next_send_time: Optional datetime object or ISO format datetime string for one-time reminders
             tz_name: User's timezone for local time display
-            
+
         Returns:
             Human-readable time string (e.g., "07:00", "2024-01-15 07:00")
         """
@@ -269,41 +268,42 @@ class ResponseBuilder:
         from datetime import datetime
 
         from src.core.timezone import format_datetime_for_display as fdfd
-        
+
         if isinstance(next_send_time, datetime):
             # Already a datetime object - format it directly
             return fdfd(next_send_time.isoformat())
-        
+
         if not cron_expr:
             return "unknown"
-        
+
         # Handle one-time reminder format: "once:ISO8601"
         if cron_expr.startswith("once:"):
             return fdfd(next_send_time) if next_send_time else "one-time"
-        
+
         # Parse standard cron expression: "M H * * *"
         parts = cron_expr.split()
         if len(parts) >= 2:
             try:
                 minute = int(parts[0])
                 hour = int(parts[1])
-                
+
                 # Convert UTC hour/minute to user's local timezone
                 from datetime import datetime
                 from datetime import timezone as tz
                 from zoneinfo import ZoneInfo
+
                 try:
                     tzinfo = ZoneInfo(tz_name)
                 except Exception:
                     tzinfo = tz.utc
-                
+
                 # Create a datetime in UTC and convert to user's timezone
                 utc_dt = datetime(2000, 1, 1, hour, minute, 0, tzinfo=tz.utc)
                 local_dt = utc_dt.astimezone(tzinfo)
                 return f"{local_dt.hour:02d}:{local_dt.minute:02d}"
             except (ValueError, IndexError):
                 pass
-        
+
         # Fallback: return the raw expression
         return cron_expr
 
@@ -317,27 +317,26 @@ class ResponseBuilder:
         # If there are failures, suggest retry or clarification
         if failed:
             critical_failures = [
-                r for r in failed 
-                if r.function_name in ["create_schedule", "update_schedule", "set_timezone"]
+                r for r in failed if r.function_name in ["create_schedule", "update_schedule", "set_timezone"]
             ]
             if critical_failures:
                 return "Would you like to try again with different details?"
-        
+
         # Check for specific follow-up scenarios
         for result in successful:
             if result.function_name == "create_schedule":
                 return None  # No follow-up needed for successful schedule creation
-            
+
             if result.function_name == "set_timezone":
                 # Suggest setting preferred time after timezone
                 return "Would you like to set your preferred lesson time as well?"
-            
+
             if result.function_name == "send_lesson" and "repeat" not in result.function_name:
                 # Suggest marking complete after sending lesson
                 return "Let me know when you've completed this lesson!"
-        
+
         return None
-    
+
     def build_simple_response(
         self,
         ai_response_text: str,
@@ -345,41 +344,41 @@ class ResponseBuilder:
     ) -> str:
         """
         Build a simple text response (convenience method).
-        
+
         Args:
             ai_response_text: Natural language response from AI
             function_results: Optional function execution results
-            
+
         Returns:
             Final response text
         """
         if not function_results:
             return ai_response_text or ""
-        
+
         built = self.build("", ai_response_text, function_results)
         return built.text
-    
+
     def add_custom_template(self, function_name: str, success_template: str, error_template: Optional[str] = None):
         """Add or override a template for a function."""
         self.success_templates[function_name] = success_template
         if error_template:
             self.error_templates[function_name] = error_template
-    
+
     def build_error_response(self, error_message: str, suggestion: Optional[str] = None) -> BuiltResponse:
         """
         Build a response for when something went wrong.
-        
+
         Args:
             error_message: The error message to display
             suggestion: Optional suggestion for the user
-            
+
         Returns:
             BuiltResponse with error information
         """
         text = f"I encountered an issue: {error_message}"
         if suggestion:
             text += f"\n\n{suggestion}"
-        
+
         return BuiltResponse(
             text=text,
             has_function_results=False,
@@ -406,4 +405,3 @@ def reset_builder():
     """Reset the global instance (useful for testing)."""
     global _builder
     _builder = None
-

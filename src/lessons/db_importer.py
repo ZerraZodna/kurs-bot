@@ -1,4 +1,5 @@
 """Database import functions for ACIM lessons."""
+
 from __future__ import annotations
 
 from typing import List, Optional
@@ -60,4 +61,3 @@ def verify_db_count(expected: int) -> bool:
         cnt = session.query(Lesson).count()
         print(f"Database contains {cnt} lessons (expected {expected})")
         return cnt >= expected
-

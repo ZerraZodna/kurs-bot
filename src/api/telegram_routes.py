@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 
-#from datetime import datetime, timedelta, timezone
+# from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy.exc import OperationalError
 
@@ -62,11 +62,7 @@ async def telegram_webhook(request: Request, secret_token: str):
         db_user = db.query(User).filter_by(external_id=str(uid), channel="telegram").first()
         if not db_user:
             db_user = User(
-                external_id=str(uid),
-                channel="telegram",
-                first_name=first_name,
-                last_name=last_name,
-                opted_in=True
+                external_id=str(uid), channel="telegram", first_name=first_name, last_name=last_name, opted_in=True
             )
             db.add(db_user)
             db.commit()
@@ -95,7 +91,9 @@ async def telegram_webhook(request: Request, secret_token: str):
     # Log all incoming messages to MessageLog with retry
     def _log_message():
         with get_session() as db:
-            uid_inner = db.query(User).filter_by(external_id=str(uid), channel="telegram").first().user_id if uid else None
+            uid_inner = (
+                db.query(User).filter_by(external_id=str(uid), channel="telegram").first().user_id if uid else None
+            )
             log = MessageLog(
                 user_id=uid_inner,
                 direction="inbound",
@@ -103,7 +101,7 @@ async def telegram_webhook(request: Request, secret_token: str):
                 external_message_id=parsed["external_message_id"],
                 content=text,
                 status="delivered",
-                error_message=None
+                error_message=None,
             )
             # Only set new columns if they exist (migration applied)
             try:
@@ -121,18 +119,13 @@ async def telegram_webhook(request: Request, secret_token: str):
     def _create_batch_lock():
         with get_session() as db:
             # Check if lock already exists and is still valid
-            existing_lock = db.query(BatchLock).filter(
-                BatchLock.user_id == user_id,
-                BatchLock.expires_at > utc_now()
-            ).first()
+            existing_lock = (
+                db.query(BatchLock).filter(BatchLock.user_id == user_id, BatchLock.expires_at > utc_now()).first()
+            )
 
             if not existing_lock:
                 # Create new lock (3 minute TTL)
-                lock = BatchLock(
-                    user_id=user_id,
-                    channel="telegram",
-                    expires_at=utc_now_plus(minutes=3)
-                )
+                lock = BatchLock(user_id=user_id, channel="telegram", expires_at=utc_now_plus(minutes=3))
                 db.add(lock)
                 db.commit()
                 asyncio.create_task(process_telegram_batch(user_id, uid))

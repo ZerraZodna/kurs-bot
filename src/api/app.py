@@ -29,34 +29,34 @@ def ensure_lessons_imported():
     try:
         # Ensure tables exist first
         Base.metadata.create_all(bind=engine)
-        
+
         with SessionLocal() as session:
             count = session.query(Lesson).count()
             if count > 0:
                 logging.info(f"Database already contains {count} lessons, skipping import")
                 return
-            
+
             # No lessons found, run import
             pdf_path = Path(__file__).resolve().parents[2] / "src" / "data" / "Sparkly ACIM lessons-extracted.pdf"
             if not pdf_path.exists():
                 logging.warning(f"PDF not found at {pdf_path}, cannot auto-import lessons")
                 return
-            
+
             logging.info(f"Auto-importing lessons from {pdf_path}...")
-            
+
             # Import the importer module
             from src.lessons import extract_formatted_text, import_to_db, parse_lessons_from_text
-            
+
             text = extract_formatted_text(pdf_path)
             lessons = parse_lessons_from_text(text)
-            
+
             if not lessons:
                 logging.warning("No lessons found in PDF")
                 return
-            
+
             added = import_to_db(lessons, clear=False, limit=None)
             logging.info(f"✅ Auto-imported {added} lessons from PDF")
-            
+
     except Exception as e:
         logging.exception(f"Failed to auto-import lessons: {e}")
 
@@ -65,12 +65,12 @@ def ensure_lessons_imported():
 async def lifespan(app: FastAPI):
     # Auto-import lessons if database is empty
     ensure_lessons_imported()
-    
+
     # Start background threads unless running in explicit test context
     if not getattr(settings, "IS_TEST_ENV", False):
         t = threading.Thread(target=nightly_memory_purge, daemon=True)
         t.start()
-        
+
         # Start Telegram long-polling if enabled
         polling_task = start_polling_task()
     else:
@@ -89,7 +89,7 @@ async def lifespan(app: FastAPI):
     # Uvicorn sets its error logger to DEBUG when --log-level debug is used
     uvicorn_error = logging.getLogger("uvicorn.error")
     is_debug = uvicorn_error.level == logging.DEBUG or uvicorn_error.getEffectiveLevel() == logging.DEBUG
-    
+
     root_logger = logging.getLogger()
     if root_logger.handlers:
         # Uvicorn has configured logging, set appropriate level
@@ -102,7 +102,7 @@ async def lifespan(app: FastAPI):
         logging.basicConfig(
             level=logging.DEBUG if is_debug else logging.INFO,
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            handlers=[logging.StreamHandler()]
+            handlers=[logging.StreamHandler()],
         )
     apply_logging_redaction()
     verify_secrets_config()
@@ -154,6 +154,7 @@ async def lifespan(app: FastAPI):
         except Exception:
             logging.exception("/api/generate ping failed at %s", base)
             return False
+
     # Consolidated Ollama availability and model checks (refactored).
     try:
         any_ok, diagnostics = run_ollama_checks(settings)
@@ -219,6 +220,7 @@ if DEV_WEB:
     static_dir = str(static_path)
     app.mount("/dev/static", StaticFiles(directory=static_dir), name="dev_static")
     app.include_router(dev_router)
+
 
 @app.get("/")
 async def root():

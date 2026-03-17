@@ -8,6 +8,7 @@ The fix: Run post_hook FIRST, then decide what to send:
 - If function results exist → send only function_response_text (combined)
 - Otherwise → send only ai_response
 """
+
 from typing import Optional
 from unittest.mock import AsyncMock
 
@@ -21,6 +22,7 @@ async def mock_generator(tokens):
 
 
 # ─── Logic simulation helpers ────────────────────────────────────────────────
+
 
 async def simulate_streaming_send_logic(
     full_response: str,
@@ -54,6 +56,7 @@ async def simulate_streaming_send_logic(
 
 
 # ─── Tests ───────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_no_duplicate_when_function_results_exist():
@@ -253,6 +256,7 @@ async def test_function_results_with_empty_execution_result():
 
 # ─── Integration-style tests with more realistic mocking ─────────────────────
 
+
 @pytest.mark.asyncio
 async def test_streaming_path_with_lesson_function():
     """
@@ -271,7 +275,9 @@ async def test_streaming_path_with_lesson_function():
 
     # Simulate the combined function response that would be built
     # (This simulates what response_builder.build() would produce)
-    function_response_text = "Let me get today's lesson for you.\n\n📖 **Lesson 1: Nothing I see means anything.**\n\nThe exercises..."
+    function_response_text = (
+        "Let me get today's lesson for you.\n\n📖 **Lesson 1: Nothing I see means anything.**\n\nThe exercises..."
+    )
 
     # Now test the send logic
     send_message = AsyncMock()

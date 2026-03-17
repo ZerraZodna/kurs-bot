@@ -16,11 +16,7 @@ def delete_user_content_rows(session: Session, user_id: int) -> Dict[str, int]:
     Returns deletion metrics. Caller owns outer transaction/commit.
     """
     deleted_memories = MemoryHandler(session).delete_user_memories(user_id=user_id)
-    deleted_messages = (
-        session.query(MessageLog)
-        .filter_by(user_id=user_id)
-        .delete(synchronize_session=False)
-    )
+    deleted_messages = session.query(MessageLog).filter_by(user_id=user_id).delete(synchronize_session=False)
 
     # Scheduler helper performs schedule deletion + APScheduler job cleanup.
     from src.scheduler import delete_user_schedules_and_remove_jobs

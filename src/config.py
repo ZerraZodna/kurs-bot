@@ -1,4 +1,3 @@
-
 from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
@@ -35,7 +34,7 @@ class Settings(BaseSettings):
     GDPR_VERIFICATION_MAX_ATTEMPTS: int = 3
     GDPR_VERIFICATION_CODE_LENGTH: int = 6
     DOWNTIME_GRACE_MINUTES: int = 30
-    
+
     SYSTEM_PROMPT: str = "You are a spiritual coach specializing in A Course in Miracles. Respond with wisdom, compassion, and practical spiritual guidance. Make always short replies with unconditional universal love. You also know: Impersonal Life, by Joseph Benner as a background, but do not have to talk about it. But reflect these principles too in your conversation. Be kind, warm and gentle. The user sees the text on a small screen, so keep the text easy to read."
     SYSTEM_PROMPT_RAG: str = "You are a helpful personal assistant. Use the provided memories and context to give clear, concise answers. Be conversational and practical. Avoid spiritual lectures unless asked."
     # Function calling prompt - appended to system prompt when functions are available
@@ -56,7 +55,7 @@ Only use functions relevant to the current context.
 """
     # Ollama temperature (0.0 = deterministic, 1.0 = creative). Lower reduces hallucination.
     OLLAMA_TEMPERATURE: float = 0.2
-# Minimum seconds between Telegram editMessageText calls during streaming.
+    # Minimum seconds between Telegram editMessageText calls during streaming.
     # 0.5s = ~2 edits/sec - safe for Telegram limits (1/sec recommended).
     TELEGRAM_STREAM_UPDATE_INTERVAL: float = 0.5
     TELEGRAM_EDIT_MAX_RETRIES: int = 3
@@ -75,5 +74,6 @@ Only use functions relevant to the current context.
         env_file_encoding="utf-8",
         extra="allow",
     )
+
 
 settings = Settings()

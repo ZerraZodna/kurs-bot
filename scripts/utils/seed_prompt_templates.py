@@ -3,6 +3,7 @@
 Exposes a `seed()` function for programmatic use and prints concise
 progress messages when run as a script.
 """
+
 from typing import Optional
 
 from src.models.database import PromptTemplate, SessionLocal, init_db

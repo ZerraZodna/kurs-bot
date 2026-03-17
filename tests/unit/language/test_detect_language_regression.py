@@ -30,13 +30,13 @@ class TestDetectLanguageRegression:
         )
         db_session.add(user)
         db_session.commit()
-        
+
         dialogue = DialogueEngine(db_session)
-        
+
         # When: Processing the problematic English message
         problematic_msg = "When is my reminder"
         await dialogue.process_message(user.user_id, problematic_msg, db_session)
-        
+
         # Then: Should detect English, not German
         lang_memories = dialogue.memory_manager.get_memory(user.user_id, "user_language")
         assert lang_memories, "No user_language memory was stored"
@@ -44,4 +44,3 @@ class TestDetectLanguageRegression:
             "Expected English language memory to have been stored (regression),"
             f" but got: {[m['value'] for m in lang_memories]}"
         )
-

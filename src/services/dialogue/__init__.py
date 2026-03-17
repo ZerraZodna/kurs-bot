@@ -37,4 +37,3 @@ __all__ = [
     "handle_schedule_messages",
     "maybe_send_next_lesson",
 ]
-

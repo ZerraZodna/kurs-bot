@@ -42,14 +42,13 @@ def purge_expired_ttl_memories(session: Optional[Session] = None) -> int:
 def purge_expired_batch_locks() -> None:
     """Remove expired batch locks from the database."""
     try:
+
         def _do_purge():
             db = SessionLocal()
             try:
                 from src.models.database import BatchLock
 
-                deleted = db.query(BatchLock).filter(
-                    BatchLock.expires_at < utc_now()
-                ).delete(synchronize_session=False)
+                deleted = db.query(BatchLock).filter(BatchLock.expires_at < utc_now()).delete(synchronize_session=False)
                 if deleted:
                     logger.info("Purged %s expired batch locks", deleted)
                 db.commit()
@@ -125,7 +124,7 @@ def nightly_memory_purge(days_keep: int = settings.MEMORY_ARCHIVE_RETENTION_DAYS
             next_run = now.replace(hour=hour_utc, minute=0, second=0, microsecond=0)
             if next_run <= now:
                 next_run += timedelta(days=1)
-            
+
             # Skip purge on first startup to avoid conflicts with normal operations
             if not first_run:
                 sleep_seconds = (next_run - now).total_seconds()
@@ -136,7 +135,7 @@ def nightly_memory_purge(days_keep: int = settings.MEMORY_ARCHIVE_RETENTION_DAYS
                 sleep_seconds = (next_run - now).total_seconds()
                 print(f"[purge] Scheduled nightly maintenance at {next_run.isoformat()}")
                 time.sleep(sleep_seconds)
-            
+
             first_run = False
         except Exception as e:
             print(f"[purge error] {e}")

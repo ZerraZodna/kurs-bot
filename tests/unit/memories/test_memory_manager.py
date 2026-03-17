@@ -19,13 +19,10 @@ class TestMemoryManager:
         """Should store and retrieve memory correctly."""
         # Given: A memory manager
         mm = MemoryManager(db=db_session)
-        
+
         # When: Storing a memory
-        mem_id = mm.store_memory(
-            test_user.user_id, "goal", "Learn Python", 
-            category="fact"
-        )
-        
+        mem_id = mm.store_memory(test_user.user_id, "goal", "Learn Python", category="fact")
+
         # Then: Memory should be stored and retrievable
         assert mem_id is not None
         memories = mm.get_memory(test_user.user_id, "goal")
@@ -36,47 +33,31 @@ class TestMemoryManager:
         """Different value should archive old memory."""
         # Given: A memory manager
         mm = MemoryManager(db=db_session)
-        
+
         # When: Storing initial memory then conflicting one
-        mem_id1 = mm.store_memory(
-            test_user.user_id, "goal", "Learn Python", 
-            category="fact"
-        )
-        mem_id2 = mm.store_memory(
-            test_user.user_id, "goal", "Learn SQL", 
-            category="fact"
-        )
-        
+        mem_id1 = mm.store_memory(test_user.user_id, "goal", "Learn Python", category="fact")
+        mem_id2 = mm.store_memory(test_user.user_id, "goal", "Learn SQL", category="fact")
+
         # Then: Should create new memory, archive old one
         assert mem_id1 != mem_id2
-        
+
         # Only one active memory
-        active = db_session.query(Memory).filter_by(
-            user_id=test_user.user_id, key="goal", is_active=True
-        ).all()
+        active = db_session.query(Memory).filter_by(user_id=test_user.user_id, key="goal", is_active=True).all()
         assert len(active) == 1
-        
+
         # Archived memory should exist
-        archived = db_session.query(Memory).filter_by(
-            user_id=test_user.user_id, key="goal", is_active=False
-        ).all()
+        archived = db_session.query(Memory).filter_by(user_id=test_user.user_id, key="goal", is_active=False).all()
         assert len(archived) == 1
 
     def test_store_memory_merge(self, db_session: Session, test_user):
         """Same value should merge."""
         # Given: A memory manager
         mm = MemoryManager(db=db_session)
-        
+
         # When: Storing same value twice
-        mem_id1 = mm.store_memory(
-            test_user.user_id, "goal", "Learn Python", 
-            category="fact"
-        )
-        mem_id2 = mm.store_memory(
-            test_user.user_id, "goal", "Learn Python", 
-            category="fact"
-        )
-        
+        mem_id1 = mm.store_memory(test_user.user_id, "goal", "Learn Python", category="fact")
+        mem_id2 = mm.store_memory(test_user.user_id, "goal", "Learn Python", category="fact")
+
         # Then: Should merge (same ID)
         assert mem_id1 == mem_id2
         mem = db_session.query(Memory).filter_by(memory_id=mem_id1).first()
@@ -94,15 +75,14 @@ class TestMemoryManager:
             is_active=False,
             archived_at=old_date,
             created_at=old_date,
-            updated_at=old_date
+            updated_at=old_date,
         )
         db_session.add(mem)
         db_session.commit()
-        
+
         # When: Purging old memories
         purged = purge_archived_memories(days_keep=365, session=db_session)
-        
+
         # Then: Old memory should be deleted
         assert purged == 1
         assert db_session.query(Memory).filter_by(key="old_key").count() == 0
-

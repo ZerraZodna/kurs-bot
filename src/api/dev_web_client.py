@@ -51,14 +51,14 @@ async def dev_message(payload: MessagePayload):
         # Use DialogueEngine to process message
         dialogue = DialogueEngine(db)
         response = await dialogue.process_message(user_id=user.user_id, text=payload.text, session=db)
-        
+
         logger = logging.getLogger(__name__)
-        
+
         if isinstance(response, dict) and response.get("type") == "stream":
             raw_generator = response["generator"]
             stream_filter = StreamingFilter(raw_generator)
             filtered_generator = stream_filter.filter_stream()
-            
+
             async def webui_stream_gen():
                 async for token in filtered_generator:
                     yield token
@@ -67,7 +67,7 @@ async def dev_message(payload: MessagePayload):
                     await response["post_hook"]("")
                 except Exception as e:
                     logger.error(f"Post-hook error: {e}")
-            
+
             return StreamingResponse(webui_stream_gen(), media_type="text/plain")
         else:
             # Fallback to text if not stream dict

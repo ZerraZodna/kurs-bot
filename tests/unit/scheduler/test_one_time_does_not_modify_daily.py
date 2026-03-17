@@ -2,6 +2,7 @@
 Migrated tests for one-time schedule creation.
  migrated from tests/test_one_time_does_not_modify_daily.py
 """
+
 from datetime import datetime, timedelta, timezone
 
 from src.models.database import Schedule, SessionLocal
@@ -25,7 +26,9 @@ def test_one_time_creation_does_not_modify_daily():
 
         # When: Create a one-time reminder for the same user
         run_at = datetime.now(timezone.utc) + timedelta(hours=1)
-        one = SchedulerService.create_one_time_schedule(user_id=user_id, run_at=run_at, message="One-time reminder", session=db)
+        one = SchedulerService.create_one_time_schedule(
+            user_id=user_id, run_at=run_at, message="One-time reminder", session=db
+        )
 
         # Then: Reload schedules from DB and assert both exist and daily was not modified
         schedules = db.query(Schedule).filter_by(user_id=user_id).all()
@@ -39,4 +42,3 @@ def test_one_time_creation_does_not_modify_daily():
 
     finally:
         db.close()
-

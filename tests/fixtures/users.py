@@ -22,7 +22,7 @@ DEFAULT_LANGUAGE = "en"
 @pytest.fixture
 def test_user(db_session: Session) -> Generator[User, None, None]:
     """Standard test user fixture.
-    
+
     Creates a basic user with default values.
     """
     user = User(
@@ -35,33 +35,33 @@ def test_user(db_session: Session) -> Generator[User, None, None]:
     )
     db_session.add(user)
     db_session.commit()
-    
+
     yield user
 
 
 @pytest.fixture
 def test_user_with_memories(db_session: Session, test_user: User) -> Generator[User, None, None]:
     """Test user with pre-populated memories.
-    
+
     Includes onboarding memories and current lesson state.
     """
     mm = MemoryManager(db_session)
-    
+
     # Add standard onboarding memories
     mm.store_memory(test_user.user_id, "first_name", DEFAULT_FIRST_NAME, category="profile", source="test")
     mm.store_memory(test_user.user_id, "data_consent", "yes", category="profile", source="test")
     mm.store_memory(test_user.user_id, "user_language", DEFAULT_LANGUAGE, category="profile", source="test")
-    
+
     # Set current lesson
     set_current_lesson(mm, test_user.user_id, 1)
-    
+
     yield test_user
 
 
 @pytest.fixture
 def test_user_norwegian(db_session: Session) -> Generator[User, None, None]:
     """Norwegian test user fixture.
-    
+
     Creates a user with Norwegian language preference.
     """
     user = User(
@@ -74,18 +74,18 @@ def test_user_norwegian(db_session: Session) -> Generator[User, None, None]:
     )
     db_session.add(user)
     db_session.commit()
-    
+
     # Add Norwegian language memory
     mm = MemoryManager(db_session)
     mm.store_memory(user.user_id, "user_language", "no", category="profile", source="test")
     mm.store_memory(user.user_id, "first_name", "Ola", category="profile", source="test")
-    
+
     yield user
 
 
 class UserFactory:
     """Factory for creating test users with custom attributes.
-    
+
     Usage:
         user = UserFactory(db_session).create(
             external_id="custom_001",
@@ -93,11 +93,11 @@ class UserFactory:
             language="es"
         )
     """
-    
+
     def __init__(self, db_session: Session):
         self.db_session = db_session
         self._counter = 0
-    
+
     def create(
         self,
         external_id: Optional[str] = None,
@@ -110,7 +110,7 @@ class UserFactory:
     ) -> User:
         """Create a test user with specified attributes."""
         self._counter += 1
-        
+
         user = User(
             external_id=external_id or f"test_user_{self._counter:03d}",
             channel=channel,
@@ -121,23 +121,23 @@ class UserFactory:
         )
         self.db_session.add(user)
         self.db_session.commit()
-        
+
         # Add memories if specified
         if first_name or language or with_onboarding_complete:
             mm = MemoryManager(self.db_session)
-            
+
             if first_name:
                 mm.store_memory(user.user_id, "first_name", first_name, category="profile", source="test")
-            
+
             if language:
                 mm.store_memory(user.user_id, "user_language", language, category="profile", source="test")
-            
+
             if with_onboarding_complete:
                 mm.store_memory(user.user_id, "data_consent", "yes", category="profile", source="test")
                 set_current_lesson(mm, user.user_id, 1)
-        
+
         return user
-    
+
     def create_ready_user(self, external_id: Optional[str] = None, first_name: str = "Test") -> User:
         """Create a user with onboarding complete (ready for normal use)."""
         return self.create(
@@ -155,10 +155,10 @@ def user_factory(db_session: Session) -> UserFactory:
 
 def create_test_user(db: Session, external_id: str, first_name: Optional[str] = None) -> int:
     """Legacy helper: Create a fresh user row for tests.
-    
+
     Removes any existing user with the same external_id, creates a new
     `User` row and returns the `user_id`.
-    
+
     Note: Prefer using the UserFactory or test_user fixture for new tests.
     """
     from src.models.database import Schedule
@@ -181,7 +181,7 @@ def create_test_user(db: Session, external_id: str, first_name: Optional[str] = 
     )
     db.add(user)
     db.commit()
-    
+
     # Only store a first_name memory when a non-empty name is provided
     if first_name and str(first_name).strip():
         mm = MemoryManager(db)
@@ -192,22 +192,22 @@ def create_test_user(db: Session, external_id: str, first_name: Optional[str] = 
 
 def make_ready_user(db: Session, external_id: str, first_name: str = "Test", timezone: Optional[str] = "UTC") -> int:
     """Legacy helper: Create a fresh user and mark onboarding complete for tests.
-    
+
     This helper calls `create_test_user` then stores the minimum memories
     required so `OnboardingService.get_onboarding_status()` returns complete.
     Returns the created `user_id`.
-    
+
     Note: Prefer using UserFactory.create_ready_user() for new tests.
     """
     user_id = create_test_user(db, external_id, first_name)
-    
+
     # Set timezone on user if provided (pass None to skip)
     if timezone is not None:
         user = db.query(User).filter_by(user_id=user_id).first()
         if user:
             user.timezone = timezone
             db.commit()
-    
+
     mm = MemoryManager(db)
     mm.store_memory(user_id, "data_consent", "yes", category="profile", source="test")
     mm.store_memory(user_id, "first_name", first_name, category="profile", source="test")

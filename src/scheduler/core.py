@@ -33,6 +33,7 @@ class SchedulerService:
     @staticmethod
     def _parse_lesson_int(value) -> Optional[int]:
         from src.lessons.delivery import _parse_lesson_int
+
         return _parse_lesson_int(value)
 
     @staticmethod
@@ -43,6 +44,7 @@ class SchedulerService:
         language: str,
     ) -> Optional[str]:
         from src.lessons.delivery import build_lesson_preview
+
         return build_lesson_preview(db, memory_manager, user_id, language)
 
     @staticmethod
@@ -52,6 +54,7 @@ class SchedulerService:
         memory_manager: MemoryManager,
     ) -> Optional[str]:
         from src.scheduler.execution import _build_schedule_message
+
         return _build_schedule_message(db, schedule, memory_manager)
 
     @staticmethod
@@ -185,6 +188,7 @@ class SchedulerService:
     ) -> int:
         """Deactivate schedules filtered by type (one_time or daily)."""
         from . import manager as schedule_manager
+
         return schedule_manager.deactivate_user_schedules_by_type(
             user_id=user_id,
             schedule_type=schedule_type,

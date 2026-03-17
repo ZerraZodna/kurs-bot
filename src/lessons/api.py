@@ -46,6 +46,7 @@ def get_lesson(lesson_id: int, session: Session) -> Optional[Lesson]:
 def format_lesson_message(lesson: Lesson, language: Optional[str] = None) -> str:
     """Format a lesson for display."""
     import asyncio
+
     try:
         return asyncio.run(_format_lesson_message(lesson, language))
     except Exception as e:
@@ -88,7 +89,9 @@ def has_lesson_status(memory_manager: MemoryManager, user_id: int) -> bool:
     return _has_lesson_status(memory_manager, user_id)
 
 
-def compute_current_lesson_state(memory_manager: MemoryManager, user_id: int, today: Optional[date] = None) -> Dict[str, Any]:
+def compute_current_lesson_state(
+    memory_manager: MemoryManager, user_id: int, today: Optional[date] = None
+) -> Dict[str, Any]:
     """Compute current lesson state."""
     return _compute_current_lesson_state(memory_manager, user_id, today)
 
@@ -103,4 +106,3 @@ __all__ = [
     "compute_current_lesson_state",
     "maybe_send_next_lesson",
 ]
-

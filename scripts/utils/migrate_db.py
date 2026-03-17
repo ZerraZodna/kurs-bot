@@ -2,6 +2,7 @@
 
 Adjusted REPO_ROOT so the script works from the new location.
 """
+
 import argparse
 import os
 import sys
@@ -28,9 +29,14 @@ def load_dotenv(repo_root: Union[str, Path]) -> None:
         if k and k not in os.environ:
             os.environ[k] = v
 
+
 def main():
     parser = argparse.ArgumentParser(description="Run alembic migrations against dev or prod DB")
-    parser.add_argument("--db", choices=("dev","prod"), help="Target database (optional). If omitted, DATABASE_URL from environment/.env is used")
+    parser.add_argument(
+        "--db",
+        choices=("dev", "prod"),
+        help="Target database (optional). If omitted, DATABASE_URL from environment/.env is used",
+    )
     parser.add_argument("--yes", "-y", action="store_true", help="Auto-confirm fallback stamping on failure")
     args = parser.parse_args()
     # Ensure project root is importable and load .env if present
@@ -82,12 +88,15 @@ def main():
         try:
             command.stamp(cfg, "heads")
             print("Alembic stamp completed — DB marked as at heads (no schema changes applied).")
-            print("If required tables are still missing, run `python scripts/utils/fix_dev_db.py` to add missing objects.")
+            print(
+                "If required tables are still missing, run `python scripts/utils/fix_dev_db.py` to add missing objects."
+            )
             return 0
         except Exception as e2:
             print("Stamping also failed:")
             print(e2)
             return 3
+
 
 if __name__ == "__main__":
     sys.exit(main())

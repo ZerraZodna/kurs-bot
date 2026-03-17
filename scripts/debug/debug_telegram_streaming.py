@@ -25,7 +25,7 @@ This invokes real Ollama (~30s).
 import asyncio
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.integrations.telegram_stream import StreamingFilter
 from src.models.database import Memory, Schedule, SessionLocal, User, init_db
@@ -39,26 +39,31 @@ def dump_user_state(db, user_id: int):
     if not user:
         print("❌ User not found")
         return
-    
-    print("User:", {
-        "user_id": user.user_id, 
-        "external_id": user.external_id, 
-        "timezone": user.timezone, 
-        "first_name": user.first_name, 
-        "lesson": user.lesson
-    })
+
+    print(
+        "User:",
+        {
+            "user_id": user.user_id,
+            "external_id": user.external_id,
+            "timezone": user.timezone,
+            "first_name": user.first_name,
+            "lesson": user.lesson,
+        },
+    )
 
     print("\\nSchedules:")
     schedules = db.query(Schedule).filter_by(user_id=user_id).all()
     for s in schedules:
-        print(f"  - {s.schedule_id}: {s.schedule_type} cron={s.cron_expression} active={s.is_active} next={s.next_send_time}")
+        print(
+            f"  - {s.schedule_id}: {s.schedule_type} cron={s.cron_expression} active={s.is_active} next={s.next_send_time}"
+        )
 
     print("\\nRecent memories (last 20):")
     mems = db.query(Memory).filter_by(user_id=user_id).order_by(Memory.created_at.desc()).limit(20).all()
     for m in mems:
         value_preview = m.value[:100] + "..." if len(m.value) > 100 else m.value
         print(f"  [{m.category}] {m.key}: {value_preview} (created {m.created_at})")
-    
+
     print("=" * 80)
 
 
@@ -68,13 +73,13 @@ async def test_telegram_streaming(user_id: int, text: str):
     try:
         # Dump initial state
         dump_user_state(db, user_id)
-        
+
         print(f"\\n🚀 Testing: user={user_id} text='{text}'\\n")
 
         dialogue = DialogueEngine(db)
-        
+
         start_time = time.time()
-        
+
         # Step 1: Get streaming response (simulates telegram.py)
         result = await dialogue.process_message(
             user_id=user_id,
@@ -84,7 +89,7 @@ async def test_telegram_streaming(user_id: int, text: str):
             include_history=True,
             history_turns=4,
         )
-        
+
         elapsed = time.time() - start_time
         print(f"⏱️  process_message_for_telegram: {elapsed:.1f}s\\n")
 
@@ -98,7 +103,7 @@ async def test_telegram_streaming(user_id: int, text: str):
         raw_generator = result["generator"]
         stream_filter = StreamingFilter(raw_generator)
         filtered_stream = stream_filter.filter_stream()
-        
+
         print("📱 Simulating Telegram stream:")
         filtered_tokens = []
         async for token in filtered_stream:
@@ -111,18 +116,20 @@ async def test_telegram_streaming(user_id: int, text: str):
 
         # Step 3: Extract for functions + post_hook (key Telegram step)
         remaining = stream_filter.get_remaining_for_functions()
-        print(f"🔧 Remaining for functions (len={len(remaining) if remaining else 0}): {repr(remaining[:200]) if remaining else 'None'}\\n")
+        print(
+            f"🔧 Remaining for functions (len={len(remaining) if remaining else 0}): {repr(remaining[:200]) if remaining else 'None'}\\n"
+        )
 
         function_text = remaining if remaining else full_response
         print(f"🔧 Running post_hook on: {repr(function_text[:200])}...\\n")
 
         # Step 4: Run post_hook for function execution
         diagnostics = await result["post_hook"](function_text)
-        
+
         print("📊 Post-hook diagnostics:")
         print(f"  structured_intent_used: {diagnostics.get('structured_intent_used')}")
         print(f"  dispatched_actions: {diagnostics.get('dispatched_actions')}")
-        
+
         execution_result = diagnostics.get("execution_result")
         if execution_result:
             print("✅ Functions executed!")
@@ -133,14 +140,14 @@ async def test_telegram_streaming(user_id: int, text: str):
                     print("     🎉 TARGET FUNCTION HIT!")
         else:
             print("❌ No functions executed!")
-        
+
         elapsed_total = time.time() - start_time
         print(f"⏱️  Total time: {elapsed_total:.1f}s\\n")
 
         # Dump final state
         print("\\n🏁 Final state:")
         dump_user_state(db, user_id)
-        
+
     finally:
         db.close()
 
@@ -150,12 +157,11 @@ if __name__ == "__main__":
         print('Usage: python -m scripts.debug.debug_telegram_streaming [user_id] ["text"]')
         print('Example: python -m scripts.debug.debug_telegram_streaming 1 "Send me todays lesson"')
         sys.exit(1)
-    
+
     user_id = int(sys.argv[1]) if len(sys.argv) > 1 else 1
     text = sys.argv[2] if len(sys.argv) > 2 else "Send me todays lesson"
-    
+
     # Init DB
     init_db()
-    
-    asyncio.run(test_telegram_streaming(user_id, text))
 
+    asyncio.run(test_telegram_streaming(user_id, text))

@@ -22,12 +22,13 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ExecutionResult:
     """Result of executing a single function."""
+
     function_name: str
     success: bool
     result: Any = None
     error: Optional[str] = None
     execution_time_ms: float = 0.0
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
         return {
@@ -42,10 +43,11 @@ class ExecutionResult:
 @dataclass
 class BatchExecutionResult:
     """Result of executing multiple functions."""
+
     results: List[ExecutionResult] = field(default_factory=list)
     all_succeeded: bool = True
     total_execution_time_ms: float = 0.0
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
         return {
@@ -53,11 +55,11 @@ class BatchExecutionResult:
             "all_succeeded": self.all_succeeded,
             "total_execution_time_ms": self.total_execution_time_ms,
         }
-    
+
     def get_successful_results(self) -> List[ExecutionResult]:
         """Get only successful results."""
         return [r for r in self.results if r.success]
-    
+
     def get_failed_results(self) -> List[ExecutionResult]:
         """Get only failed results."""
         return [r for r in self.results if not r.success]
@@ -65,12 +67,12 @@ class BatchExecutionResult:
 
 class FunctionExecutor:
     """Executes function calls with error handling and result collection."""
-    
+
     def __init__(self, registry: Optional[FunctionRegistry] = None):
         self.registry = registry or get_function_registry()
         self._handlers: Dict[str, Callable] = {}
         self._register_default_handlers()
-    
+
     def _register_default_handlers(self):
         """Register default function handlers."""
         # Scheduling handlers
@@ -83,64 +85,63 @@ class FunctionExecutor:
         self._handlers["delete_all_one_time_reminders"] = self._handle_delete_all_one_time_reminders
         self._handlers["delete_all_daily_reminders"] = self._handle_delete_all_daily_reminders
         self._handlers["delete_all_reminders"] = self._handle_delete_all_reminders
-        
+
         # Lesson handlers
         self._handlers["send_lesson"] = self._handle_send_lesson
         self._handlers["send_todays_lesson"] = self._handle_send_todays_lesson
         self._handlers["set_current_lesson"] = self._handle_set_current_lesson
-        
+
         # Profile handlers
         self._handlers["set_timezone"] = self._handle_set_timezone
         self._handlers["set_language"] = self._handle_set_language
         self._handlers["set_preferred_time"] = self._handle_set_preferred_time
         self._handlers["update_profile"] = self._handle_update_profile
-                
+
         # Confirmation handlers
         self._handlers["confirm_yes"] = self._handle_confirm_yes
         self._handlers["confirm_no"] = self._handle_confirm_no
-        
+
         # Memory extraction handler
         self._handlers["extract_memory"] = self._handle_extract_memory
-        
+
         # Memory deletion handler (AI version of forget memory)
         self._handlers["forget_memories"] = self._handle_forget_memories
 
-    
     def register_handler(self, function_name: str, handler: Callable):
         """Register a custom handler for a function."""
         self._handlers[function_name] = handler
         logger.debug(f"Registered handler for function: {function_name}")
-    
+
     # ============== DRY Helper Methods ==============
-    
+
     def _ok_response(self, **kwargs) -> Dict[str, Any]:
         """Build a success response."""
         return {"ok": True, **kwargs}
-    
+
     def _error_response(self, error: str, **kwargs) -> Dict[str, Any]:
         """Build an error response."""
         return {"ok": False, "error": error, **kwargs}
-    
+
     def _validate_time(self, time_str: str) -> tuple[bool, Optional[str], Optional[str]]:
         """Validate and normalize time string. Returns (is_valid, normalized, error)."""
         return ParameterValidator.validate_time(time_str)
-    
+
     def _validate_timezone(self, tz_str: str) -> tuple[bool, Optional[str], Optional[str]]:
         """Validate and normalize timezone string. Returns (is_valid, normalized, error)."""
         return ParameterValidator.validate_timezone(tz_str)
-    
+
     def _validate_language(self, lang_str: str) -> tuple[bool, Optional[str], Optional[str]]:
         """Validate and normalize language string. Returns (is_valid, normalized, error)."""
         return ParameterValidator.validate_language(lang_str)
-    
+
     def _validate_datetime(self, dt_str: str) -> tuple[bool, Optional[datetime], Optional[str]]:
         """Validate and normalize datetime string. Returns (is_valid, datetime_obj, error)."""
         return ParameterValidator.validate_datetime(dt_str)
-    
+
     def _get_lesson_by_id(self, lesson_id: int, session) -> Optional[Lesson]:
         """Get lesson by ID from database."""
         return session.query(Lesson).filter_by(lesson_id=lesson_id).first()
-    
+
     async def execute_all(
         self,
         functions: List[Dict[str, Any]],
@@ -149,28 +150,29 @@ class FunctionExecutor:
     ) -> BatchExecutionResult:
         """
         Execute all function calls sequentially.
-        
+
         Args:
             functions: List of function calls with 'name' and 'parameters'
             context: Execution context (user_id, session, memory_manager, etc.)
             continue_on_error: Whether to continue executing after an error
-            
+
         Returns:
             BatchExecutionResult with all execution results
         """
         import time
-        
+
         batch_result = BatchExecutionResult()
         start_time = time.time()
-        
+
         for func_call in functions:
             function_name = func_call.get("name")
             parameters = func_call.get("parameters", {})
-            
-            # Early logging of RAW function name before any processing/redaction
-            logger.info(f"[executor] Processing function call: name='{function_name}' (len={len(function_name) if function_name else 0})")
 
-            
+            # Early logging of RAW function name before any processing/redaction
+            logger.info(
+                f"[executor] Processing function call: name='{function_name}' (len={len(function_name) if function_name else 0})"
+            )
+
             # Validate function exists
             if not self.registry.is_valid_function(function_name):
                 result = ExecutionResult(
@@ -182,7 +184,7 @@ class FunctionExecutor:
                 if not continue_on_error:
                     break
                 continue
-            
+
             # Validate parameters
             is_valid, errors = self.registry.validate_call(function_name, parameters)
             if not is_valid:
@@ -195,15 +197,17 @@ class FunctionExecutor:
                 if not continue_on_error:
                     break
                 continue
-            
+
             # Execute the function
             try:
                 exec_start = time.time()
                 logger.info(f"[executor] Looking for handler: '{function_name}'")
                 handler = self._handlers.get(function_name)
-                
+
                 if handler is None:
-                    logger.warning(f"[executor] No handler found for known function '{function_name}' (len={len(function_name)}). Skipping.")
+                    logger.warning(
+                        f"[executor] No handler found for known function '{function_name}' (len={len(function_name)}). Skipping."
+                    )
 
                     result = ExecutionResult(
                         function_name=function_name,
@@ -216,7 +220,7 @@ class FunctionExecutor:
                     logger.debug(f"[executor] Calling handler for '{function_name}'")
                     handler_result = await handler(parameters, context)
                     exec_time = (time.time() - exec_start) * 1000
-                    
+
                     result = ExecutionResult(
                         function_name=function_name,
                         success=True,
@@ -225,16 +229,15 @@ class FunctionExecutor:
                     )
                     logger.info(f"Executed {function_name} in {exec_time:.2f}ms")
 
-                
                 batch_result.results.append(result)
-                
+
                 if not result.success and not continue_on_error:
                     break
-                    
+
             except Exception as e:
                 exec_time = (time.time() - exec_start) * 1000
                 logger.exception(f"Error executing function {function_name}")
-                
+
                 result = ExecutionResult(
                     function_name=function_name,
                     success=False,
@@ -242,22 +245,22 @@ class FunctionExecutor:
                     execution_time_ms=exec_time,
                 )
                 batch_result.results.append(result)
-                
+
                 if not continue_on_error:
                     break
-        
+
         # Calculate batch results
         batch_result.total_execution_time_ms = (time.time() - start_time) * 1000
         batch_result.all_succeeded = all(r.success for r in batch_result.results)
-        
+
         logger.info(
             f"Batch execution completed: {len(batch_result.get_successful_results())} succeeded, "
             f"{len(batch_result.get_failed_results())} failed, "
             f"total time: {batch_result.total_execution_time_ms:.2f}ms"
         )
-        
+
         return batch_result
-    
+
     async def execute_single(
         self,
         function_name: str,
@@ -266,12 +269,12 @@ class FunctionExecutor:
     ) -> ExecutionResult:
         """
         Execute a single function call.
-        
+
         Args:
             function_name: Name of the function to execute
             parameters: Function parameters
             context: Execution context
-            
+
         Returns:
             ExecutionResult
         """
@@ -282,7 +285,7 @@ class FunctionExecutor:
                 success=False,
                 error=f"Unknown function: {function_name}",
             )
-        
+
         # Validate parameters
         is_valid, errors = self.registry.validate_call(function_name, parameters)
         if not is_valid:
@@ -291,12 +294,13 @@ class FunctionExecutor:
                 success=False,
                 error=f"Parameter validation failed: {', '.join(errors)}",
             )
-        
+
         # Execute
         try:
             import time
+
             start_time = time.time()
-            
+
             handler = self._handlers.get(function_name)
             if handler is None:
                 return ExecutionResult(
@@ -304,17 +308,17 @@ class FunctionExecutor:
                     success=False,
                     error=f"No handler registered for function: {function_name}",
                 )
-            
+
             result = await handler(parameters, context)
             exec_time = (time.time() - start_time) * 1000
-            
+
             return ExecutionResult(
                 function_name=function_name,
                 success=True,
                 result=result,
                 execution_time_ms=exec_time,
             )
-            
+
         except Exception as e:
             logger.exception(f"Error executing function {function_name}")
             return ExecutionResult(
@@ -322,23 +326,23 @@ class FunctionExecutor:
                 success=False,
                 error=str(e),
             )
-    
+
     # ============== Handler Methods ==============
-    
+
     async def _handle_create_schedule(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle create_schedule function."""
         from src.scheduler import api as scheduler_api
-        
+
         user_id = context.get("user_id")
         time = params.get("time")
         message = params.get("message", "Time for your ACIM lesson")
         lesson_id = params.get("lesson_id")
-        
+
         # Validate time format using DRY helper
         is_valid, normalized_time, error = self._validate_time(time)
         if not is_valid:
             return self._error_response(error)
-        
+
         try:
             schedule = scheduler_api.create_daily_schedule(
                 user_id=user_id,
@@ -353,19 +357,19 @@ class FunctionExecutor:
             )
         except Exception as e:
             return self._error_response(str(e))
-    
+
     async def _handle_update_schedule(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle update_schedule function."""
         from src.scheduler import api as scheduler_api
-        
+
         schedule_id = params.get("schedule_id")
         time = params.get("time")
-        
+
         # Validate time format using DRY helper
         is_valid, normalized_time, error = self._validate_time(time)
         if not is_valid:
             return self._error_response(error)
-        
+
         try:
             updated = scheduler_api.update_daily_schedule(
                 schedule_id=schedule_id,
@@ -380,13 +384,13 @@ class FunctionExecutor:
             return self._error_response("Schedule not found or update failed")
         except Exception as e:
             return self._error_response(str(e))
-    
+
     async def _handle_delete_schedule(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle delete_schedule function."""
         from src.scheduler import api as scheduler_api
-        
+
         schedule_id = params.get("schedule_id")
-        
+
         try:
             result = scheduler_api.deactivate_schedule(
                 schedule_id=schedule_id,
@@ -397,28 +401,28 @@ class FunctionExecutor:
             return self._error_response("Schedule not found or already inactive")
         except Exception as e:
             return self._error_response(str(e))
-    
+
     async def _handle_query_schedule(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle query_schedule function."""
         from src.core.timezone import format_dt_in_timezone, get_user_timezone_from_db
         from src.scheduler import api as scheduler_api
         from src.scheduler.domain import is_one_time_schedule_type
         from src.scheduler.memory_helpers import get_schedule_message
-        
+
         user_id = context.get("user_id")
         session = context.get("session")
         memory_manager = context.get("memory_manager")
-        
+
         # Get user's timezone for converting times to local display
         tz_name = get_user_timezone_from_db(session, user_id) if session else "UTC"
-        
+
         try:
             schedules = scheduler_api.get_user_schedules(
                 user_id=user_id,
                 active_only=True,
                 session=session,
             )
-            
+
             schedule_list = []
             for s in schedules:
                 # Convert next_send_time to user's local timezone for display
@@ -426,7 +430,7 @@ class FunctionExecutor:
                 if s.next_send_time:
                     local_dt, _ = format_dt_in_timezone(s.next_send_time, tz_name)
                     local_time = local_dt.isoformat()
-                
+
                 schedule_data = {
                     "schedule_id": s.schedule_id,
                     "schedule_type": s.schedule_type,
@@ -434,36 +438,36 @@ class FunctionExecutor:
                     "next_send_time": local_time,  # Return local time, not UTC
                     "is_active": s.is_active,
                 }
-                
+
                 # For one-time reminders, fetch the message from memory
                 if is_one_time_schedule_type(s.schedule_type) and memory_manager:
                     message = get_schedule_message(memory_manager, user_id, s.schedule_id)
                     if message:
                         schedule_data["message"] = message
-                
+
                 schedule_list.append(schedule_data)
-            
+
             return self._ok_response(
                 schedules=schedule_list,
                 timezone=tz_name,  # Include timezone info for debugging
             )
         except Exception as e:
             return self._error_response(str(e))
-    
+
     async def _handle_create_one_time_reminder(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle create_one_time_reminder function."""
         from src.core.timezone import to_utc
         from src.scheduler import api as scheduler_api
-        
+
         user_id = context.get("user_id")
         run_at = params.get("run_at")
         message = params.get("message", "Reminder")
-        
+
         # Validate datetime using DRY helper
         is_valid, dt_obj, error = self._validate_datetime(run_at)
         if not is_valid:
             return self._error_response(error)
-        
+
         try:
             # Convert to UTC for storage
             run_at_utc = to_utc(dt_obj)
@@ -480,111 +484,113 @@ class FunctionExecutor:
             )
         except Exception as e:
             return self._error_response(str(e))
-    
+
     async def _handle_delete_one_time_reminder(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle delete_one_time_reminder function."""
         from src.scheduler.domain import is_one_time_schedule_type
-        
+
         user_id = context.get("user_id")
         schedule_id = params.get("schedule_id")
         session = context.get("session")
-        
+
         try:
             # Get the schedule to verify it exists and belongs to the user
             from src.models.database import Schedule
-            schedule = session.query(Schedule).filter_by(
-                schedule_id=schedule_id, 
-                user_id=user_id
-            ).first()
-            
+
+            schedule = session.query(Schedule).filter_by(schedule_id=schedule_id, user_id=user_id).first()
+
             if not schedule:
                 return self._error_response("Schedule not found")
-            
+
             # Verify it's a one-time reminder
             if not is_one_time_schedule_type(schedule.schedule_type):
                 return self._error_response("This is not a one-time reminder")
-            
+
             # Deactivate the schedule
             schedule.is_active = False
             session.add(schedule)
             session.commit()
-            
+
             return self._ok_response(
                 schedule_id=schedule_id,
                 deleted=True,
             )
         except Exception as e:
             return self._error_response(str(e))
-    
-    async def _handle_delete_all_one_time_reminders(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def _handle_delete_all_one_time_reminders(
+        self, params: Dict[str, Any], context: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Handle delete_all_one_time_reminders function."""
         from src.scheduler import api as scheduler_api
-        
+
         user_id = context.get("user_id")
-        
+
         try:
             count = scheduler_api.deactivate_user_schedules_by_type(
                 user_id=user_id,
                 schedule_type="one_time",
                 session=context.get("session"),
             )
-            
+
             return self._ok_response(
                 deleted_count=count,
                 type="one_time",
             )
         except Exception as e:
             return self._error_response(str(e))
-    
-    async def _handle_delete_all_daily_reminders(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def _handle_delete_all_daily_reminders(
+        self, params: Dict[str, Any], context: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Handle delete_all_daily_reminders function."""
         from src.scheduler import api as scheduler_api
-        
+
         user_id = context.get("user_id")
-        
+
         try:
             count = scheduler_api.deactivate_user_schedules_by_type(
                 user_id=user_id,
                 schedule_type="daily",
                 session=context.get("session"),
             )
-            
+
             return self._ok_response(
                 deleted_count=count,
                 type="daily",
             )
         except Exception as e:
             return self._error_response(str(e))
-    
+
     async def _handle_delete_all_reminders(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle delete_all_reminders function."""
         from src.scheduler import api as scheduler_api
-        
+
         user_id = context.get("user_id")
-        
+
         try:
             count = scheduler_api.deactivate_user_schedules(
                 user_id=user_id,
                 session=context.get("session"),
             )
-            
+
             return self._ok_response(
                 deleted_count=count,
                 type="all",
             )
         except Exception as e:
             return self._error_response(str(e))
-    
+
     async def _handle_send_lesson(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle send_lesson function."""
         lesson_id = params.get("lesson_id")
         session = context.get("session")
-        
+
         try:
             lesson = self._get_lesson_by_id(lesson_id, session)
             if not lesson:
                 return self._error_response(f"Lesson {lesson_id} not found")
-            
+
             return self._ok_response(
                 lesson_id=lesson_id,
                 title=lesson.title,
@@ -592,21 +598,21 @@ class FunctionExecutor:
             )
         except Exception as e:
             return self._error_response(str(e))
-        
+
     async def _handle_send_todays_lesson(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle send_todays_lesson function.
-        
+
         Computes today's lesson from user state, or uses explicit lesson_id if provided.
         Uses compute_current_lesson_state for auto-advance logic (current +1 if inactive yesterday).
         """
         user_id = context.get("user_id")
         session = context.get("session")
         memory_manager = context.get("memory_manager")
-        
+
         if not user_id or not memory_manager:
             return self._error_response("Missing user context")
-        
-# Explicit lesson_id override from params
+
+        # Explicit lesson_id override from params
         state = None
         lesson_id = params.get("lesson_id")
         if lesson_id is not None:
@@ -619,13 +625,15 @@ class FunctionExecutor:
             # Compute today's lesson from state (auto-advance if needed)
             state = compute_current_lesson_state(memory_manager, user_id)
             lesson_id = state["lesson_id"]
-            logger.info(f"send_todays_lesson user={user_id}: computed lesson_id={lesson_id}, advanced={state.get('advanced_by_day', False)}")
-        
+            logger.info(
+                f"send_todays_lesson user={user_id}: computed lesson_id={lesson_id}, advanced={state.get('advanced_by_day', False)}"
+            )
+
         try:
             lesson = self._get_lesson_by_id(lesson_id, session)
             if not lesson:
                 return self._error_response(f"Lesson {lesson_id} not available (check imports)")
-            
+
             return self._ok_response(
                 lesson_id=lesson_id,
                 title=lesson.title,
@@ -640,36 +648,37 @@ class FunctionExecutor:
         from src.core.timezone import resolve_timezone_name
         from src.memories.constants import MemoryKey
         from src.scheduler import api as scheduler_api
-        
+
         user_id = context.get("user_id")
         timezone_str = params.get("timezone")
         session = context.get("session")
         memory_manager = context.get("memory_manager")
-        
+
         # Validate timezone using DRY helper
         is_valid, normalized_tz, error = self._validate_timezone(timezone_str)
         if not is_valid:
             return self._error_response(error)
-        
+
         # Resolve to IANA timezone
         resolved = resolve_timezone_name(normalized_tz)
         if not resolved:
             return self._error_response(f"Could not resolve timezone: {normalized_tz}")
-        
+
         try:
             # Update user record
             from src.models.database import User
+
             user = session.query(User).filter_by(user_id=user_id).first()
             if user:
                 user.timezone = resolved
                 session.add(user)
                 session.commit()
                 logger.info(f"Updated user {user_id} timezone to {resolved}")
-            
+
             # Update schedules to maintain preferred local time
             if memory_manager:
                 from src.scheduler.domain import is_daily_schedule_family
-                
+
                 # Try PREFERRED_LESSON_TIME first, then fallback to checking all memories
                 preferred_time = None
                 preferred_time_mem = memory_manager.get_memory(user_id, MemoryKey.PREFERRED_LESSON_TIME)
@@ -682,15 +691,21 @@ class FunctionExecutor:
                         if "time" in mem.get("key", "").lower() or ":" in mem.get("value", ""):
                             preferred_time = mem.get("value")
                             break
-                
+
                 if preferred_time:
                     # Get user's active daily schedules using the context session
                     from src.models.database import Schedule
-                    schedules = session.query(Schedule).filter_by(
-                        user_id=user_id,
-                        is_active=True,
-                    ).all()
-                    
+
+                    schedules = (
+                        session
+                        .query(Schedule)
+                        .filter_by(
+                            user_id=user_id,
+                            is_active=True,
+                        )
+                        .all()
+                    )
+
                     # Update each daily schedule to use the preferred time in new timezone
                     updated_count = 0
                     for schedule in schedules:
@@ -702,28 +717,28 @@ class FunctionExecutor:
                             )
                             if updated:
                                 updated_count += 1
-                    
+
                     if updated_count > 0:
                         logger.info(f"Updated {updated_count} daily schedules to {preferred_time} for timezone change")
-            
+
             return self._ok_response(timezone=resolved)
         except Exception as e:
             logger.exception("Error in set_timezone")
             return self._error_response(str(e))
-    
+
     async def _handle_set_language(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle set_language function."""
         from src.memories.constants import MemoryCategory, MemoryKey
-        
+
         user_id = context.get("user_id")
         language = params.get("language")
         memory_manager = context.get("memory_manager")
-        
+
         # Validate language using DRY helper
         is_valid, normalized_lang, error = self._validate_language(language)
         if not is_valid:
             return self._error_response(error)
-        
+
         try:
             # Store in memory
             memory_manager.store_memory(
@@ -733,24 +748,24 @@ class FunctionExecutor:
                 category=MemoryCategory.PROFILE.value,
                 source="function_executor",
             )
-            
+
             return self._ok_response(language=normalized_lang)
         except Exception as e:
             return self._error_response(str(e))
-    
+
     async def _handle_set_preferred_time(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle set_preferred_time function."""
         from src.memories.constants import MemoryCategory, MemoryKey
-        
+
         user_id = context.get("user_id")
         time = params.get("time")
         memory_manager = context.get("memory_manager")
-        
+
         # Validate time using DRY helper
         is_valid, normalized_time, error = self._validate_time(time)
         if not is_valid:
             return self._error_response(error)
-        
+
         try:
             # Store in memory
             memory_manager.store_memory(
@@ -760,20 +775,20 @@ class FunctionExecutor:
                 category=MemoryCategory.PROFILE.value,
                 source="function_executor",
             )
-            
+
             return self._ok_response(time=normalized_time)
         except Exception as e:
             return self._error_response(str(e))
-    
+
     async def _handle_update_profile(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle update_profile function."""
         from src.memories.constants import MemoryCategory, MemoryKey
-        
+
         user_id = context.get("user_id")
         key = params.get("key")
         value = params.get("value")
         memory_manager = context.get("memory_manager")
-        
+
         # Map common profile keys to memory keys
         key_mapping = {
             "name": MemoryKey.FULL_NAME,
@@ -781,9 +796,9 @@ class FunctionExecutor:
             "email": "email",
             "background": MemoryKey.PERSONAL_BACKGROUND,
         }
-        
+
         memory_key = key_mapping.get(key, key)
-        
+
         try:
             memory_manager.store_memory(
                 user_id=user_id,
@@ -792,19 +807,19 @@ class FunctionExecutor:
                 category=MemoryCategory.PROFILE.value,
                 source="function_executor",
             )
-            
+
             return self._ok_response(key=key, value=value)
         except Exception as e:
             return self._error_response(str(e))
-    
+
     async def _handle_confirm_yes(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle confirm_yes function."""
         from src.memories.constants import MemoryCategory, MemoryKey
-        
+
         user_id = context.get("user_id")
         confirmation_context = params.get("context", "general")
         memory_manager = context.get("memory_manager")
-        
+
         try:
             # Special handling for lesson repeat context
             if confirmation_context == "lesson_repeat" and memory_manager:
@@ -819,10 +834,7 @@ class FunctionExecutor:
                             lesson = self._get_lesson_by_id(lesson_id, session)
                             if lesson:
                                 # Clear the offered memory after use
-                                memory_manager.archive_memories(
-                                    user_id, 
-                                    [offered_memories[0].get("memory_id")]
-                                )
+                                memory_manager.archive_memories(user_id, [offered_memories[0].get("memory_id")])
                                 return self._ok_response(
                                     confirmed=True,
                                     context=confirmation_context,
@@ -832,7 +844,7 @@ class FunctionExecutor:
                                 )
                     except (ValueError, TypeError):
                         logger.warning(f"Invalid lesson_id in lesson_repeat_offered: {lesson_id_str}")
-            
+
             # Store confirmation
             memory_manager.store_memory(
                 user_id=user_id,
@@ -842,41 +854,39 @@ class FunctionExecutor:
                 source="function_executor",
                 ttl_hours=1,
             )
-            
+
             return self._ok_response(confirmed=True, context=confirmation_context)
         except Exception as e:
             return self._error_response(str(e))
-    
+
     async def _handle_confirm_no(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle confirm_no function."""
-        
+
         user_id = context.get("user_id")
         confirmation_context = params.get("context", "general")
         memory_manager = context.get("memory_manager")
-        
+
         try:
             # Store confirmation
-            memory_manager.store_memory(
-                user_id=user_id,
-                key="user_confirmation")
-            
+            memory_manager.store_memory(user_id=user_id, key="user_confirmation")
+
             return self._ok_response(confirmed=False, context=confirmation_context)
         except Exception as e:
             return self._error_response(str(e))
-    
+
     async def _handle_extract_memory(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle extract_memory function."""
         from src.lessons.state import set_current_lesson
         from src.memories.constants import MemoryCategory, MemoryKey
-        
+
         user_id = context.get("user_id")
         key = params.get("key")
         value = params.get("value")
         ttl_hours = params.get("ttl_hours")
         memory_manager = context.get("memory_manager")
-        
+
         logger.info(f"extract_memory called: user_id={user_id}, key={key}, value={value}")
-        
+
         # Route lesson state writes through the centralized helpers
         # This ensures DRY - all lesson progress goes through lesson_state
         if key == MemoryKey.LESSON_CURRENT:
@@ -895,16 +905,15 @@ class FunctionExecutor:
                 updated=True,
             )
 
-        
         # For non-lesson memories, continue with existing logic
         # Determine category from key (call the helper method)
         category = self._get_memory_category_for_key(key)
         logger.info(f"extract_memory storing: user_id={user_id}, key={key}, value={value}, category={category}")
-        
+
         try:
             # Check for existing memory with same key
             existing = memory_manager.get_memory(user_id, key)
-            
+
             memory_manager.store_memory(
                 user_id=user_id,
                 key=key,
@@ -913,7 +922,7 @@ class FunctionExecutor:
                 source="function_executor",
                 ttl_hours=ttl_hours,
             )
-            
+
             logger.info(f"extract_memory stored successfully: user_id={user_id}, key={key}")
             return self._ok_response(
                 key=key,
@@ -924,11 +933,11 @@ class FunctionExecutor:
         except Exception as e:
             logger.error(f"extract_memory failed: user_id={user_id}, key={key}, error={e}")
             return self._error_response(str(e))
-    
+
     def _get_memory_category_for_key(self, key: str) -> str:
         """Infer memory category from key name."""
         from src.memories.constants import MemoryCategory, MemoryKey
-        
+
         # Use centralized key sets from MemoryKey (DRY)
         if key in MemoryKey.PROFILE_KEYS:
             return MemoryCategory.PROFILE.value
@@ -940,16 +949,16 @@ class FunctionExecutor:
     async def _handle_set_current_lesson(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle set_current_lesson function."""
         from src.lessons.state import set_current_lesson
-        
+
         user_id = context.get("user_id")
         memory_manager = context.get("memory_manager")
         lesson_number = params.get("lesson_number")
-        
+
         try:
             lesson_number = int(lesson_number)
             if not (1 <= lesson_number <= 365):
                 return self._error_response(f"Lesson {lesson_number} out of range 1-365")
-            
+
             set_current_lesson(memory_manager, user_id, lesson_number)
             logger.info(f"set_current_lesson: user_id={user_id}, lesson={lesson_number}")
             return self._ok_response(lesson_number=lesson_number)
@@ -959,19 +968,20 @@ class FunctionExecutor:
     async def _handle_forget_memories(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle forget_memories function - AI callable semantic memory deletion."""
         from src.memories.semantic_search import get_semantic_search_service
-        
+
         user_id = context.get("user_id")
         query_text = params.get("query_text")
         session = context.get("session")
         memory_manager = context.get("memory_manager")
-        
+
         if not query_text or not query_text.strip():
             return self._error_response("query_text is required")
-        
+
         if not memory_manager:
             return self._error_response("Missing memory_manager in context")
-        
+
         from src.models.database import Session
+
         search_service = get_semantic_search_service()
         with Session(bind=session.get_bind()) as search_session:
             results = await search_service.search_memories(
@@ -981,14 +991,14 @@ class FunctionExecutor:
                 limit=10,  # Reasonable default limit
             )
             memory_ids = [memory.memory_id for memory, _ in results]
-        
+
         if not memory_ids:
             return self._error_response("No matching memories found")
-        
+
         archived_count = memory_manager.archive_memories(user_id, memory_ids)
-        
+
         logger.info(f"forgot {archived_count} memories for user {user_id} matching '{query_text}'")
-        
+
         return self._ok_response(
             query_text=query_text,
             found_count=len(memory_ids),

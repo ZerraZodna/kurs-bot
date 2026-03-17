@@ -40,10 +40,7 @@ def create_daily_schedule(
     """Create a daily schedule for lesson delivery."""
     with get_session(session) as s:
         # Debug: trace schedule creation attempts
-        logger.debug(
-            f"create_daily_schedule called user={user_id} "
-            f"time_str={time_str} ts={utc_now().isoformat()}"
-        )
+        logger.debug(f"create_daily_schedule called user={user_id} time_str={time_str} ts={utc_now().isoformat()}")
         # Compute next send time and cron expression for the user's timezone
         tz_name = get_user_timezone_from_db(s, user_id)
 
@@ -63,11 +60,7 @@ def create_daily_schedule(
         )
 
         created_at = getattr(schedule, "created_at", None)
-        created_str = (
-            created_at.isoformat()
-            if created_at is not None
-            else utc_now().isoformat()
-        )
+        created_str = created_at.isoformat() if created_at is not None else utc_now().isoformat()
         logger.debug(
             f"persisted schedule id=<{getattr(schedule, 'schedule_id', None)}> "
             f"user={user_id} next_send_local_input={next_send.isoformat()} "
@@ -87,7 +80,6 @@ def create_daily_schedule(
             schedule_jobs.sync_job_for_schedule(schedule)
         except Exception as e:
             logger.exception("Could not add job for schedule %s: %s", getattr(schedule, "schedule_id", None), e)
-
 
         # For logging, parse the time string into hour/minute if available
         hour, minute = parse_time_string(time_str)
@@ -136,7 +128,6 @@ def update_daily_schedule(
                 schedule_jobs.sync_job_for_schedule(updated)
         except Exception as e:
             logger.exception("Could not update job %s: %s", schedule_id, e)
-
 
         # Ensure hour/minute are defined for logging (may not exist if parse failed)
         hour, minute = parse_time_string(time_str)
@@ -261,4 +252,3 @@ def deactivate_schedule(schedule_id: int, session: Optional[Session] = None) -> 
                 logger.info("✓ Deactivated schedule %s", schedule_id)
         except Exception as e:
             logger.exception("Error deactivating schedule %s: %s", schedule_id, e)
-

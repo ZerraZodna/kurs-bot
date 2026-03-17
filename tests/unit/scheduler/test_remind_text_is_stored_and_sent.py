@@ -2,6 +2,7 @@
 Migrated tests for remind text storage and sending.
  migrated from tests/test_remind_text_is_stored_and_sent.py
 """
+
 import json
 from datetime import datetime, timedelta, timezone
 
@@ -27,7 +28,7 @@ async def test_remind_me_creates_one_time_with_correct_message():
 
         # When: Build a schedule_spec like an assistant intent would provide
         run_at = (datetime.now(timezone.utc) + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
-        
+
         # When: Use FunctionExecutor to create one-time reminder
         executor = get_function_executor()
         context = {
@@ -35,16 +36,16 @@ async def test_remind_me_creates_one_time_with_correct_message():
             "session": db,
             "memory_manager": MemoryManager(db),
         }
-        
+
         result = await executor.execute_single(
             "create_one_time_reminder",
             {
                 "run_at": run_at.isoformat(),
                 "message": "Remind me to go out with the garbage at 12:00",
             },
-            context
+            context,
         )
-        
+
         # Then: Operation should succeed
         assert result.success is True
         assert result.result.get("ok") is True

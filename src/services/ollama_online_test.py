@@ -3,6 +3,7 @@
 Small, synchronous helpers used by the FastAPI startup lifespan to keep
 the health-check logic organized and testable.
 """
+
 import logging
 import re
 from typing import Dict, List, Optional, Tuple
@@ -117,7 +118,10 @@ def run_ollama_checks(settings) -> Tuple[bool, List[Dict]]:
     # Step A: If any cloud-marked models exist, check cloud service and /api/tags
     if cloud_models:
         if not cloud:
-            diagnostics.append({"error": "cloud models configured but CLOUD_OLLAMA_URL not set", "models": cloud_models})
+            diagnostics.append({
+                "error": "cloud models configured but CLOUD_OLLAMA_URL not set",
+                "models": cloud_models,
+            })
             any_ok = False
         else:
             b = _strip_api(cloud)
@@ -188,7 +192,10 @@ def run_ollama_checks(settings) -> Tuple[bool, List[Dict]]:
     # Step B: If any non-cloud models exist, check local service via /api/tags
     if local_models:
         if not local:
-            diagnostics.append({"error": "local models configured but LOCAL_OLLAMA_URL not set", "models": local_models})
+            diagnostics.append({
+                "error": "local models configured but LOCAL_OLLAMA_URL not set",
+                "models": local_models,
+            })
             any_ok = False
         else:
             b = _strip_api(local)

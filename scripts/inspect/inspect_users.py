@@ -10,5 +10,5 @@ from src.scheduler import SessionLocal
 if __name__ == "__main__":
     db = SessionLocal()
     for u in db.query(User).all():
-        print(u.user_id, u.external_id, u.channel, u.first_name, getattr(u,"timezone", None))
+        print(u.user_id, u.external_id, u.channel, u.first_name, getattr(u, "timezone", None))
     db.close()

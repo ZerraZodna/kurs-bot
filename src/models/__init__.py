@@ -9,7 +9,17 @@ from .templates import PromptTemplate
 from .user import User
 
 __all__ = [
-    "User", "Memory", "Lesson", "Schedule", "MessageLog",
-    "Unsubscribe", "ConsentLog", "GdprRequest", "GdprAuditLog", "GdprVerification",
-    "BatchLock", "JobState", "PromptTemplate"
+    "User",
+    "Memory",
+    "Lesson",
+    "Schedule",
+    "MessageLog",
+    "Unsubscribe",
+    "ConsentLog",
+    "GdprRequest",
+    "GdprAuditLog",
+    "GdprVerification",
+    "BatchLock",
+    "JobState",
+    "PromptTemplate",
 ]

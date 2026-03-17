@@ -18,11 +18,11 @@ logger = logging.getLogger(__name__)
 
 class SemanticSearchService:
     """Service for keyword search over memories (embeddings removed)"""
-    
+
     def __init__(self):
         self.similarity_threshold = settings.SEMANTIC_SEARCH_THRESHOLD or 0.3
         self.max_results = settings.SEMANTIC_SEARCH_MAX_RESULTS or 5
-    
+
     async def search_memories(
         self,
         user_id: int,
@@ -34,7 +34,7 @@ class SemanticSearchService:
     ) -> List[Tuple[MemoryEntity, float]]:
         """
         Keyword search for relevant memories.
-        
+
         Scores by keyword match strength + recency.
         """
         if not query_text or not query_text.strip():
@@ -42,7 +42,7 @@ class SemanticSearchService:
             return []
 
         memory_handler = MemoryHandler(session)
-        
+
         # Primary: keyword candidates (LIKE match count)
         try:
             candidates = memory_handler.keyword_candidates(
@@ -57,11 +57,14 @@ class SemanticSearchService:
 
         if not candidates:
             # Fallback: top recent active
-            candidates = memory_handler.top_active_memories(
-                user_id=user_id,
-                categories=categories,
-                limit=50,
-            ) or []
+            candidates = (
+                memory_handler.top_active_memories(
+                    user_id=user_id,
+                    categories=categories,
+                    limit=50,
+                )
+                or []
+            )
 
         # Score: keyword quality (0-1) * recency boost
         scored = []
@@ -73,8 +76,8 @@ class SemanticSearchService:
         thresh = threshold or self.similarity_threshold
         filtered = [(m, s) for m, s in scored if s >= thresh]
         filtered.sort(key=lambda t: t[1], reverse=True)
-        return filtered[:limit or self.max_results]
-    
+        return filtered[: limit or self.max_results]
+
     def _keyword_relevance_score(self, query: str, text: str) -> float:
         """Simple heuristic score: match count * recency proxy."""
         words = set(query.lower().split())
@@ -84,7 +87,8 @@ class SemanticSearchService:
         # Recency boost (fake, since no timestamp here)
         score *= 0.9 + 0.1 * (len(text) / 1000)  # Longer text slight boost
         return score
-    
+
+
 # Removed: rerank_memories (embeddings gone)
 # filter_by_similarity no longer needed (inline in search_memories)
 

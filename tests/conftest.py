@@ -26,17 +26,11 @@ from src.models.database import Base
 # Auto-import fixture modules (after model registry populated)
 pytest_plugins = [
     "tests.fixtures.database",
-    "tests.fixtures.users", 
+    "tests.fixtures.users",
     "tests.fixtures.services",
 ]
 
 # Ensure all models are registered for test DB schema creation
-
-
-
-
-
-
 
 
 # Prevent accidental outbound HTTP requests to Ollama during tests unless
@@ -68,17 +62,23 @@ def _block_ollama_http_requests():
 
         async def _async_request(self, method, url, *args, **kwargs):
             if _is_ollama_url(url):
-                raise RuntimeError("Blocked outgoing HTTP request to Ollama in tests (enable with TEST_USE_REAL_OLLAMA=1)")
+                raise RuntimeError(
+                    "Blocked outgoing HTTP request to Ollama in tests (enable with TEST_USE_REAL_OLLAMA=1)"
+                )
             return await _orig_async_request(self, method, url, *args, **kwargs)
 
         def _sync_request(self, method, url, *args, **kwargs):
             if _is_ollama_url(url):
-                raise RuntimeError("Blocked outgoing HTTP request to Ollama in tests (enable with TEST_USE_REAL_OLLAMA=1)")
+                raise RuntimeError(
+                    "Blocked outgoing HTTP request to Ollama in tests (enable with TEST_USE_REAL_OLLAMA=1)"
+                )
             return _orig_sync_request(self, method, url, *args, **kwargs)
 
         def _module_request(method, url, *args, **kwargs):
             if _is_ollama_url(url):
-                raise RuntimeError("Blocked outgoing HTTP request to Ollama in tests (enable with TEST_USE_REAL_OLLAMA=1)")
+                raise RuntimeError(
+                    "Blocked outgoing HTTP request to Ollama in tests (enable with TEST_USE_REAL_OLLAMA=1)"
+                )
             return _orig_module_request(method, url, *args, **kwargs)
 
         httpx.AsyncClient.request = _async_request
@@ -92,6 +92,7 @@ def _block_ollama_http_requests():
     # Restore originals at session end
     try:
         import httpx as _httpx
+
         if _orig_async_request is not None:
             _httpx.AsyncClient.request = _orig_async_request
         if _orig_sync_request is not None:
@@ -108,17 +109,18 @@ def ensure_test_db(db_engine, monkeypatch):
 
     Recreates DB schema for isolation. Trigger seeding removed in Phase 3
     as embedding-based trigger matching was replaced by function calling.
-    
+
     Uses the worker-aware db_engine fixture to support pytest-xdist parallel
     execution. Also patches SessionLocal to use the worker-specific engine.
-    
+
     Patches all locations where SessionLocal is imported to ensure they use
     the worker-specific database during parallel test execution.
     """
     # Patch SessionLocal to use the worker-specific engine
     from sqlalchemy.orm import sessionmaker
+
     TestSessionLocal = sessionmaker(bind=db_engine, autoflush=False, autocommit=False, future=True)
-    
+
     # Patch all locations where SessionLocal is imported directly
     # This ensures parallel test execution works correctly with pytest-xdist
     monkeypatch.setattr("src.models.database.SessionLocal", TestSessionLocal)
@@ -137,19 +139,18 @@ def ensure_test_db(db_engine, monkeypatch):
     monkeypatch.setattr("src.services.maintenance.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("src.middleware.consent.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("src.language.prompt_registry.SessionLocal", TestSessionLocal)
-    
+
     # Skip app startup lessons import in tests
     monkeypatch.setattr("src.api.app.ensure_lessons_imported", lambda: None, raising=False)
-    
+
     repo_root = Path(__file__).resolve().parents[1]
-    
+
     # Always drop_all + create_all for reliable test isolation (fixes SQLite truncation issues in CI)
     Base.metadata.drop_all(bind=db_engine)
     Base.metadata.create_all(bind=db_engine)
     print("Recreated test DB schema")
-    
-    yield
 
+    yield
 
 
 @pytest.fixture(autouse=True)
@@ -162,6 +163,7 @@ def per_test_cleanup():
     # Clear AI Judge cache before/after each test to ensure tests call Ollama
     try:
         from src.memories.cache import DecisionCache
+
         cache = DecisionCache()
         cache.clear()
     except Exception:
@@ -181,6 +183,7 @@ def per_test_cleanup():
     # Close embedding service instance if present
     try:
         import importlib
+
         emb_mod = importlib.import_module("src.services.embedding_service")
         svc = getattr(emb_mod, "_embedding_service", None)
         if svc is not None:
@@ -231,6 +234,7 @@ def session_teardown():
     # Close embedding service if it was instantiated
     try:
         import importlib
+
         emb_mod = importlib.import_module("src.services.embedding_service")
         svc = getattr(emb_mod, "_embedding_service", None)
         if svc is not None:

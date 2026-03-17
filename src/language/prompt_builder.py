@@ -18,7 +18,7 @@ from src.models.database import Lesson, MessageLog, User
 class PromptBuilder:
     """
     Assembles multi-user context-aware prompts from memories, preferences, and conversation history.
-    
+
     Prompt Structure:
     1. System Role/Persona
     2. User Profile Context (name, preferences, goals)
@@ -26,7 +26,7 @@ class PromptBuilder:
     4. Conversation History (recent turns)
     5. Current User Input
     """
-    
+
     # Memory category priority for context inclusion (0=highest priority)
     MEMORY_PRIORITY = {
         "profile": 0,
@@ -36,7 +36,7 @@ class PromptBuilder:
         "insights": 4,
         "conversation": 5,
     }
-    
+
     # Max tokens to reserve for each context section (approximate)
     TOKEN_LIMITS = {
         "profile": 150,
@@ -63,12 +63,12 @@ class PromptBuilder:
         "- Do not summarize, interpret, explain, or rewrite the lesson text.\n"
         "- Return only the lesson body."
     )
-    
+
     def __init__(self, db: Session, memory_manager: Optional[MemoryManager] = None):
         self.db = db
         self.memory_manager = memory_manager or MemoryManager(db)
         self.function_definitions = get_function_definitions()
-    
+
     def build_prompt(
         self,
         user_id: int,
@@ -83,7 +83,7 @@ class PromptBuilder:
     ) -> str:
         """
         Build a context-rich prompt for the LLM.
-        
+
         Args:
             user_id: User ID from database
             user_input: Current user message
@@ -92,7 +92,7 @@ class PromptBuilder:
             include_conversation_history: Include recent conversation context
             history_turns: Number of recent message pairs to include
             max_context_tokens: Soft limit on context section size (approximate)
-        
+
         Returns:
             Formatted prompt ready for Ollama
         """
@@ -101,13 +101,13 @@ class PromptBuilder:
         if not user:
             # Fallback for unknown users
             return f"{system_prompt}\n\nUser: {user_input}\n\nAssistant:"
-        
+
         # Build context blocks
         context_parts = [system_prompt]
         output_rules = self._build_channel_output_rules(user)
         if output_rules:
             context_parts.append(f"\n\n{output_rules}")
-        
+
         # 1. Today's Lesson (optional)
         # Skip injecting lesson into prompt when user explicitly asks for it -
         # let the function calling system (send_todays_lesson) provide the full text instead.
@@ -131,38 +131,38 @@ class PromptBuilder:
         profile_context = self._build_profile_context(user)
         if profile_context:
             context_parts.append(f"\n-- User Profile\n{profile_context}")
-                
+
         # 4. User Preferences
         prefs_context = self._build_preferences_context(user_id)
         if prefs_context:
             context_parts.append(f"\n-- Preferences\n{prefs_context}")
-        
+
         # 5. Semantic Relevant Memories (optional)
         semantic_context = self._build_semantic_memory_context(relevant_memories or [])
         if semantic_context:
             context_parts.append(f"\n-- Relevant Memories\n{semantic_context}")
-        
+
         # 6. Conversation History
         if include_conversation_history:
             history_context = self._build_conversation_history(user_id, history_turns)
             if history_context:
                 context_parts.append(f"\n-- Recent Conversation\n{history_context}")
-        
+
         # 7. Function Definitions (if enabled)
         if include_functions:
             function_context = self._build_function_context(context_type)
             if function_context:
                 context_parts.append(f"\n\n{function_context}")
-        
+
         # 8. Onboarding Next Step Context (if in onboarding)
         if context_type.startswith("onboarding"):
             onboarding_context = self._build_onboarding_next_step_context(user_id)
             if onboarding_context:
                 context_parts.append(onboarding_context)
-        
+
         # 9. Current Message
         context_parts.append(f"\n-- Current Message\nUser: {user_input}\n\nAssistant:")
-        
+
         return "".join(context_parts)
 
     def _is_direct_lesson_text_request(self, user_input: str) -> bool:
@@ -206,10 +206,10 @@ class PromptBuilder:
     ) -> str:
         """
         Build a RAG-focused prompt with minimal context.
-        
+
         Skips ACIM lesson and category-based memories.
         Uses only semantically relevant memories from the search.
-        
+
         Args:
             user_id: User ID from database
             user_input: Current user message
@@ -218,7 +218,7 @@ class PromptBuilder:
             include_conversation_history: Include recent conversation context
             history_turns: Number of recent message pairs to include
             max_memories: Maximum relevant memories to include
-        
+
         Returns:
             Formatted RAG prompt ready for Ollama
         """
@@ -226,12 +226,12 @@ class PromptBuilder:
         user = self.db.query(User).filter_by(user_id=user_id).first()
         if not user:
             return f"{system_prompt}\n\nUser: {user_input}\n\nAssistant:"
-        
+
         context_parts = [system_prompt]
         output_rules = self._build_channel_output_rules(user)
         if output_rules:
             context_parts.append(f"\n\n{output_rules}")
-        
+
         # 1. Minimal user profile (just name if available)
         if user.first_name:
             name = user.first_name
@@ -241,33 +241,33 @@ class PromptBuilder:
             local_time = self._get_user_local_time_str(user)
             if local_time:
                 context_parts.append(f"\n{local_time}")
-        
+
         # 2. Semantically relevant memories only
         semantic_context = self._build_semantic_memory_context(relevant_memories or [], max_items=max_memories)
         if semantic_context:
             context_parts.append(f"\n-- Relevant Context\n{semantic_context}")
-        
+
         # 3. Light conversation history
         if include_conversation_history:
             history_context = self._build_conversation_history(user_id, history_turns)
             if history_context:
                 context_parts.append(f"\n-- Recent Conversation\n{history_context}")
-        
+
         # 4. Function Definitions (if enabled)
         if include_functions:
             function_context = self._build_function_context(context_type)
             if function_context:
                 context_parts.append(f"\n\n{function_context}")
-        
+
         # 5. Onboarding Next Step Context (if in onboarding)
         if context_type.startswith("onboarding"):
             onboarding_context = self._build_onboarding_next_step_context(user_id)
             if onboarding_context:
                 context_parts.append(onboarding_context)
-        
+
         # 6. Current message
         context_parts.append(f"\n-- Current Message\nUser: {user_input}\n\nAssistant:")
-        
+
         return "".join(context_parts)
 
     def _build_channel_output_rules(self, user: Any) -> str:
@@ -340,7 +340,7 @@ class PromptBuilder:
         content = lesson.content or ""
         if max_chars and len(content) > max_chars:
             content = content[:max_chars].rsplit(" ", 1)[0] + "..."
-        
+
         lesson_text = f'<b>Lesson {lesson.lesson_id}</b>: "{lesson.title}"\n\n{content}'
         return {"lesson_text": lesson_text, "state": state}
 
@@ -379,7 +379,8 @@ class PromptBuilder:
     def _get_last_lesson_from_logs(self, user_id: int) -> Optional[Dict[str, Any]]:
         """Fallback: infer last sent lesson from message logs."""
         messages = (
-            self.db.query(MessageLog)
+            self.db
+            .query(MessageLog)
             .filter(MessageLog.user_id == user_id, MessageLog.direction == "outbound")
             .order_by(MessageLog.created_at.desc())
             .limit(20)
@@ -407,97 +408,104 @@ class PromptBuilder:
         except ValueError:
             digits = "".join(ch for ch in value if ch.isdigit())
             return int(digits) if digits else None
-    
+
     def _build_profile_context(self, user: Any) -> str:
         """Extract user profile information from topic-based memories."""
         # Get consolidated profile from topic manager
         profile = self.memory_manager.topic_manager.get_profile_context(user.user_id, user)
-        
+
         # Format as prompt lines
         parts = []
         for field_name, value in profile.items():
             parts.append(f"{field_name.replace('_', ' ').title()}: {value}")
-        
+
         # Add channel info
         if user.phone_number:
             parts.append(f"Channel: {user.channel} ({user.phone_number})")
         else:
             parts.append(f"Channel: {user.channel}")
-        
+
         # Add user tenure
         if user.created_at:
             created = to_utc(user.created_at)
             days_active = (utc_now() - created).days
             parts.append(f"User since: {days_active} days ago")
-        
+
         # Add local time
         local_time = self._get_user_local_time_str(user)
         if local_time:
             parts.append(local_time)
-                
+
         return "\n".join(parts) if parts else ""
-        
+
     def _build_preferences_context(self, user_id: int) -> str:
         """Retrieve user communication and learning preferences."""
         tone = self.memory_manager.get_memory(user_id, MemoryKey.PREFERRED_TONE)
-        
+
         parts = []
         if tone:
             parts.append(f"Preferred Tone: {tone[0]['value']}")
-        
+
         return "\n".join(parts) if parts else ""
-        
+
     def _build_conversation_history(self, user_id: int, num_turns: int = 4) -> str:
         """Retrieve recent conversation history for multi-turn context."""
         # Query recent messages for this user, ordered by creation date
-        messages = self.db.query(MessageLog).filter(
-            MessageLog.user_id == user_id,
-            MessageLog.status.in_(["delivered", "sent"]),  # Only successful messages
-        ).order_by(MessageLog.created_at.desc()).limit(num_turns * 2).all()
-        
+        messages = (
+            self.db
+            .query(MessageLog)
+            .filter(
+                MessageLog.user_id == user_id,
+                MessageLog.status.in_(["delivered", "sent"]),  # Only successful messages
+            )
+            .order_by(MessageLog.created_at.desc())
+            .limit(num_turns * 2)
+            .all()
+        )
+
         if not messages:
             return ""
-        
+
         # Reverse to chronological order (oldest first)
         messages = list(reversed(messages))
-        
+
         parts = []
         # Take last N turns (each turn = 2 messages: user + assistant)
-        for msg in messages[-(num_turns * 2):]:
+        for msg in messages[-(num_turns * 2) :]:
             if msg.direction == "inbound":
                 parts.append(f"User: {msg.content}")
             else:
                 parts.append(f"Assistant: {msg.content}")
-        
+
         return "\n".join(parts) if parts else ""
-    
+
     def _build_function_context(self, context_type: str) -> str:
         """Build function definitions context for the given context type."""
         return self.function_definitions.for_context(context_type)
-    
+
     def _build_onboarding_next_step_context(self, user_id: int) -> str:
         """Build context for the next onboarding step to guide the AI.
-        
+
         This injects the next onboarding question into the prompt so the AI
         knows what to ask after extracting information like the user's name.
         """
         from src.onboarding.service import OnboardingService
-        
+
         onboarding = OnboardingService(self.db)
         status = onboarding.get_onboarding_status(user_id)
-        
+
         # If onboarding is complete, no need to add context
         if status.get("onboarding_complete"):
             return ""
-        
+
         # Get the next onboarding prompt
         next_prompt = onboarding.get_onboarding_prompt(user_id)
         if not next_prompt:
             return ""
-        
+
         # Determine which step is next based on status
         next_step = status.get("next_step", "unknown")
-        
+
         return f"""
 -- Next Onboarding Step
 Current step: {next_step}
@@ -510,48 +518,50 @@ Important: Combine your acknowledgment with the next question naturally. For exa
 - "Nice to meet you, Johannes! To help me serve you better, could you tell me if you're comfortable with me storing our conversation to personalize your experience?" → CORRECT
 
 Always transition smoothly to the next onboarding question."""
-    
+
     def _detect_onboarding_stage(self, user_id: int) -> Optional[str]:
         """Detect specific onboarding stage from pending step memory."""
         from src.functions.definitions import FunctionDefinitions
         from src.memories.constants import MemoryKey
-        
+
         pending_step = self.memory_manager.get_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING)
         if not pending_step:
             return None
-        
+
         # Get the step value from the most recent memory
         step_value = str(pending_step[0].get("value", "")).lower()
-        
+
         # Use centralized stage map from FunctionDefinitions (DRY)
         return FunctionDefinitions.ONBOARDING_STAGE_MAP.get(step_value)
-    
+
     def _detect_context_from_state(self, user_id: int) -> str:
         """Detect context based on user state."""
         # Check for pending schedule request
         from src.memories.constants import MemoryKey
+
         pending_schedule = self.memory_manager.get_memory(user_id, MemoryKey.SCHEDULE_REQUEST_PENDING)
         if pending_schedule:
             return "schedule_setup"
-        
+
         # Check for specific onboarding stage first
         onboarding_stage = self._detect_onboarding_stage(user_id)
         if onboarding_stage:
             return onboarding_stage
-        
+
         # Check if user is new (general onboarding)
         user = self.db.query(User).filter_by(user_id=user_id).first()
         if user and (utc_now() - to_utc(user.created_at)).days < 1:
             return "onboarding"
-        
+
         # Check for morning lesson confirmation
         from src.lessons.state import compute_current_lesson_state
+
         state = compute_current_lesson_state(self.memory_manager, user_id)
         if state.get("needs_confirmation"):
             return "morning_lesson_confirmation"
-        
+
         return "general_chat"
-                
+
     def build_onboarding_prompt(self, system_prompt: str) -> str:
         """Build initial onboarding prompt for new users."""
         return f"""{system_prompt}

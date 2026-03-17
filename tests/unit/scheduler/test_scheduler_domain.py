@@ -23,7 +23,7 @@ class TestScheduleTypePredicates:
         """Should correctly identify daily schedule types."""
         # Then: Should return True for daily type
         assert is_daily_schedule_type(SCHEDULE_TYPE_DAILY) is True
-        
+
         # And: Should return False for non-daily types
         assert is_daily_schedule_type("daily_custom") is False
         assert is_daily_schedule_type(None) is False
@@ -32,10 +32,10 @@ class TestScheduleTypePredicates:
         """Should identify all schedules in daily family."""
         # Then: Daily type is in family
         assert is_daily_schedule_family(SCHEDULE_TYPE_DAILY) is True
-        
+
         # And: Custom daily types are also in the family
         assert is_daily_schedule_family("daily_custom") is True
-        
+
         # And: Non-daily types are not in the family
         assert is_daily_schedule_family("weekly") is False
         assert is_daily_schedule_family(None) is False
@@ -44,10 +44,10 @@ class TestScheduleTypePredicates:
         """Should correctly identify one-time schedule types."""
         # Then: Should return True for one-time types
         assert is_one_time_schedule_type(SCHEDULE_TYPE_ONE_TIME_REMINDER) is True
-        
+
         # And: Custom one-time types are also recognized
         assert is_one_time_schedule_type("one_time_custom") is True
-        
+
         # And: Non one-time types return False
         assert is_one_time_schedule_type("daily") is False
         assert is_one_time_schedule_type(None) is False
@@ -61,4 +61,3 @@ class TestJobIdHelper:
         # Then: Should match the jobs module's implementation
         assert job_id_for_schedule(42) == "schedule_42"
         assert jobs.job_id_for_schedule(42) == "schedule_42"
-

@@ -30,22 +30,21 @@ class TestLanguageDetectionShortMessages:
         )
         db_session.add(user)
         db_session.commit()
-        
+
         dialogue = DialogueEngine(db_session)
-        
+
         # When: First sending Norwegian message to set language
         norwegian_msg = "Hei! Jeg heter Johannes"
         await dialogue.process_message(user.user_id, norwegian_msg, db_session)
-        
+
         # Then: Language should be stored as Norwegian
         lang_memories = dialogue.memory_manager.get_memory(user.user_id, "user_language")
         assert lang_memories and lang_memories[0]["value"].lower().startswith("no")
-        
+
         # When: Sending short English reply
         short_reply = "Yes, sounds good"
         await dialogue.process_message(user.user_id, short_reply, db_session)
-        
+
         # Then: Language should remain Norwegian
         lang_memories_after = dialogue.memory_manager.get_memory(user.user_id, "user_language")
         assert lang_memories_after and lang_memories_after[0]["value"].lower().startswith("no")
-

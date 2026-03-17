@@ -4,6 +4,7 @@ This module provides a small facade around the existing scheduler code
 so job-management logic can be tested and moved independently of the
 `core` module in later steps.
 """
+
 import logging
 from datetime import timezone
 from typing import Any
@@ -24,12 +25,14 @@ logger = logging.getLogger(__name__)
 def init_scheduler(app: Any = None):
     """Initialize and return the global scheduler (delegates to core)."""
     from .core import SchedulerService
+
     return SchedulerService.init_scheduler()
 
 
 def shutdown_scheduler():
     """Shut down the global scheduler (delegates to core)."""
     from .core import SchedulerService
+
     return SchedulerService.shutdown()
 
 
@@ -49,6 +52,7 @@ def sync_job_for_schedule(schedule: Any) -> None:
     `schedule_id`, `schedule_type`, `cron_expression`, `next_send_time`.
     """
     from .core import SchedulerService
+
     scheduler = SchedulerService.get_scheduler()
     job_id = _job_id_for(schedule.schedule_id)
 
@@ -84,6 +88,7 @@ def sync_job_for_schedule(schedule: Any) -> None:
 
 def remove_job_for_schedule(schedule_id: int) -> None:
     from .core import SchedulerService
+
     scheduler = SchedulerService.get_scheduler()
     job_id = _job_id_for(schedule_id)
     try:

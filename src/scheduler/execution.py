@@ -41,6 +41,7 @@ def _load_lesson(db: Session, lesson_id: int) -> Optional[Lesson]:
     """Delegates to lessons.delivery.get_lesson_or_import."""
     return get_lesson_or_import(db, lesson_id)
 
+
 def _build_schedule_message(
     db: Session,
     schedule: Schedule,
@@ -54,7 +55,7 @@ def _build_schedule_message(
     language = get_user_language(memory_manager, schedule.user_id)
 
     from src.lessons.state import get_current_lesson
-    
+
     last_sent = get_current_lesson(memory_manager, schedule.user_id)
     if not last_sent:
         return build_lesson_preview(db, memory_manager, schedule.user_id, language)
@@ -82,7 +83,8 @@ def run_recovery_check(
         try:
             now = utc_now()
             due = (
-                db.query(Schedule)
+                db
+                .query(Schedule)
                 .filter(
                     Schedule.is_active == True,
                     Schedule.next_send_time != None,
@@ -119,6 +121,7 @@ def run_recovery_check(
                 schedule.last_sent_at = now
                 try:
                     from . import jobs as schedule_jobs
+
                     schedule_jobs.remove_job_for_schedule(schedule.schedule_id)
                 except Exception as e:
                     logger.warning("Could not remove job %s: %s", job_id_for_schedule(schedule.schedule_id), e)

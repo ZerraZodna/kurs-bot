@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 # Dialogue endpoints
 
+
 class MessageRequest(BaseModel):
     user_id: int
     text: str

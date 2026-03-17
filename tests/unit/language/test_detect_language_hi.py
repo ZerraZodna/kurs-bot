@@ -31,16 +31,15 @@ class TestDetectLanguageHi:
         )
         db_session.add(user)
         db_session.commit()
-        
+
         mm = MemoryManager(db_session)
-        
+
         # When: Detecting language for "Hi"
         result = await detect_and_store_language(mm, user.user_id, "Hi")
-        
+
         # Then: Should store 'en' as the language
         lang_memories = mm.get_memory(user.user_id, "user_language")
         assert lang_memories, "No user_language memory stored"
         assert any(m["value"].lower().startswith("en") for m in lang_memories), (
             f"Expected 'en' to be stored for message 'Hi', got: {[m['value'] for m in lang_memories]}"
         )
-

@@ -1,6 +1,7 @@
 """
 API routes for context-aware dialogue endpoints
 """
+
 import logging
 from typing import List
 
@@ -26,6 +27,7 @@ router = APIRouter(prefix="/api/v1/dialogue", tags=["dialogue"])
 
 logger = logging.getLogger(__name__)
 
+
 def get_db():
     """Dependency for database session."""
     db = SessionLocal()
@@ -41,11 +43,12 @@ def get_db():
 
 # Dialogue endpoints
 
+
 @router.post("/message")
 async def send_message(request: MessageRequest, db: Session = Depends(get_db)):
     """
     Send a message and get an AI response with full context awareness.
-    
+
     The response is generated considering:
     - User profile and preferences
     - Learning goals and progress
@@ -56,7 +59,7 @@ async def send_message(request: MessageRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter_by(user_id=request.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Process with full context
     dialogue_engine = DialogueEngine(db)
     response = await dialogue_engine.process_message(
@@ -66,21 +69,23 @@ async def send_message(request: MessageRequest, db: Session = Depends(get_db)):
         include_history=request.include_history,
         history_turns=request.history_turns,
     )
-    
+
     # ALWAYS streaming
     if isinstance(response, dict) and response.get("type") == "stream":
         from src.integrations.telegram_stream import StreamingFilter
+
         raw_generator = response["generator"]
         stream_filter = StreamingFilter(raw_generator)
         filtered_generator = stream_filter.filter_stream()
-        
+
         async def webui_stream_gen():
             full_text = ""
             async for token in filtered_generator:
                 yield token + "\\n"
             await response["post_hook"](full_text)
-        
+
         from fastapi.responses import StreamingResponse
+
         return StreamingResponse(webui_stream_gen(), media_type="text/plain")
     else:
         # Fallback to text if not stream dict
@@ -95,20 +100,21 @@ async def onboard_user(user_id: int, db: Session = Depends(get_db)):
     user = db.query(User).filter_by(user_id=user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     dialogue_engine = DialogueEngine(db)
     prompt = dialogue_engine.get_onboarding_prompt()
-    
+
     return {"prompt": prompt}
 
 
 # Memory management endpoints
 
+
 @router.post("/memory")
 async def store_memory(request: MemoryRequest, db: Session = Depends(get_db)):
     """
     Store a memory for a user.
-    
+
     Memory categories:
     - profile: User information (name, timezone, accessibility)
     - goals: Learning objectives and goals
@@ -121,7 +127,7 @@ async def store_memory(request: MemoryRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter_by(user_id=request.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Store memory
     memory_manager = MemoryManager(db)
     memory_id = memory_manager.store_memory(
@@ -131,7 +137,7 @@ async def store_memory(request: MemoryRequest, db: Session = Depends(get_db)):
         category=request.category,
         ttl_hours=request.ttl_hours,
     )
-    
+
     return {
         "memory_id": memory_id,
         "user_id": request.user_id,
@@ -146,10 +152,10 @@ async def get_memory(user_id: int, key: str, db: Session = Depends(get_db)):
     user = db.query(User).filter_by(user_id=user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     memory_manager = MemoryManager(db)
     memories = memory_manager.get_memory(user_id, key)
-    
+
     return {
         "user_id": user_id,
         "key": key,
@@ -166,15 +172,15 @@ async def get_user_context(user_id: int, db: Session = Depends(get_db)):
     user = db.query(User).filter_by(user_id=user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     memory_manager = MemoryManager(db)
-    
+
     # Gather context
     preferences = memory_manager.get_memory(user_id, MemoryKey.PREFERRED_TONE)
     progress = get_current_lesson(memory_manager, user_id)
-    
+
     name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "User"
-    
+
     return UserContextResponse(
         user_id=user_id,
         name=name,
@@ -189,10 +195,10 @@ async def delete_memory(user_id: int, key: str, db: Session = Depends(get_db)):
     user = db.query(User).filter_by(user_id=user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Note: This implementation archives memories; modify as needed
     # For now, we'll just return a success response
-    
+
     return {
         "user_id": user_id,
         "key": key,
@@ -202,12 +208,13 @@ async def delete_memory(user_id: int, key: str, db: Session = Depends(get_db)):
 
 # Batch operations
 
+
 @router.post("/memory/batch")
 async def batch_store_memory(requests: List[MemoryRequest], db: Session = Depends(get_db)):
     """Store multiple memories in one request."""
     results = []
     memory_manager = MemoryManager(db)
-    
+
     for req in requests:
         user = db.query(User).filter_by(user_id=req.user_id).first()
         if not user:
@@ -217,7 +224,7 @@ async def batch_store_memory(requests: List[MemoryRequest], db: Session = Depend
                 "message": "User not found",
             })
             continue
-        
+
         memory_id = memory_manager.store_memory(
             user_id=req.user_id,
             key=req.key,
@@ -225,14 +232,14 @@ async def batch_store_memory(requests: List[MemoryRequest], db: Session = Depend
             category=req.category,
             ttl_hours=req.ttl_hours,
         )
-        
+
         results.append({
             "user_id": req.user_id,
             "memory_id": memory_id,
             "key": req.key,
             "status": "stored",
         })
-    
+
     return {"results": results}
 
 
@@ -243,22 +250,22 @@ async def batch_store_memory(requests: List[MemoryRequest], db: Session = Depend
 def get_lesson(lesson_id: int, db: Session = Depends(get_db)):
     """
     Get a specific ACIM lesson by ID.
-    
+
     Returns the full lesson text and metadata.
     Lessons are imported from the ACIM PDF (run scripts/import_acim_lessons.py).
-    
+
     Args:
         lesson_id: Lesson number (1-365)
-    
+
     Returns:
         Lesson with title, content, and metadata
     """
     from src.models.database import Lesson
-    
+
     lesson = db.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
     if not lesson:
         raise HTTPException(status_code=404, detail=f"Lesson {lesson_id} not found")
-    
+
     return LessonResponse(
         lesson_id=lesson.lesson_id,
         title=lesson.title,
@@ -275,27 +282,27 @@ def get_lesson(lesson_id: int, db: Session = Depends(get_db)):
 async def semantic_search(request: SemanticSearchRequest, db: Session = Depends(get_db)):
     """
     Semantically search user's memories for contextually relevant information.
-    
+
     Uses vector embeddings to find memories similar to the query text,
     rather than exact keyword matching.
-    
+
     Args:
         user_id: User ID
         query: Search query text
         categories: Optional list of memory categories to filter by
         limit: Maximum results to return
         threshold: Minimum similarity score (0.0-1.0)
-    
+
     Returns:
         List of memories ranked by semantic similarity
     """
     from src.memories.semantic_search import get_semantic_search_service
-    
+
     # Verify user exists
     user = db.query(User).filter_by(user_id=request.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Perform semantic search
     search_service = get_semantic_search_service()
     results = await search_service.search_memories(
@@ -304,23 +311,22 @@ async def semantic_search(request: SemanticSearchRequest, db: Session = Depends(
         session=db,
         categories=request.categories,
         limit=request.limit,
-        threshold=request.threshold
+        threshold=request.threshold,
     )
-    
+
     # Format results
     memory_results = []
     for memory, score in results:
-        memory_results.append(MemoryWithScore(
-            memory_id=memory.memory_id,
-            key=memory.key,
-            value=memory.value,
-            category=memory.category,
-            similarity_score=round(score, 4)
-        ))
-    
+        memory_results.append(
+            MemoryWithScore(
+                memory_id=memory.memory_id,
+                key=memory.key,
+                value=memory.value,
+                category=memory.category,
+                similarity_score=round(score, 4),
+            )
+        )
+
     return SemanticSearchResponse(
-        user_id=request.user_id,
-        query=request.query,
-        results=memory_results,
-        count=len(memory_results)
+        user_id=request.user_id, query=request.query, results=memory_results, count=len(memory_results)
     )

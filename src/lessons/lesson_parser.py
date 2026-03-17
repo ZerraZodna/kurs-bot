@@ -1,4 +1,5 @@
 """Lesson parsing from extracted text."""
+
 from __future__ import annotations
 
 import re
@@ -12,13 +13,13 @@ from .text_normalizer import (
 
 def extract_title(block: str) -> str:
     """Extract title - just get first sentence after lesson header."""
-    
+
     # Join lines with spaces first (so multi-line quotes become one line)
     text = " ".join(block.split("\n"))
-    
+
     # Strip all HTML tags
     text = re.sub(r"</?[a-z]+>", "", text, flags=re.IGNORECASE)
-    
+
     # Find first sentence - everything up to first .! or ?
     match = re.match(r"^([^.!?]+[.!?])", text)
     if match:
@@ -29,7 +30,7 @@ def extract_title(block: str) -> str:
             # Strip leading quotes (ASCII ", curly " and ")
             title = re.sub(r"^[\u0022\u201c\u201d]+", "", title)
             return title[:128]
-    
+
     return "Lesson"
 
 
@@ -44,7 +45,7 @@ def _normalize_header_line(s: str) -> str:
 
 def _extract_id_from_line(s: str) -> Optional[int | Tuple[int, int]]:
     """Extract lesson ID(s) from a normalized header line.
-    
+
     Returns:
         - int: single lesson ID
         - tuple of (start, end): range of lesson IDs
@@ -66,7 +67,7 @@ def _extract_id_from_line(s: str) -> Optional[int | Tuple[int, int]]:
 
 def parse_lessons_from_text(full_text: str) -> List[Tuple[int, str, str]]:
     """Parse lessons from extracted text.
-    
+
     Returns:
         List of (lesson_id, title, content) tuples.
     """
@@ -83,7 +84,10 @@ def parse_lessons_from_text(full_text: str) -> List[Tuple[int, str, str]]:
         # 'lesson' optionally followed by a number/roman numerals, or a
         # spaced-letter variant like 'L E S S O N'. This avoids false
         # positives such as lines that begin "lesson a day".
-        if re.match(r"(?i)^(?:l\s*e\s*s\s*s\s*o\s*n\b|lesson(?:\s*(?:\d{1,3}|[ivxlcdm]+)\b)?$)", s_norm) or compact == "lesson":
+        if (
+            re.match(r"(?i)^(?:l\s*e\s*s\s*s\s*o\s*n\b|lesson(?:\s*(?:\d{1,3}|[ivxlcdm]+)\b)?$)", s_norm)
+            or compact == "lesson"
+        ):
             lid = _extract_id_from_line(s_norm)
             if lid is None:
                 for j in range(i + 1, min(i + 6, len(lines))):
@@ -109,11 +113,15 @@ def parse_lessons_from_text(full_text: str) -> List[Tuple[int, str, str]]:
         block = "\n".join(block_lines).strip()
         if len(block) < 60:
             continue
-        block = re.sub(r"(\d(?:\s+\d){1,3})\s*(?:t\s*o|-|–)\s*(\d(?:\s+\d){1,3})",
-                       lambda m: re.sub(r"\s+", "", m.group(1)) + " to " + re.sub(r"\s+", "", m.group(2)),
-                       block,
-                       flags=re.I)
-        block = re.sub(r"(?mi)(lesson)\s+((?:\d\s+){1,3}\d)", lambda m: m.group(1) + " " + re.sub(r"\s+", "", m.group(2)), block)
+        block = re.sub(
+            r"(\d(?:\s+\d){1,3})\s*(?:t\s*o|-|–)\s*(\d(?:\s+\d){1,3})",
+            lambda m: re.sub(r"\s+", "", m.group(1)) + " to " + re.sub(r"\s+", "", m.group(2)),
+            block,
+            flags=re.I,
+        )
+        block = re.sub(
+            r"(?mi)(lesson)\s+((?:\d\s+){1,3}\d)", lambda m: m.group(1) + " " + re.sub(r"\s+", "", m.group(2)), block
+        )
         first_line = block.splitlines()[0].strip()
         if re.match(r"(?i)^(part\b|workbook\b|page\b)", first_line):
             continue
@@ -135,7 +143,7 @@ def parse_lessons_from_text(full_text: str) -> List[Tuple[int, str, str]]:
                 break
         if first_header_line > 0:
             intro_lines = lines[:first_header_line]
-            intro_block = "\n".join(l.strip() for l in intro_lines if l.strip()).strip()
+line.strip() for line in intro_lines if line.strip()
             if len(intro_block) > 80:
                 out.append((0, "Introduction", intro_block))
 
@@ -161,4 +169,3 @@ def parse_lessons_from_text(full_text: str) -> List[Tuple[int, str, str]]:
         content = _normalize_lesson_content_header(content, lid)
         out.append((lid, title, content))
     return out
-

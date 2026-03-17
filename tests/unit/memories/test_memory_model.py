@@ -24,11 +24,11 @@ class TestMemoryModel:
             value="blue",
             is_active=True,
             created_at=datetime.datetime.utcnow(),
-            updated_at=datetime.datetime.utcnow()
+            updated_at=datetime.datetime.utcnow(),
         )
         db_session.add(mem)
         db_session.commit()
-        
+
         # Then: Memory should be stored and have an ID
         assert mem.memory_id is not None
 
@@ -42,14 +42,14 @@ class TestMemoryModel:
             value="blue",
             is_active=True,
             created_at=datetime.datetime.utcnow(),
-            updated_at=datetime.datetime.utcnow()
+            updated_at=datetime.datetime.utcnow(),
         )
         db_session.add(mem)
         db_session.commit()
-        
+
         # When: Reading the memory by key
         fetched = db_session.query(Memory).filter_by(key="fav_color").first()
-        
+
         # Then: Should return the correct value
         assert fetched.value == "blue"
 
@@ -63,16 +63,16 @@ class TestMemoryModel:
             value="blue",
             is_active=True,
             created_at=datetime.datetime.utcnow(),
-            updated_at=datetime.datetime.utcnow()
+            updated_at=datetime.datetime.utcnow(),
         )
         db_session.add(mem)
         db_session.commit()
-        
+
         # When: Updating the memory value
         fetched = db_session.query(Memory).filter_by(key="fav_color").first()
         fetched.value = "green"
         db_session.commit()
-        
+
         # Then: Should reflect the new value
         updated = db_session.query(Memory).filter_by(memory_id=mem.memory_id).first()
         assert updated.value == "green"
@@ -87,16 +87,15 @@ class TestMemoryModel:
             value="blue",
             is_active=True,
             created_at=datetime.datetime.utcnow(),
-            updated_at=datetime.datetime.utcnow()
+            updated_at=datetime.datetime.utcnow(),
         )
         db_session.add(mem)
         db_session.commit()
-        
+
         # When: Deleting the memory
         fetched = db_session.query(Memory).filter_by(key="fav_color").first()
         db_session.delete(fetched)
         db_session.commit()
-        
+
         # Then: Memory should no longer exist
         assert db_session.query(Memory).filter_by(memory_id=mem.memory_id).first() is None
-

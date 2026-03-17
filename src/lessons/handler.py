@@ -33,9 +33,7 @@ def _find_lesson_by_id(session: Session, lesson_id: int) -> Optional[Lesson]:
     return session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
 
 
-async def format_lesson_message(
-    lesson: Lesson, language: Optional[str], call_ollama_fn=None
-) -> str:
+async def format_lesson_message(lesson: Lesson, language: Optional[str], call_ollama_fn=None) -> str:
     """
     Format lesson for display with optional translation.
 
@@ -78,4 +76,3 @@ async def translate_text(text: str, language: str, call_ollama_fn=None) -> str:
     except Exception as e:
         logger.warning(f"Translation failed, sending original text: {e}")
         return text
-

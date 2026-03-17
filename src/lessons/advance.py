@@ -80,7 +80,7 @@ async def maybe_send_next_lesson(
     if previous_lesson_id:
         repeat_note = f"If you'd like to repeat Lesson {previous_lesson_id} instead, just let me know."
         message = f"{message}\n\n{repeat_note}"
-        
+
         # Store what lesson was offered for repeat so we can handle "Yes, repeat" later
         memory_manager.store_memory(
             user_id=user_id,
@@ -89,7 +89,7 @@ async def maybe_send_next_lesson(
             category=MemoryCategory.PROGRESS.value,
             source="advance.py",
         )
-    
+
     if (language or "").lower() not in ["en"]:
         message = await translate_text(message, language, call_ollama)
 
@@ -99,4 +99,3 @@ async def maybe_send_next_lesson(
     session.commit()
 
     return message
-

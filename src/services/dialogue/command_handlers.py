@@ -32,6 +32,7 @@ def parse_rag_prefix(text: str) -> Tuple[str, bool]:
         return stripped, True
     return text, False
 
+
 def _execute_verified_request(session: Session, user_id: int, verification) -> str:
     request_type = verification.request_type
     payload = {}
@@ -138,11 +139,7 @@ async def handle_gdpr_commands(
     )
 
     description = action_descriptions.get(action, "")
-    return (
-        f"{description}\n\n"
-        f"To proceed, reply with: verify {code}\n"
-        f"(Code expires in 10 minutes)"
-    )
+    return f"{description}\n\nTo proceed, reply with: verify {code}\n(Code expires in 10 minutes)"
 
 
 def handle_list_memories(text: str, memory_manager, session: Session, user_id: int) -> Optional[str]:
@@ -164,6 +161,7 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
     # Accept trigger optionally followed by extra query text (handled below)
 
     try:
+
         def _format_mem_lines(mems: list) -> list:
             out = []
             out.append("Memory")
@@ -176,8 +174,8 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
                 category = getattr(mem, "category", "")
                 if len(val) > 300:
                     val = val[:297] + "..."
-                category = (category or "")
-                                
+                category = category or ""
+
                 # Wrap label in backticks to prevent Markdown italics from underscores
                 # Format: date `label` "value"
                 line = f"{date_short} {category}.{key_part}={val}"
@@ -202,10 +200,7 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
 
         # If no query provided or user asked for '*', list all memories and user table data
         if not query_tail or query_tail.strip() == "*":
-            rows = (
-                MemoryHandler(session)
-                .list_active_memories(user_id=user_id, order_ascending=True)
-            )
+            rows = MemoryHandler(session).list_active_memories(user_id=user_id, order_ascending=True)
 
             user = session.query(User).filter(User.user_id == user_id).first()
 
@@ -275,9 +270,7 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
         search_service = get_semantic_search_service()
         with Session(bind=session.get_bind()) as search_session:
             results = _run_coro_sync(
-                search_service.search_memories(
-                    user_id=user_id, query_text=query_tail, session=search_session, limit=20
-                )
+                search_service.search_memories(user_id=user_id, query_text=query_tail, session=search_session, limit=20)
             )
         if not results:
             return "No results for query"
@@ -350,10 +343,15 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> Option
 
             # Include private templates owned by this user (owner stored as str(user_id))
             try:
-                private_templates = db.query(PromptTemplate).filter(
-                    PromptTemplate.visibility == "private",
-                    PromptTemplate.owner == str(user_id),
-                ).all()
+                private_templates = (
+                    db
+                    .query(PromptTemplate)
+                    .filter(
+                        PromptTemplate.visibility == "private",
+                        PromptTemplate.owner == str(user_id),
+                    )
+                    .all()
+                )
                 for t in private_templates:
                     suffix = " (active)" if active_type == "selected" and active_key == t.key else ""
                     parts_out.append(f"{t.key} (private){suffix}: {t.title}")
@@ -433,7 +431,10 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> Option
             custom = memory_manager.get_memory(user_id, MemoryKey.CUSTOM_RAG_PROMPT)
             parts_out = []
             if custom and custom[0].get("value"):
-                parts_out.append("Custom prompt: " + (custom[0].get("value")[:200] + ("..." if len(custom[0].get("value")) > 200 else "")))
+                parts_out.append(
+                    "Custom prompt: "
+                    + (custom[0].get("value")[:200] + ("..." if len(custom[0].get("value")) > 200 else ""))
+                )
             if sel and sel[0].get("value"):
                 key = sel[0].get("value")
                 tmpl = db.query(PromptTemplate).filter(PromptTemplate.key == key).first()

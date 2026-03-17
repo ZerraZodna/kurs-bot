@@ -2,6 +2,7 @@
 Migrated tests for GDPR verification.
  migrated from tests/test_gdpr_verification.py
 """
+
 import datetime
 
 import pytest
@@ -47,7 +48,7 @@ def test_gdpr_verification_flow(db_session):
     """
     # Given: User exists
     user = _create_user(db_session)
-    
+
     # When: Creating a verification code
     code = create_verification(
         session=db_session,
@@ -61,4 +62,3 @@ def test_gdpr_verification_flow(db_session):
     # Then: Verification succeeds
     verification = verify_code(db_session, user.user_id, code)
     assert verification.verified_at is not None
-

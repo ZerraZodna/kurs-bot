@@ -2,6 +2,7 @@
 
 Alternative to ngrok/webhook for local development.
 """
+
 import asyncio
 import logging
 from typing import Optional, Set
@@ -107,10 +108,15 @@ async def _trigger_batch(user_id: int, external_id: str) -> None:
 
     db = SessionLocal()
     try:
-        existing = db.query(BatchLock).filter(
-            BatchLock.user_id == user_id,
-            BatchLock.expires_at > utc_now(),
-        ).first()
+        existing = (
+            db
+            .query(BatchLock)
+            .filter(
+                BatchLock.user_id == user_id,
+                BatchLock.expires_at > utc_now(),
+            )
+            .first()
+        )
         if not existing:
             lock = BatchLock(
                 user_id=user_id,
@@ -127,6 +133,7 @@ async def _trigger_batch(user_id: int, external_id: str) -> None:
 async def _import_and_process(user_id: int, external_id: str) -> None:
     """Import and run batch processing (avoid circular import)."""
     from src.integrations.telegram import process_telegram_batch
+
     await process_telegram_batch(user_id, external_id)
 
 
@@ -222,4 +229,3 @@ def start_polling_task() -> Optional[asyncio.Task]:
     if not settings.USE_TELEGRAM_LONG_POLLING:
         return None
     return asyncio.create_task(start_polling())
-

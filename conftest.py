@@ -35,6 +35,7 @@ def _load_dotenv_if_present():
     except Exception:
         pass
 
+
 _load_dotenv_if_present()
 import sys
 import types
@@ -46,17 +47,23 @@ if not _test_use_real or str(_test_use_real).strip().lower() not in ("1", "true"
     mod_name = "src.services.dialogue.ollama_client"
     if mod_name not in sys.modules:
         _fake = types.ModuleType(mod_name)
+
         async def _fake_call_ollama(prompt: str, model: Optional[str] = None, language: Optional[str] = None) -> str:
-            short = (prompt[:160] + "..." ) if len(prompt) > 160 else prompt
+            short = (prompt[:160] + "...") if len(prompt) > 160 else prompt
             return f"[MOCK_OLLAMA_REPLY] model={model or 'default'} lang={language or 'en'} text={short}"
-        async def _fake_stream_ollama(prompt: str, model: Optional[str] = None, language: Optional[str] = None, temperature=None):
-            short = (prompt[:160] + "..." ) if len(prompt) > 160 else prompt
+
+        async def _fake_stream_ollama(
+            prompt: str, model: Optional[str] = None, language: Optional[str] = None, temperature=None
+        ):
+            short = (prompt[:160] + "...") if len(prompt) > 160 else prompt
             yield f"[MOCK_OLLAMA_STREAM] model={model or 'default'} lang={language or 'en'} text={short}"
+
         _fake.call_ollama = _fake_call_ollama
         _fake.stream_ollama = _fake_stream_ollama
         sys.modules[mod_name] = _fake
         # Ensure the package exposes attributes that tests may monkeypatch
         import importlib
+
         pkg = importlib.import_module("src.services.dialogue")
         pkg.ollama_client = _fake
         pkg.call_ollama = _fake.call_ollama
@@ -65,7 +72,7 @@ if not _test_use_real or str(_test_use_real).strip().lower() not in ("1", "true"
 # pytest plugins (DB fixtures imported here trigger db_engine)
 pytest_plugins = [
     "tests.fixtures.database",
-    "tests.fixtures.users", 
+    "tests.fixtures.users",
     "tests.fixtures.services",
 ]
 
@@ -79,11 +86,13 @@ def module_db_setup(db_engine):
     yield
     # Temp DB cleaned by fixture, no drop_all needed
 
+
 @pytest.fixture(scope="function", autouse=True)
 def truncate_test_tables(db_engine):
     """Fast per-test cleanup: DELETE FROM key tables (100x faster than drop_all). Safe if tables missing."""
     from sqlalchemy import text
     from sqlalchemy.exc import OperationalError
+
     with db_engine.connect() as conn:
         for table in ["schedule", "message_log", "memory", "user"]:
             try:
@@ -91,6 +100,7 @@ def truncate_test_tables(db_engine):
             except OperationalError:
                 pass  # Table not exists OK
         conn.commit()
+
 
 @pytest.fixture(autouse=True)
 def block_external_http():
@@ -101,31 +111,39 @@ def block_external_http():
     orig_request = None
     try:
         import httpx
+
         LOCAL = "localhost:11434"
         CLOUD = "ollama.com"
-        def is_ollama_url(u): 
+
+        def is_ollama_url(u):
             s = str(u)
             return LOCAL in s or CLOUD in s
+
         orig_request = httpx.request
+
         def blocked_request(method, url, *args, **kwargs):
             if is_ollama_url(url):
                 raise RuntimeError("Blocked Ollama HTTP in tests (set TEST_USE_REAL_OLLAMA=1)")
             return orig_request(method, url, *args, **kwargs)
+
         httpx.request = blocked_request
     except Exception:
         pass
     yield
     try:
         import httpx
+
         if orig_request:
             httpx.request = orig_request
-    except:
+    except Exception:
         pass
+
 
 def pytest_collection_modifyitems(config, items):
     serial_items = [i for i in items if i.get_closest_marker("serial")]
     other_items = [i for i in items if not i.get_closest_marker("serial")]
     items[:] = other_items + serial_items
+
 
 def pytest_configure(config):
     defaults_model = "llama3.2:3b"
@@ -144,9 +162,8 @@ def pytest_configure(config):
             import importlib
 
             import src.config as cfg
+
             importlib.reload(cfg)
             print("🔧 Test Ollama model overrides applied")
-        except:
+        except Exception:
             pass
-
-

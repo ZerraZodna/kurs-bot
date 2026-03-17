@@ -61,7 +61,12 @@ async def handle_schedule_messages(
     lower = (text or "").lower()
     daily_indicators = ["daily", "every day", "each day", "every morning", "every evening", "hver dag", "daglig"]
 
-    time_patterns = [r"(\d{1,2}:\d{2})", r"(\d{1,2}\s?(?:am|pm))", r"kl\s*(\d{1,2}(?::\d{2})?)", r"(\d{1,2})[.:](\d{2})"]
+    time_patterns = [
+        r"(\d{1,2}:\d{2})",
+        r"(\d{1,2}\s?(?:am|pm))",
+        r"kl\s*(\d{1,2}(?::\d{2})?)",
+        r"(\d{1,2})[.:](\d{2})",
+    ]
     found_time = None
     for pat in time_patterns:
         m = re.search(pat, text, re.IGNORECASE)

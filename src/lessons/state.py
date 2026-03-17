@@ -50,21 +50,18 @@ def has_lesson_status(memory_manager: MemoryManager, user_id: int) -> bool:
     return get_current_lesson(memory_manager, user_id) is not None
 
 
-def compute_current_lesson_state(memory_manager: MemoryManager, user_id: int, today: Optional[date] = None) -> Dict[str, Any]:
+def compute_current_lesson_state(
+    memory_manager: MemoryManager, user_id: int, today: Optional[date] = None
+) -> Dict[str, Any]:
     """Compute lesson state from users.lesson and last_active_at for daily advancement."""
     lesson_id = get_current_lesson(memory_manager, user_id)
 
     if lesson_id is None:
-        return {
-            "lesson_id": 1,
-            "progress_note": None,
-            "advanced_by_day": True,
-            "previous_lesson_id": None
-        }
+        return {"lesson_id": 1, "progress_note": None, "advanced_by_day": True, "previous_lesson_id": None}
 
     user = memory_manager.db.query(User).filter(User.user_id == user_id).first()
     last_active = getattr(user, "last_active_at", None)
-    
+
     # Centralized date comparison via timezone utils
     if date_is_past(last_active):
         previous_id = lesson_id
@@ -73,20 +70,15 @@ def compute_current_lesson_state(memory_manager: MemoryManager, user_id: int, to
             "lesson_id": proposed_id,
             "progress_note": None,
             "advanced_by_day": True,
-            "previous_lesson_id": previous_id
+            "previous_lesson_id": previous_id,
         }
 
-    return {
-        "lesson_id": int(lesson_id),
-        "progress_note": None,
-        "advanced_by_day": False,
-        "previous_lesson_id": None
-    }
+    return {"lesson_id": int(lesson_id), "progress_note": None, "advanced_by_day": False, "previous_lesson_id": None}
 
 
 def get_lesson_state(memory_manager: MemoryManager, user_id: int) -> Dict[str, Any]:
     """Return lesson state for backward compatibility.
-    
+
     Deprecated: Use get_current_lesson() directly.
     """
     cur = get_current_lesson(memory_manager, user_id)
@@ -95,4 +87,3 @@ def get_lesson_state(memory_manager: MemoryManager, user_id: int) -> Dict[str, A
         "last_sent_lesson_id": cur,
         "updated_at": None,
     }
-

@@ -24,9 +24,9 @@ class MemoryCategory(str, Enum):
         """Normalize a category string to a valid value."""
         if not category:
             return cls.FACT.value
-        
+
         normalized = category.lower().strip()
-        
+
         # Handle common aliases
         aliases = {
             "preferences": cls.PREFERENCES.value,
@@ -41,7 +41,7 @@ class MemoryCategory(str, Enum):
             "chat": cls.CONVERSATION.value,
             "audit": cls.AUDIT.value,
         }
-        
+
         return aliases.get(normalized, cls.FACT.value)
 
 
@@ -79,9 +79,14 @@ class MemoryKey:
     # Centralized key sets for memory category inference (DRY)
     # These are frozensets for efficient membership testing
     PROFILE_KEYS = frozenset({
-        FULL_NAME, FIRST_NAME, NAME, USER_LANGUAGE,
-        PREFERRED_LESSON_TIME, PERSONAL_BACKGROUND,
+        FULL_NAME,
+        FIRST_NAME,
+        NAME,
+        USER_LANGUAGE,
+        PREFERRED_LESSON_TIME,
+        PERSONAL_BACKGROUND,
     })
     PROGRESS_KEYS = frozenset({
-        LESSON_CURRENT, "insight",
+        LESSON_CURRENT,
+        "insight",
     })

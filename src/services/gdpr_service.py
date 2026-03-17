@@ -384,6 +384,7 @@ def erase_user_data(
     actor: str,
 ) -> None:
     from src.services.admin_notifier import send_admin_notification
+
     user = session.query(User).filter_by(user_id=user_id).first()
     if not user:
         raise ValueError("User not found")

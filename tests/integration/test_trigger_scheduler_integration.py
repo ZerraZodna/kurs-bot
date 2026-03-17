@@ -27,6 +27,7 @@ async def test_trigger_based_schedule_edit(db_session, test_user, monkeypatch):
     # Make Ollama return a structured intent so the function executor is called directly
     async def fake_call_ollama_with_intent(prompt: str, model: str = None, language: str = None) -> str:
         return '{"intent": {"name": "update_schedule", "action_type": "update_schedule"}}'
+
     # Patch the module-level ollama client so all call sites use the fake
     monkeypatch.setattr("src.services.dialogue.ollama_client.call_ollama", fake_call_ollama_with_intent)
 
@@ -41,28 +42,25 @@ async def test_trigger_based_schedule_edit(db_session, test_user, monkeypatch):
         "session": db_session,
         "memory_manager": dialogue.memory_manager,
     }
-    
+
     # Deactivate existing schedules
     SchedulerService.deactivate_user_schedules(user_id, session=db_session)
-    
+
     # Create new schedule at 10:15
-    result = await executor.execute_single(
-        "create_schedule",
-        {"time": "10:15"},
-        context
-    )
-    
+    result = await executor.execute_single("create_schedule", {"time": "10:15"}, context)
+
     assert result.success is True
     assert result.result.get("ok") is True
 
     # After execution, verify schedule updated to 10:15 using the same db_session
     from src.scheduler import manager as schedule_manager
+
     schedules = schedule_manager.get_user_schedules(user_id, session=db_session)
     # Find the active schedule
     active = [s for s in schedules if s.is_active]
     assert len(active) == 1
     sched = active[0]
-    
+
     # Compute expected next_send using user's timezone and compare stored UTC value
     from src.scheduler.time_utils import compute_next_send_and_cron
 
@@ -71,5 +69,6 @@ async def test_trigger_based_schedule_edit(db_session, test_user, monkeypatch):
     expected_next_send, expected_cron = compute_next_send_and_cron("10:15", tz_name)
 
     assert sched.next_send_time is None or (
-        sched.next_send_time.hour == expected_next_send.hour and sched.next_send_time.minute == expected_next_send.minute
+        sched.next_send_time.hour == expected_next_send.hour
+        and sched.next_send_time.minute == expected_next_send.minute
     )

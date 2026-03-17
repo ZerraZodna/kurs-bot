@@ -102,10 +102,7 @@ class TestCompleteWorkflow:
         po = PromptOptimizer()
 
         # Store many memories
-        topics = [
-            "Python", "Web Development", "Data Science",
-            "Machine Learning", "Cloud Computing"
-        ]
+        topics = ["Python", "Web Development", "Data Science", "Machine Learning", "Cloud Computing"]
 
         for topic in topics:
             mm.store_memory(
@@ -158,9 +155,7 @@ class TestCompleteWorkflow:
 
         # Allocate tokens with limited budget
         truncated = po.truncate_context_sections(
-            sections,
-            total_budget=500,
-            priority_order=["profile", "goals", "history"]
+            sections, total_budget=500, priority_order=["profile", "goals", "history"]
         )
 
         # Should have all sections but truncated

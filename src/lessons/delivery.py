@@ -79,6 +79,7 @@ def deliver_lesson(
     messages = []
     if language is None:
         from src.scheduler.memory_helpers import get_user_language
+
         language = get_user_language(memory_manager, user_id)
 
     # Compute/use target lesson
@@ -106,4 +107,3 @@ def deliver_lesson(
         messages.append(message)
 
     return messages
-

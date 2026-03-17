@@ -79,7 +79,9 @@ def test_full_pdf_lesson_1_title_not_intro_bleed(acim_pdf_text):
     assert 1 in by_id, "Lesson 1 missing from parsed output"
     title, content = by_id[1]
     assert "Nothing I see" in title, f"Unexpected lesson 1 title: {title!r}"
-    assert not content.lower().startswith("lesson 1\\n\\nlesson a day"), "Lesson 1 should not start with 'lesson a day' intro bleed"
+    assert not content.lower().startswith("lesson 1\\n\\nlesson a day"), (
+        "Lesson 1 should not start with 'lesson a day' intro bleed"
+    )
 
 
 def test_spacing_normalizer_repairs_missing_spaces_after_punctuation():

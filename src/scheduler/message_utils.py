@@ -13,6 +13,7 @@ from src.services.traffic_tracker import record_traffic_event
 
 logger = logging.getLogger(__name__)
 
+
 def translate_text_sync(text: str, language: str) -> str:
     print("Translate to lng=%s", str)
     try:
@@ -24,6 +25,7 @@ def translate_text_sync(text: str, language: str) -> str:
         model = settings.OLLAMA_MODEL
         # Lazy import to avoid circular imports at module import time
         from src.services.dialogue.ollama_client import call_ollama
+
         resp = asyncio.run(call_ollama(prompt, model=model))
         return resp or text
     except Exception as e:
@@ -37,6 +39,7 @@ def send_outbound_message(db: Session, user: User, text: str) -> None:
     try:
         if user.channel == "telegram":
             from src import scheduler as _scheduler_pkg
+
             asyncio.run(_scheduler_pkg.send_message(int(user.external_id), text))
             record_traffic_event()
         else:

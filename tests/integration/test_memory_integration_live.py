@@ -2,6 +2,7 @@
 Migrated live integration tests for memory with real Ollama.
  migrated from tests/test_memory_integration_live.py
 """
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -22,4 +23,3 @@ def db_session():
     session.commit()
     yield session
     session.close()
-

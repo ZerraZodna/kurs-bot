@@ -5,6 +5,7 @@ Revises: merge_heads
 Create Date: 2026-02-09 12:00:00.000000
 
 """
+
 import sqlalchemy as sa
 from alembic import op
 
@@ -30,8 +31,12 @@ def upgrade():
         sa.Column("owner", sa.String(length=128), nullable=True),
         sa.Column("visibility", sa.String(length=32), nullable=False, server_default="public"),
         sa.Column("version", sa.Integer(), nullable=False, server_default="1"),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")
+        ),
     )
 
 

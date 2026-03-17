@@ -46,4 +46,3 @@ def get_user_language(memory_manager: MemoryManager, user_id: int) -> str:
     memories = memory_manager.get_memory(user_id, MemoryKey.USER_LANGUAGE)
     # Stored values are ISO codes (e.g., 'en', 'no'). Return stored value or 'en'.
     return memories[0].get("value", "en") if memories else "en"
-

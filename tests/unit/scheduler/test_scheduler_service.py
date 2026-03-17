@@ -2,6 +2,7 @@
 Migrated tests for SchedulerService.
  migrated from tests/test_scheduler_service.py
 """
+
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -30,7 +31,7 @@ def db_session():
         opted_in=True,
         created_at=datetime.now(timezone.utc),
     )
-    
+
     # Create test lessons
     lesson = Lesson(
         lesson_id=1,
@@ -82,7 +83,6 @@ class TestSchedulerService:
             return {"ok": True}
 
         monkeypatch.setattr(scheduler_module, "send_message", fake_send_message)
-
 
         # Given: User with active daily schedule
         user = db_session.query(User).first()
@@ -149,15 +149,11 @@ class TestSchedulerService:
         now_naive = now.replace(tzinfo=None)
         assert next_send > now_naive
 
-
-    def test_deactivate_user_schedules(
-        self, db_session, scheduler_session_factory
-    ):
+    def test_deactivate_user_schedules(self, db_session, scheduler_session_factory):
         """Given: User has active schedules
         When: deactivate_user_schedules is called
         Then: All schedules are deactivated
         """
-
 
         user = db_session.query(User).first()
         schedule = Schedule(
@@ -179,4 +175,3 @@ class TestSchedulerService:
         db_session.refresh(schedule)
         assert deactivated == 1
         assert schedule.is_active is False
-

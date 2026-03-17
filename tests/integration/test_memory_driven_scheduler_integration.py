@@ -30,13 +30,9 @@ async def test_memory_driven_schedule_creation(db_session, test_user):
         "session": db_session,
         "memory_manager": mm,
     }
-    
-    result = await executor.execute_single(
-        "create_schedule",
-        {"time": "10:15"},
-        context
-    )
-    
+
+    result = await executor.execute_single("create_schedule", {"time": "10:15"}, context)
+
     assert result.success is True
     assert result.result.get("ok") is True
     assert "schedule_id" in result.result
@@ -47,7 +43,7 @@ async def test_memory_driven_schedule_creation(db_session, test_user):
     active = [s for s in all_schedules if s.is_active]
     assert len(active) == 1
     sched = active[0]
-    
+
     # Compute expected next_send using user's timezone and compare stored UTC value
     from src.scheduler.time_utils import compute_next_send_and_cron
 
@@ -56,5 +52,6 @@ async def test_memory_driven_schedule_creation(db_session, test_user):
     expected_next_send, expected_cron = compute_next_send_and_cron("10:15", tz_name)
 
     assert sched.next_send_time is None or (
-        sched.next_send_time.hour == expected_next_send.hour and sched.next_send_time.minute == expected_next_send.minute
+        sched.next_send_time.hour == expected_next_send.hour
+        and sched.next_send_time.minute == expected_next_send.minute
     )

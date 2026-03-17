@@ -98,11 +98,12 @@ def test_temporal_resolution(memory_manager, clean_test_data, test_user_id):
             category=MemoryCategory.PROFILE.value,
         )
         # Update created_at
-        mem = db.query(Memory).filter(
-            Memory.user_id == test_user_id,
-            Memory.key == MemoryKey.NAME,
-            Memory.value == value
-        ).first()
+        mem = (
+            db
+            .query(Memory)
+            .filter(Memory.user_id == test_user_id, Memory.key == MemoryKey.NAME, Memory.value == value)
+            .first()
+        )
         if mem:
             mem.created_at = created_at
             db.commit()

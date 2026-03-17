@@ -15,7 +15,7 @@ async def main():
 
     judge = MemoryJudge()
     print("Using RAG model:", settings.OLLAMA_MODEL)
-    
+
     for msg in messages:
         print("\n=== MESSAGE ===")
         print(msg)

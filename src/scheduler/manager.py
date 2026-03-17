@@ -4,6 +4,7 @@ This module contains functions that perform CRUD operations on the
 `Schedule` model without interacting with APScheduler. It is intended to
 be a thin, testable layer so the APScheduler wiring can live separately.
 """
+
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -91,7 +92,8 @@ def get_user_schedules(user_id: int, session: Session, active_only: bool = True)
 
 def find_active_daily_schedule(user_id: int, session: Session) -> Optional[Schedule]:
     return (
-        session.query(Schedule)
+        session
+        .query(Schedule)
         .filter_by(user_id=user_id, is_active=True, schedule_type=SCHEDULE_TYPE_DAILY)
         .order_by(Schedule.created_at)
         .first()
@@ -99,10 +101,7 @@ def find_active_daily_schedule(user_id: int, session: Session) -> Optional[Sched
 
 
 def find_existing_one_time_reminder(
-    user_id: int, 
-    run_at: datetime, 
-    session: Session,
-    tolerance_seconds: int = 60
+    user_id: int, run_at: datetime, session: Session, tolerance_seconds: int = 60
 ) -> Optional[Schedule]:
     """Requires active Session."""
     """Check if user already has an active one-time reminder at approximately the same time.
@@ -117,27 +116,23 @@ def find_existing_one_time_reminder(
         Existing Schedule if found, None otherwise
     """
     from .domain import is_one_time_schedule_type
-    
+
     # Get all active schedules for user
-    schedules = (
-        session.query(Schedule)
-        .filter_by(user_id=user_id, is_active=True)
-        .all()
-    )
-    
+    schedules = session.query(Schedule).filter_by(user_id=user_id, is_active=True).all()
+
     # Check for one-time reminders within tolerance
     for schedule in schedules:
         if not is_one_time_schedule_type(schedule.schedule_type):
             continue
-        
+
         if schedule.next_send_time is None:
             continue
-        
+
         # Calculate time difference
         time_diff = abs((schedule.next_send_time - run_at).total_seconds())
         if time_diff <= tolerance_seconds:
             return schedule
-    
+
     return None
 
 
@@ -158,10 +153,7 @@ def deactivate_user_schedules(user_id: int, session: Session, active_only: bool 
 
 
 def deactivate_user_schedules_by_type(
-    user_id: int, 
-    schedule_type: str, 
-    session: Session,
-    active_only: bool = True
+    user_id: int, schedule_type: str, session: Session, active_only: bool = True
 ) -> int:
     """Requires active Session."""
     """Deactivate a user's schedules filtered by type. Returns number deactivated.
@@ -176,11 +168,11 @@ def deactivate_user_schedules_by_type(
         Number of schedules deactivated
     """
     from .domain import is_daily_schedule_type, is_one_time_schedule_type
-    
+
     query = session.query(Schedule).filter_by(user_id=user_id)
     if active_only:
         query = query.filter_by(is_active=True)
-    
+
     # Filter by schedule type
     if schedule_type == "one_time":
         all_schedules = query.all()
@@ -190,10 +182,10 @@ def deactivate_user_schedules_by_type(
         schedules = [sched for sched in all_schedules if is_daily_schedule_type(sched.schedule_type)]
     else:
         schedules = []
-    
+
     if not schedules:
         return 0
-    
+
     for schedule in schedules:
         schedule.is_active = False
         session.add(schedule)

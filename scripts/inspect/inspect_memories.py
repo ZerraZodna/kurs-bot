@@ -4,6 +4,7 @@
 Usage: python scripts/inspect/inspect_memories.py [USER_ID]
 If USER_ID is omitted, defaults to 7.
 """
+
 import json
 import sys
 
@@ -39,10 +40,15 @@ def main():
     init_db()
     mm = MemoryManager()
 
-    q = mm.db.query(Memory).filter(
-        Memory.user_id == user_id,
-        Memory.is_active == True,
-    ).order_by(Memory.created_at)
+    q = (
+        mm.db
+        .query(Memory)
+        .filter(
+            Memory.user_id == user_id,
+            Memory.is_active == True,
+        )
+        .order_by(Memory.created_at)
+    )
 
     rows = q.all()
     lesson_memories = [as_dict(r) for r in rows if is_lesson_memory(r)]

@@ -1,4 +1,5 @@
 """Add conversation context columns to MessageLog"""
+
 import sqlalchemy as sa
 from alembic import op
 

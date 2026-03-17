@@ -5,6 +5,7 @@ Revises: add_memory_embeddings
 Create Date: 2026-02-04 12:00:00.000000
 
 """
+
 import sqlalchemy as sa
 from alembic import op
 

@@ -1,5 +1,4 @@
-"""Schedule query detection and response helpers.
-"""
+"""Schedule query detection and response helpers."""
 
 from __future__ import annotations
 

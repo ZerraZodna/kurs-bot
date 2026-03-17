@@ -11,10 +11,10 @@ Usage:
     # Import lessons from PDF to DB
     from src.lessons import main
     main()
-    
+
     # Or use individual components
     from src.lessons import extract_formatted_text, parse_lessons_from_text, import_to_db
-    
+
     # Lesson delivery functions
     from src.lessons import maybe_send_next_lesson, get_current_lesson, set_current_lesson
 """
@@ -54,4 +54,3 @@ __all__ = [
     "has_lesson_status",
     "set_current_lesson",
 ]
-

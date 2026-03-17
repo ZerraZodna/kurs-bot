@@ -1,4 +1,5 @@
 """PDF extraction for ACIM lessons using PyMuPDF (fitz)."""
+
 from __future__ import annotations
 
 import re
@@ -164,7 +165,7 @@ def extract_formatted_text(pdf_path: Path) -> str:
         # If previous line ends with sentence-ending punctuation, keep a
         # paragraph break. If next line starts lowercase, treat as a
         # continuation and use a single newline.
-        if re.search(r'[\.\!\?\:\;\"\)\]]$', prev_last):
+        if re.search(r"[\.\!\?\:\;\"\)\]]$", prev_last):
             sep = "\n\n"
         elif re.match(r"^[a-z]", next_first):
             sep = "\n"
@@ -231,8 +232,8 @@ def extract_formatted_text(pdf_path: Path) -> str:
 
         # Lookahead to decide paragraph break
         next_line = lines[i + 1].strip() if i + 1 < len(lines) else ""
-        ends_sentence = bool(re.search(r'[\.\!\?\:\;\"\)\]]$', s))
-        next_starts_cap = bool(re.match(r'^[A-Z0-9\"\(\[]', next_line))
+        ends_sentence = bool(re.search(r"[\.\!\?\:\;\"\)\]]$", s))
+        next_starts_cap = bool(re.match(r"^[A-Z0-9\"\(\[]", next_line))
         next_len = len(next_line)
 
         # Tightened rule: only treat as paragraph break when previous
@@ -263,7 +264,7 @@ def extract_formatted_text(pdf_path: Path) -> str:
         if not p_strip:
             continue
         starts_lower = p_strip[0].islower()
-        prev_ends_sentence = bool(re.search(r'[\.\!\?\"]$', prev.strip()))
+        prev_ends_sentence = bool(re.search(r"[\.\!\?\"]$", prev.strip()))
         is_header = bool(re.match(r"(?i)^(lesson\b|lesson\s+\d|intro|introduction|part\b|workbook\b)", p_strip))
         is_quoted_para = bool(re.match(r'^[*]*[""].+[""][.!?]?[*]*$', p_strip))
         prev_is_colon_intro = prev.strip().endswith(":")
@@ -292,18 +293,17 @@ def extract_formatted_text(pdf_path: Path) -> str:
     plain_text = plain_text.replace(marker, "\n\n")
 
     # Replace bold italcs start/stop "space" bold italic with a new line break
-    # Example:  <b><em>"Nothing I see in this room [on this street,</em></b> <b><em>from this window, in this place] means anything."</em></b> Now look slowly around 
-    # Here we want a NewLine after "</em></b> " -> "</em>>/b>\n" 
-    # New:  <b><em>"Nothing I see in this room [on this street,</em></b>\n<b><em>from this window, in this place] means anything."</em></b>\nNow look slowly around 
+    # Example:  <b><em>"Nothing I see in this room [on this street,</em></b> <b><em>from this window, in this place] means anything."</em></b> Now look slowly around
+    # Here we want a NewLine after "</em></b> " -> "</em>>/b>\n"
+    # New:  <b><em>"Nothing I see in this room [on this street,</em></b>\n<b><em>from this window, in this place] means anything."</em></b>\nNow look slowly around
     plain_text = plain_text.replace("</em></b> ", "</em></b>\n")
 
     # <em>"I can escape from the world by giving </em> <em>up attack thoughts about _____."</em> Hold each attack thought in m
     # <em>"I can escape from the world by giving </em>\n<em>up attack thoughts about _____."</em>\nHold each attack thought in m
     plain_text = plain_text.replace("</em> ", "</em>\n")
-    #plain_text = plain_text.replace(':\n\n', ':\n')
+    # plain_text = plain_text.replace(':\n\n', ':\n')
 
     # PDF keystone thinks we dont need " " between ".T" -> ". T"
     plain_text = re.sub(r"\.T", ". T", plain_text)
 
     return plain_text.strip()
-

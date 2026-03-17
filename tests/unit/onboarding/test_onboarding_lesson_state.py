@@ -21,16 +21,16 @@ class TestOnboardingLessonState:
         """
         # Given: A user
         user_id = create_test_user(db_session, "test_onboarding_lesson_state", "Test")
-        
+
         mm = MemoryManager(db_session)
-        
+
         # When: Onboarding sets current lesson using set_current_lesson (stores on user.lesson)
         set_current_lesson(mm, user_id, 8)
-        
+
         # Then: get_current_lesson should return the stored value from user model
         cur = get_current_lesson(mm, user_id)
         assert str(cur) == "8" or cur == 8
-        
+
         # And: get_lesson_state should reflect current_lesson = 8
         state = get_lesson_state(mm, user_id)
         assert state.get("current_lesson") == "8" or state.get("current_lesson") == 8

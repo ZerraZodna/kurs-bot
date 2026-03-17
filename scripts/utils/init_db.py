@@ -6,6 +6,7 @@ Usage:
 If `--db` is not provided, the script will try to read `DATABASE_URL` from
 the repository `.env` file or the environment.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -70,6 +71,7 @@ def _ensure_repo_root_on_path() -> None:
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
 
+
 def init_db(database_url: str, yes: bool = False, lessons: Optional[str] = None) -> None:
     """Initialize the specified database and seed defaults."""
     # Export DATABASE_URL for downstream imports
@@ -81,12 +83,6 @@ def init_db(database_url: str, yes: bool = False, lessons: Optional[str] = None)
         sys.path.insert(0, str(repo_root))
 
     from src.models.database import Base, engine
-
-    db_path_info = None
-    if database_url.startswith("sqlite"):
-        # Try to extract file path
-        if database_url.startswith("sqlite:///"):
-            db_path_info = Path(database_url.replace("sqlite:///", ""))
 
     print("🗄️  Creating database schema...")
     Base.metadata.drop_all(bind=engine)
@@ -101,6 +97,7 @@ def init_db(database_url: str, yes: bool = False, lessons: Optional[str] = None)
     try:
         print("\n✨ Seeding default prompt templates...")
         from scripts.utils.seed_prompt_templates import seed as _seed_prompts
+
         _seed_prompts()
         print("✅ Prompt templates seeded")
     except Exception as e:
@@ -116,6 +113,7 @@ def init_db(database_url: str, yes: bool = False, lessons: Optional[str] = None)
             else:
                 print(f"\n==> Importing ACIM lessons from {pdf_path}")
                 from src.lessons import main as import_main
+
                 import_main(["--pdf", str(pdf_path)])
 
     except Exception as e:

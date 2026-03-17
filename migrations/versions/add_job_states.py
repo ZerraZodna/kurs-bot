@@ -5,6 +5,7 @@ Revises: add_gdpr_verifications
 Create Date: 2026-02-05 12:00:00.000000
 
 """
+
 import sqlalchemy as sa
 from alembic import op
 

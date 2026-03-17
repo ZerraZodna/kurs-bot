@@ -11,15 +11,14 @@ except Exception:
     MemoryKey = None  # type: ignore[misc]
 
 
-
 class ConversationContextBuilder:
     """Helpers for building multi-turn conversation context."""
-    
+
     @staticmethod
     def format_conversation_turn(user_msg: str, assistant_msg: str) -> str:
         """Format a single conversation exchange."""
         return f"User: {user_msg}\n\nAssistant: {assistant_msg}"
-    
+
 
 class ContextOptimizer:
     """Utility helpers for estimating tokens and preparing context text for prompts.
@@ -71,4 +70,3 @@ class ContextOptimizer:
             value = m.get("value", "")
             lines.append(f"{value}")
         return "\n".join(lines)
-

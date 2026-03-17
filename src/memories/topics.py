@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 
 class MemoryTopic(str, Enum):
     """Top-level memory topics."""
+
     IDENTITY = "identity"
     PREFERENCES = "preferences"
 
@@ -32,12 +33,10 @@ CANONICAL_KEY_MAP: Dict[str, tuple[MemoryTopic, str]] = {
     "birth_date": (MemoryTopic.IDENTITY, "birth_date"),
     "personal_background": (MemoryTopic.IDENTITY, "background"),
     "background": (MemoryTopic.IDENTITY, "background"),
-        
     # Preferences topic
     "preferred_lesson_time": (MemoryTopic.PREFERENCES, "preferred_lesson_time"),
     "lesson_time": (MemoryTopic.PREFERENCES, "preferred_lesson_time"),
     "reminder_time": (MemoryTopic.PREFERENCES, "preferred_lesson_time"),
-        
     "learning_style": (MemoryTopic.PREFERENCES, "learning_style"),
     "preferred_tone": (MemoryTopic.PREFERENCES, "preferred_tone"),
     "tone": (MemoryTopic.PREFERENCES, "preferred_tone"),
@@ -50,11 +49,12 @@ CANONICAL_KEY_MAP: Dict[str, tuple[MemoryTopic, str]] = {
 @dataclass
 class TopicFieldValue:
     """A single value within a topic field with metadata."""
+
     value: Any
     source: str
     updated_at: datetime
     original_key: str  # The key used when storing (e.g., "first_name" or "name")
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "value": self.value,
@@ -67,10 +67,11 @@ class TopicFieldValue:
 @dataclass
 class TopicField:
     """A field within a topic, containing current value and history."""
+
     canonical_name: str
     current: TopicFieldValue
     history: List[TopicFieldValue] = field(default_factory=list)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "value": self.current.value,
@@ -84,29 +85,21 @@ class TopicField:
 @dataclass
 class TopicData:
     """Complete data for a topic with all its fields."""
+
     topic: MemoryTopic
     fields: Dict[str, TopicField] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "topic": self.topic.value,
-            "fields": {
-                name: field.to_dict() 
-                for name, field in self.fields.items()
-            }
-        }
-        
+        return {"topic": self.topic.value, "fields": {name: field.to_dict() for name, field in self.fields.items()}}
+
     def get_all_fields(self) -> Dict[str, Any]:
         """Get all field values as a simple dict for easy iteration."""
-        return {
-            name: field.current.value 
-            for name, field in self.fields.items()
-        }
+        return {name: field.current.value for name, field in self.fields.items()}
 
 
 def resolve_canonical_key(key: str) -> Optional[tuple[MemoryTopic, str]]:
     """Resolve any key synonym to its canonical (topic, field) tuple.
-    
+
     Returns None if key is not recognized.
     """
     key_lower = key.lower().strip()

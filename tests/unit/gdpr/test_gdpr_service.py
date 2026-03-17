@@ -2,6 +2,7 @@
 Migrated tests for GDPR service.
  migrated from tests/test_gdpr.py
 """
+
 import datetime
 
 from src.models.database import (
@@ -85,6 +86,7 @@ def _create_schedule(session, user_id: int):
     session.commit()
     return schedule
 
+
 def test_gdpr_export_restrict_rectify_erase(db_session):
     """Given: A user with memories, messages, schedules, and unsubscribes
     When: GDPR operations are performed (export, restrict, rectify, erase)
@@ -165,7 +167,7 @@ def test_gdpr_retention_purges_ttl_memories(db_session):
 
     # When: Purging expired TTL memories
     deleted = purge_expired_ttl_memories(session=db_session)
-    
+
     # Then: Memory should be deleted
     assert deleted == 1
     assert db_session.query(Memory).filter_by(user_id=user.user_id).count() == 0
@@ -196,4 +198,3 @@ def test_gdpr_object_and_withdraw_consent(db_session):
     refreshed = db_session.query(User).filter_by(user_id=user.user_id).first()
     assert refreshed.processing_restricted is True
     assert refreshed.opted_in is False
-

@@ -29,9 +29,7 @@ def init_scheduler() -> BackgroundScheduler:
         return _scheduler
 
     # Configure job store (stores jobs in database)
-    jobstores = {
-        "default": SQLAlchemyJobStore(url=settings.DATABASE_URL, tablename="apscheduler_jobs")
-    }
+    jobstores = {"default": SQLAlchemyJobStore(url=settings.DATABASE_URL, tablename="apscheduler_jobs")}
 
     # Create scheduler
     _scheduler = BackgroundScheduler(
