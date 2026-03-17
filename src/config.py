@@ -25,9 +25,6 @@ class Settings(BaseSettings):
     SEMANTIC_SEARCH_MAX_RESULTS: int = 5
     # Set to False in CI/.env.template to enable lightweight test-mode embeddings.
     TEST_USE_REAL_OLLAMA: bool = True
-    # Trigger matcher defaults
-    TRIGGER_SIMILARITY_THRESHOLD: float = 0.75
-    TRIGGER_MATCHER_REFRESH_SECS: int = 300
     # Marks execution as test context; lets code avoid prod DB, real services
     IS_TEST_ENV: bool = False
     GDPR_ADMIN_TOKEN: str = ""

@@ -16,9 +16,6 @@ jobs:
       TEST_USE_REAL_OLLAMA: '0'
       # Mark CI as test environment so background threads stay off and test DB is enforced
       IS_TEST_ENV: '1'
-      # Function calling migration complete - no trigger embeddings needed
-      FUNCTION_CALLING_ENABLED: 'true'
-    
 
     steps:
       - uses: actions/checkout@v4
