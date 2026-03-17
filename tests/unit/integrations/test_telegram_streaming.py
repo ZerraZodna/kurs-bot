@@ -6,8 +6,9 @@ The streaming feature sends LLM responses to users in real-time by:
 2. Progressively editing the message as tokens arrive
 3. Running post-hook (function calling) after streaming completes
 """
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 
 async def mock_token_generator(tokens: list[str]):
@@ -27,8 +28,8 @@ async def test_send_message_streaming_sends_initial_message():
     from src.integrations.telegram import send_message_streaming
     
     # Mock the send_message function
-    with patch('src.integrations.telegram.send_message') as mock_send:
-        with patch('src.integrations.telegram.edit_message') as mock_edit:
+    with patch("src.integrations.telegram.send_message") as mock_send:
+        with patch("src.integrations.telegram.edit_message") as mock_edit:
             mock_send.return_value = {"ok": True, "result": {"message_id": 123}}
             
             # Create a token generator that yields a few tokens
@@ -56,8 +57,8 @@ async def test_send_message_streaming_returns_full_text():
     """
     from src.integrations.telegram import send_message_streaming
     
-    with patch('src.integrations.telegram.send_message') as mock_send:
-        with patch('src.integrations.telegram.edit_message') as mock_edit:
+    with patch("src.integrations.telegram.send_message") as mock_send:
+        with patch("src.integrations.telegram.edit_message") as mock_edit:
             mock_send.return_value = {"ok": True, "result": {"message_id": 123}}
             
             tokens = ["This ", "is ", "a ", "test ", "message", "."]
@@ -80,8 +81,8 @@ async def test_send_message_streaming_edits_message_progressive():
     """
     from src.integrations.telegram import send_message_streaming
     
-    with patch('src.integrations.telegram.send_message') as mock_send:
-        with patch('src.integrations.telegram.edit_message') as mock_edit:
+    with patch("src.integrations.telegram.send_message") as mock_send:
+        with patch("src.integrations.telegram.edit_message") as mock_edit:
             mock_send.return_value = {"ok": True, "result": {"message_id": 123}}
             
             # Use a small interval so we get multiple edits
@@ -106,8 +107,8 @@ async def test_send_message_streaming_with_empty_generator():
     """
     from src.integrations.telegram import send_message_streaming
     
-    with patch('src.integrations.telegram.send_message') as mock_send:
-        with patch('src.integrations.telegram.edit_message') as mock_edit:
+    with patch("src.integrations.telegram.send_message") as mock_send:
+        with patch("src.integrations.telegram.edit_message") as mock_edit:
             # Empty generator
             generator = mock_token_generator([])
             
@@ -135,8 +136,9 @@ async def test_process_telegram_batch_uses_streaming():
     # The key test is that send_message_streaming exists and is imported
     # The actual integration is tested via the implementation in process_telegram_batch
     
-    from src.integrations.telegram import send_message_streaming
     import inspect
+
+    from src.integrations.telegram import send_message_streaming
     
     # Verify send_message_streaming is a proper async function
     assert inspect.iscoroutinefunction(send_message_streaming)
@@ -144,9 +146,9 @@ async def test_process_telegram_batch_uses_streaming():
     # Verify it has the right signature
     sig = inspect.signature(send_message_streaming)
     params = list(sig.parameters.keys())
-    assert 'chat_id' in params
-    assert 'token_generator' in params
-    assert 'min_update_interval' in params
+    assert "chat_id" in params
+    assert "token_generator" in params
+    assert "min_update_interval" in params
     
     # Verify it returns a tuple with (str, Optional[int])
     # We can't check the return annotation easily, but we verified it's async
@@ -162,8 +164,8 @@ async def test_streaming_respects_min_update_interval():
     """
     from src.integrations.telegram import send_message_streaming
     
-    with patch('src.integrations.telegram.send_message') as mock_send:
-        with patch('src.integrations.telegram.edit_message') as mock_edit:
+    with patch("src.integrations.telegram.send_message") as mock_send:
+        with patch("src.integrations.telegram.edit_message") as mock_edit:
             mock_send.return_value = {"ok": True, "result": {"message_id": 123}}
             
             # Create generator with many small tokens

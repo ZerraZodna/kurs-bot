@@ -1,14 +1,15 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
-from src.models.base import Base
+
 from src.core.clock import utc_now
+from src.models.base import Base
 
 
 class Memory(Base):
-    __tablename__ = 'memories'
+    __tablename__ = "memories"
 
     memory_id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
     category = Column(String(64), nullable=False)
     key = Column(String(128), nullable=False)
     value = Column(Text, nullable=False)  # JSON-friendly
@@ -22,4 +23,4 @@ class Memory(Base):
     archived_at = Column(DateTime(timezone=True))
 
     # Relationships
-    user = relationship('User', back_populates='memories')
+    user = relationship("User", back_populates="memories")

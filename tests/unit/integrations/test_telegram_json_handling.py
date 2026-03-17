@@ -1,9 +1,10 @@
 """
 Test to verify what gets passed to send_message when AI returns JSON.
 """
-import pytest
-from unittest.mock import AsyncMock
 import asyncio
+from unittest.mock import AsyncMock
+
+import pytest
 
 
 async def mock_generator(tokens):
@@ -17,12 +18,12 @@ def test_json_response_extraction():
     from src.functions.intent_parser import get_intent_parser
     
     # Simulate the AI response with JSON
-    ai_json_response = '''{
+    ai_json_response = """{
   "response": "Today's lesson is a time for reflection and inner peace.",
   "functions": [
     {"name": "send_todays_lesson", "parameters": {}}
   ]
-}'''
+}"""
     
     # The extract_text function from dialogue_engine
     def extract_response_text(full_response_text: str) -> str:
@@ -54,12 +55,12 @@ def test_empty_response_with_function():
     from src.functions.intent_parser import get_intent_parser
     
     # Simulate AI response with empty response and only function call
-    ai_json_response = '''{
+    ai_json_response = """{
   "response": "",
   "functions": [
     {"name": "send_todays_lesson", "parameters": {}}
   ]
-}'''
+}"""
     
     def extract_response_text(full_response_text: str) -> str:
         parser = get_intent_parser()
@@ -90,7 +91,7 @@ async def test_telegram_batch_with_json_response():
     from src.functions.intent_parser import get_intent_parser
     
     # Simulate accumulated full response from streaming
-    full_response = '''{"response": "Today's lesson is a time for reflection", "functions": [{"name": "send_todays_lesson", "parameters": {}}]}'''
+    full_response = """{"response": "Today's lesson is a time for reflection", "functions": [{"name": "send_todays_lesson", "parameters": {}}]}"""
     
     # The extract_text function from dialogue_engine (fixed version)
     def extract_response_text(full_response_text: str) -> str:
@@ -124,11 +125,11 @@ async def test_telegram_batch_with_empty_response():
     mock_result = {
         "type": "stream",
         "generator": mock_generator([
-            '{',
+            "{",
             '"response": "",',
             '"functions": [',
             '{"name": "send_todays_lesson", "parameters": {}}',
-            ']}'
+            "]}"
         ]),
         "post_hook": AsyncMock(),
         "extract_text": lambda text: ""  # Empty response

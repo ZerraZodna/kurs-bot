@@ -1,15 +1,16 @@
-from fastapi import APIRouter
-from pydantic import BaseModel
-from typing import Optional
+import getpass
+import logging
 import os
 import socket
-import getpass
+from typing import Optional
 
+from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+
+from src.integrations.telegram_stream import StreamingFilter
 from src.models.database import SessionLocal, User
 from src.services.dialogue_engine import DialogueEngine
-import logging
-from fastapi.responses import StreamingResponse
-from src.integrations.telegram_stream import StreamingFilter
 
 router = APIRouter(prefix="/dev")
 

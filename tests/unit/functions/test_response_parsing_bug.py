@@ -2,8 +2,10 @@
 Test to confirm the bug where full JSON response with function calls
 is sent to Telegram instead of just the response text.
 """
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
 from src.functions.intent_parser import IntentParser
 
 
@@ -16,12 +18,12 @@ class TestResponseParsingBug:
         
         # Simulate an LLM response with both text and function calls
         # Using a valid registered function name
-        llm_response = '''{
+        llm_response = """{
   "response": "Your goal, Dev, is to remember that your thoughts are images you've made, and to begin seeing beyond illusions.",
   "functions": [
     {"name": "extract_memory", "parameters": {"key": "learninggoal", "value": "Spiritual growth through ACIM lessons"}}
   ]
-}'''
+}"""
         
         result = parser.parse(llm_response)
         
@@ -37,12 +39,12 @@ class TestResponseParsingBug:
         """Demonstrate the bug: raw response contains JSON, parsed response contains only text."""
         parser = IntentParser()
         
-        raw_response = '''{
+        raw_response = """{
   "response": "Hello, how can I help you?",
   "functions": [
     {"name": "set_timezone", "parameters": {"timezone": "UTC"}}
   ]
-}'''
+}"""
         
         result = parser.parse(raw_response)
         
@@ -69,12 +71,12 @@ class TestResponseParsingBug:
         # 2. executor parses/executes it correctly
         # 3. But the method returns the raw JSON string, not "Hello"
         
-        raw_llm_response = '''{
+        raw_llm_response = """{
   "response": "Your goal is spiritual growth.",
   "functions": [
     {"name": "extract_memory", "parameters": {"key": "goal", "value": "spiritual growth"}}
   ]
-}'''
+}"""
         
         parser = IntentParser()
         parsed = parser.parse(raw_llm_response)
@@ -115,12 +117,12 @@ class TestDesiredBehavior:
         mock_session.query.return_value.filter_by.return_value.first.return_value = mock_user
         
         # Mock the LLM response with function calls
-        raw_llm_response = '''{
+        raw_llm_response = """{
   "response": "Your goal, Dev, is spiritual growth.",
   "functions": [
     {"name": "extract_memory", "parameters": {"key": "learninggoal", "value": "Spiritual growth through ACIM lessons"}}
   ]
-}'''
+}"""
         
         # The expected response that should be sent to Telegram
         expected_response = "Your goal, Dev, is spiritual growth."

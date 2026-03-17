@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import re
 
-
 EMAIL_RE = re.compile(r"([a-zA-Z0-9_.+-]+)@([a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)")
 PHONE_RE = re.compile(r"(\+?\d[\d\s\-()]{6,}\d)")
 TOKEN_RE = re.compile(r"(Bearer\s+)?[A-Za-z0-9_\-]{20,}")

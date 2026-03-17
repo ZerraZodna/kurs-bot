@@ -9,25 +9,25 @@ async def consume_stream_response(response):
     3. response_builder.build to combine stream text + function results
     4. Return final combined text matching production Telegram behavior.
     """
-    if not isinstance(response, dict) or response.get('type') != 'stream':
+    if not isinstance(response, dict) or response.get("type") != "stream":
         return str(response), None
     
-    from src.integrations.telegram_stream import StreamingFilter
     from src.functions.intent_parser import get_intent_parser
     from src.functions.response_builder import get_response_builder
+    from src.integrations.telegram_stream import StreamingFilter
     
     # Step 1: Simulate StreamingFilter processing (production telegram.py)
-    raw_generator = response['generator']
+    raw_generator = response["generator"]
     stream_filter = StreamingFilter(raw_generator)
     filtered_generator = stream_filter.filter_stream()
     
     # Step 2: Consume filtered stream (what Telegram displays)
-    stream_text = ''
+    stream_text = ""
     async for chunk in filtered_generator:
         stream_text += chunk
     
     # Step 3: Run post_hook with full stream text (production)
-    diagnostics = await response['post_hook'](stream_text)
+    diagnostics = await response["post_hook"](stream_text)
     
     # Step 4: Get remaining JSON/functions content (production)
     remaining_json = stream_filter.get_remaining_for_functions()

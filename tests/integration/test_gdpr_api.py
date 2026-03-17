@@ -10,11 +10,11 @@ from fastapi.testclient import TestClient
 from src.api.app import app
 from src.config import settings
 from src.models.database import (
-    User,
     Memory,
     MessageLog,
     Schedule,
     Unsubscribe,
+    User,
 )
 from src.services.gdpr_service import record_consent
 
@@ -22,8 +22,9 @@ from src.services.gdpr_service import record_consent
 @pytest.fixture
 def client(db_engine):
     """Create a test client for the API with test DB dependency override."""
-    from src.api.gdpr_routes import get_db
     from sqlalchemy.orm import sessionmaker
+
+    from src.api.gdpr_routes import get_db
     TestSessionLocal = sessionmaker(bind=db_engine, autoflush=False, autocommit=False, future=True)
     def override_get_db():
         db = TestSessionLocal()

@@ -1,11 +1,11 @@
 """Ollama client mocking utilities."""
 
+import json
 import os
 import sys
 import types
-import json
 from typing import Optional
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 
 def _env_is_truthy(name: str) -> bool:

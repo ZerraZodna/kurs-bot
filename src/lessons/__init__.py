@@ -20,14 +20,13 @@ Usage:
 """
 
 # PDF import functions
-from .pdf_extractor import extract_formatted_text
-from .lesson_parser import parse_lessons_from_text
-from .db_importer import import_to_db, verify_db_count
-
 # Lesson delivery/progression functions (restored from original exports)
 from .advance import is_simple_greeting, maybe_send_next_lesson
+from .db_importer import import_to_db, verify_db_count
 from .handler import format_lesson_message, translate_text
 from .importer import ensure_lessons_available
+from .lesson_parser import parse_lessons_from_text
+from .pdf_extractor import extract_formatted_text
 from .state import (
     compute_current_lesson_state,
     get_current_lesson,
@@ -36,24 +35,23 @@ from .state import (
     set_current_lesson,
 )
 
-
 __all__ = [
     # PDF import functions
-    'extract_formatted_text',
-    'parse_lessons_from_text',
-    'import_to_db',
-    'verify_db_count',
+    "extract_formatted_text",
+    "parse_lessons_from_text",
+    "import_to_db",
+    "verify_db_count",
     # CLI entry points
     # Lesson delivery/progression functions
-    'is_simple_greeting',
-    'maybe_send_next_lesson',
-    'format_lesson_message',
-    'translate_text',
-    'ensure_lessons_available',
-    'compute_current_lesson_state',
-    'get_current_lesson',
-    'get_lesson_state',
-    'has_lesson_status',
-    'set_current_lesson',
+    "is_simple_greeting",
+    "maybe_send_next_lesson",
+    "format_lesson_message",
+    "translate_text",
+    "ensure_lessons_available",
+    "compute_current_lesson_state",
+    "get_current_lesson",
+    "get_lesson_state",
+    "has_lesson_status",
+    "set_current_lesson",
 ]
 

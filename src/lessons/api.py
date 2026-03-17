@@ -6,26 +6,34 @@ lesson modules.
 """
 
 import logging
-from typing import Optional, Dict, Any
 from datetime import date
+from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
 
-from src.models.database import Lesson
-from src.memories.manager import MemoryManager
+from src.lessons.advance import maybe_send_next_lesson as _maybe_send_next_lesson
+from src.lessons.handler import (
+    _find_lesson_by_id as _find_lesson,
+)
+from src.lessons.handler import (
+    format_lesson_message as _format_lesson_message,
+)
+from src.lessons.state import (
+    compute_current_lesson_state as _compute_current_lesson_state,
+)
 
 # Import from internal modules
 from src.lessons.state import (
     get_current_lesson as _get_current_lesson,
-    set_current_lesson as _set_current_lesson,
+)
+from src.lessons.state import (
     has_lesson_status as _has_lesson_status,
-    compute_current_lesson_state as _compute_current_lesson_state,
 )
-from src.lessons.handler import (
-    format_lesson_message as _format_lesson_message,
-    _find_lesson_by_id as _find_lesson,
+from src.lessons.state import (
+    set_current_lesson as _set_current_lesson,
 )
-from src.lessons.advance import maybe_send_next_lesson as _maybe_send_next_lesson
+from src.memories.manager import MemoryManager
+from src.models.database import Lesson
 
 logger = logging.getLogger(__name__)
 

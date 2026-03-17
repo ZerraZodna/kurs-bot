@@ -6,8 +6,9 @@ This module provides helper functions for memory extraction.
 from __future__ import annotations
 
 import re
-from src.memories.manager import MemoryManager
+
 from src.memories.constants import MemoryKey
+from src.memories.manager import MemoryManager
 
 
 def _normalize_lesson_completed_value(value) -> str | None:

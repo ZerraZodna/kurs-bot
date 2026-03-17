@@ -5,8 +5,8 @@ This test verifies that when send_todays_lesson function is called,
 the response builder correctly formats the full lesson content.
 """
 
+from src.functions.executor import BatchExecutionResult, ExecutionResult
 from src.functions.response_builder import ResponseBuilder
-from src.functions.executor import ExecutionResult, BatchExecutionResult
 
 
 def test_send_todays_lesson_includes_full_content():

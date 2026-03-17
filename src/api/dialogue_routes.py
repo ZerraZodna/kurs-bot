@@ -2,15 +2,25 @@
 API routes for context-aware dialogue endpoints
 """
 import logging
-from fastapi import APIRouter, Depends, HTTPException
 from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+
+from src.api.schemas import (
+    LessonResponse,
+    MemoryRequest,
+    MemoryWithScore,
+    MessageRequest,
+    SemanticSearchRequest,
+    SemanticSearchResponse,
+    UserContextResponse,
+)
 from src.lessons.state import get_current_lesson
-from src.models.database import SessionLocal, User
-from src.services.dialogue_engine import DialogueEngine
 from src.memories import MemoryManager
 from src.memories.constants import MemoryKey
-from src.api.schemas import MessageRequest, MemoryRequest, UserContextResponse, LessonResponse, SemanticSearchRequest, SemanticSearchResponse, MemoryWithScore
+from src.models.database import SessionLocal, User
+from src.services.dialogue_engine import DialogueEngine
 
 router = APIRouter(prefix="/api/v1/dialogue", tags=["dialogue"])
 

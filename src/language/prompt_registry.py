@@ -8,11 +8,11 @@ Prototype implementation:
 """
 import logging
 from typing import Optional
-from src.models.database import PromptTemplate
+
+from src.config import settings
 from src.memories import MemoryManager
 from src.memories.constants import MemoryKey
-from src.models.database import SessionLocal
-from src.config import settings
+from src.models.database import PromptTemplate, SessionLocal
 
 logger = logging.getLogger(__name__)
 

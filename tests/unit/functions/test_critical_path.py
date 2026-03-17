@@ -3,16 +3,18 @@ Critical path tests for function calling infrastructure.
 Tests key functions without requiring full database setup.
 """
 
-import pytest
 import json
 from datetime import datetime
 from unittest.mock import Mock, patch
 
-# Import the modules we're testing
-from src.functions.registry import FunctionRegistry, get_function_registry
+import pytest
+
+from src.functions.executor import BatchExecutionResult, ExecutionResult, FunctionExecutor
 from src.functions.intent_parser import IntentParser, get_intent_parser
 from src.functions.parameters import ParameterValidator
-from src.functions.executor import FunctionExecutor, ExecutionResult, BatchExecutionResult
+
+# Import the modules we're testing
+from src.functions.registry import FunctionRegistry, get_function_registry
 from src.functions.response_builder import ResponseBuilder
 
 
@@ -274,8 +276,8 @@ class TestFunctionExecutor:
         executor._handlers["test_function"] = mock_handler
         
         # Register the function in registry
-        with patch.object(executor.registry, 'is_valid_function', return_value=True):
-            with patch.object(executor.registry, 'validate_call', return_value=(True, [])):
+        with patch.object(executor.registry, "is_valid_function", return_value=True):
+            with patch.object(executor.registry, "validate_call", return_value=(True, [])):
                 result = await executor.execute_single(
                     function_name="test_function",
                     parameters={"param1": "value1"},
@@ -306,8 +308,8 @@ class TestFunctionExecutor:
             {"name": "error_func", "parameters": {}},
         ]
         
-        with patch.object(executor.registry, 'is_valid_function', return_value=True):
-            with patch.object(executor.registry, 'validate_call', return_value=(True, [])):
+        with patch.object(executor.registry, "is_valid_function", return_value=True):
+            with patch.object(executor.registry, "validate_call", return_value=(True, [])):
                 result = await executor.execute_all(functions, context={"user_id": 123})
         
         assert len(result.results) == 2

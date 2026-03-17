@@ -6,20 +6,18 @@ from typing import Any, Dict, List, Optional, cast
 
 from sqlalchemy.orm import Session
 
+from src.core.timezone import utc_now as _utc_now
 from src.memories.memory_handler import MemoryHandler
 from src.memories.user_data_service import delete_user_content_rows
 from src.models.database import (
-    User,
+    ConsentLog,
+    GdprAuditLog,
+    GdprRequest,
     MessageLog,
     Schedule,
     Unsubscribe,
-    ConsentLog,
-    GdprRequest,
-    GdprAuditLog,
+    User,
 )
-
-
-from src.core.timezone import utc_now as _utc_now
 
 
 def _hash_value(value: str) -> str:

@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 from src.core.timezone import to_utc, utc_now
-from src.models.database import SessionLocal, JobState, init_db
+from src.models.database import JobState, SessionLocal, init_db
 
 
 def get_state(key: str) -> Optional[str]:

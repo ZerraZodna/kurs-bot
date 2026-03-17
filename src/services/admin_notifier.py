@@ -4,9 +4,10 @@ import asyncio
 import logging
 from typing import Optional
 
+import httpx
+
 from src.config import settings
 from src.integrations.telegram import send_message
-import httpx
 from src.scheduler.job_state import get_state, set_state
 
 logger = logging.getLogger(__name__)

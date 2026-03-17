@@ -2,9 +2,11 @@
 
 import asyncio
 import logging
+
 from sqlalchemy.orm import Session
 
 from src.config import settings
+
 # Use dynamic lookup for send_message so tests can monkeypatch the package symbol
 from src.models.database import MessageLog, User
 from src.services.traffic_tracker import record_traffic_event

@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import List, Optional
 
 from src.core.clock import utc_now
-from src.models.database import SessionLocal, Lesson
+from src.models.database import Lesson, SessionLocal
 
 
 def import_to_db(
@@ -35,9 +35,9 @@ def import_to_db(
                 continue
             lesson = Lesson(
                 lesson_id=lid,
-                title=(title or '')[:128],
+                title=(title or "")[:128],
                 content=content,
-                difficulty_level='beginner',
+                difficulty_level="beginner",
                 duration_minutes=15,
                 created_at=utc_now(),
             )

@@ -8,14 +8,12 @@ These tests verify that:
 """
 
 import pytest
+from tests.fixtures.users import create_test_user
 
 from src.memories import MemoryManager
-from src.onboarding import OnboardingService
-from src.onboarding import schedule_setup
-from src.models.database import User, Schedule
+from src.models.database import Schedule, User
+from src.onboarding import OnboardingService, schedule_setup
 from src.scheduler.domain import SCHEDULE_TYPE_DAILY
-
-from tests.fixtures.users import create_test_user
 
 
 class TestOnboardingTimezoneHandling:
@@ -212,8 +210,8 @@ class TestEnsureUserTimezoneBug:
         from src.scheduler.time_utils import compute_next_send_and_cron
         next_send_utc, cron = compute_next_send_and_cron("07:30", "Europe/Oslo")
         
-        from src.scheduler.domain import SCHEDULE_TYPE_DAILY
         from src.scheduler import manager as schedule_manager
+        from src.scheduler.domain import SCHEDULE_TYPE_DAILY
         schedule = schedule_manager.create_schedule(
             user_id=user_id,
             lesson_id=1,

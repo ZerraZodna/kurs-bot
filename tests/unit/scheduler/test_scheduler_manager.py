@@ -4,6 +4,7 @@ Refactored to use new test fixtures from tests/fixtures/
 """
 
 import datetime
+
 from sqlalchemy.orm import Session
 
 from src.models.database import Schedule

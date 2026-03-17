@@ -1,18 +1,22 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 import time
 from datetime import timedelta
+from typing import Optional
+
 from sqlalchemy.orm import Session
-from src.models.database import SessionLocal, MessageLog, get_session
-from src.memories.memory_handler import MemoryHandler
-from src.scheduler.maintenance import (
-    purge_inactive_schedules as _scheduler_purge_inactive_schedules,
-    purge_job_states as _scheduler_purge_job_states,
-)
+
 from src.config import settings
 from src.core.timezone import utc_now
+from src.memories.memory_handler import MemoryHandler
+from src.models.database import MessageLog, SessionLocal, get_session
+from src.scheduler.maintenance import (
+    purge_inactive_schedules as _scheduler_purge_inactive_schedules,
+)
+from src.scheduler.maintenance import (
+    purge_job_states as _scheduler_purge_job_states,
+)
 
 logger = logging.getLogger(__name__)
 

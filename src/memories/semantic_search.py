@@ -6,10 +6,12 @@ Performs keyword-based search on user memories with recency/relevance scoring.
 
 import logging
 from typing import List, Optional, Tuple
+
 from sqlalchemy.orm import Session
+
+from src.config import settings
 from src.memories.memory_handler import MemoryHandler
 from src.memories.types import MemoryEntity
-from src.config import settings
 
 logger = logging.getLogger(__name__)
 

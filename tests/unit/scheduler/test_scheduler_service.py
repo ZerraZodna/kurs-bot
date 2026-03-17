@@ -2,14 +2,15 @@
 Migrated tests for SchedulerService.
  migrated from tests/test_scheduler_service.py
 """
+from datetime import datetime, timedelta, timezone
+
 import pytest
-from datetime import datetime, timezone, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.lessons.state import set_current_lesson
-from src.models.database import Base, User, Lesson, Schedule, MessageLog
 from src import scheduler as scheduler_module
+from src.lessons.state import set_current_lesson
+from src.models.database import Base, Lesson, MessageLog, Schedule, User
 
 
 @pytest.fixture(scope="function")
@@ -102,8 +103,8 @@ class TestSchedulerService:
         db_session.commit()
 
         # Given: Last sent lesson is 1
+        from src.lessons.state import compute_current_lesson_state, get_current_lesson
         from src.memories import MemoryManager
-        from src.lessons.state import get_current_lesson, compute_current_lesson_state
 
         mm = MemoryManager(db_session)
         set_current_lesson(mm, user.user_id, 1)

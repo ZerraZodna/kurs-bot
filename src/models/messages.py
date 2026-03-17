@@ -1,14 +1,15 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
-from src.models.base import Base
+
 from src.core.clock import utc_now
+from src.models.base import Base
 
 
 class MessageLog(Base):
-    __tablename__ = 'message_logs'
+    __tablename__ = "message_logs"
 
     message_id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
     direction = Column(String(16), nullable=False)  # inbound|outbound
     channel = Column(String(32), nullable=False)
     external_message_id = Column(String(128))
@@ -21,4 +22,4 @@ class MessageLog(Base):
     processed_at = Column(DateTime(timezone=True))
 
     # Relationships
-    user = relationship('User', back_populates='message_logs')
+    user = relationship("User", back_populates="message_logs")

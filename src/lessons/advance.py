@@ -5,15 +5,14 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from src.core.timezone import utc_now
+from src.lessons.state import compute_current_lesson_state
 from src.memories.constants import MemoryCategory, MemoryKey
+from src.memories.dialogue_helpers import get_user_language
 from src.models.database import Lesson
 from src.models.user import User
-from src.lessons.state import compute_current_lesson_state
-
-from src.core.timezone import utc_now
 
 from .handler import format_lesson_message, translate_text
-from src.memories.dialogue_helpers import get_user_language
 
 
 def is_simple_greeting(text: str) -> bool:

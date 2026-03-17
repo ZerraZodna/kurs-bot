@@ -7,7 +7,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from src.core.timezone import utc_now
-from src.models.database import Schedule, JobState, SessionLocal, get_session
+from src.models.database import JobState, Schedule, SessionLocal, get_session
 
 logger = logging.getLogger(__name__)
 

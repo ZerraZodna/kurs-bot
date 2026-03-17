@@ -1,11 +1,11 @@
 from pathlib import Path
+
 import pytest
 
 from src.lessons.lesson_parser import (
-    parse_lessons_from_text,
     _normalize_sentence_spacing,
+    parse_lessons_from_text,
 )
-
 from src.lessons.pdf_extractor import extract_formatted_text
 
 

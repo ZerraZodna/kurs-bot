@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
 from src.core.timezone import utc_now
-from src.scheduler.job_state import get_state_json, set_state_json, set_state_datetime
+from src.scheduler.job_state import get_state_json, set_state_datetime, set_state_json
 
 logger = logging.getLogger(__name__)
 

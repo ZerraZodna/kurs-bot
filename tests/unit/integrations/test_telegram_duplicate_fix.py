@@ -9,8 +9,9 @@ The fix: Run post_hook FIRST, then decide what to send:
 - Otherwise → send only ai_response
 """
 from typing import Optional
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 
 
 async def mock_generator(tokens):
@@ -261,7 +262,7 @@ async def test_streaming_path_with_lesson_function():
     from src.functions.intent_parser import get_intent_parser
 
     # Simulate accumulated full response from streaming
-    full_response = '''{"response": "Let me get today's lesson for you.", "functions": [{"name": "send_todays_lesson", "parameters": {}}]}'''
+    full_response = """{"response": "Let me get today's lesson for you.", "functions": [{"name": "send_todays_lesson", "parameters": {}}]}"""
 
     # Extract ai_response
     parser = get_intent_parser()

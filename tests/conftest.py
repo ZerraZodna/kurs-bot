@@ -14,9 +14,7 @@ from pathlib import Path
 import pytest
 
 # Register fake modules at import time to prevent real initialization
-
 from tests.mocks.ollama_mock import register_fake_ollama
-
 
 register_fake_ollama()
 

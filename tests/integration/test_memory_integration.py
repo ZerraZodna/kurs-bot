@@ -6,13 +6,13 @@ Migrated from tests/test_integration_memory.py to use new test fixtures.
 
 import pytest
 from sqlalchemy.orm import Session
-from src.models.database import User, MessageLog
-from src.memories import MemoryManager
+from tests.fixtures.users import create_test_user
+
 from src.language.prompt_builder import PromptBuilder
 from src.language.prompt_optimizer import PromptOptimizer
-from src.services.context_utils import MemoryKey, MemoryCategory
-
-from tests.fixtures.users import create_test_user
+from src.memories import MemoryManager
+from src.models.database import MessageLog, User
+from src.services.context_utils import MemoryCategory, MemoryKey
 
 
 class TestCompleteWorkflow:

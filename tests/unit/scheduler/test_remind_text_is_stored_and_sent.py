@@ -3,13 +3,13 @@ Migrated tests for remind text storage and sending.
  migrated from tests/test_remind_text_is_stored_and_sent.py
 """
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from src.models.database import SessionLocal, Schedule
-from src.memories import MemoryManager
 from src.functions.executor import get_function_executor
+from src.memories import MemoryManager
+from src.models.database import Schedule, SessionLocal
 
 
 @pytest.mark.asyncio

@@ -4,11 +4,12 @@ This module contains functions that perform CRUD operations on the
 `Schedule` model without interacting with APScheduler. It is intended to
 be a thin, testable layer so the APScheduler wiring can live separately.
 """
-from typing import List, Optional, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from src.core.timezone import to_utc, utc_now
-from src.models.database import Session, SessionLocal, Schedule
+from src.models.database import Schedule, Session, SessionLocal
+
 from .domain import SCHEDULE_TYPE_DAILY
 
 
@@ -174,7 +175,7 @@ def deactivate_user_schedules_by_type(
     Returns:
         Number of schedules deactivated
     """
-    from .domain import is_one_time_schedule_type, is_daily_schedule_type
+    from .domain import is_daily_schedule_type, is_one_time_schedule_type
     
     query = session.query(Schedule).filter_by(user_id=user_id)
     if active_only:

@@ -1,26 +1,26 @@
 from __future__ import annotations
 
-import logging
-import json
-from typing import Optional, Tuple
 import asyncio
+import json
+import logging
 import threading
+from typing import Optional, Tuple
 
 from sqlalchemy.orm import Session
 
 from src.memories.constants import MemoryCategory, MemoryKey
-from src.memories.semantic_search import get_semantic_search_service
 from src.memories.memory_handler import MemoryHandler
+from src.memories.semantic_search import get_semantic_search_service
+from src.models.database import PromptTemplate, SessionLocal
+from src.models.user import User
 from src.services.gdpr_service import (
-    export_user_data,
-    restrict_processing,
     erase_user_data,
+    export_user_data,
     object_to_processing,
+    restrict_processing,
     withdraw_consent,
 )
 from src.services.gdpr_verification import create_verification, verify_code
-from src.models.database import PromptTemplate, SessionLocal
-from src.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -180,7 +180,7 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
                                 
                 # Wrap label in backticks to prevent Markdown italics from underscores
                 # Format: date `label` "value"
-                line = f'{date_short} {category}.{key_part}={val}'
+                line = f"{date_short} {category}.{key_part}={val}"
                 out.append(line)
             return out
 

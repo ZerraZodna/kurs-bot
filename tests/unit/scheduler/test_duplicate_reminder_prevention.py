@@ -1,13 +1,14 @@
 """
 Tests for duplicate reminder prevention in the scheduler.
 """
-import pytest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from src.scheduler.domain import SCHEDULE_TYPE_ONE_TIME_REMINDER
 from src.scheduler.manager import find_existing_one_time_reminder
 from src.scheduler.operations import create_one_time_schedule
-from src.scheduler.domain import SCHEDULE_TYPE_ONE_TIME_REMINDER
 
 
 class TestDuplicateReminderPrevention:
@@ -148,16 +149,16 @@ class TestCreateOneTimeScheduleDeduplication:
         existing_schedule.schedule_id = 42
         
         # Mock the find_existing_one_time_reminder to return the existing schedule
-        with patch('src.scheduler.operations.schedule_manager.find_existing_one_time_reminder') as mock_find:
+        with patch("src.scheduler.operations.schedule_manager.find_existing_one_time_reminder") as mock_find:
             mock_find.return_value = existing_schedule
             
             # Mock MemoryManager
-            with patch('src.scheduler.operations.MemoryManager') as mock_mm_class:
+            with patch("src.scheduler.operations.MemoryManager") as mock_mm_class:
                 mock_mm = MagicMock()
                 mock_mm_class.return_value = mock_mm
                 
                 # Mock sync_job_for_schedule
-                with patch('src.scheduler.operations.schedule_jobs.sync_job_for_schedule'):
+                with patch("src.scheduler.operations.schedule_jobs.sync_job_for_schedule"):
                     
                     run_at = datetime(2024, 1, 15, 14, 30, 0, tzinfo=timezone.utc)
                     result = create_one_time_schedule(
@@ -176,23 +177,23 @@ class TestCreateOneTimeScheduleDeduplication:
     async def test_create_one_time_schedule_creates_new_when_no_duplicate(self):
         """Test that a new schedule is created when no duplicate exists."""
         # Mock find_existing_one_time_reminder to return None (no duplicate)
-        with patch('src.scheduler.operations.schedule_manager.find_existing_one_time_reminder') as mock_find:
+        with patch("src.scheduler.operations.schedule_manager.find_existing_one_time_reminder") as mock_find:
             mock_find.return_value = None
             
             # Mock create_schedule to return a new schedule
             mock_new_schedule = MagicMock()
             mock_new_schedule.schedule_id = 99
             
-            with patch('src.scheduler.operations.schedule_manager.create_schedule') as mock_create:
+            with patch("src.scheduler.operations.schedule_manager.create_schedule") as mock_create:
                 mock_create.return_value = mock_new_schedule
                 
                 # Mock MemoryManager
-                with patch('src.scheduler.operations.MemoryManager') as mock_mm_class:
+                with patch("src.scheduler.operations.MemoryManager") as mock_mm_class:
                     mock_mm = MagicMock()
                     mock_mm_class.return_value = mock_mm
                     
                     # Mock sync_job_for_schedule
-                    with patch('src.scheduler.operations.schedule_jobs.sync_job_for_schedule'):
+                    with patch("src.scheduler.operations.schedule_jobs.sync_job_for_schedule"):
                         
                         run_at = datetime(2024, 1, 15, 14, 30, 0, tzinfo=timezone.utc)
                         result = create_one_time_schedule(

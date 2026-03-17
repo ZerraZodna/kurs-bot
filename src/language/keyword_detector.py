@@ -6,8 +6,7 @@ without native dependencies. It returns a tuple (code, confidence, meta).
 from __future__ import annotations
 
 import re
-from typing import Optional, Tuple, Dict
-
+from typing import Dict, Optional, Tuple
 
 _LANG_KEYWORDS = {
     "en": {"the", "and", "is", "you", "do", "search", "please", "hello", "hi", "hey", "thanks", "thank"},

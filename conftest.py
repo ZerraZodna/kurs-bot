@@ -7,25 +7,27 @@ Central location for all test database setup and configuration.
 # project modules during collection. We implement a small, dependency-free
 # loader so tests do not need `python-dotenv` installed.
 import os
+
 os.environ.setdefault("IS_TEST_ENV", "1")
 from pathlib import Path
-import time
-from pathlib import Path
+
 import pytest
+
+
 def _load_dotenv_if_present():
     repo_root = Path(__file__).resolve().parent
-    env_path = repo_root / '.env'
+    env_path = repo_root / ".env"
     if not env_path.exists():
         return
     try:
-        with env_path.open('r', encoding='utf8') as f:
+        with env_path.open("r", encoding="utf8") as f:
             for raw in f:
                 line = raw.strip()
-                if not line or line.startswith('#'):
+                if not line or line.startswith("#"):
                     continue
-                if '=' not in line:
+                if "=" not in line:
                     continue
-                k, v = line.split('=', 1)
+                k, v = line.split("=", 1)
                 k = k.strip()
                 v = v.strip().strip('"')
                 if k and os.getenv(k) is None:
@@ -56,8 +58,8 @@ if not _test_use_real or str(_test_use_real).strip().lower() not in ("1", "true"
         # Ensure the package exposes attributes that tests may monkeypatch
         import importlib
         pkg = importlib.import_module("src.services.dialogue")
-        setattr(pkg, "ollama_client", _fake)
-        setattr(pkg, "call_ollama", _fake.call_ollama)
+        pkg.ollama_client = _fake
+        pkg.call_ollama = _fake.call_ollama
 
 
 # pytest plugins (DB fixtures imported here trigger db_engine)
@@ -68,6 +70,7 @@ pytest_plugins = [
 ]
 
 from src.models.database import Base
+
 
 @pytest.fixture(scope="module", autouse=True)
 def module_db_setup(db_engine):
@@ -139,6 +142,7 @@ def pytest_configure(config):
     if changed:
         try:
             import importlib
+
             import src.config as cfg
             importlib.reload(cfg)
             print("🔧 Test Ollama model overrides applied")

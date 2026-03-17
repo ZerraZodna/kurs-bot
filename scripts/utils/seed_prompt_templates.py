@@ -5,7 +5,7 @@ progress messages when run as a script.
 """
 from typing import Optional
 
-from src.models.database import SessionLocal, PromptTemplate, init_db
+from src.models.database import PromptTemplate, SessionLocal, init_db
 
 
 def seed(delete_existing_system: bool = False) -> None:
@@ -58,9 +58,9 @@ def seed(delete_existing_system: bool = False) -> None:
         seeded = 0
         # If requested, delete all existing system-owned prompt templates
         if delete_existing_system:
-            existing_count = db.query(PromptTemplate).filter(PromptTemplate.owner == 'system').count()
+            existing_count = db.query(PromptTemplate).filter(PromptTemplate.owner == "system").count()
             if existing_count:
-                db.query(PromptTemplate).filter(PromptTemplate.owner == 'system').delete(synchronize_session=False)
+                db.query(PromptTemplate).filter(PromptTemplate.owner == "system").delete(synchronize_session=False)
                 db.commit()
                 print(f"🗑️ Deleted {existing_count} system prompt template(s)")
             else:
@@ -74,8 +74,8 @@ def seed(delete_existing_system: bool = False) -> None:
                 key=t["key"],
                 title=t["title"],
                 text=t["text"],
-                owner='system',
-                visibility='public',
+                owner="system",
+                visibility="public",
                 version=1,
             )
             db.add(tmpl)
@@ -105,9 +105,9 @@ def main(argv: Optional[list] = None) -> int:
         seed(delete_existing_system=delete_flag)
         return 0
     except Exception as exc:
-        print('❌ Failed to seed prompt templates:', exc)
+        print("❌ Failed to seed prompt templates:", exc)
         return 2
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     raise SystemExit(main())

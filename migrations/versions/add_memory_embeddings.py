@@ -12,8 +12,8 @@ this stub prevents Alembic from failing when resolving revisions.
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = 'add_memory_embeddings'
-down_revision = 'add_conversation_context'
+revision = "add_memory_embeddings"
+down_revision = "add_conversation_context"
 branch_labels = None
 depends_on = None
 

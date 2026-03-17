@@ -3,14 +3,14 @@
 Simplified onboarding flow: Name -> Consent
 """
 
-import pytest
 import os
 
-from src.services.dialogue_engine import DialogueEngine
-from src.memories import MemoryManager
-from src.lessons.state import get_current_lesson
-
+import pytest
 from tests.fixtures.users import make_ready_user
+
+from src.lessons.state import get_current_lesson
+from src.memories import MemoryManager
+from src.services.dialogue_engine import DialogueEngine
 
 
 class TestOnboardingDefersLessonRequest:

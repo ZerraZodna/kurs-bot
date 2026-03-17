@@ -5,6 +5,7 @@ Tests that string "true"/"false" are properly converted to boolean True/False.
 """
 
 import pytest
+
 from src.functions.parameters import ParameterValidator
 
 

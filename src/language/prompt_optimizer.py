@@ -3,7 +3,7 @@ Advanced prompt optimization utilities for token and context management.
 Provides tools for pruning, summarizing, and optimizing prompts.
 """
 
-from typing import List, Dict
+from typing import Dict, List
 
 
 class PromptOptimizer:
@@ -79,7 +79,7 @@ class PromptOptimizer:
         
         # Truncate and break at word boundary
         truncated = text[:estimated_chars]
-        last_space = truncated.rfind(' ')
+        last_space = truncated.rfind(" ")
         if last_space > 0:
             truncated = truncated[:last_space]
         return truncated + "..."

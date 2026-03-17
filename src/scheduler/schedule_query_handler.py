@@ -3,10 +3,11 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
-from src.models.database import Schedule
 from src.core.timezone import format_dt_in_timezone
+from src.models.database import Schedule
+
 from .domain import is_one_time_schedule_type
 
 

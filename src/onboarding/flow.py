@@ -5,12 +5,13 @@ from enum import Enum
 from typing import Optional
 
 from sqlalchemy.orm import Session
-from src.services.gdpr_service import record_consent
-from src.onboarding.user_management import delete_user_and_data
-from src.memories.dialogue_helpers import get_user_language
-from src.memories.constants import MemoryCategory, MemoryKey
+
 from src.language import onboarding_prompts as prompts_module
 from src.language.onboarding_prompts import format_onboarding_message_with_name
+from src.memories.constants import MemoryCategory, MemoryKey
+from src.memories.dialogue_helpers import get_user_language
+from src.onboarding.user_management import delete_user_and_data
+from src.services.gdpr_service import record_consent
 
 logger = logging.getLogger(__name__)
 

@@ -4,9 +4,10 @@ Refactored to use new test fixtures from tests/fixtures/
 """
 
 from datetime import timezone
+
 from sqlalchemy.orm import Session
 
-from src.core.timezone import parse_local_time_to_utc, format_dt_in_timezone
+from src.core.timezone import format_dt_in_timezone, parse_local_time_to_utc
 from src.scheduler import SchedulerService
 
 

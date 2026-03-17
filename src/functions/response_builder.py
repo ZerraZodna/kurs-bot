@@ -6,11 +6,12 @@ with results from executed function calls.
 """
 
 import logging
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+from src.core.timezone import format_datetime_for_display
 
 from .executor import BatchExecutionResult, ExecutionResult
-from src.core.timezone import format_datetime_for_display
 
 logger = logging.getLogger(__name__)
 
@@ -200,25 +201,25 @@ class ResponseBuilder:
             if schedules:
                 details = []
                 for s in schedules:
-                    schedule_type = s.get('schedule_type', 'reminder')
+                    schedule_type = s.get("schedule_type", "reminder")
                     time_display = self._format_cron_expression(
-                        s.get('cron_expression', ''),
-                        s.get('next_send_time'),
+                        s.get("cron_expression", ""),
+                        s.get("next_send_time"),
                         tz_name
                     )
                     
                     # Map schedule types to friendly display names
                     type_display_map = {
-                        'one_time_reminder': 'Remind once',
-                        'daily': 'Daily reminder',
+                        "one_time_reminder": "Remind once",
+                        "daily": "Daily reminder",
                     }
-                    type_display = type_display_map.get(schedule_type, schedule_type.replace('_', ' '))
+                    type_display = type_display_map.get(schedule_type, schedule_type.replace("_", " "))
                     
                     # For one-time reminders, show the message if available
-                    if schedule_type == 'one_time_reminder':
-                        message = s.get('message', '')
+                    if schedule_type == "one_time_reminder":
+                        message = s.get("message", "")
                         if message:
-                            details.append(f"  - {type_display} at {time_display} - \"{message}\"")
+                            details.append(f'  - {type_display} at {time_display} - "{message}"')
                         else:
                             details.append(f"  - {type_display} at {time_display}")
                     else:
@@ -266,6 +267,7 @@ class ResponseBuilder:
         """
         # Handle datetime object (passed from executor with local timezone)
         from datetime import datetime
+
         from src.core.timezone import format_datetime_for_display as fdfd
         
         if isinstance(next_send_time, datetime):
@@ -287,7 +289,8 @@ class ResponseBuilder:
                 hour = int(parts[1])
                 
                 # Convert UTC hour/minute to user's local timezone
-                from datetime import datetime, timezone as tz
+                from datetime import datetime
+                from datetime import timezone as tz
                 from zoneinfo import ZoneInfo
                 try:
                     tzinfo = ZoneInfo(tz_name)

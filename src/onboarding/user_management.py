@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from sqlalchemy.orm import Session
 import logging
+
+from sqlalchemy.orm import Session
 
 from src.memories.user_data_service import delete_user_content_rows
 
@@ -65,8 +66,8 @@ def is_user_new(db: Session, user_id: int, threshold_minutes: int = 10) -> bool:
     Returns:
         True if user created within threshold
     """
-    from src.models.database import User
     from src.core.timezone import to_utc, utc_now
+    from src.models.database import User
 
     user = db.query(User).filter_by(user_id=user_id).first()
     if not user:

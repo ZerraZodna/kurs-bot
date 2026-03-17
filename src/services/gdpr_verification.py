@@ -9,10 +9,9 @@ from typing import Any, Dict, Optional
 from sqlalchemy.orm import Session
 
 from src.config import settings
+from src.core.timezone import to_utc
+from src.core.timezone import utc_now as _utc_now
 from src.models.database import GdprVerification
-
-
-from src.core.timezone import to_utc, utc_now as _utc_now
 
 
 def _ensure_utc_aware(dt: datetime) -> datetime:

@@ -1,7 +1,8 @@
 """Unit tests for lesson repeat and memory conflict resolution."""
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from src.memories.constants import MemoryKey
 
@@ -11,7 +12,7 @@ class TestLessonRepeatOffered:
 
     def test_lesson_repeat_offered_constant_exists(self):
         """Test that LESSON_REPEAT_OFFERED constant exists."""
-        assert hasattr(MemoryKey, 'LESSON_REPEAT_OFFERED')
+        assert hasattr(MemoryKey, "LESSON_REPEAT_OFFERED")
         assert MemoryKey.LESSON_REPEAT_OFFERED == "lesson_repeat_offered"
 
 class TestConfirmYesLessonRepeat:

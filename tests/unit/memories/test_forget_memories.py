@@ -3,14 +3,16 @@
 
 Tests semantic memory deletion via AI function call.
 """
-import pytest
-from unittest.mock import Mock, AsyncMock, MagicMock
 from typing import List, Tuple
+from unittest.mock import AsyncMock, MagicMock, Mock
+
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.functions.executor import FunctionExecutor
 from src.models.base import Base
+
 # No Memory type import needed for mocks
 
 

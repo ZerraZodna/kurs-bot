@@ -6,14 +6,15 @@ error handling, and result collection.
 """
 
 import logging
-from typing import Dict, List, Any, Optional, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any, Callable, Dict, List, Optional
 
-from .registry import FunctionRegistry, get_function_registry
-from .parameters import ParameterValidator
-from src.models.schedule import Lesson
 from src.lessons.state import compute_current_lesson_state
+from src.models.schedule import Lesson
+
+from .parameters import ParameterValidator
+from .registry import FunctionRegistry, get_function_registry
 
 logger = logging.getLogger(__name__)
 
@@ -399,10 +400,10 @@ class FunctionExecutor:
     
     async def _handle_query_schedule(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle query_schedule function."""
+        from src.core.timezone import format_dt_in_timezone, get_user_timezone_from_db
         from src.scheduler import api as scheduler_api
         from src.scheduler.domain import is_one_time_schedule_type
         from src.scheduler.memory_helpers import get_schedule_message
-        from src.core.timezone import get_user_timezone_from_db, format_dt_in_timezone
         
         user_id = context.get("user_id")
         session = context.get("session")
@@ -451,8 +452,8 @@ class FunctionExecutor:
     
     async def _handle_create_one_time_reminder(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle create_one_time_reminder function."""
-        from src.scheduler import api as scheduler_api
         from src.core.timezone import to_utc
+        from src.scheduler import api as scheduler_api
         
         user_id = context.get("user_id")
         run_at = params.get("run_at")
@@ -865,8 +866,8 @@ class FunctionExecutor:
     
     async def _handle_extract_memory(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle extract_memory function."""
-        from src.memories.constants import MemoryCategory, MemoryKey
         from src.lessons.state import set_current_lesson
+        from src.memories.constants import MemoryCategory, MemoryKey
         
         user_id = context.get("user_id")
         key = params.get("key")

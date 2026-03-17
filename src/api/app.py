@@ -1,25 +1,28 @@
+import asyncio
+import logging
+import threading
+from contextlib import asynccontextmanager
+from pathlib import Path
+from urllib.parse import urlparse
+
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-from src.services.maintenance import nightly_memory_purge
-from src.middleware.consent import ConsentMiddleware
-from src.middleware.api_key_auth import ApiKeyAuthMiddleware
-from src.middleware.logging_redaction import apply_logging_redaction
-from src.services.security_checks import verify_secrets_config
-from src.models.database import SessionLocal, Lesson, Base, engine
-from src.config import settings
-from src.scheduler import SchedulerService
+
 from src.api.dialogue_routes import router as dialogue_router
 from src.api.gdpr_routes import router as gdpr_router
 from src.api.telegram_routes import router as telegram_router
+from src.config import settings
 from src.integrations.telegram_polling import start_polling_task
-import threading
-import asyncio
-from urllib.parse import urlparse
-from pathlib import Path
-import logging
-import httpx
+from src.middleware.api_key_auth import ApiKeyAuthMiddleware
+from src.middleware.consent import ConsentMiddleware
+from src.middleware.logging_redaction import apply_logging_redaction
+from src.models.database import Base, Lesson, SessionLocal, engine
+from src.scheduler import SchedulerService
+from src.services.maintenance import nightly_memory_purge
 from src.services.ollama_online_test import run_ollama_checks
+from src.services.security_checks import verify_secrets_config
+
 
 def ensure_lessons_imported():
     """Auto-import lessons from PDF if database is empty."""
@@ -42,7 +45,7 @@ def ensure_lessons_imported():
             logging.info(f"Auto-importing lessons from {pdf_path}...")
             
             # Import the importer module
-            from src.lessons import extract_formatted_text, parse_lessons_from_text, import_to_db
+            from src.lessons import extract_formatted_text, import_to_db, parse_lessons_from_text
             
             text = extract_formatted_text(pdf_path)
             lessons = parse_lessons_from_text(text)
@@ -98,7 +101,7 @@ async def lifespan(app: FastAPI):
         # No handlers configured yet, set up basic logging
         logging.basicConfig(
             level=logging.DEBUG if is_debug else logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             handlers=[logging.StreamHandler()]
         )
     apply_logging_redaction()
@@ -209,6 +212,7 @@ logging.debug(f"computed static_path={static_path} exists={static_path.exists()}
 if DEV_WEB:
     logging.debug("DEV_WEB is True — mounting dev static and router")
     from fastapi.staticfiles import StaticFiles
+
     from src.api.dev_web_client import router as dev_router
 
     # Mount static files under /dev/static using project-relative path

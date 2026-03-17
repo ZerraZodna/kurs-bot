@@ -5,10 +5,11 @@ Migrated from tests/test_memory_driven_scheduler_integration.py to use new test 
 """
 
 import pytest
-from src.models.database import User, Schedule
+
+from src.functions.executor import get_function_executor
 from src.memories import MemoryManager
 from src.memories.constants import MemoryKey
-from src.functions.executor import get_function_executor
+from src.models.database import Schedule, User
 
 
 @pytest.mark.asyncio

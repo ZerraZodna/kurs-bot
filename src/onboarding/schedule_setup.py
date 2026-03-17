@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Optional
-from sqlalchemy.orm import Session
 import logging
+from typing import Optional
 
-from src.scheduler import api as scheduler_api
-from src.scheduler.domain import SCHEDULE_TYPE_DAILY
+from sqlalchemy.orm import Session
+
 from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
+from src.scheduler import api as scheduler_api
+from src.scheduler.domain import SCHEDULE_TYPE_DAILY
 
 logger = logging.getLogger(__name__)
 

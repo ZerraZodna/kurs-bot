@@ -4,10 +4,11 @@ Provides builder patterns for creating test data with clean, readable syntax.
 """
 
 import datetime
-from typing import List, Optional, Any, Dict
+from typing import Any, Dict, List, Optional
+
 from sqlalchemy.orm import Session
 
-from src.models.database import Memory, Schedule, MessageLog, Lesson
+from src.models.database import Lesson, Memory, MessageLog, Schedule
 
 
 class MemoryBuilder:

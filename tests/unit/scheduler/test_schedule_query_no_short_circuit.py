@@ -5,8 +5,9 @@ was incorrectly treated as a status query instead of flowing through to the
 function calling system.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from sqlalchemy.orm import Session
 
 from src.scheduler.schedule_handlers import handle_schedule_messages
@@ -103,7 +104,7 @@ async def test_explicit_daily_schedule_with_time_still_works():
     # This should still be handled pre-LLM as it's an explicit daily schedule request
     text = "set my daily reminder for 09:00"
     
-    with patch('src.scheduler.schedule_handlers.scheduler_api') as mock_scheduler:
+    with patch("src.scheduler.schedule_handlers.scheduler_api") as mock_scheduler:
         mock_scheduler.get_user_schedules.return_value = []
         mock_scheduler.parse_time_string.return_value = (9, 0)
         
@@ -135,7 +136,7 @@ async def test_pause_request_still_works():
     
     text = "pause my reminders"
     
-    with patch('src.scheduler.schedule_handlers.scheduler_api') as mock_scheduler:
+    with patch("src.scheduler.schedule_handlers.scheduler_api") as mock_scheduler:
         mock_scheduler.deactivate_user_schedules.return_value = 1
         
         result = await handle_schedule_messages(

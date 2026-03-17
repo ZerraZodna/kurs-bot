@@ -6,10 +6,11 @@ Migrated from tests/test_trigger_scheduler_integration.py to use new test fixtur
 
 import pytest
 
-from src.models.database import User
-from src.services.dialogue_engine import DialogueEngine
-from src.scheduler import SchedulerService
 from src.functions.executor import get_function_executor
+from src.models.database import User
+from src.scheduler import SchedulerService
+from src.services.dialogue_engine import DialogueEngine
+
 
 @pytest.mark.asyncio
 async def test_trigger_based_schedule_edit(db_session, test_user, monkeypatch):

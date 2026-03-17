@@ -2,9 +2,9 @@
 Migrated tests for one-time schedule creation.
  migrated from tests/test_one_time_does_not_modify_daily.py
 """
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
-from src.models.database import SessionLocal, Schedule
+from src.models.database import Schedule, SessionLocal
 from src.scheduler import SchedulerService
 
 

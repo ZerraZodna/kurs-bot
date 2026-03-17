@@ -6,8 +6,8 @@ send_todays_lesson, the final response includes the full lesson content
 from the function result, not just the AI's introductory text.
 """
 
+from src.functions.executor import BatchExecutionResult, ExecutionResult
 from src.functions.response_builder import ResponseBuilder
-from src.functions.executor import ExecutionResult, BatchExecutionResult
 
 
 def test_lesson_response_prioritizes_function_content_over_ai_text():

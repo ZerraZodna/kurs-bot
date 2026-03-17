@@ -1,11 +1,12 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
 from sqlalchemy.orm import relationship
-from src.models.base import Base
+
 from src.core.clock import utc_now
+from src.models.base import Base
 
 
 class User(Base):
-    __tablename__ = 'users'
+    __tablename__ = "users"
 
     user_id = Column(Integer, primary_key=True)
     external_id = Column(String(128), nullable=False)
@@ -25,11 +26,11 @@ class User(Base):
     last_active_at = Column(DateTime(timezone=True))
 
     # Relationships
-    memories = relationship('Memory', back_populates='user')
-    schedules = relationship('Schedule', back_populates='user')
-    message_logs = relationship('MessageLog', back_populates='user')
-    unsubscribes = relationship('Unsubscribe', back_populates='user')
-    consent_logs = relationship('ConsentLog', back_populates='user')
-    gdpr_requests = relationship('GdprRequest', back_populates='user')
-    gdpr_audit_logs = relationship('GdprAuditLog', back_populates='user')
-    gdpr_verifications = relationship('GdprVerification', back_populates='user')
+    memories = relationship("Memory", back_populates="user")
+    schedules = relationship("Schedule", back_populates="user")
+    message_logs = relationship("MessageLog", back_populates="user")
+    unsubscribes = relationship("Unsubscribe", back_populates="user")
+    consent_logs = relationship("ConsentLog", back_populates="user")
+    gdpr_requests = relationship("GdprRequest", back_populates="user")
+    gdpr_audit_logs = relationship("GdprAuditLog", back_populates="user")
+    gdpr_verifications = relationship("GdprVerification", back_populates="user")

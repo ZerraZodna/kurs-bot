@@ -9,13 +9,13 @@ This module provides a minimal, testable implementation that:
 The implementation intentionally avoids old ad-hoc mappings and string conversions.
 """
 
+import re
 from typing import Optional
 
-import re
-
 from langdetect import detect_langs
-from src.language.keyword_detector import detect_language as keyword_detect
+
 from src.config import settings
+from src.language.keyword_detector import detect_language as keyword_detect
 from src.memories.constants import MemoryCategory, MemoryKey
 
 # Comprehensive supported ISO-639-1 two-letter codes.

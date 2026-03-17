@@ -1,7 +1,5 @@
 import asyncio
-import json
 import sys
-from datetime import datetime
 from pathlib import Path
 
 # Ensure repo root is on path for src imports
@@ -9,8 +7,7 @@ repo_root = Path(__file__).resolve().parents[2]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from src.models.database import SessionLocal, User, Memory, Schedule, init_db
-from src.memories import MemoryManager
+from src.models.database import Memory, Schedule, SessionLocal, User, init_db
 from src.services.dialogue_engine import DialogueEngine
 
 
@@ -39,7 +36,7 @@ def dump_user_state(db, user_id):
         v = m.value
         if v is None:
             v = ""
-        print({"key": m.key, "category": m.category, "value": (v[:200] + '...' if len(v) > 200 else v), "created_at": (m.created_at.isoformat() if m.created_at else None)})
+        print({"key": m.key, "category": m.category, "value": (v[:200] + "..." if len(v) > 200 else v), "created_at": (m.created_at.isoformat() if m.created_at else None)})
 
 
 async def run_check(user_id: int, text: str):
@@ -50,9 +47,9 @@ async def run_check(user_id: int, text: str):
         print("\nInvoking DialogueEngine.process_message() with text:\n", text)
         dialogue = DialogueEngine(db)
         resp = await dialogue.process_message(user_id, text, db)
-        print('\n--- LLM response start ---')
+        print("\n--- LLM response start ---")
         print(resp)
-        print('--- LLM response end ---\n')
+        print("--- LLM response end ---\n")
 
         print("\nPost-run schedules and memories:")
         dump_user_state(db, user_id)
@@ -60,7 +57,7 @@ async def run_check(user_id: int, text: str):
         db.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     user_id = int(sys.argv[1]) if len(sys.argv) > 1 else 7
     text = sys.argv[2] if len(sys.argv) > 2 else "Set my daily reminder for lessons to 09:00"
     # Ensure DB exists

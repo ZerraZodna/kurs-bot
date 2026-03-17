@@ -10,7 +10,7 @@ import argparse
 import datetime
 from zoneinfo import ZoneInfo
 
-from src.models.database import SessionLocal, Schedule, User
+from src.models.database import Schedule, SessionLocal, User
 
 
 def inspect_by_schedule_id(db, schedule_id):
@@ -40,15 +40,15 @@ def _print_ns(ns, user_id, db):
         print("isoformat:", ns.isoformat())
     except Exception as e:
         print("isoformat() failed:", e)
-    print("tzinfo:", getattr(ns, 'tzinfo', None))
+    print("tzinfo:", getattr(ns, "tzinfo", None))
 
     # Fetch user tz
     user = db.query(User).filter_by(user_id=user_id).first()
-    user_tz = getattr(user, 'timezone', None) if user else None
+    user_tz = getattr(user, "timezone", None) if user else None
     print("user.timezone:", user_tz)
 
     # If naive, assume UTC for inspection (code's current behavior)
-    if getattr(ns, 'tzinfo', None) is None:
+    if getattr(ns, "tzinfo", None) is None:
         print("Interpreting stored value as UTC (naive) for inspection")
         ns_assumed = ns.replace(tzinfo=datetime.timezone.utc)
     else:
@@ -64,10 +64,10 @@ def _print_ns(ns, user_id, db):
         print("Conversion to user timezone failed:", e)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument('--schedule-id', type=int)
-    p.add_argument('--user-id', type=int)
+    p.add_argument("--schedule-id", type=int)
+    p.add_argument("--user-id", type=int)
     args = p.parse_args()
 
     db = SessionLocal()
@@ -77,6 +77,6 @@ if __name__ == '__main__':
         elif args.user_id:
             inspect_by_user_id(db, args.user_id)
         else:
-            print('Please pass --schedule-id or --user-id')
+            print("Please pass --schedule-id or --user-id")
     finally:
         db.close()

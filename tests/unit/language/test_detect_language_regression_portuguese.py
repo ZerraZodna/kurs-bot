@@ -3,12 +3,13 @@
 Migrated from tests/test_detect_language_regression_portuguese.py to use new test fixtures.
 """
 
-import pytest
 from datetime import datetime, timezone
 
-from src.models.database import User
-from src.memories import MemoryManager
+import pytest
+
 from src.language.language_service import detect_and_store_language
+from src.memories import MemoryManager
+from src.models.database import User
 
 
 class TestDetectLanguageRegressionPortuguese:

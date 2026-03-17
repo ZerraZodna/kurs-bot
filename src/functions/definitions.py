@@ -5,9 +5,10 @@ Generates prompt text describing available functions for the AI,
 including JSON format instructions and examples.
 """
 
-from typing import Dict, List, Optional, Any
 import json
 import logging
+from typing import Any, Dict, List, Optional
+
 from .registry import FunctionRegistry, get_function_registry
 
 logger = logging.getLogger(__name__)

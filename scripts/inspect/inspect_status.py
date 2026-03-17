@@ -4,19 +4,16 @@
 import sys
 from pathlib import Path
 
-from sqlalchemy.exc import SQLAlchemyError
-
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from src.config import settings
 from src.models.database import (  # noqa: E402
     Lesson,
     MessageLog,
     SessionLocal,
     User,
 )
-from src.models.memory import Memory
-from src.config import settings
 
 
 def main() -> int:

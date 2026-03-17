@@ -58,20 +58,20 @@ class DummyAsyncClient:
         except Exception:
             return False
         
-        local = os.getenv('LOCAL_OLLAMA_URL') or 'http://localhost:11434'
-        cloud = os.getenv('CLOUD_OLLAMA_URL') or 'https://ollama.com'
+        local = os.getenv("LOCAL_OLLAMA_URL") or "http://localhost:11434"
+        cloud = os.getenv("CLOUD_OLLAMA_URL") or "https://ollama.com"
         
         return (
             local in url_str or
             cloud in url_str or
-            'ollama.com' in url_str or
-            'localhost:11434' in url_str
+            "ollama.com" in url_str or
+            "localhost:11434" in url_str
         )
     
     async def post(self, *args, **kwargs) -> DummyResponse:
         """Mock POST request."""
         if self._block_ollama and args:
-            url = args[0] if args else kwargs.get('url')
+            url = args[0] if args else kwargs.get("url")
             if url and self._is_ollama_url(url):
                 raise RuntimeError(
                     f"Blocked outbound Ollama HTTP call during tests: {url}"
@@ -165,11 +165,11 @@ class HttpxMock:
                 self._mock = mock_instance
             
             async def post(self, *args, **kwargs):
-                url = args[0] if args else kwargs.get('url', '')
+                url = args[0] if args else kwargs.get("url", "")
                 return self._mock._get_response(str(url))
             
             async def get(self, *args, **kwargs):
-                url = args[0] if args else kwargs.get('url', '')
+                url = args[0] if args else kwargs.get("url", "")
                 return self._mock._get_response(str(url))
         
         monkeypatch.setattr(

@@ -3,16 +3,17 @@
 Migrated from tests/test_scheduler_characterization.py to use new test fixtures.
 """
 
-import pytest
 from datetime import datetime, timedelta, timezone
 
+import pytest
+from tests.fixtures.users import make_ready_user
+
+from src.core.timezone import format_dt_in_timezone
+from src.functions.executor import get_function_executor
 from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.models.database import Schedule, User
 from src.scheduler import SchedulerService
-from src.core.timezone import format_dt_in_timezone
-from src.functions.executor import get_function_executor
-from tests.fixtures.users import make_ready_user
 
 
 class TestSchedulerCharacterization:

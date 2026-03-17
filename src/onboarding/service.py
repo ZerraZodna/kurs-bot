@@ -6,26 +6,27 @@ detectors, prompt generation, schedule setup, and user management.
 
 from __future__ import annotations
 
-from typing import Optional, Dict, Any
-from sqlalchemy.orm import Session
-from src.memories import MemoryManager
 import logging
+from typing import Any, Dict, Optional
 
-from src.onboarding.detectors import (
-    detect_consent_keywords,
-    detect_decline_keywords,
-)
+from sqlalchemy.orm import Session
+
 from src.language.onboarding_prompts import (
+    format_onboarding_message_with_name,
     get_continuation_welcome_message,
     get_lesson_1_welcome_message,
     get_onboarding_complete_message_text,
     get_onboarding_message,
-    format_onboarding_message_with_name,
 )
-from src.onboarding.status import get_onboarding_status_dict
-from src.onboarding.schedule_setup import create_auto_schedule
-from src.onboarding.user_management import is_user_new
+from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
+from src.onboarding.detectors import (
+    detect_consent_keywords,
+    detect_decline_keywords,
+)
+from src.onboarding.schedule_setup import create_auto_schedule
+from src.onboarding.status import get_onboarding_status_dict
+from src.onboarding.user_management import is_user_new
 
 logger = logging.getLogger(__name__)
 

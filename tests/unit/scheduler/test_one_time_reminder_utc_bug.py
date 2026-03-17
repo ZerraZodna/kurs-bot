@@ -5,7 +5,7 @@ operations.py, then converted again in jobs.py. This test verifies the bug
 and will pass once the fix is applied.
 """
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
 from zoneinfo import ZoneInfo
 
@@ -54,8 +54,9 @@ class TestOneTimeReminderUTCConversion:
         This test verifies the actual behavior of sync_job_for_schedule
         by checking what DateTrigger is created.
         """
-        from src.scheduler.jobs import sync_job_for_schedule
         from apscheduler.triggers.date import DateTrigger
+
+        from src.scheduler.jobs import sync_job_for_schedule
         
         # Create a mock schedule with a specific UTC time
         run_at = datetime(2026, 3, 2, 14, 14, 0, tzinfo=timezone.utc)  # 14:14 UTC
@@ -71,11 +72,11 @@ class TestOneTimeReminderUTCConversion:
         
         def capture_add_job(*args, **kwargs):
             nonlocal captured_trigger
-            captured_trigger = kwargs.get('trigger')
+            captured_trigger = kwargs.get("trigger")
             return Mock()
         
         # Mock the scheduler
-        with patch('src.scheduler.core.SchedulerService') as mock_service_class:
+        with patch("src.scheduler.core.SchedulerService") as mock_service_class:
             mock_scheduler = Mock()
             mock_scheduler.add_job = capture_add_job
             mock_service_class.get_scheduler.return_value = mock_scheduler
@@ -108,17 +109,17 @@ class TestOneTimeReminderUTCConversion:
         captured_times = []
         
         def capture_create_schedule(*args, **kwargs):
-            captured_times.append(kwargs.get('next_send_time'))
+            captured_times.append(kwargs.get("next_send_time"))
             mock_schedule = Mock()
             mock_schedule.schedule_id = 456
             mock_schedule.schedule_type = "one_time_reminder"
             return mock_schedule
         
         # Mock the database and related functions
-        with patch('src.scheduler.operations.schedule_manager.create_schedule', side_effect=capture_create_schedule), \
-             patch('src.scheduler.operations.schedule_manager.find_existing_one_time_reminder', return_value=None), \
-             patch('src.scheduler.operations.schedule_jobs') as mock_jobs, \
-             patch('src.scheduler.operations.MemoryManager') as mock_mm_class:
+        with patch("src.scheduler.operations.schedule_manager.create_schedule", side_effect=capture_create_schedule), \
+             patch("src.scheduler.operations.schedule_manager.find_existing_one_time_reminder", return_value=None), \
+             patch("src.scheduler.operations.schedule_jobs") as mock_jobs, \
+             patch("src.scheduler.operations.MemoryManager") as mock_mm_class:
             
             mock_mm = Mock()
             mock_mm_class.return_value = mock_mm
@@ -196,6 +197,7 @@ class TestDateTriggerBehavior:
         then manager.py converts again (which should be idempotent).
         """
         from apscheduler.triggers.date import DateTrigger
+
         from src.core.timezone import to_utc
         
         # Start with local time (Oslo 15:14)

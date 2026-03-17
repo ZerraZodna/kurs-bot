@@ -1,9 +1,9 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
-from src.models.database import SessionLocal, User, Schedule
+from src.core.timezone import format_dt_in_timezone, to_utc
+from src.models.database import Schedule, SessionLocal, User
 from src.scheduler import SchedulerService
 from src.scheduler import manager as schedule_manager
-from src.core.timezone import format_dt_in_timezone, to_utc
 
 
 def _create_test_user(db, timezone_name=None):

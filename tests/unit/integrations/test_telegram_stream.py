@@ -1,5 +1,6 @@
 """Tests for the StreamingFilter class."""
 import pytest
+
 from src.integrations.telegram_stream import StreamingFilter
 
 
@@ -16,7 +17,7 @@ async def test_skips_json_prefix():
     """
     StreamingFilter should skip the {"response": " prefix and not yield it.
     """
-    tokens = ['{"response": "', 'Hello ', 'world', '!"}']
+    tokens = ['{"response": "', "Hello ", "world", '!"}']
     generator = mock_token_generator(tokens)
     filter = StreamingFilter(generator)
     
@@ -35,7 +36,7 @@ async def test_skips_json_prefix_with_spaces():
     """
     StreamingFilter should handle JSON prefix with varying whitespace.
     """
-    tokens = ['{  "response"  :  "', 'Hello ', 'world', '!"}']
+    tokens = ['{  "response"  :  "', "Hello ", "world", '!"}']
     generator = mock_token_generator(tokens)
     filter = StreamingFilter(generator)
     
@@ -55,7 +56,7 @@ async def test_buffers_incomplete_html_tag():
     StreamingFilter should buffer incomplete HTML tags until complete.
     """
     # Token splits a tag across multiple tokens
-    tokens = ['Hello <b', '>world</b', '!']
+    tokens = ["Hello <b", ">world</b", "!"]
     generator = mock_token_generator(tokens)
     filter = StreamingFilter(generator)
     
@@ -73,7 +74,7 @@ async def test_buffers_incomplete_closing_tag():
     """
     StreamingFilter should buffer incomplete closing tags.
     """
-    tokens = ['Hello world</', 'em>!']
+    tokens = ["Hello world</", "em>!"]
     generator = mock_token_generator(tokens)
     filter = StreamingFilter(generator)
     
@@ -92,7 +93,7 @@ async def test_buffers_incomplete_html_entity():
     """
     StreamingFilter should buffer incomplete HTML entities until complete.
     """
-    tokens = ['Hello &nbsp', '; world!']
+    tokens = ["Hello &nbsp", "; world!"]
     generator = mock_token_generator(tokens)
     filter = StreamingFilter(generator)
     
@@ -110,7 +111,7 @@ async def test_buffers_amp_entity():
     """
     StreamingFilter should properly buffer &amp; entity.
     """
-    tokens = ['Hello &amp', '; world!']
+    tokens = ["Hello &amp", "; world!"]
     generator = mock_token_generator(tokens)
     filter = StreamingFilter(generator)
     
@@ -179,7 +180,7 @@ async def test_functions_not_returned_with_multiple_tokens():
     # Split the JSON across multiple tokens to test boundary detection with fragmentation
     tokens = [
         '{"response": "Hello ', 
-        'world', 
+        "world", 
         '", "functions": [{"name": "test"}]}'
     ]
     generator = mock_token_generator(tokens)
@@ -213,13 +214,13 @@ async def test_functions_not_returned_with_token_fragmentation():
     # This simulates the actual fragmentation pattern from Ollama
     # Token splits at the exact problematic boundary
     tokens = [
-        'Hello world',
-        '.',
+        "Hello world",
+        ".",
         '",',          # End of response string + comma
         '\n  "',       # Whitespace + opening quote for next field
-        'functions',   # "functions" keyword - arrives later!
+        "functions",   # "functions" keyword - arrives later!
         '": []',       # Colon + empty array
-        '\n}'          # End of JSON
+        "\n}"          # End of JSON
     ]
     generator = mock_token_generator(tokens)
     filter = StreamingFilter(generator)
@@ -265,7 +266,7 @@ async def test_handles_plain_text_response():
     """
     StreamingFilter should handle plain text responses without JSON.
     """
-    tokens = ['Hello world!']
+    tokens = ["Hello world!"]
     generator = mock_token_generator(tokens)
     filter = StreamingFilter(generator)
     

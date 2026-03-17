@@ -7,8 +7,8 @@ import datetime
 
 from sqlalchemy.orm import Session
 
-from src.models.database import Memory
 from src.memories import MemoryManager
+from src.models.database import Memory
 from src.services.maintenance import purge_archived_memories
 
 

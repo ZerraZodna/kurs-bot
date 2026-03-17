@@ -20,7 +20,7 @@ Example:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional, List, Any
+from typing import Any, List, Optional
 
 from sqlalchemy.orm import Session
 
@@ -201,6 +201,7 @@ def get_user_schedules(
         List of Schedule objects
     """
     from src.models.database import get_session
+
     from . import manager as schedule_manager
     
     with get_session(session) as s:

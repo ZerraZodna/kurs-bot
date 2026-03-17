@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import os
 import sys
 from pathlib import Path
 
@@ -27,12 +26,10 @@ import asyncio
 import sys
 import time
 from datetime import datetime
-from typing import Optional
 
-from src.models.database import SessionLocal, User, Memory, Schedule, init_db
-from src.memories import MemoryManager  # Not directly used but for type hints if needed
-from src.services.dialogue_engine import DialogueEngine
 from src.integrations.telegram_stream import StreamingFilter
+from src.models.database import Memory, Schedule, SessionLocal, User, init_db
+from src.services.dialogue_engine import DialogueEngine
 
 
 def dump_user_state(db, user_id: int):
@@ -59,7 +56,7 @@ def dump_user_state(db, user_id: int):
     print("\\nRecent memories (last 20):")
     mems = db.query(Memory).filter_by(user_id=user_id).order_by(Memory.created_at.desc()).limit(20).all()
     for m in mems:
-        value_preview = m.value[:100] + '...' if len(m.value) > 100 else m.value
+        value_preview = m.value[:100] + "..." if len(m.value) > 100 else m.value
         print(f"  [{m.category}] {m.key}: {value_preview} (created {m.created_at})")
     
     print("=" * 80)
@@ -109,7 +106,7 @@ async def test_telegram_streaming(user_id: int, text: str):
             print(token)
         print("\\n📱 Stream complete\\n")
 
-        full_response = ''.join(filtered_tokens)
+        full_response = "".join(filtered_tokens)
         print(f"📄 Full Telegram response (len={len(full_response)}):\\n{repr(full_response[:1000])}...\\n")
 
         # Step 3: Extract for functions + post_hook (key Telegram step)
@@ -126,14 +123,14 @@ async def test_telegram_streaming(user_id: int, text: str):
         print(f"  structured_intent_used: {diagnostics.get('structured_intent_used')}")
         print(f"  dispatched_actions: {diagnostics.get('dispatched_actions')}")
         
-        execution_result = diagnostics.get('execution_result')
+        execution_result = diagnostics.get("execution_result")
         if execution_result:
             print("✅ Functions executed!")
             for r in execution_result.results:
                 status = "✅" if r.success else "❌"
                 print(f"  {status} {r.function_name}: {r.result if r.result else r.error or 'no result'}")
                 if r.function_name == "send_todays_lesson":
-                    print(f"     🎉 TARGET FUNCTION HIT!")
+                    print("     🎉 TARGET FUNCTION HIT!")
         else:
             print("❌ No functions executed!")
         
@@ -148,9 +145,9 @@ async def test_telegram_streaming(user_id: int, text: str):
         db.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if not sys.argv[1:]:
-        print("Usage: python -m scripts.debug.debug_telegram_streaming [user_id] [\"text\"]")
+        print('Usage: python -m scripts.debug.debug_telegram_streaming [user_id] ["text"]')
         print('Example: python -m scripts.debug.debug_telegram_streaming 1 "Send me todays lesson"')
         sys.exit(1)
     

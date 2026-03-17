@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 
-
-
-
 def get_lesson_1_welcome_message(language: str, name: str) -> str:
 	messages = {
 		"no": f"""Perfekt, {name}! La oss begynne sammen med Leksjon 1. Dette er hvor transformasjonen starter.

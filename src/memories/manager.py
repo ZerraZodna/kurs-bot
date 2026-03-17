@@ -1,9 +1,11 @@
 import logging
-from typing import Optional, List
+from typing import List, Optional
+
 from sqlalchemy.orm import Session
-from src.models.database import SessionLocal
-from src.memories.store import MemoryStore
+
 from src.memories.memory_handler import MemoryHandler, MemoryRecord
+from src.memories.store import MemoryStore
+from src.models.database import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -68,12 +70,12 @@ class MemoryManager:
             self._topic_manager = TopicManager(self)
         return self._topic_manager
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # quick manual test
     from src.models.database import init_db
     init_db()
     mm = MemoryManager()
     uid = 1
-    mid = mm.store_memory(uid, 'learning_goal', 'Complete ACIM 365 lessons')
-    print('stored', mid)
-    print(mm.get_memory(uid, 'learning_goal'))
+    mid = mm.store_memory(uid, "learning_goal", "Complete ACIM 365 lessons")
+    print("stored", mid)
+    print(mm.get_memory(uid, "learning_goal"))

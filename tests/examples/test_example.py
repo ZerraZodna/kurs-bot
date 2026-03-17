@@ -10,17 +10,18 @@ This file serves as a reference for:
 import pytest
 from sqlalchemy.orm import Session
 
-# Import fixtures (they're automatically available via conftest.py)
-from src.models.database import User
-from src.memories import MemoryManager
-
 # Import utilities
 from tests.utils.assertions import (
-    assert_memory_stored,
     assert_memory_count,
+    assert_memory_stored,
     assert_response_contains,
 )
-from tests.utils.builders import MemoryBuilder, ScheduleBuilder, ConversationBuilder
+from tests.utils.builders import ConversationBuilder, MemoryBuilder, ScheduleBuilder
+
+from src.memories import MemoryManager
+
+# Import fixtures (they're automatically available via conftest.py)
+from src.models.database import User
 
 
 class TestMemoryManager:

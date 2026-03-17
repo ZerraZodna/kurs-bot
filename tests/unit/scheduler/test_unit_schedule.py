@@ -9,9 +9,9 @@ Tests the flow where:
 
 import pytest
 
-from src.models.database import Lesson
-from src.memories import MemoryManager
 from src.lessons.state import get_current_lesson, set_current_lesson
+from src.memories import MemoryManager
+from src.models.database import Lesson
 
 
 def _ensure_lesson(session, lesson_id: int, title: str, content: str):

@@ -4,10 +4,11 @@
 Usage: python scripts/inspect/inspect_memories.py [USER_ID]
 If USER_ID is omitted, defaults to 7.
 """
-import sys
 import json
-from src.models.database import init_db, Memory
+import sys
+
 from src.memories import MemoryManager
+from src.models.database import Memory, init_db
 
 
 def is_lesson_memory(m):

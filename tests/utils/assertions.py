@@ -4,10 +4,11 @@ Provides standardized assertion functions for common test scenarios.
 These make tests more readable and reduce duplication.
 """
 
-from typing import Optional, List
+from typing import List, Optional
+
 from sqlalchemy.orm import Session
 
-from src.models.database import Memory, Schedule, MessageLog, User
+from src.models.database import Memory, MessageLog, Schedule, User
 
 
 def assert_memory_stored(

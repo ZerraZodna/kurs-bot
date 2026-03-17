@@ -1,16 +1,17 @@
 """Service fixtures for tests."""
 
 import datetime
-from typing import Generator, Optional
-from unittest.mock import MagicMock, AsyncMock
+from collections.abc import Generator
+from typing import Optional
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy.orm import Session
 
 from src.memories import MemoryManager
-from src.services.dialogue_engine import DialogueEngine
-from src.scheduler import SchedulerService
 from src.models.database import Lesson
+from src.scheduler import SchedulerService
+from src.services.dialogue_engine import DialogueEngine
 
 
 @pytest.fixture
@@ -57,6 +58,7 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
     """
     import json
     import re
+
     from src.memories.constants import MemoryKey
     mock_client = MagicMock()
     
@@ -68,7 +70,7 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
         has_onboarding = "Current step:" in prompt
         sys.stderr.write(f"\n[MOCK] Onboarding context present: {has_onboarding}\n")
         if has_onboarding:
-            step_match = re.search(r'Current step:\s*(\w+)', prompt, re.IGNORECASE)
+            step_match = re.search(r"Current step:\s*(\w+)", prompt, re.IGNORECASE)
             if step_match:
                 sys.stderr.write(f"[MOCK] Step found: {step_match.group(1)}\n")
         
@@ -77,12 +79,12 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
         user_msg = ""
         
         # Try to find in Current Message section - match up to \n\nAssistant:
-        current_msg_match = re.search(r'-- Current Message\s*\n\s*User:\s*(.+?)(?:\n\nAssistant:|$)', prompt, re.IGNORECASE | re.DOTALL)
+        current_msg_match = re.search(r"-- Current Message\s*\n\s*User:\s*(.+?)(?:\n\nAssistant:|$)", prompt, re.IGNORECASE | re.DOTALL)
         if current_msg_match:
             user_msg = current_msg_match.group(1).strip()
         else:
             # Fallback: try to find last User: line in conversation history
-            user_matches = re.findall(r'User:\s*(.+?)(?:\n|$)', prompt, re.IGNORECASE)
+            user_matches = re.findall(r"User:\s*(.+?)(?:\n|$)", prompt, re.IGNORECASE)
             if user_matches:
                 user_msg = user_matches[-1].strip()
         
@@ -90,13 +92,13 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
         
         # Check for onboarding context - look for "Next Onboarding Step" in prompt
         # Use simpler, more robust regex patterns
-        current_step_match = re.search(r'Current step:\s*(\w+)', prompt, re.IGNORECASE)
+        current_step_match = re.search(r"Current step:\s*(\w+)", prompt, re.IGNORECASE)
         next_question_match = re.search(r'ask this next question:\s*"([^"]+)"', prompt, re.IGNORECASE)
         current_onboarding_step = current_step_match.group(1).lower() if current_step_match else None
         next_question = next_question_match.group(1) if next_question_match else None
         
         # For name extraction - check for "my name is X" pattern
-        name_match = re.search(r'my\s+name\s+is\s+(\w+)', user_msg, re.IGNORECASE)
+        name_match = re.search(r"my\s+name\s+is\s+(\w+)", user_msg, re.IGNORECASE)
         if name_match:
             name = name_match.group(1)
             # If we have a next onboarding question, include it in the response
@@ -115,7 +117,7 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
             })
         
         # For simple yes/no responses (name confirmation, consent, etc.)
-        if user_msg_lower in ['yes', 'ja']:
+        if user_msg_lower in ["yes", "ja"]:
             # Check context from prompt - use onboarding step if available
             if current_onboarding_step == "name" or "name" in prompt_lower:
                 response_text = "Great! I'll use your name from Telegram."
@@ -123,7 +125,7 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
                     response_text += f" {next_question}"
                 # Extract the name from the prompt (it should be in the user profile section)
                 name_from_profile = None
-                profile_match = re.search(r'User Profile\s*\n.*?Name:\s*(\w+)', prompt, re.IGNORECASE | re.DOTALL)
+                profile_match = re.search(r"User Profile\s*\n.*?Name:\s*(\w+)", prompt, re.IGNORECASE | re.DOTALL)
                 if profile_match:
                     name_from_profile = profile_match.group(1)
                 functions = [
@@ -166,7 +168,7 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
                 ]
             })
         
-        if user_msg_lower in ['no', 'nei']:
+        if user_msg_lower in ["no", "nei"]:
             return json.dumps({
                 "response": "No problem! Let me know if you need anything else.",
                 "functions": [
@@ -185,7 +187,7 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
         
         # For lesson status extraction
         # Check for "I am on lesson X" or "I'm on lesson X" pattern (more specific than just "lesson X")
-        i_am_lesson_match = re.search(r'i\s*(?:am|\'m)\s+(?:on\s+)?lesson\s*(\d+)', user_msg, re.IGNORECASE)
+        i_am_lesson_match = re.search(r"i\s*(?:am|\'m)\s+(?:on\s+)?lesson\s*(\d+)", user_msg, re.IGNORECASE)
         if i_am_lesson_match:
             lesson_num = i_am_lesson_match.group(1)
             response_text = f"Great! I'll note that you're currently on Lesson {lesson_num}."
@@ -199,7 +201,7 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
             })
         
         # Check for "lesson X" or "on lesson X" pattern
-        lesson_match = re.search(r'(?:on\s+)?lesson\s*(\d+)', user_msg, re.IGNORECASE)
+        lesson_match = re.search(r"(?:on\s+)?lesson\s*(\d+)", user_msg, re.IGNORECASE)
         if lesson_match:
             lesson_num = lesson_match.group(1)
             response_text = f"Great! I'll note that you're currently on Lesson {lesson_num}."
@@ -213,7 +215,7 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
             })
         
         # Check for just a number (e.g., "10")
-        num_match = re.match(r'^(\d{1,3})$', user_msg)
+        num_match = re.match(r"^(\d{1,3})$", user_msg)
         if num_match:
             lesson_num = num_match.group(1)
             response_text = f"Perfect! I'll set your current lesson to Lesson {lesson_num}."
@@ -228,7 +230,7 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
         
         # Check for timezone/location mentions (e.g., "New York", "London", "Tokyo")
         # This handles cases where user provides a location instead of yes/no
-        tz_match = re.search(r'\b(New\s+York|London|Tokyo|Paris|Berlin|Sydney|Los\s+Angeles|Chicago|Dubai|Mumbai|Singapore|Hong\s+Kong|Toronto|Vancouver|Oslo|Stockholm|Copenhagen|Helsinki|Madrid|Rome|Amsterdam|Zurich|Vienna|Brussels|Warsaw|Prague|Budapest|Athens|Istanbul|Cairo|Johannesburg|Nairobi|Lagos|Casablanca|Tel\s+Aviv|Dubai|Doha|Kuwait\s+City|Riyadh|Tehran|Karachi|Delhi|Mumbai|Kolkata|Chennai|Bangalore|Hyderabad|Pune|Ahmedabad|Dhaka|Kathmandu|Colombo|Male|Thimphu|Yangon|Bangkok|Phnom\s+Penh|Vientiane|Hanoi|Ho\s+Chi\s+Minh\s+City|Kuala\s+Lumpur|Singapore|Jakarta|Manila|Taipei|Seoul|Busan|Pyongyang|Beijing|Shanghai|Guangzhou|Shenzhen|Chengdu|Xi\'an|Wuhan|Nanjing|Hangzhou|Suzhou|Tianjin|Qingdao|Dalian|Shenyang|Changchun|Harbin|Kunming|Nanning|Guiyang|Lanzhou|Xining|Yinchuan|Urumqi|Lhasa|Hohhot|Taiyuan|Shijiazhuang|Jinan|Zhengzhou|Hefei|Nanchang|Fuzhou|Xiamen|Changsha|Wuhan|Ningbo|Wenzhou|Jinhua|Shaoxing|Jiaxing|Huzhou|Zhoushan|Taizhou|Quzhou|Lishui|Hainan|Sanya|Haikou|Danzhou|Wanning|Wenchang|Qionghai|Dongfang|Wuzhishan|Baoting|Baisha|Changjiang|Ledong|Lingao|Chengmai|Dingan|Tunchang|Qiongzhong|Baisha)\b', user_msg, re.IGNORECASE)
+        tz_match = re.search(r"\b(New\s+York|London|Tokyo|Paris|Berlin|Sydney|Los\s+Angeles|Chicago|Dubai|Mumbai|Singapore|Hong\s+Kong|Toronto|Vancouver|Oslo|Stockholm|Copenhagen|Helsinki|Madrid|Rome|Amsterdam|Zurich|Vienna|Brussels|Warsaw|Prague|Budapest|Athens|Istanbul|Cairo|Johannesburg|Nairobi|Lagos|Casablanca|Tel\s+Aviv|Dubai|Doha|Kuwait\s+City|Riyadh|Tehran|Karachi|Delhi|Mumbai|Kolkata|Chennai|Bangalore|Hyderabad|Pune|Ahmedabad|Dhaka|Kathmandu|Colombo|Male|Thimphu|Yangon|Bangkok|Phnom\s+Penh|Vientiane|Hanoi|Ho\s+Chi\s+Minh\s+City|Kuala\s+Lumpur|Singapore|Jakarta|Manila|Taipei|Seoul|Busan|Pyongyang|Beijing|Shanghai|Guangzhou|Shenzhen|Chengdu|Xi\'an|Wuhan|Nanjing|Hangzhou|Suzhou|Tianjin|Qingdao|Dalian|Shenyang|Changchun|Harbin|Kunming|Nanning|Guiyang|Lanzhou|Xining|Yinchuan|Urumqi|Lhasa|Hohhot|Taiyuan|Shijiazhuang|Jinan|Zhengzhou|Hefei|Nanchang|Fuzhou|Xiamen|Changsha|Wuhan|Ningbo|Wenzhou|Jinhua|Shaoxing|Jiaxing|Huzhou|Zhoushan|Taizhou|Quzhou|Lishui|Hainan|Sanya|Haikou|Danzhou|Wanning|Wenchang|Qionghai|Dongfang|Wuzhishan|Baoting|Baisha|Changjiang|Ledong|Lingao|Chengmai|Dingan|Tunchang|Qiongzhong|Baisha)\b", user_msg, re.IGNORECASE)
         if tz_match:
             location = tz_match.group(1)
             # Map common locations to timezones

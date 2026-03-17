@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from typing import Optional, Callable
+import re
+from typing import Callable, Optional
 
 from sqlalchemy.orm import Session
 
+from src.lessons.handler import translate_text
+from src.memories.constants import MemoryCategory, MemoryKey
+from src.memories.dialogue_helpers import get_user_language
 from src.scheduler import api as scheduler_api
 from src.scheduler.domain import is_daily_schedule_family
-import re
 
 # One-time reminder keyword parsing removed — handled by assistant + triggers
 from src.services.dialogue.pause_handler import detect_pause_request
-from src.memories.dialogue_helpers import get_user_language
-from src.memories.constants import MemoryCategory, MemoryKey
-from src.lessons.handler import translate_text
 
 
 async def handle_schedule_messages(

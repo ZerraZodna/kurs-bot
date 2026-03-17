@@ -7,15 +7,16 @@ This test file covers the query_schedule function handler which:
 - Includes messages for one-time reminders from memory
 """
 
-import pytest
 import json
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
+import pytest
+
 from src.functions.executor import FunctionExecutor
-from src.models.database import Schedule
 from src.memories import MemoryManager
-from src.memories.constants import MemoryKey, MemoryCategory
+from src.memories.constants import MemoryCategory, MemoryKey
+from src.models.database import Schedule
 
 
 class TestHandleQuerySchedule:
@@ -41,8 +42,8 @@ class TestHandleQuerySchedule:
         When: _handle_query_schedule is called
         Then: Return empty schedules list with success
         """
-        with patch('src.core.timezone.get_user_timezone_from_db', return_value='Europe/Oslo'):
-            with patch('src.scheduler.api.get_user_schedules', return_value=[]):
+        with patch("src.core.timezone.get_user_timezone_from_db", return_value="Europe/Oslo"):
+            with patch("src.scheduler.api.get_user_schedules", return_value=[]):
                 context = {
                     "user_id": test_user.user_id,
                     "session": db_session,
@@ -86,12 +87,12 @@ class TestHandleQuerySchedule:
         db_session.add(schedule2)
         db_session.commit()
         
-        with patch('src.core.timezone.get_user_timezone_from_db', return_value='Europe/Oslo'):
-            with patch('src.core.timezone.format_dt_in_timezone') as mock_format:
+        with patch("src.core.timezone.get_user_timezone_from_db", return_value="Europe/Oslo"):
+            with patch("src.core.timezone.format_dt_in_timezone") as mock_format:
                 # Mock timezone conversion to return a fixed time
                 mock_format.return_value = (datetime(2024, 1, 15, 10, 0, tzinfo=timezone.utc), "Europe/Oslo")
                 
-                with patch('src.scheduler.api.get_user_schedules', return_value=[schedule1, schedule2]):
+                with patch("src.scheduler.api.get_user_schedules", return_value=[schedule1, schedule2]):
                     context = {
                         "user_id": test_user.user_id,
                         "session": db_session,
@@ -133,13 +134,13 @@ class TestHandleQuerySchedule:
         db_session.commit()
         
         # User in Europe/Oslo (UTC+1 in winter)
-        with patch('src.core.timezone.get_user_timezone_from_db', return_value='Europe/Oslo'):
-            with patch('src.core.timezone.format_dt_in_timezone') as mock_format:
+        with patch("src.core.timezone.get_user_timezone_from_db", return_value="Europe/Oslo"):
+            with patch("src.core.timezone.format_dt_in_timezone") as mock_format:
                 # Mock: 9 AM UTC should become 10 AM in Europe/Oslo
                 local_dt = datetime(2024, 1, 15, 10, 0, tzinfo=timezone.utc)
                 mock_format.return_value = (local_dt, "Europe/Oslo")
                 
-                with patch('src.scheduler.api.get_user_schedules', return_value=[schedule]):
+                with patch("src.scheduler.api.get_user_schedules", return_value=[schedule]):
                     context = {
                         "user_id": test_user.user_id,
                         "session": db_session,
@@ -183,12 +184,12 @@ class TestHandleQuerySchedule:
             {"key": MemoryKey.SCHEDULE_MESSAGE, "value": message_data}
         ]
         
-        with patch('src.core.timezone.get_user_timezone_from_db', return_value='UTC'):
-            with patch('src.core.timezone.format_dt_in_timezone') as mock_format:
+        with patch("src.core.timezone.get_user_timezone_from_db", return_value="UTC"):
+            with patch("src.core.timezone.format_dt_in_timezone") as mock_format:
                 mock_format.return_value = (schedule.next_send_time, "UTC")
                 
-                with patch('src.scheduler.api.get_user_schedules', return_value=[schedule]):
-                    with patch('src.scheduler.memory_helpers.get_schedule_message') as mock_get_msg:
+                with patch("src.scheduler.api.get_user_schedules", return_value=[schedule]):
+                    with patch("src.scheduler.memory_helpers.get_schedule_message") as mock_get_msg:
                         mock_get_msg.return_value = "Don't forget your lesson!"
                         
                         context = {
@@ -240,12 +241,12 @@ class TestHandleQuerySchedule:
         db_session.add(inactive_schedule)
         db_session.commit()
         
-        with patch('src.core.timezone.get_user_timezone_from_db', return_value='UTC'):
-            with patch('src.core.timezone.format_dt_in_timezone') as mock_format:
+        with patch("src.core.timezone.get_user_timezone_from_db", return_value="UTC"):
+            with patch("src.core.timezone.format_dt_in_timezone") as mock_format:
                 mock_format.return_value = (datetime(2024, 1, 15, 9, 0, tzinfo=timezone.utc), "UTC")
                 
                 # Only return active schedules from the API
-                with patch('src.scheduler.api.get_user_schedules', return_value=[active_schedule]):
+                with patch("src.scheduler.api.get_user_schedules", return_value=[active_schedule]):
                     context = {
                         "user_id": test_user.user_id,
                         "session": db_session,
@@ -267,8 +268,8 @@ class TestHandleQuerySchedule:
         When: _handle_query_schedule is called
         Then: Return error response
         """
-        with patch('src.core.timezone.get_user_timezone_from_db', return_value='UTC'):
-            with patch('src.scheduler.api.get_user_schedules', side_effect=Exception("Database error")):
+        with patch("src.core.timezone.get_user_timezone_from_db", return_value="UTC"):
+            with patch("src.scheduler.api.get_user_schedules", side_effect=Exception("Database error")):
                 context = {
                     "user_id": test_user.user_id,
                     "session": db_session,
@@ -302,11 +303,11 @@ class TestHandleQuerySchedule:
         db_session.add(schedule)
         db_session.commit()
         
-        with patch('src.core.timezone.get_user_timezone_from_db', return_value='UTC'):
-            with patch('src.core.timezone.format_dt_in_timezone') as mock_format:
+        with patch("src.core.timezone.get_user_timezone_from_db", return_value="UTC"):
+            with patch("src.core.timezone.format_dt_in_timezone") as mock_format:
                 mock_format.return_value = (schedule.next_send_time, "UTC")
                 
-                with patch('src.scheduler.api.get_user_schedules', return_value=[schedule]):
+                with patch("src.scheduler.api.get_user_schedules", return_value=[schedule]):
                     # Context without memory_manager
                     context = {
                         "user_id": test_user.user_id,
@@ -329,8 +330,8 @@ class TestHandleQuerySchedule:
         When: _handle_query_schedule is called
         Then: Return schedules using default UTC timezone
         """
-        with patch('src.core.timezone.get_user_timezone_from_db', return_value='UTC'):
-            with patch('src.scheduler.api.get_user_schedules', return_value=[]):
+        with patch("src.core.timezone.get_user_timezone_from_db", return_value="UTC"):
+            with patch("src.scheduler.api.get_user_schedules", return_value=[]):
                 context = {
                     "user_id": test_user.user_id,
                     "session": None,  # No session
@@ -387,11 +388,11 @@ class TestHandleQueryScheduleIntegration:
             source="test",
         )
         
-        with patch('src.core.timezone.get_user_timezone_from_db', return_value='UTC'):
-            with patch('src.core.timezone.format_dt_in_timezone') as mock_format:
+        with patch("src.core.timezone.get_user_timezone_from_db", return_value="UTC"):
+            with patch("src.core.timezone.format_dt_in_timezone") as mock_format:
                 mock_format.return_value = (schedule.next_send_time, "UTC")
                 
-                with patch('src.scheduler.api.get_user_schedules', return_value=[schedule]):
+                with patch("src.scheduler.api.get_user_schedules", return_value=[schedule]):
                     context = {
                         "user_id": test_user.user_id,
                         "session": db_session,

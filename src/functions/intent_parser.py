@@ -6,10 +6,11 @@ and handling malformed responses gracefully.
 """
 
 import json
-import re
 import logging
+import re
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
+
 from .registry import FunctionRegistry, get_function_registry
 
 logger = logging.getLogger(__name__)
@@ -120,7 +121,7 @@ class IntentParser:
         try:
             fixed = json_str.strip()
             fixed = re.sub(r'^\{\s*([A-Za-z_][A-Za-z0-9_]*)"', r'{"\1"', fixed)
-            fixed = re.sub(r'^\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:', r'{"\1":', fixed)
+            fixed = re.sub(r"^\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:", r'{"\1":', fixed)
 
             json.loads(fixed)
             return fixed

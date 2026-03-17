@@ -1,20 +1,22 @@
 import logging
-from typing import Optional, Dict
+from typing import Dict, Optional
+
 from sqlalchemy.orm import Session
-from src.memories import MemoryManager
+
+from src.config import settings
+from src.core.timezone import format_dt_in_timezone, get_user_timezone_from_db
 from src.language.prompt_builder import PromptBuilder
+from src.language.prompt_registry import get_prompt_registry
+from src.memories import MemoryManager
+from src.memories.constants import MemoryCategory, MemoryKey
 from src.memories.semantic_search import get_semantic_search_service
-from src.onboarding.service import OnboardingService
+from src.models.database import User
 from src.onboarding.flow import OnboardingFlow
+from src.onboarding.service import OnboardingService
 from src.scheduler import api as scheduler_api
 from src.services.dialogue import (
     stream_ollama,
 )
-from src.config import settings
-from src.models.database import User
-from src.memories.constants import MemoryKey, MemoryCategory
-from src.core.timezone import get_user_timezone_from_db, format_dt_in_timezone
-from src.language.prompt_registry import get_prompt_registry
 
 logger = logging.getLogger(__name__)
 
@@ -131,9 +133,7 @@ class DialogueEngine:
 
     async def _handle_commands(self, user_id: int, text: str, session: Session, use_rag: bool) -> Optional[str]:
         """Handle various specialized commands."""
-        from src.services.dialogue import (
-            handle_list_memories, handle_rag_prompt_command
-        )
+        from src.services.dialogue import handle_list_memories, handle_rag_prompt_command
         
         if use_rag:
             list_memories = handle_list_memories(text, self.memory_manager, session, user_id)
@@ -163,9 +163,7 @@ class DialogueEngine:
     async def _handle_lesson_and_schedule_stage(
         self, user_id: int, text: str, session: Session, user_lang: str, include_lesson: bool, use_rag: bool
     ) -> Optional[str]:
-        from src.services.dialogue import (
-            handle_schedule_messages, maybe_send_next_lesson
-        )
+        from src.services.dialogue import handle_schedule_messages, maybe_send_next_lesson
         
         schedule_response = await handle_schedule_messages(
             user_id=user_id,
@@ -240,7 +238,7 @@ class DialogueEngine:
         is_english = not user_lang or user_lang.lower() == "en"
 
         async def post_hook(full_response_text: str):
-            from src.functions import get_intent_parser, get_function_executor
+            from src.functions import get_function_executor, get_intent_parser
             parser = get_intent_parser()
             parse_result = parser.parse(full_response_text)
             diagnostics = {}
@@ -294,8 +292,8 @@ class DialogueEngine:
         if use_rag:
             return "rag"
         
-        from src.memories.constants import MemoryKey
         from src.functions.definitions import FunctionDefinitions
+        from src.memories.constants import MemoryKey
         pending_step = self.memory_manager.get_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING)
         if pending_step:
             step_value = str(pending_step[0].get("value", "")).lower()
@@ -321,8 +319,8 @@ class DialogueEngine:
 
     async def _handle_schedule_request(self, user_id: int, text: str, session: Session) -> Optional[str]:
         """Handle explicit schedule requests (unchanged helper)."""
-        from src.services.dialogue import get_user_language, translate_text
         from src.scheduler.schedule_query_handler import build_schedule_status_response
+        from src.services.dialogue import get_user_language, translate_text
         
         schedules = scheduler_api.get_user_schedules(user_id, session=session)
         if schedules:

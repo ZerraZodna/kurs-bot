@@ -1,16 +1,16 @@
 """User fixtures and factories for tests."""
 
 import datetime
-from typing import Optional, Generator
+from collections.abc import Generator
+from typing import Optional
 
 import pytest
 from sqlalchemy.orm import Session
 
-from src.models.database import User
+from src.lessons.state import set_current_lesson
 from src.memories import MemoryManager
 from src.memories.memory_handler import MemoryHandler
-from src.lessons.state import set_current_lesson
-
+from src.models.database import User
 
 # Constants
 DEFAULT_EXTERNAL_ID = "test_user_001"

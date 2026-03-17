@@ -17,12 +17,12 @@ class TestTodaysLessonJsonBug:
         parser = IntentParser()
         
         # This is what the AI returns when asked about today's lesson
-        llm_response = '''{
+        llm_response = """{
   "response": "Today's lesson is a time for reflection and inner peace.",
   "functions": [
     {"name": "send_todays_lesson", "parameters": {}}
   ]
-}'''
+}"""
         
         result = parser.parse(llm_response)
         
@@ -43,12 +43,12 @@ class TestTodaysLessonJsonBug:
         parser = IntentParser()
         
         # This is what the LLM returns
-        raw_llm_response = '''{
+        raw_llm_response = """{
   "response": "Today's lesson is a time for reflection and inner peace.",
   "functions": [
     {"name": "send_todays_lesson", "parameters": {}}
   ]
-}'''
+}"""
         
         result = parser.parse(raw_llm_response)
         
@@ -88,12 +88,12 @@ class TestTodaysLessonJsonBug:
         ]
         
         # The LLM would return similar JSON for all these variations
-        llm_response_template = '''{
+        llm_response_template = """{
       "response": "Today's lesson is about finding peace within.",
       "functions": [
         {"name": "send_todays_lesson", "parameters": {}}
       ]
-    }'''
+    }"""
 
         
         for user_query in variations:
@@ -122,12 +122,12 @@ class TestTodaysLessonDesiredBehavior:
         parser = IntentParser()
         
         # LLM returns JSON with function call
-        llm_response = '''{
+        llm_response = """{
   "response": "Today's lesson is a time for reflection and inner peace.",
   "functions": [
     {"name": "send_todays_lesson", "parameters": {}}
   ]
-}'''
+}"""
         
         result = parser.parse(llm_response)
         
@@ -146,12 +146,12 @@ class TestTodaysLessonDesiredBehavior:
         """
         parser = IntentParser()
         
-        llm_response = '''{
+        llm_response = """{
   "response": "Here is today's lesson for you.",
   "functions": [
     {"name": "send_todays_lesson", "parameters": {}}
   ]
-}'''
+}"""
         
         result = parser.parse(llm_response)
         

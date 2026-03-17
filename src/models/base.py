@@ -1,7 +1,8 @@
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import declarative_base
 import logging
 import sys
+
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import declarative_base
 
 # Use Settings from config.py for database URL
 from src.config import settings

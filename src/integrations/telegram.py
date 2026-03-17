@@ -1,13 +1,16 @@
 import asyncio
-import httpx
 import logging
 import re
 import time
-from typing import Optional, Dict, Any, AsyncIterator
+from collections.abc import AsyncIterator
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
+import httpx
+
 from src.config import settings
-from src.models.database import SessionLocal, MessageLog, BatchLock
 from src.integrations.telegram_stream import StreamingFilter
+from src.models.database import BatchLock, MessageLog, SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -29,18 +32,18 @@ def sanitize_html_for_telegram(text: str) -> str:
     
     # Step 1: Convert <ul><li> items to bullet points with dashes
     # First handle <li> content and prepend with dash
-    text = re.sub(r'<li>(.*?)</li>', r'- \1\n', text, flags=re.DOTALL)
+    text = re.sub(r"<li>(.*?)</li>", r"- \1\n", text, flags=re.DOTALL)
     # Remove <ul> tags
-    text = re.sub(r'</?ul[^>]*>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r"</?ul[^>]*>", "", text, flags=re.IGNORECASE)
     
     # Step 2: Convert <br> to newlines
-    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
     
     # Step 3: Strip unsupported HTML tags but keep their content
     text = _strip_unsupported_tags(text)
     
     # Clean up excessive newlines
-    text = re.sub(r'\n{3,}', '\n\n', text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
     
     return text.strip()
 
@@ -48,13 +51,13 @@ def sanitize_html_for_telegram(text: str) -> str:
 def _strip_unsupported_tags(text: str) -> str:
     """Remove HTML tags that Telegram doesn't support, keeping their content."""
     # List of tags Telegram supports
-    supported_tags = ['b', 'strong', 'i', 'em', 'u', 's', 'code', 'pre', 'a']
+    supported_tags = ["b", "strong", "i", "em", "u", "s", "code", "pre", "a"]
     
     # Pattern to match any tag not in supported list
     # This matches <tag> or </tag> where tag is not in supported list
     def replace_tag(match):
         # Return just the content between tags
-        return match.group(1) or ''
+        return match.group(1) or ""
     
     # Match opening tags with content: <unsupported>content</unsupported>
     # pattern = r'<(/?)(?!/?(?:' + '|'.join(supported_tags) + r')\b)(\w+)[^>]*>([^<]*)'
@@ -63,9 +66,9 @@ def _strip_unsupported_tags(text: str) -> str:
     result = []
     i = 0
     while i < len(text):
-        if text[i] == '<':
+        if text[i] == "<":
             # Find the end of the tag
-            end = text.find('>', i)
+            end = text.find(">", i)
             if end == -1:
                 result.append(text[i])
                 i += 1
@@ -77,9 +80,9 @@ def _strip_unsupported_tags(text: str) -> str:
             # is_closing = tag.startswith('</')
             
             # Extract tag name
-            tag_name = re.sub(r'[</>]', '', tag).lower()
+            tag_name = re.sub(r"[</>]", "", tag).lower()
             # Handle self-closing tags and attributes
-            tag_name = re.split(r'[\s>]', tag_name)[0]
+            tag_name = re.split(r"[\s>]", tag_name)[0]
             
             if tag_name in supported_tags:
                 # Keep the tag
@@ -93,7 +96,7 @@ def _strip_unsupported_tags(text: str) -> str:
             result.append(text[i])
             i += 1
     
-    return ''.join(result)
+    return "".join(result)
 
 
 class TelegramHandler:
@@ -450,15 +453,15 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                     logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] function_parse_text='{function_parse_text[:1000]}...' (len={len(function_parse_text)})")
                     logger.info(f"[telegram FUNCTION_FAILURE user={user_id}] raw_generator_remaining='{stream_filter.get_remaining_for_functions()[:500]}...'")
 
-                    from src.functions.intent_parser import get_intent_parser
                     from src.functions import get_function_executor
+                    from src.functions.intent_parser import get_intent_parser
                     from src.functions.response_builder import get_response_builder
 
                     parser = get_intent_parser()
                     parse_result = parser.parse(function_parse_text)
                     
                     # RAW functions logging before any processing
-                    fn_names = [f.get('name', 'NO_NAME') for f in parse_result.functions]
+                    fn_names = [f.get("name", "NO_NAME") for f in parse_result.functions]
                     fn_details = [f"{f.get('name', 'NO_NAME')} (len={len(f.get('name', ''))})" for f in parse_result.functions]
                     logger.info(f"[telegram RAW_FUNCTIONS user={user_id}] functions_count={len(parse_result.functions)}, names={fn_names}, details={fn_details}")
                     logger.info(f"[telegram PARSE_RESULT user={user_id}] success={parse_result.success},fallback={parse_result.is_fallback},functions={len(parse_result.functions)},errors={len(parse_result.errors or [])}")
@@ -481,7 +484,7 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                     
 # Handle all cases: success, empty [], parse errors, exec fails
                     parse_had_errors = bool(parse_result.errors and not parse_result.success)
-                    exec_had_errors = diagnostics.get('execution_result') and 'error' in str(diagnostics.get('execution_result', '')).lower()
+                    exec_had_errors = diagnostics.get("execution_result") and "error" in str(diagnostics.get("execution_result", "")).lower()
 
                     if parse_result.functions:  # Valid functions found
                         logger.info(f"[telegram VALID_FUNCTIONS user={user_id}] Executing {len(parse_result.functions)} functions")

@@ -6,9 +6,10 @@ Migrated from tests/test_prompt_builder.py to use new test fixtures.
 
 import pytest
 from sqlalchemy.orm import Session
-from src.models.database import User, MessageLog
-from src.memories import MemoryManager
+
 from src.language.prompt_builder import PromptBuilder
+from src.memories import MemoryManager
+from src.models.database import MessageLog, User
 from src.services.context_utils import ContextOptimizer
 
 

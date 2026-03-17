@@ -4,13 +4,14 @@ This test verifies that when a user provides a new name (e.g., "Johannes"),
 it overrides the old Telegram name (e.g., "Dev").
 """
 
-import pytest
 from datetime import datetime, timezone
 
-from src.models.database import init_db, SessionLocal, Memory
+import pytest
+
+from src.memories.constants import MemoryCategory, MemoryKey
 from src.memories.manager import MemoryManager
 from src.memories.topics import MemoryTopic
-from src.memories.constants import MemoryCategory, MemoryKey
+from src.models.database import Memory, SessionLocal, init_db
 
 
 @pytest.fixture

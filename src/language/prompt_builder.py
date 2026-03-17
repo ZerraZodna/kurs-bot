@@ -3,14 +3,16 @@ Prompt Builder: Constructs context-aware prompts from user memory, preferences, 
 Supports dynamic context assembly for Ollama LLM with token optimization.
 """
 
-from typing import Dict, List, Optional, Any, Tuple
-from sqlalchemy.orm import Session
 import re
-from src.core.timezone import get_user_timezone_from_db, format_dt_in_timezone, to_utc, utc_now
-from src.models.database import MessageLog, User, Lesson
+from typing import Any, Dict, List, Optional, Tuple
+
+from sqlalchemy.orm import Session
+
+from src.core.timezone import format_dt_in_timezone, get_user_timezone_from_db, to_utc, utc_now
+from src.functions.definitions import get_function_definitions
 from src.memories import MemoryManager
 from src.memories.constants import MemoryKey
-from src.functions.definitions import get_function_definitions
+from src.models.database import Lesson, MessageLog, User
 
 
 class PromptBuilder:
@@ -184,7 +186,7 @@ class PromptBuilder:
         ):
             return True
 
-        if re.search(r'\\btoday\\b.*?(?:lesson|leksjon)|lesson\\s+for\\s+today|today\'?s?\\s+lesson', normalized, re.I):
+        if re.search(r"\\btoday\\b.*?(?:lesson|leksjon)|lesson\\s+for\\s+today|today\'?s?\\s+lesson", normalized, re.I):
             return True
         today_words = {"today", "todays", "idag", "dagens"}
         has_today_word = bool(tokens & today_words) or ("i dag" in normalized)
@@ -321,7 +323,7 @@ class PromptBuilder:
         if max_chars and len(content) > max_chars:
             content = content[:max_chars].rsplit(" ", 1)[0] + "..."
 
-        lesson_text = f"<b>Lesson {lesson.lesson_id}</b>: \"{lesson.title}\"\n\n{content}"
+        lesson_text = f'<b>Lesson {lesson.lesson_id}</b>: "{lesson.title}"\n\n{content}'
         return lesson_text, state.get("progress_note")
 
     def get_today_lesson_context(self, user_id: int, max_chars: int = 800) -> Dict[str, Any]:
@@ -339,7 +341,7 @@ class PromptBuilder:
         if max_chars and len(content) > max_chars:
             content = content[:max_chars].rsplit(" ", 1)[0] + "..."
         
-        lesson_text = f"<b>Lesson {lesson.lesson_id}</b>: \"{lesson.title}\"\n\n{content}"
+        lesson_text = f'<b>Lesson {lesson.lesson_id}</b>: "{lesson.title}"\n\n{content}'
         return {"lesson_text": lesson_text, "state": state}
 
     def _get_current_lesson_state(self, user_id: int) -> Dict[str, Any]:
@@ -511,8 +513,8 @@ Always transition smoothly to the next onboarding question."""
     
     def _detect_onboarding_stage(self, user_id: int) -> Optional[str]:
         """Detect specific onboarding stage from pending step memory."""
-        from src.memories.constants import MemoryKey
         from src.functions.definitions import FunctionDefinitions
+        from src.memories.constants import MemoryKey
         
         pending_step = self.memory_manager.get_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING)
         if not pending_step:

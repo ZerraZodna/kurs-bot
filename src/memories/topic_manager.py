@@ -7,18 +7,17 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from typing import Any, Dict, List
+
 from src.core.timezone import utc_now
-from typing import Dict, List, Any
-
-
 from src.memories.manager import MemoryManager
 from src.memories.topics import (
-    MemoryTopic, 
-    TopicData, 
-    TopicField, 
+    MemoryTopic,
+    TopicData,
+    TopicField,
     TopicFieldValue,
-    resolve_canonical_key,
     get_all_keys_for_topic,
+    resolve_canonical_key,
 )
 
 logger = logging.getLogger(__name__)

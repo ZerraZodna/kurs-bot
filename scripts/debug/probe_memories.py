@@ -1,6 +1,7 @@
 import asyncio
-from src.memories.ai_judge import MemoryJudge
+
 from src.config import settings
+from src.memories.ai_judge import MemoryJudge
 
 
 async def main():
@@ -23,5 +24,5 @@ async def main():
         print(res)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())

@@ -3,8 +3,9 @@
 Migrated from tests/test_detect_language_regression.py to use new test fixtures.
 """
 
-import pytest
 from datetime import datetime, timezone
+
+import pytest
 
 from src.models.database import User
 from src.services.dialogue_engine import DialogueEngine

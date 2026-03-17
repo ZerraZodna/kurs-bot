@@ -5,13 +5,13 @@ Public API:
 - `MemoryManager` : DB-backed memory manager implementation.
 """
 
-from .service import MemoryService
-from .manager import MemoryManager
 from . import manager
+from .constants import MemoryCategory, MemoryKey
+from .manager import MemoryManager
 from .memory_handler import MemoryHandler
+from .service import MemoryService
 from .store import MemoryStore
 from .types import MemoryEntity, MemoryRecord
-from .constants import MemoryCategory, MemoryKey
 from .user_data_service import delete_user_content_rows
 
 __all__ = [

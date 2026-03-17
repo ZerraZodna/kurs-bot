@@ -8,14 +8,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import List, Optional
+
 from sqlalchemy.orm import Session
-from typing import Optional, List
+
 from src.core.timezone import utc_now
-from src.models.database import Lesson, User
-from src.memories import MemoryManager
-from src.lessons.state import get_current_lesson, set_current_lesson, compute_current_lesson_state
 from src.lessons.handler import format_lesson_message as handler_format_lesson_message
 from src.lessons.importer import ensure_lessons_available
+from src.lessons.state import compute_current_lesson_state, get_current_lesson, set_current_lesson
+from src.memories import MemoryManager
+from src.models.database import Lesson, User
 from src.scheduler.message_utils import send_outbound_message
 
 logger = logging.getLogger(__name__)

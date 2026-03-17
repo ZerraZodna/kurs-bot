@@ -12,14 +12,14 @@ from typing import Callable, Optional
 from sqlalchemy.orm import Session
 
 from src.core.timezone import utc_now
+from src.lessons import format_lesson_message
+from src.lessons.delivery import build_lesson_preview, deliver_lesson, get_lesson_or_import
 from src.memories import MemoryManager
 from src.models.database import Lesson, Schedule, User, get_session
 from src.scheduler.message_utils import send_outbound_message
 
 from .domain import is_one_time_schedule_type, job_id_for_schedule
 from .memory_helpers import get_schedule_message, get_user_language
-from src.lessons import format_lesson_message
-from src.lessons.delivery import get_lesson_or_import, build_lesson_preview, deliver_lesson
 
 logger = logging.getLogger(__name__)
 

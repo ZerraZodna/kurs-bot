@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import asyncio
 import sys
-from datetime import datetime
 from pathlib import Path
 
 # Ensure repo root on path
@@ -11,6 +10,7 @@ if str(repo_root) not in sys.path:
 
 from src.models.database import SessionLocal, User, init_db
 from src.services.dialogue_engine import DialogueEngine
+
 
 def dump_user_lesson_state(db, user_id: int):
     user = db.query(User).filter_by(user_id=user_id).first()

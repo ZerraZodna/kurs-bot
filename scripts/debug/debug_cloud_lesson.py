@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import asyncio
+import logging
 import sys
 from pathlib import Path
-import logging
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -10,9 +10,10 @@ repo_root = Path(__file__).resolve().parents[2]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from src.models.database import SessionLocal, User, init_db
-from src.services.dialogue_engine import DialogueEngine
 from src.integrations.telegram_stream import StreamingFilter
+from src.models.database import SessionLocal, init_db
+from src.services.dialogue_engine import DialogueEngine
+
 
 async def test_cloud_lesson(user_id: int = 1, query: str = "send me todays lesson"):
     db = SessionLocal()
@@ -39,7 +40,7 @@ async def test_cloud_lesson(user_id: int = 1, query: str = "send me todays lesso
                 raw_tokens.append(token)
                 print(f"RAW: {repr(token)}")
             
-            full_raw = ''.join(raw_tokens)
+            full_raw = "".join(raw_tokens)
             print(f"\nFULL RAW RESPONSE (len={len(full_raw)}):")
             print(repr(full_raw))
             
@@ -53,7 +54,7 @@ async def test_cloud_lesson(user_id: int = 1, query: str = "send me todays lesso
                 filtered_tokens.append(token)
                 print(f"FILTERED: {repr(token)}")
             
-            full_filtered = ''.join(filtered_tokens)
+            full_filtered = "".join(filtered_tokens)
             print(f"\nFULL FILTERED (len={len(full_filtered)}): {repr(full_filtered)}")
             
             remaining = stream_filter.get_remaining_for_functions()
@@ -68,7 +69,7 @@ async def test_cloud_lesson(user_id: int = 1, query: str = "send me todays lesso
     finally:
         db.close()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     init_db()
     asyncio.run(test_cloud_lesson())
 

@@ -12,13 +12,14 @@ For parallel test execution with pytest-xdist, each worker gets its own
 temporary database file to avoid SQLite file locking issues.
 """
 
-import os
 import datetime
-from typing import Generator
+import os
+from collections.abc import Generator
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+
 
 @pytest.fixture(scope="module", autouse=True)
 def module_db_session(db_engine):
@@ -28,9 +29,8 @@ def module_db_session(db_engine):
     TestSessionLocal = sessionmaker(bind=db_engine, autoflush=False, autocommit=False, future=True)
     mp.setattr("src.models.database.SessionLocal", TestSessionLocal)
 
-from src.models.database import Base
 from src.models import User
-
+from src.models.database import Base
 
 # Constants for test database
 DEFAULT_TEST_USER_EXTERNAL_ID = "test_user_001"

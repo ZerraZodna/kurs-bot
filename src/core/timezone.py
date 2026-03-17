@@ -5,12 +5,9 @@ This module centralizes timezone helpers for reuse across packages.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone, date
+from datetime import date, datetime, timezone
 from typing import Optional, Tuple
-
 from zoneinfo import ZoneInfo
-
-
 
 
 def _normalize_tz_name(tz_name: Optional[str]) -> Optional[str]:
@@ -277,11 +274,11 @@ def format_datetime_for_display(iso_string: Optional[str]) -> str:
     
     try:
         # Parse the ISO string
-        dt = datetime.fromisoformat(iso_string.replace('Z', '+00:00'))
+        dt = datetime.fromisoformat(iso_string.replace("Z", "+00:00"))
         # Format as YYYY-MM-DD HH:MM (without seconds, with space instead of T)
         return f"{dt:%Y-%m-%d %H:%M}"
     except Exception:
         # If parsing fails, just replace T with space as fallback
-        if 'T' in iso_string:
-            return iso_string.replace('T', ' ')[:16]  # Take up to minutes
+        if "T" in iso_string:
+            return iso_string.replace("T", " ")[:16]  # Take up to minutes
         return iso_string

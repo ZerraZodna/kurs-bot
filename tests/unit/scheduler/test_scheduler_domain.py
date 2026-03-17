@@ -9,8 +9,8 @@ from src.scheduler import jobs
 from src.scheduler.domain import (
     SCHEDULE_TYPE_DAILY,
     SCHEDULE_TYPE_ONE_TIME_REMINDER,
-    is_daily_schedule_type,
     is_daily_schedule_family,
+    is_daily_schedule_type,
     is_one_time_schedule_type,
     job_id_for_schedule,
 )

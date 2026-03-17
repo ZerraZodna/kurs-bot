@@ -3,18 +3,18 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from src.models.database import SessionLocal, User
 from src.config import settings
+from src.models.database import SessionLocal, User
 from src.services.gdpr_service import (
+    erase_user_data,
     export_user_data,
-    restrict_processing,
     object_to_processing,
     rectify_user,
-    erase_user_data,
+    restrict_processing,
     withdraw_consent,
 )
 

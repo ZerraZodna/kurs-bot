@@ -4,11 +4,11 @@ Provides the scheduler façade and exposes SchedulerService and related
 utilities (jobs, manager, time utilities, helpers) for use by the
 application.
 """
-from src.models.database import SessionLocal
 from src.integrations.telegram import send_message
+from src.models.database import SessionLocal
 
-from .core import SchedulerService
 from . import jobs, manager, time_utils
+from .core import SchedulerService
 
 __all__ = [
     "SchedulerService",

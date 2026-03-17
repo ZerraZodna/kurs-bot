@@ -1,11 +1,12 @@
 """Test script to verify streaming path with StreamingFilter."""
 import asyncio
 import sys
-sys.path.insert(0, '/Users/johannessteen/kurs-bot')
 
+sys.path.insert(0, "/Users/johannessteen/kurs-bot")
+
+from src.integrations.telegram_stream import StreamingFilter
 from src.models.database import SessionLocal, init_db
 from src.services.dialogue_engine import DialogueEngine
-from src.integrations.telegram_stream import StreamingFilter
 
 
 async def test_streaming_with_filter(user_id: int, text: str):
@@ -45,34 +46,34 @@ async def test_streaming_with_filter(user_id: int, text: str):
                 filtered_tokens.append(token)
                 print(f"FILTERED: {repr(token[:1000])}")
             
-            full_response = ''.join(filtered_tokens)
+            full_response = "".join(filtered_tokens)
             print(f"\n--- Full response for Telegram (length={len(full_response)}) ---")
             print(f"First 2000 chars: {repr(full_response[:2000])}")
             
             # Get remaining content for function processing
             # Pass full_response so we can extract functions from it
             remaining = stream_filter.get_remaining_for_functions()
-            print(f"\n--- Remaining for functions ---")
+            print("\n--- Remaining for functions ---")
             print(f"Remaining: {repr(remaining[:200] if remaining else None)}")
             
             # THE FIX: Use remaining_for_functions (includes functions JSON) for post_hook
             # This is what telegram.py does - it passes the functions to post_hook
             function_parse_text = remaining if remaining else full_response
             
-            print(f"\n--- Running post_hook ---")
+            print("\n--- Running post_hook ---")
             print(f"Passing to post_hook (length={len(function_parse_text)}): {repr(function_parse_text[:200])}")
             
             diagnostics = await result["post_hook"](function_parse_text)
             
-            print(f"\n--- Diagnostics ---")
+            print("\n--- Diagnostics ---")
             print(f"Keys: {diagnostics.keys() if diagnostics else 'None'}")
             print(f"structured_intent_used: {diagnostics.get('structured_intent_used')}")
             print(f"dispatched_actions: {diagnostics.get('dispatched_actions')}")
             print(f"execution_result: {diagnostics.get('execution_result')}")
             
-            if diagnostics.get('execution_result'):
+            if diagnostics.get("execution_result"):
                 print("\n✅ Function executed successfully!")
-                results = diagnostics['execution_result'].results
+                results = diagnostics["execution_result"].results
                 for r in results:
                     print(f"  - {r.function_name}: {r.success}")
                     if r.result:
@@ -87,7 +88,7 @@ async def test_streaming_with_filter(user_id: int, text: str):
         db.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     init_db()
     user_id = int(sys.argv[1]) if len(sys.argv) > 1 else 1
     text = sys.argv[2] if len(sys.argv) > 2 else "Send me today´s lesson"

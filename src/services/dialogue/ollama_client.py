@@ -15,6 +15,7 @@ from typing import Any, Optional
 from urllib.parse import urlparse
 
 import httpx
+
 from src.config import settings
 
 # Optional official client for cloud usage

@@ -4,9 +4,10 @@ This test verifies that when a user says "in 10 minutes", the reminder
 is scheduled correctly in their local timezone, not UTC.
 """
 
-import pytest
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
+
+import pytest
 
 
 class TestRelativeTimeParsing:
@@ -22,7 +23,7 @@ class TestRelativeTimeParsing:
         
         # Mock current time
         mock_utc_now = datetime(2026, 3, 2, 14, 4, 0, tzinfo=timezone.utc)  # 14:04 UTC
-        oslo_tz = ZoneInfo('Europe/Oslo')
+        oslo_tz = ZoneInfo("Europe/Oslo")
         mock_oslo_now = mock_utc_now.astimezone(oslo_tz)  # Should be 15:04 Oslo
         
         # Verify our mock times are correct
@@ -75,7 +76,7 @@ class TestRelativeTimeParsing:
         # Expected: 16:05 Oslo time = 15:05 UTC
         
         mock_utc_now = datetime(2026, 3, 2, 14, 55, 0, tzinfo=timezone.utc)  # 14:55 UTC = 15:55 Oslo
-        oslo_tz = ZoneInfo('Europe/Oslo')
+        oslo_tz = ZoneInfo("Europe/Oslo")
         mock_oslo_now = mock_utc_now.astimezone(oslo_tz)
         
         assert mock_oslo_now.hour == 15
@@ -106,7 +107,7 @@ class TestRelativeTimeParsing:
     def test_in_x_minutes_when_utc_and_local_differ_significantly(self):
         """Test when there's a significant offset between UTC and local time."""
         # Let's say user is in Tokyo (UTC+9)
-        tokyo_tz = ZoneInfo('Asia/Tokyo')
+        tokyo_tz = ZoneInfo("Asia/Tokyo")
         
         # Tokyo: 23:00, UTC: 14:00
         mock_utc = datetime(2026, 3, 2, 14, 0, 0, tzinfo=timezone.utc)
@@ -139,7 +140,7 @@ class TestRelativeTimeParsing:
         # The bug is that the code used 15:04 as UTC instead of Oslo time!
         
         # Let's verify this theory
-        oslo_tz = ZoneInfo('Europe/Oslo')
+        oslo_tz = ZoneInfo("Europe/Oslo")
         
         # If the code thought 15:04 was UTC (bug):
         buggy_base = datetime(2026, 3, 2, 15, 4, 0, tzinfo=timezone.utc)

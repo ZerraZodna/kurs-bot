@@ -3,8 +3,9 @@
 Uses users.lesson for current lesson state memory for completion history.
 """
 
-from typing import Optional, Dict, Any
 from datetime import date
+from typing import Any, Dict, Optional
+
 from src.core.timezone import date_is_past
 from src.memories.manager import MemoryManager
 from src.models.user import User
@@ -62,7 +63,7 @@ def compute_current_lesson_state(memory_manager: MemoryManager, user_id: int, to
         }
 
     user = memory_manager.db.query(User).filter(User.user_id == user_id).first()
-    last_active = getattr(user, 'last_active_at', None)
+    last_active = getattr(user, "last_active_at", None)
     
     # Centralized date comparison via timezone utils
     if date_is_past(last_active):

@@ -17,7 +17,7 @@ def test_rag_list_memories_personal_assistant(monkeypatch):
     Then: It returns the relevant memories
     """
     # Import inside test to ensure patched symbols resolve correctly
-    from src.services.dialogue.command_handlers import parse_rag_prefix, handle_list_memories
+    from src.services.dialogue.command_handlers import handle_list_memories, parse_rag_prefix
 
     # Given: Create an in-memory engine/session
     engine = create_engine("sqlite:///:memory:")

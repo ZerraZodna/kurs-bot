@@ -9,9 +9,10 @@ to provide clean text for Telegram streaming, handling:
 - Returning remaining content for function processing
 """
 
-import re
 import logging
-from typing import AsyncIterator, Tuple, Optional
+import re
+from collections.abc import AsyncIterator
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +30,10 @@ class StreamingFilter:
     """
     
     # HTML tags that Telegram supports and should be buffered
-    HTML_TAGS = {'b', 'strong', 'i', 'em', 'u', 's', 'code', 'pre', 'a', 'span'}
+    HTML_TAGS = {"b", "strong", "i", "em", "u", "s", "code", "pre", "a", "span"}
     
     # HTML entities that should be buffered until complete
-    HTML_ENTITIES: set[str] = {'nbsp', 'amp', 'lt', 'gt', 'quot', 'apos', 'copy', 'reg', 'trade', 'mdash', 'ndash', 'lsquo', 'rsquo', 'ldquo', 'rdquo'}
+    HTML_ENTITIES: set[str] = {"nbsp", "amp", "lt", "gt", "quot", "apos", "copy", "reg", "trade", "mdash", "ndash", "lsquo", "rsquo", "ldquo", "rdquo"}
     
     def __init__(self, token_generator: AsyncIterator[str]):
         """Initialize the filter with a raw token generator.
@@ -52,10 +53,10 @@ class StreamingFilter:
         Returns True if we're in the middle of an opening or closing tag.
         """
         # Check for incomplete opening tag: <tag or <tag attr
-        if re.search(r'<[a-zA-Z][a-zA-Z0-9]*(\s[^>]*)?$', text):
+        if re.search(r"<[a-zA-Z][a-zA-Z0-9]*(\s[^>]*)?$", text):
             return True
         # Check for incomplete closing tag: </tag
-        if re.search(r'</[a-zA-Z][a-zA-Z0-9]*$', text):
+        if re.search(r"</[a-zA-Z][a-zA-Z0-9]*$", text):
             return True
         return False
     
@@ -65,13 +66,13 @@ class StreamingFilter:
         Returns True if we're in the middle of an entity like &nbsp
         """
         # Match incomplete entity: &xyz (no semicolon yet)
-        if re.search(r'&[a-zA-Z][a-zA-Z0-9]*$', text):
+        if re.search(r"&[a-zA-Z][a-zA-Z0-9]*$", text):
             return True
         # Match partial entity: &#
-        if re.search(r'&#$', text):
+        if re.search(r"&#$", text):
             return True
         # Match incomplete numeric entity: &#x
-        if re.search(r'&#[a-fA-F0-9]*$', text) and not re.search(r'&#x[0-9a-fA-F]+;$', text):
+        if re.search(r"&#[a-fA-F0-9]*$", text) and not re.search(r"&#x[0-9a-fA-F]+;$", text):
             return True
         return False
     
@@ -86,7 +87,7 @@ class StreamingFilter:
             return False
             
         # Check if text ends with a backslash that could start an escape
-        if text.endswith('\\'):
+        if text.endswith("\\"):
             # Check for double backslash - could be \\ followed by n
             # In JSON, \\n = literal backslash + n, not newline
             # But we need to see what comes next
@@ -94,11 +95,11 @@ class StreamingFilter:
             return True
             
         # Check for incomplete \u escape (need \uXXXX - 4 hex digits)
-        if re.search(r'\\u[0-9a-fA-F]{0,3}$', text):
+        if re.search(r"\\u[0-9a-fA-F]{0,3}$", text):
             return True
             
         # Check for incomplete \x escape (need \xNN - 2 hex digits)
-        if re.search(r'\\x[0-9a-fA-F]{0,1}$', text):
+        if re.search(r"\\x[0-9a-fA-F]{0,1}$", text):
             return True
             
         return False
@@ -157,10 +158,10 @@ class StreamingFilter:
             
         result = text
         # Order matters: handle escaped backslashes first
-        result = result.replace('\\\\', '\\')  # \\ -> \
-        result = result.replace('\\n', '\n')    # \n -> newline
-        result = result.replace('\\r', '\r')    # \r -> carriage return
-        result = result.replace('\\t', '\t')    # \t -> tab
+        result = result.replace("\\\\", "\\")  # \\ -> \
+        result = result.replace("\\n", "\n")    # \n -> newline
+        result = result.replace("\\r", "\r")    # \r -> carriage return
+        result = result.replace("\\t", "\t")    # \t -> tab
         result = result.replace('\\"', '"')     # \" -> "
         result = result.replace("\\'", "'")     # \' -> '
         return result
@@ -197,7 +198,7 @@ class StreamingFilter:
                     # Buffer is only whitespace, skip
                     self._buffer = ""
                     continue
-                elif not re.match(r'^\s*\{', self._buffer):
+                elif not re.match(r"^\s*\{", self._buffer):
                     # Buffer doesn't start with {, might be plain text response
                     self._json_prefix_skipped = True
                 else:

@@ -4,18 +4,18 @@ Alternative to ngrok/webhook for local development.
 """
 import asyncio
 import logging
-from typing import Set, Optional
+from typing import Optional, Set
 
 import httpx
 
 from src.config import settings
 from src.integrations.telegram import (
+    API_BASE,
+    TELEGRAM_BOT_TOKEN,
     TelegramHandler,
     send_typing_action,
-    TELEGRAM_BOT_TOKEN,
-    API_BASE,
 )
-from src.models.database import SessionLocal, User, MessageLog, BatchLock
+from src.models.database import BatchLock, MessageLog, SessionLocal, User
 from src.services.admin_notifier import send_admin_notification
 
 logger = logging.getLogger(__name__)

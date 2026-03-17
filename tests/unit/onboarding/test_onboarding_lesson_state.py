@@ -4,11 +4,10 @@ Migrated from tests/test_onboarding_lesson_state.py to use new test fixtures.
 """
 
 import pytest
-
-from src.memories import MemoryManager
-from src.lessons.state import get_lesson_state, get_current_lesson, set_current_lesson
-
 from tests.fixtures.users import create_test_user
+
+from src.lessons.state import get_current_lesson, get_lesson_state, set_current_lesson
+from src.memories import MemoryManager
 
 
 class TestOnboardingLessonState:

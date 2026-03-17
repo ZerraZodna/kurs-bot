@@ -4,23 +4,22 @@ Migrated tests for GDPR service.
 """
 import datetime
 
-
 from src.models.database import (
-    User,
     Memory,
     MessageLog,
     Schedule,
+    User,
 )
-from src.services.maintenance import purge_expired_ttl_memories
 from src.services.gdpr_service import (
-    export_user_data,
-    restrict_processing,
-    object_to_processing,
-    rectify_user,
     erase_user_data,
+    export_user_data,
+    object_to_processing,
     record_consent,
+    rectify_user,
+    restrict_processing,
     withdraw_consent,
 )
+from src.services.maintenance import purge_expired_ttl_memories
 
 
 def _create_user(db_session):

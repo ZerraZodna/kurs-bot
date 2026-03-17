@@ -9,7 +9,7 @@ repo_root = Path(__file__).resolve().parents[2]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from src.models.database import SessionLocal, User, Memory, Schedule, Lesson, init_db
+from src.models.database import Memory, Schedule, SessionLocal, User, init_db
 from src.services.dialogue_engine import DialogueEngine
 
 
@@ -37,7 +37,7 @@ def dump_user_state(db, user_id: int):
             print(f"  {status} [{s.schedule_type}] id={s.schedule_id}, cron='{s.cron_expression}', next={next_time}, lesson='{lesson_title}'")
     
     print("\n🧠 Relevant Memories (schedule-related, recent 50):")
-    relevant_keys = ['schedule_message', 'schedule_request_pending', 'preferred_daily_time']
+    relevant_keys = ["schedule_message", "schedule_request_pending", "preferred_daily_time"]
     mems = db.query(Memory).filter(
         Memory.user_id == user_id,
         Memory.key.in_(relevant_keys)
@@ -46,12 +46,12 @@ def dump_user_state(db, user_id: int):
     all_mems = db.query(Memory).filter_by(user_id=user_id).order_by(Memory.created_at.desc()).limit(20).all()
     if mems:
         for m in mems:
-            preview = m.value[:150] + '...' if len(m.value) > 150 else m.value
+            preview = m.value[:150] + "..." if len(m.value) > 150 else m.value
             print(f"  [{m.category}] {m.key}: {preview}")
     elif all_mems:
         print("  (no schedule memories; recent general:)")
         for m in all_mems[:5]:
-            preview = m.value[:100] + '...' if len(m.value) > 100 else m.value
+            preview = m.value[:100] + "..." if len(m.value) > 100 else m.value
             print(f"    [{m.category}] {m.key}: {preview}")
     else:
         print("  (no memories)")
@@ -86,7 +86,7 @@ async def debug_reminders_query(user_id: int = 1, query: str = "What are my remi
             # Consume the stream (like telegram_stream.py)
             async for token in response["generator"]:
                 full_response += token
-                print(f"🔤 Token: {repr(token)}", end='', flush=True)
+                print(f"🔤 Token: {repr(token)}", end="", flush=True)
             print("\n📄 Full streamed response collected.\n")
             
             print(f"📝 Full response preview (len={len(full_response)}):")
@@ -112,14 +112,14 @@ async def debug_reminders_query(user_id: int = 1, query: str = "What are my remi
             # Detailed breakdown
             print(f"\nstructured_intent_used: {diagnostics.get('structured_intent_used', 'N/A')}")
             print(f"dispatched_actions: {diagnostics.get('dispatched_actions', [])}")
-            exec_result = diagnostics.get('execution_result')
-            if exec_result and hasattr(exec_result, 'results'):
+            exec_result = diagnostics.get("execution_result")
+            if exec_result and hasattr(exec_result, "results"):
                 print("Functions executed:")
                 for r in exec_result.results:
                     status = "✅" if r.success else "❌"
                     print(f"  {status} {r.function_name}: {getattr(r, 'result', 'N/A') or getattr(r, 'error', 'no output')}")
-                    if 'get_user_schedules' in r.function_name or 'schedule' in r.function_name.lower():
-                        print(f"     🎯 REMINDER FUNCTION!")
+                    if "get_user_schedules" in r.function_name or "schedule" in r.function_name.lower():
+                        print("     🎯 REMINDER FUNCTION!")
             else:
                 print("(no execution_result)")
         else:
@@ -136,7 +136,7 @@ async def debug_reminders_query(user_id: int = 1, query: str = "What are my remi
         db.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # CLI: python -m scripts.debug.debug_reminders_user1 [user_id] [query]
     user_id = int(sys.argv[1]) if len(sys.argv) > 1 else 1
     query = sys.argv[2] if len(sys.argv) > 2 else "What are my reminders"
