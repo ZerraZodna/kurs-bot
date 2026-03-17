@@ -44,9 +44,7 @@ class MemoryHandler(MemoryStore):
         return q
 
     def list_active_by_key(self, user_id: int, key: str) -> List[MemoryEntity]:
-        return (
-            self.db.query(Memory).filter(Memory.user_id == user_id, Memory.key == key, Memory.is_active).all()
-        )
+        return self.db.query(Memory).filter(Memory.user_id == user_id, Memory.key == key, Memory.is_active).all()
 
     def list_active_memories(
         self,

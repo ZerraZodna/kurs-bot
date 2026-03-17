@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from src.core.timezone import datetime
 from typing import Any, Dict, List, Optional
 from typing import TYPE_CHECKING
- 
+
 if TYPE_CHECKING:
     from .executor import ExecutionResult
 
@@ -259,7 +259,9 @@ class ResponseBuilder:
         except KeyError:
             return f"⚠ {result.function_name} failed: {result.error}"
 
-    def _format_cron_expression(self, cron_expr: str, next_send_time: Optional[datetime] = None, tz_name: str = "UTC") -> str:
+    def _format_cron_expression(
+        self, cron_expr: str, next_send_time: Optional[datetime] = None, tz_name: str = "UTC"
+    ) -> str:
         """
         Format a cron expression or special time format into human-readable time.
         Delegates ALL timezone logic to src.core.timezone.
@@ -288,7 +290,7 @@ class ResponseBuilder:
 
         # Fallback: return the raw expression
         return cron_expr
- 
+
     def _determine_follow_up(
         self,
         successful: List[ExecutionResult],
@@ -340,7 +342,9 @@ class ResponseBuilder:
         built = self.build("", ai_response_text, function_results)
         return built.text
 
-    def add_custom_template(self, function_name: str, success_template: str, error_template: Optional[str] = None) -> None:
+    def add_custom_template(
+        self, function_name: str, success_template: str, error_template: Optional[str] = None
+    ) -> None:
         """Add or override a template for a function."""
         self.success_templates[function_name] = success_template
         if error_template:

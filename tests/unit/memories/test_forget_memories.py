@@ -73,7 +73,7 @@ async def test_forget_memories_success():
     exec_result = await executor.execute_single("forget_memories", {"query_text": "test query to forget"}, context)
     actual_result = exec_result.result
 
-# Assertions: verify handler behavior through mocks. Fixed session.get_bind mock for in-memory SQLite get_bind AttributeError.
+    # Assertions: verify handler behavior through mocks. Fixed session.get_bind mock for in-memory SQLite get_bind AttributeError.
     assert exec_result.success is True
     archive_args = context["memory_manager"].archive_memories.call_args[0]
     assert archive_args[0] == user_id
@@ -152,4 +152,3 @@ async def test_forget_memories_missing_memory_manager():
     assert exec_result.success is True
     assert actual_result["ok"] is False
     assert "memory_manager" in actual_result["error"]
-

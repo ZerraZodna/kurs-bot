@@ -47,6 +47,7 @@ async def test_trigger_based_schedule_edit(db_session, test_user, monkeypatch):
     SchedulerService.deactivate_user_schedules(user_id, session=db_session)
 
     import time
+
     time.sleep(0.1)  # Allow scheduler thread to process
 
     # Create new schedule at 10:15

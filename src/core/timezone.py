@@ -289,7 +289,7 @@ def format_datetime_for_display(iso_string: Optional[str]) -> str:
 
 def format_cron_local(hour: int, minute: int, tz_name: str) -> Tuple[str, str]:
     """Format UTC cron to local HH:MM + resolved tz.
-    
+
     Raises ValueError on invalid tz_name.
     Returns (local_time_str, resolved_tz_name)
     """
@@ -304,7 +304,7 @@ def format_cron_local(hour: int, minute: int, tz_name: str) -> Tuple[str, str]:
 
 def now_local(tz_name: str) -> Tuple[datetime, str]:
     """Current time in user's local timezone (aware) + resolved tz name.
-    
+
     Raises ValueError on invalid tz_name (no silent fallback).
     Returns (local_dt, resolved_tz_name)
     """

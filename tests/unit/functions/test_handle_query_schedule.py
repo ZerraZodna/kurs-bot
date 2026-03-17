@@ -43,15 +43,15 @@ class TestHandleQuerySchedule:
         Then: Return empty schedules list with success
         """
         with patch("src.core.timezone.get_user_timezone_from_db", return_value="Europe/Oslo"):
-                with patch("src.scheduler.api.get_user_schedules", return_value=[]):
-                    context = {
-                        "user_id": test_user.user_id,
-                        "session": db_session,
-                        "memory_manager": mock_memory_manager,
-                    }
+            with patch("src.scheduler.api.get_user_schedules", return_value=[]):
+                context = {
+                    "user_id": test_user.user_id,
+                    "session": db_session,
+                    "memory_manager": mock_memory_manager,
+                }
 
-                    exec_result = await executor.execute_single("query_schedule", {}, context)
-                    result = exec_result.result
+                exec_result = await executor.execute_single("query_schedule", {}, context)
+                result = exec_result.result
 
         assert exec_result.success
         assert result["ok"] is True
@@ -188,17 +188,17 @@ class TestHandleQuerySchedule:
                 mock_format.return_value = (schedule.next_send_time, "UTC")
 
                 with patch("src.scheduler.api.get_user_schedules", return_value=[schedule]):
-                        with patch("src.scheduler.memory_helpers.get_schedule_message") as mock_get_msg:
-                            mock_get_msg.return_value = "Don't forget your lesson!"
+                    with patch("src.scheduler.memory_helpers.get_schedule_message") as mock_get_msg:
+                        mock_get_msg.return_value = "Don't forget your lesson!"
 
-                            context = {
-                                "user_id": test_user.user_id,
-                                "session": db_session,
-                                "memory_manager": mock_memory_manager,
-                            }
+                        context = {
+                            "user_id": test_user.user_id,
+                            "session": db_session,
+                            "memory_manager": mock_memory_manager,
+                        }
 
-                            exec_result = await executor.execute_single("query_schedule", {}, context)
-                            result = exec_result.result
+                        exec_result = await executor.execute_single("query_schedule", {}, context)
+                        result = exec_result.result
 
         assert exec_result.success
         assert result["ok"] is True

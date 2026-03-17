@@ -10,7 +10,6 @@ that added embedding columns was intentionally removed from the codebase;
 this stub prevents Alembic from failing when resolving revisions.
 """
 
-
 # revision identifiers, used by Alembic.
 revision = "add_memory_embeddings"
 down_revision = "add_conversation_context"
