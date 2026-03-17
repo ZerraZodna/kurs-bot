@@ -10,7 +10,8 @@ from __future__ import annotations
 import hashlib
 import logging
 import uuid
-from datetime import datetime, timedelta
+from src.core.timezone import datetime
+from datetime import timedelta
 from typing import List, Optional
 
 from sqlalchemy.orm import Session
@@ -37,14 +38,14 @@ class MemoryHandler(MemoryStore):
     @staticmethod
     def build_active_query(session: Session, user_id: int, categories: Optional[List[str]] = None):
         """Build a base query for active user memories."""
-        q = session.query(Memory).filter(Memory.user_id == user_id).filter(Memory.is_active == True)
+        q = session.query(Memory).filter(Memory.user_id == user_id).filter(Memory.is_active)
         if categories:
             q = q.filter(Memory.category.in_(categories))
         return q
 
     def list_active_by_key(self, user_id: int, key: str) -> List[MemoryEntity]:
         return (
-            self.db.query(Memory).filter(Memory.user_id == user_id, Memory.key == key, Memory.is_active == True).all()
+            self.db.query(Memory).filter(Memory.user_id == user_id, Memory.key == key, Memory.is_active).all()
         )
 
     def list_active_memories(
@@ -152,7 +153,7 @@ class MemoryHandler(MemoryStore):
                 Memory.user_id == user_id,
                 Memory.key == key,
                 Memory.category == category,
-                Memory.is_active == True,
+                Memory.is_active,
             )
             .all()
         )
@@ -231,7 +232,7 @@ class MemoryHandler(MemoryStore):
             .filter(
                 Memory.user_id == user_id,
                 Memory.memory_id.in_(memory_ids),
-                Memory.is_active == True,
+                Memory.is_active,
             )
             .update({Memory.is_active: False, Memory.archived_at: now}, synchronize_session=False)
         )

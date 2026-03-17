@@ -8,7 +8,7 @@ metadata, parameters, and validation schemas.
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class ParameterSchema:
     default: Optional[Any] = None
     examples: List[str] = field(default_factory=list)
 
-    def validate(self, value: Any) -> tuple[bool, Optional[str]]:
+    def validate(self, value: Any) -> Tuple[bool, Optional[str]]:
         """Validate a parameter value with type coercion for common cases."""
         if value is None:
             if self.required:
@@ -58,7 +58,7 @@ class ParameterSchema:
                         return False, f"Parameter '{self.name}' must be an integer"
                 except (ValueError, TypeError):
                     return False, f"Parameter '{self.name}' must be an integer"
-            elif isinstance(value, float):
+            if isinstance(value, float) and value.is_integer():
                 if not value.is_integer():
                     return False, f"Parameter '{self.name}' must be an integer"
             elif not isinstance(value, int):
@@ -155,7 +155,7 @@ class FunctionMetadata:
             if not is_valid:
                 errors.append(error)
 
-        return len(errors) == 0, errors
+        return len(errors) == 0, [e for e in errors if e is not None]
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for prompt generation."""
@@ -190,7 +190,7 @@ class FunctionRegistry:
         self._functions: Dict[str, FunctionMetadata] = {}
         self._register_default_functions()
 
-    def _register_default_functions(self):
+    def _register_default_functions(self) -> None:
         """Register all default functions."""
         # Scheduling functions
         self.register(
@@ -215,8 +215,9 @@ class FunctionRegistry:
                     ParameterSchema(
                         name="lesson_id",
                         description="Specific lesson ID to start with (optional)",
-                        type=ParameterType.INTEGER,
+                        type=ParameterType.STRING,
                         required=False,
+                        examples=["1"],
                     ),
                 ],
                 examples=[
@@ -353,7 +354,7 @@ class FunctionRegistry:
                         description="Lesson ID",
                         type=ParameterType.INTEGER,
                         required=True,
-                        examples=[1, 42, 365],
+                        examples=["1", "42", "365"],
                     ),
                 ],
                 contexts=["general_chat", "lesson_review"],
@@ -370,7 +371,7 @@ class FunctionRegistry:
                         description="Lesson ID (optional, defaults to today's)",
                         type=ParameterType.INTEGER,
                         required=False,
-                        examples=[1, 42, 365],
+                        examples=["1", "42", "365"],
                     ),
                 ],
                 contexts=["general_chat", "morning_lesson_confirmation"],
@@ -512,7 +513,7 @@ class FunctionRegistry:
                         description="Time-to-live in hours (optional)",
                         type=ParameterType.INTEGER,
                         required=False,
-                        examples=[24, 168, 720],
+                        examples=["24", "168", "720"],
                     ),
                 ],
                 examples=[
@@ -543,7 +544,7 @@ class FunctionRegistry:
                         description="Lesson number (1-365)",
                         type=ParameterType.INTEGER,
                         required=True,
-                        examples=[1, 28, 29, 100],
+                        examples=["1", "28", "29", "100"],
                     ),
                 ],
                 examples=[
@@ -617,7 +618,7 @@ def get_function_registry() -> FunctionRegistry:
     return _registry
 
 
-def reset_registry():
+def reset_registry() -> None:
     """Reset the global registry (useful for testing)."""
     global _registry
     _registry = None

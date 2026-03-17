@@ -3,7 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import secrets
-from datetime import datetime, timedelta
+from src.core.timezone import datetime
+from datetime import timedelta
 from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session

@@ -10,3 +10,5 @@ Adapter file for Claude Code.
 - When guidance overlaps across docs, prefer `AGENTS.md` for repository rules.
 - Keep this file minimal; do not duplicate shared policies here.
 
+- MANDATORY: Timezone handling ONLY via `src.core.timezone`. No direct imports of `datetime.timezone` or `zoneinfo`.
+

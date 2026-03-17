@@ -6,7 +6,7 @@ Contains APScheduler initialization/shutdown and singleton access.
 from __future__ import annotations
 
 import logging
-from datetime import timezone
+from src.core.timezone import timezone
 from typing import Optional
 
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore

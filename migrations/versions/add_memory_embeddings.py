@@ -10,7 +10,6 @@ that added embedding columns was intentionally removed from the codebase;
 this stub prevents Alembic from failing when resolving revisions.
 """
 
-from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "add_memory_embeddings"

@@ -17,7 +17,7 @@ def purge_inactive_schedules(days_keep: int = 7, session: Optional[Session] = No
     with get_session(session) as s:
         cutoff = utc_now() - timedelta(days=days_keep)
         q = s.query(Schedule).filter(
-            Schedule.is_active == False,
+            not Schedule.is_active,
             Schedule.created_at < cutoff,
         )
         deleted = q.count()

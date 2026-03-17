@@ -334,8 +334,10 @@ class TestFunctionExecutor:
             "value": "Sarah",
         }
 
-        result = await executor._handle_extract_memory(params, context)
+        exec_result = await executor.execute_single("extract_memory", params, context)
+        result = exec_result.result
 
+        assert exec_result.success
         assert result["ok"] is True
         assert result["key"] == "name"
         assert result["value"] == "Sarah"

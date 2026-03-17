@@ -216,7 +216,7 @@ def get_function_definitions(registry: Optional[FunctionRegistry] = None) -> Fun
     return _definitions
 
 
-def reset_definitions():
+def reset_definitions() -> None:
     """Reset the global instance (useful for testing)."""
     global _definitions
     _definitions = None

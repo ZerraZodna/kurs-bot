@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from src.core.timezone import datetime
 from typing import Any, Optional
 
 from src.core.timezone import to_utc, utc_now

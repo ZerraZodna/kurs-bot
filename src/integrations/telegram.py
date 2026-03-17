@@ -3,7 +3,7 @@ import logging
 import re
 import time
 from collections.abc import AsyncIterator
-from datetime import datetime, timezone
+from src.core.timezone import datetime, timezone
 from typing import Any, Dict, Optional
 
 import httpx

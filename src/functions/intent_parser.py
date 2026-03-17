@@ -86,10 +86,10 @@ class IntentParser:
                     pass
 
             # Fall back to treating as natural language
-            return self._create_fallback_result(response_text, [f"JSON parse error: {e}"])
+            return self._create_fallback_result(response_text, [f"JSON parse error: {str(e)}"])
         except Exception as e:
             logger.error(f"Unexpected parse error: {e}")
-            return self._create_fallback_result(response_text, [f"Parse error: {e}"])
+            return self._create_fallback_result(response_text, [f"Parse error: {str(e)}"])
 
     def _extract_json(self, text: str) -> Optional[str]:
         """Extract JSON from text, handling markdown code blocks."""
@@ -278,7 +278,7 @@ def get_intent_parser(registry: Optional[FunctionRegistry] = None) -> IntentPars
     return _parser
 
 
-def reset_parser():
+def reset_parser() -> None:
     """Reset the global instance (useful for testing)."""
     global _parser
     _parser = None

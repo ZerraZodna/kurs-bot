@@ -130,7 +130,6 @@ def ensure_test_db(db_engine, monkeypatch):
     monkeypatch.setattr("src.scheduler.job_state.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("src.memories.manager.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("src.integrations.telegram.SessionLocal", TestSessionLocal)
-    monkeypatch.setattr("src.api.telegram_routes.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("src.api.dialogue_routes.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("src.api.dev_web_client.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("src.api.gdpr_routes.SessionLocal", TestSessionLocal)
@@ -169,14 +168,21 @@ def per_test_cleanup():
     except Exception:
         pass
 
-    # Best-effort scheduler shutdown after each test
+    # Robust scheduler cleanup: remove all jobs then shutdown
     try:
-        from src.scheduler.core import SchedulerService
+        from src.scheduler.lifecycle import get_scheduler, shutdown_scheduler
 
-        try:
-            SchedulerService.shutdown()
-        except Exception:
-            pass
+        scheduler = get_scheduler()
+        if scheduler:
+            try:
+                scheduler.remove_all_jobs()
+                print("Cleared all APScheduler jobs")
+            except Exception:
+                pass
+            try:
+                shutdown_scheduler()
+            except Exception:
+                pass
     except Exception:
         pass
 

@@ -86,8 +86,8 @@ def run_recovery_check(
                 db
                 .query(Schedule)
                 .filter(
-                    Schedule.is_active == True,
-                    Schedule.next_send_time != None,
+                    Schedule.is_active,
+                    Schedule.next_send_time is not None,
                     Schedule.next_send_time <= now,
                 )
                 .all()

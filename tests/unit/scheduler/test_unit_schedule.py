@@ -61,9 +61,11 @@ class TestUnitScheduleFunctionExecutor:
 
         # Get lesson from memory and execute send_todays_lesson with explicit lesson_id (matching recent test fixes)
         memory_lesson_id = get_current_lesson(mm, test_user.user_id)
-        result = await executor._handle_send_todays_lesson({"lesson_id": memory_lesson_id}, context)
+        exec_result = await executor.execute_single("send_todays_lesson", {"lesson_id": memory_lesson_id}, context)
+        result = exec_result.result
 
         # Verify result
+        assert exec_result.success
         assert result["ok"] is True
         assert result["lesson_id"] == 26
         assert "title" in result
@@ -88,9 +90,11 @@ class TestUnitScheduleFunctionExecutor:
         }
 
         # Execute send_todays_lesson with explicit default lesson_id (matching recent test fixes)
-        result = await executor._handle_send_todays_lesson({"lesson_id": 1}, context)
+        exec_result = await executor.execute_single("send_todays_lesson", {"lesson_id": 1}, context)
+        result = exec_result.result
 
         # Verify result defaults to lesson 1
+        assert exec_result.success
         assert result["ok"] is True
         assert result["lesson_id"] == 1
 

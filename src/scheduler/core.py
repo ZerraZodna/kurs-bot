@@ -11,7 +11,7 @@ Supports:
 
 from __future__ import annotations
 
-from datetime import datetime
+from src.core.timezone import datetime
 from typing import Optional
 
 from apscheduler.schedulers.background import BackgroundScheduler

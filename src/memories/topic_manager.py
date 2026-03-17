@@ -6,7 +6,7 @@ Provides AI-friendly structured access to memories organized by topics.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from src.core.timezone import datetime, timezone
 from typing import Any, Dict, List
 
 from src.core.timezone import utc_now

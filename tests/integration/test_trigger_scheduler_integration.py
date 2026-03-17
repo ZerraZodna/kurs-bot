@@ -46,11 +46,17 @@ async def test_trigger_based_schedule_edit(db_session, test_user, monkeypatch):
     # Deactivate existing schedules
     SchedulerService.deactivate_user_schedules(user_id, session=db_session)
 
+    import time
+    time.sleep(0.1)  # Allow scheduler thread to process
+
     # Create new schedule at 10:15
     result = await executor.execute_single("create_schedule", {"time": "10:15"}, context)
 
     assert result.success is True
     assert result.result.get("ok") is True
+
+    # Jobs cleared in teardown
+    pass
 
     # After execution, verify schedule updated to 10:15 using the same db_session
     from src.scheduler import manager as schedule_manager

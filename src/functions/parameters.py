@@ -6,7 +6,7 @@ Handles validation, type checking, and coercion of function parameters.
 
 import logging
 import re
-from datetime import datetime
+from src.core.timezone import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -344,7 +344,7 @@ class ParameterValidator:
             elif param_type == "datetime":
                 is_valid, dt_obj, error = ParameterValidator.validate_datetime(value)
                 if is_valid:
-                    coerced[param_name] = dt_obj.isoformat()
+                    coerced[param_name] = dt_obj.isoformat() if dt_obj else None
                 else:
                     errors.append(f"Parameter '{param_name}': {error}")
 
@@ -359,7 +359,7 @@ class ParameterValidator:
         return len(errors) == 0, coerced, errors
 
 
-def _coerce_boolean(value):
+def _coerce_boolean(value) -> bool:
     """Coerce a value to boolean, handling string representations."""
     if isinstance(value, bool):
         return value
@@ -373,21 +373,7 @@ def _coerce_boolean(value):
     return bool(value)
 
 
-def _coerce_boolean(value):
-    """Coerce a value to boolean, handling string representations."""
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        lower = value.lower().strip()
-        if lower in ("true", "yes", "1", "on"):
-            return True
-        if lower in ("false", "no", "0", "off"):
-            return False
-    # Fallback to Python's bool() for other types (numbers, etc.)
-    return bool(value)
-
-
-def get_common_timezones() -> set:
+def get_common_timezones() -> set[str]:
     """Get a set of common IANA timezone names."""
     # This is a simplified list - in production, use pytz or zoneinfo
     return {

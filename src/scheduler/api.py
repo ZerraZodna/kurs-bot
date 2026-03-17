@@ -19,7 +19,7 @@ Example:
 
 from __future__ import annotations
 
-from datetime import datetime
+from src.core.timezone import datetime
 from typing import Any, List, Optional
 
 from sqlalchemy.orm import Session

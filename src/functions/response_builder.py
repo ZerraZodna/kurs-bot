@@ -7,9 +7,15 @@ with results from executed function calls.
 
 import logging
 from dataclasses import dataclass, field
+from src.core.timezone import datetime
 from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING
+ 
+if TYPE_CHECKING:
+    from .executor import ExecutionResult
 
-from src.core.timezone import format_datetime_for_display
+from src.core.timezone import format_datetime_for_display, format_cron_local
+
 
 from .executor import BatchExecutionResult, ExecutionResult
 
@@ -166,7 +172,7 @@ class ResponseBuilder:
 
         return "\n".join(parts) if parts else ""
 
-    def _format_success_result(self, result: ExecutionResult) -> Optional[str]:
+    def _format_success_result(self, result: "ExecutionResult") -> str:
         """Format a successful function result."""
         template = self.success_templates.get(result.function_name)
         if not template:
@@ -240,7 +246,7 @@ class ResponseBuilder:
             # Fallback if template formatting fails
             return f"✓ {result.function_name} completed"
 
-    def _format_error_result(self, result: ExecutionResult) -> Optional[str]:
+    def _format_error_result(self, result: "ExecutionResult") -> str:
         """Format a failed function result."""
         template = self.error_templates.get(result.function_name)
         if not template:
@@ -253,32 +259,22 @@ class ResponseBuilder:
         except KeyError:
             return f"⚠ {result.function_name} failed: {result.error}"
 
-    def _format_cron_expression(self, cron_expr: str, next_send_time: Any = None, tz_name: str = "UTC") -> str:
-        """Format a cron expression or special time format into human-readable time.
-
-        Args:
-            cron_expr: The cron expression (e.g., "0 7 * * *") or special format (e.g., "once:2024-01-15T07:00:00")
-            next_send_time: Optional datetime object or ISO format datetime string for one-time reminders
-            tz_name: User's timezone for local time display
-
-        Returns:
-            Human-readable time string (e.g., "07:00", "2024-01-15 07:00")
+    def _format_cron_expression(self, cron_expr: str, next_send_time: Optional[datetime] = None, tz_name: str = "UTC") -> str:
         """
-        # Handle datetime object (passed from executor with local timezone)
-        from datetime import datetime
-
-        from src.core.timezone import format_datetime_for_display as fdfd
+        Format a cron expression or special time format into human-readable time.
+        Delegates ALL timezone logic to src.core.timezone.
+        """
+        from src.core.timezone import format_datetime_for_display
 
         if isinstance(next_send_time, datetime):
-            # Already a datetime object - format it directly
-            return fdfd(next_send_time.isoformat())
+            return format_datetime_for_display(next_send_time.isoformat())
 
         if not cron_expr:
             return "unknown"
 
         # Handle one-time reminder format: "once:ISO8601"
         if cron_expr.startswith("once:"):
-            return fdfd(next_send_time) if next_send_time else "one-time"
+            return format_datetime_for_display(next_send_time) if next_send_time else "one-time"
 
         # Parse standard cron expression: "M H * * *"
         parts = cron_expr.split()
@@ -286,27 +282,13 @@ class ResponseBuilder:
             try:
                 minute = int(parts[0])
                 hour = int(parts[1])
-
-                # Convert UTC hour/minute to user's local timezone
-                from datetime import datetime
-                from datetime import timezone as tz
-                from zoneinfo import ZoneInfo
-
-                try:
-                    tzinfo = ZoneInfo(tz_name)
-                except Exception:
-                    tzinfo = tz.utc
-
-                # Create a datetime in UTC and convert to user's timezone
-                utc_dt = datetime(2000, 1, 1, hour, minute, 0, tzinfo=tz.utc)
-                local_dt = utc_dt.astimezone(tzinfo)
-                return f"{local_dt.hour:02d}:{local_dt.minute:02d}"
+                return format_cron_local(hour, minute, tz_name)
             except (ValueError, IndexError):
                 pass
 
         # Fallback: return the raw expression
         return cron_expr
-
+ 
     def _determine_follow_up(
         self,
         successful: List[ExecutionResult],
@@ -316,7 +298,7 @@ class ResponseBuilder:
         """Determine if a follow-up prompt is needed."""
         # If there are failures, suggest retry or clarification
         if failed:
-            critical_failures = [
+            critical_failures: List[ExecutionResult] = [
                 r for r in failed if r.function_name in ["create_schedule", "update_schedule", "set_timezone"]
             ]
             if critical_failures:
@@ -358,7 +340,7 @@ class ResponseBuilder:
         built = self.build("", ai_response_text, function_results)
         return built.text
 
-    def add_custom_template(self, function_name: str, success_template: str, error_template: Optional[str] = None):
+    def add_custom_template(self, function_name: str, success_template: str, error_template: Optional[str] = None) -> None:
         """Add or override a template for a function."""
         self.success_templates[function_name] = success_template
         if error_template:
@@ -401,7 +383,7 @@ def get_response_builder() -> ResponseBuilder:
     return _builder
 
 
-def reset_builder():
+def reset_builder() -> None:
     """Reset the global instance (useful for testing)."""
     global _builder
     _builder = None

@@ -6,7 +6,7 @@ so job-management logic can be tested and moved independently of the
 """
 
 import logging
-from datetime import timezone
+from src.core.timezone import timezone
 from typing import Any
 
 from apscheduler.triggers.cron import CronTrigger
@@ -87,6 +87,8 @@ def sync_job_for_schedule(schedule: Any) -> None:
 
 
 def remove_job_for_schedule(schedule_id: int) -> None:
+    from apscheduler.jobstores.base import JobLookupError
+
     from .core import SchedulerService
 
     scheduler = SchedulerService.get_scheduler()
@@ -94,5 +96,7 @@ def remove_job_for_schedule(schedule_id: int) -> None:
     try:
         scheduler.remove_job(job_id)
         logger.info("Removed job %s", job_id)
+    except JobLookupError:
+        logger.debug("Job %s not found (already removed or never existed)", job_id)
     except Exception as e:
         logger.warning("Could not remove job %s: %s", job_id, e)

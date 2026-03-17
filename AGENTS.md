@@ -68,6 +68,10 @@
 - When adding new functions that accept `session: Optional[Session] = None`, always use the context manager pattern.
 - The same principle applies to any resource that needs cleanup (file handles, HTTP clients, etc.).
 
+### Timezone Centralization (MANDATORY)
+- ALL timezone operations MUST use ONLY `src.core.timezone` module
+- BANNED everywhere else: `import datetime`, `from datetime import timezone`, `from zoneinfo`
+
 ## Testing and Pull Requests
 - Standard command: `npm test`
 - Targeted command: `npm test -- tests/test_telegram_handler.py tests/test_prompt_builder.py -q`

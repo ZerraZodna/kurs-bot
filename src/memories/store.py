@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import datetime
+from src.core.timezone import datetime
 from typing import List, Optional
 
 from .types import MemoryEntity, MemoryRecord

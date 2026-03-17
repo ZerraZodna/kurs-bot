@@ -42,9 +42,11 @@ class TestConfirmYesLessonRepeat:
         params = {"context": "lesson_repeat"}
 
         # Call the handler
-        result = await executor._handle_confirm_yes(params, context)
+        exec_result = await executor.execute_single("confirm_yes", params, context)
+        result = exec_result.result
 
         # Verify the result
+        assert exec_result.success
         assert result["ok"] is True
         assert result["confirmed"] is True
         assert result["context"] == "lesson_repeat"
@@ -67,8 +69,10 @@ class TestConfirmYesLessonRepeat:
 
         params = {"context": "general"}
 
-        result = await executor._handle_confirm_yes(params, context)
+        exec_result = await executor.execute_single("confirm_yes", params, context)
+        result = exec_result.result
 
+        assert exec_result.success
         assert result["ok"] is True
         assert result["confirmed"] is True
         assert result["context"] == "general"

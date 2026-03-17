@@ -285,3 +285,31 @@ def format_datetime_for_display(iso_string: Optional[str]) -> str:
         if "T" in iso_string:
             return iso_string.replace("T", " ")[:16]  # Take up to minutes
         return iso_string
+
+
+def format_cron_local(hour: int, minute: int, tz_name: str) -> Tuple[str, str]:
+    """Format UTC cron to local HH:MM + resolved tz.
+    
+    Raises ValueError on invalid tz_name.
+    Returns (local_time_str, resolved_tz_name)
+    """
+    resolved_name = resolve_timezone_name(tz_name)
+    if not resolved_name:
+        raise ValueError(f"Invalid timezone: {tz_name}")
+    tzinfo = ZoneInfo(resolved_name)
+    utc_dt = datetime(2000, 1, 1, hour, minute, 0, tzinfo=timezone.utc)
+    local_dt = utc_dt.astimezone(tzinfo)
+    return f"{local_dt.hour:02d}:{local_dt.minute:02d}", resolved_name
+
+
+def now_local(tz_name: str) -> Tuple[datetime, str]:
+    """Current time in user's local timezone (aware) + resolved tz name.
+    
+    Raises ValueError on invalid tz_name (no silent fallback).
+    Returns (local_dt, resolved_tz_name)
+    """
+    resolved_name = resolve_timezone_name(tz_name)
+    if not resolved_name:
+        raise ValueError(f"Invalid timezone: {tz_name}")
+    tz = ZoneInfo(resolved_name)
+    return utc_now().astimezone(tz), resolved_name

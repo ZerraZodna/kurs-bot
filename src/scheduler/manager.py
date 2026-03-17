@@ -5,7 +5,7 @@ This module contains functions that perform CRUD operations on the
 be a thin, testable layer so the APScheduler wiring can live separately.
 """
 
-from datetime import datetime
+from src.core.timezone import datetime
 from typing import Any, Dict, List, Optional
 
 from src.core.timezone import to_utc, utc_now

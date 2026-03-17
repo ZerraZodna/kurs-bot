@@ -45,7 +45,7 @@ def main():
         .query(Memory)
         .filter(
             Memory.user_id == user_id,
-            Memory.is_active == True,
+            Memory.is_active,
         )
         .order_by(Memory.created_at)
     )
