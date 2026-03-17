@@ -27,8 +27,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Install project requirements for CI
-          pip install -r requirements.txt
+          pip install -e '.[dev]'
       - name: Lint
         run: |
           ruff check . --output-format=github

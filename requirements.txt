@@ -2,17 +2,10 @@ fastapi
 uvicorn
 sqlalchemy
 alembic
-# Mail not implemented (yet)
-#sendgrid
-pytest
-pytest-cov
-pytest-asyncio
-pytest-xdist
 httpx
 apscheduler
 langdetect
 ollama
-pydantic_core==2.41.5
 pydantic-settings
 pymupdf
-ruff
+pydantic_core==2.41.5

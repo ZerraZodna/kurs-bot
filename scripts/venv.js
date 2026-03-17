@@ -81,18 +81,11 @@ function installDeps() {
   runPip(['-m', 'pip', 'install', '--upgrade', 'pip']);
 
   // Install CPU-only PyTorch wheel to avoid pulling CUDA wheels
-  console.log('Installing CPU PyTorch wheel from official index...');
-  runPip(['-m', 'pip', 'install', '--no-cache-dir', '--index-url', 'https://download.pytorch.org/whl/cpu', 'torch']);
+// Removed unused torch install
 
-  // Finally install project requirements
-  const req = path.join(repoRoot, 'requirements.txt');
-  if (fs.existsSync(req)) {
-    console.log('Installing project requirements from requirements.txt...');
-    runPip(['-m', 'pip', 'install', '--no-cache-dir', '-r', req]);
-  } else {
-    console.log('requirements.txt not found; installing project in editable mode...');
-    runPip(['-m', 'pip', 'install', '-e', repoRoot]);
-  }
+// Install project + dev deps from pyproject.toml
+  console.log('Installing project + dev deps from pyproject.toml...');
+  runPip(['-m', 'pip', 'install', '-e', '.[dev]']);
 }
 
 function runPyModule(mod, args = []) {

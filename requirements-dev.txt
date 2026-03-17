@@ -1,0 +1,7 @@
+# Development dependencies
+ruff
+pre-commit
+pytest
+pytest-cov
+pytest-asyncio
+pytest-xdist
