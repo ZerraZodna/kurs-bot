@@ -143,7 +143,7 @@ def parse_lessons_from_text(full_text: str) -> List[Tuple[int, str, str]]:
                 break
         if first_header_line > 0:
             intro_lines = lines[:first_header_line]
-line.strip() for line in intro_lines if line.strip()
+            intro_block = "\n".join(line.strip() for line in intro_lines if line.strip()).strip()
             if len(intro_block) > 80:
                 out.append((0, "Introduction", intro_block))
 

@@ -34,7 +34,7 @@ from src.services.dialogue_engine import DialogueEngine
 
 def dump_user_state(db, user_id: int):
     """Dump user state: user, schedules, recent memories."""
-    print(f"\\n=== User {user_id} state (at {datetime.now().isoformat()}) ===")
+    print(f"\\n=== User {user_id} state (at {datetime.now(tz=timezone.utc).isoformat()}) ===")
     user = db.query(User).filter_by(user_id=user_id).first()
     if not user:
         print("❌ User not found")
