@@ -47,11 +47,11 @@ def sync_job_for_schedule(schedule: Any) -> None:
     """
     from .core import SchedulerService
     scheduler = SchedulerService.get_scheduler()
-    job_id = _job_id_for(getattr(schedule, "schedule_id"))
+    job_id = _job_id_for(schedule.schedule_id)
 
     try:
         if is_one_time_schedule_type(getattr(schedule, "schedule_type", "")):
-            run_at = getattr(schedule, "next_send_time")
+            run_at = schedule.next_send_time
             if run_at is None:
                 logger.warning("one_time schedule %s has no next_send_time", job_id)
                 return
@@ -70,7 +70,7 @@ def sync_job_for_schedule(schedule: Any) -> None:
         scheduler.add_job(
             func=SchedulerService.execute_scheduled_task,
             trigger=trigger,
-            args=[getattr(schedule, "schedule_id")],
+            args=[schedule.schedule_id],
             id=job_id,
             replace_existing=True,
         )

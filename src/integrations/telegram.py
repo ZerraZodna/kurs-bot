@@ -4,7 +4,7 @@ import logging
 import re
 import time
 from typing import Optional, Dict, Any, AsyncIterator
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from src.config import settings
 from src.models.database import SessionLocal, MessageLog, BatchLock
 from src.integrations.telegram_stream import StreamingFilter

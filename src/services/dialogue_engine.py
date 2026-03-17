@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, AsyncIterator, Dict
+from typing import Optional, Dict
 from sqlalchemy.orm import Session
 from src.memories import MemoryManager
 from src.language.prompt_builder import PromptBuilder
@@ -8,7 +8,6 @@ from src.onboarding.service import OnboardingService
 from src.onboarding.flow import OnboardingFlow
 from src.scheduler import api as scheduler_api
 from src.services.dialogue import (
-    call_ollama,
     stream_ollama,
 )
 from src.config import settings
@@ -165,7 +164,7 @@ class DialogueEngine:
         self, user_id: int, text: str, session: Session, user_lang: str, include_lesson: bool, use_rag: bool
     ) -> Optional[str]:
         from src.services.dialogue import (
-            handle_schedule_messages, maybe_send_next_lesson, get_user_language
+            handle_schedule_messages, maybe_send_next_lesson
         )
         
         schedule_response = await handle_schedule_messages(

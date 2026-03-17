@@ -8,11 +8,10 @@ error handling, and result collection.
 import logging
 from typing import Dict, List, Any, Optional, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 
 from .registry import FunctionRegistry, get_function_registry
 from .parameters import ParameterValidator
-from src.memories.constants import MemoryCategory, MemoryKey
 from src.models.schedule import Lesson
 from src.lessons.state import compute_current_lesson_state
 
@@ -483,7 +482,6 @@ class FunctionExecutor:
     
     async def _handle_delete_one_time_reminder(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle delete_one_time_reminder function."""
-        from src.scheduler import manager as schedule_manager
         from src.scheduler.domain import is_one_time_schedule_type
         
         user_id = context.get("user_id")
@@ -638,7 +636,7 @@ class FunctionExecutor:
 
     async def _handle_set_timezone(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle set_timezone function."""
-        from src.core.timezone import resolve_timezone_name, to_utc
+        from src.core.timezone import resolve_timezone_name
         from src.memories.constants import MemoryKey
         from src.scheduler import api as scheduler_api
         
@@ -801,7 +799,6 @@ class FunctionExecutor:
     async def _handle_confirm_yes(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle confirm_yes function."""
         from src.memories.constants import MemoryCategory, MemoryKey
-        from src.models.database import Lesson
         
         user_id = context.get("user_id")
         confirmation_context = params.get("context", "general")
@@ -832,7 +829,7 @@ class FunctionExecutor:
                                     title=lesson.title,
                                     content=lesson.content,
                                 )
-                    except (ValueError, TypeError) as e:
+                    except (ValueError, TypeError):
                         logger.warning(f"Invalid lesson_id in lesson_repeat_offered: {lesson_id_str}")
             
             # Store confirmation
@@ -851,7 +848,6 @@ class FunctionExecutor:
     
     async def _handle_confirm_no(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Handle confirm_no function."""
-        from src.memories.constants import MemoryCategory, MemoryKey
         
         user_id = context.get("user_id")
         confirmation_context = params.get("context", "general")
@@ -956,7 +952,7 @@ class FunctionExecutor:
             set_current_lesson(memory_manager, user_id, lesson_number)
             logger.info(f"set_current_lesson: user_id={user_id}, lesson={lesson_number}")
             return self._ok_response(lesson_number=lesson_number)
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             return self._error_response(f"Invalid lesson number: {lesson_number}")
 
     async def _handle_forget_memories(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:

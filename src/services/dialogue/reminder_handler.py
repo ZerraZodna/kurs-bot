@@ -2,20 +2,7 @@
 
 from __future__ import annotations
 
-import json
 import logging
-import re
-from typing import Optional, Dict, Any
-from datetime import datetime, timezone
-from src.core.timezone import to_utc
-from sqlalchemy.orm import Session
-from src.models.database import Lesson
-from src.memories import MemoryManager
-from src.memories.constants import MemoryCategory, MemoryKey
-from src.lessons.state import (
-    get_current_lesson,
-    set_current_lesson,
-)
 
 logger = logging.getLogger(__name__)
 

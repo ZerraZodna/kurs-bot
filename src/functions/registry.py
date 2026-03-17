@@ -6,7 +6,7 @@ metadata, parameters, and validation schemas.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Callable
+from typing import Dict, List, Optional, Any
 from enum import Enum
 import logging
 

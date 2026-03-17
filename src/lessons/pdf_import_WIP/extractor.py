@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Iterator
 
 from .reader import PDFReader, PDFPage, TextSpan
 

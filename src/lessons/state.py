@@ -4,10 +4,9 @@ Uses users.lesson for current lesson state memory for completion history.
 """
 
 from typing import Optional, Dict, Any
-from datetime import date, datetime, timezone
-from src.core.timezone import date_is_past, to_utc
+from datetime import date
+from src.core.timezone import date_is_past
 from src.memories.manager import MemoryManager
-from src.memories.constants import MemoryCategory, MemoryKey
 from src.models.user import User
 
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, cast
 
 from sqlalchemy.orm import Session
@@ -20,8 +19,7 @@ from src.models.database import (
 )
 
 
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+from src.core.timezone import utc_now as _utc_now
 
 
 def _hash_value(value: str) -> str:

@@ -24,8 +24,7 @@ from src.language.onboarding_prompts import (
 )
 from src.onboarding.status import get_onboarding_status_dict
 from src.onboarding.schedule_setup import create_auto_schedule
-from src.onboarding.user_management import delete_user_and_data, is_user_new
-from src.lessons.api import set_current_lesson, has_lesson_status
+from src.onboarding.user_management import is_user_new
 from src.memories.constants import MemoryCategory, MemoryKey
 
 logger = logging.getLogger(__name__)

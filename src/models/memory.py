@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from src.models.base import Base
-import datetime
+from src.core.clock import utc_now
 
 
 class Memory(Base):
@@ -16,8 +16,8 @@ class Memory(Base):
     conflict_group_id = Column(String(64))
     source = Column(String(64), default="dialogue_engine")
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
     ttl_expires_at = Column(DateTime(timezone=True))
     archived_at = Column(DateTime(timezone=True))
 

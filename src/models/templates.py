@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, Text
 from src.models.base import Base
-import datetime
+from src.core.clock import utc_now
 
 
 class PromptTemplate(Base):
@@ -13,5 +13,5 @@ class PromptTemplate(Base):
     owner = Column(String(128), nullable=True)
     visibility = Column(String(32), default='public')  # public|private
     version = Column(Integer, default=1)
-    created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)

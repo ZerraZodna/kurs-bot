@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Dict, Optional
 
+from src.core.timezone import utc_now
 from src.scheduler.job_state import get_state_json, set_state_json, set_state_datetime
 
 logger = logging.getLogger(__name__)
@@ -14,7 +15,7 @@ _MAX_BUCKETS = 21  # 3-week rolling buffer
 
 
 def _today_str() -> str:
-    return datetime.now(timezone.utc).date().isoformat()
+    return utc_now().date().isoformat()
 
 
 def _load_buckets() -> List[Dict[str, int]]:
@@ -37,7 +38,7 @@ def record_traffic_event() -> None:
     else:
         buckets.append({"date": today, "count": 1})
     _save_buckets(buckets)
-    set_state_datetime(_LAST_MESSAGE_KEY, datetime.now(timezone.utc))
+    set_state_datetime(_LAST_MESSAGE_KEY, utc_now())
 
 
 def get_last_message_at() -> Optional[datetime]:
@@ -48,7 +49,7 @@ def get_last_message_at() -> Optional[datetime]:
 
 def is_today_lowest_traffic() -> bool:
     """Return True if today's count is <= min of prior same weekday buckets."""
-    today = datetime.now(timezone.utc).date()
+    today = utc_now().date()
     today_str = today.isoformat()
     buckets = _load_buckets()
     today_count = 0

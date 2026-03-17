@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text
 from sqlalchemy.orm import relationship
 from src.models.base import Base
-import datetime
+from src.core.clock import utc_now
 
 
 class User(Base):
@@ -21,7 +21,7 @@ class User(Base):
     restriction_reason = Column(Text)
     is_deleted = Column(Boolean, default=False, nullable=False)
     deleted_at = Column(DateTime(timezone=True))
-    created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     last_active_at = Column(DateTime(timezone=True))
 
     # Relationships

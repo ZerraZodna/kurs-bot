@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from src.models.base import Base
-import datetime
+from src.core.clock import utc_now
 
 
 class GdprRequest(Base):
@@ -14,7 +14,7 @@ class GdprRequest(Base):
     reason = Column(Text)
     details = Column(Text)
     actor = Column(String(64), default="user", nullable=False)
-    requested_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    requested_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     processed_at = Column(DateTime(timezone=True))
 
     # Relationships
@@ -29,7 +29,7 @@ class GdprAuditLog(Base):
     action = Column(String(64), nullable=False)
     details = Column(Text)
     actor = Column(String(64), default="system", nullable=False)
-    created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     # Relationships
     user = relationship('User', back_populates='gdpr_audit_logs')
@@ -47,7 +47,7 @@ class GdprVerification(Base):
     attempts = Column(Integer, default=0, nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     verified_at = Column(DateTime(timezone=True))
-    created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     # Relationships
     user = relationship('User', back_populates='gdpr_verifications')

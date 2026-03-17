@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from src.memories import MemoryManager
 from src.services.maintenance import nightly_memory_purge
 from src.middleware.consent import ConsentMiddleware
 from src.middleware.api_key_auth import ApiKeyAuthMiddleware

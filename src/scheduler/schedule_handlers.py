@@ -6,12 +6,10 @@ from sqlalchemy.orm import Session
 
 from src.scheduler import api as scheduler_api
 from src.scheduler.domain import is_daily_schedule_family
-from src.core.timezone import get_user_timezone_from_db
 import re
 
 # One-time reminder keyword parsing removed — handled by assistant + triggers
 from src.services.dialogue.pause_handler import detect_pause_request
-from src.scheduler.schedule_query_handler import build_schedule_status_response
 from src.memories.dialogue_helpers import get_user_language
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.lessons.handler import translate_text

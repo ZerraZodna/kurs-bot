@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from src.models.database import SessionLocal
 from src.memories.store import MemoryStore
 from src.memories.memory_handler import MemoryHandler, MemoryRecord
-from src.memories.constants import MemoryCategory, MemoryKey
 
 logger = logging.getLogger(__name__)
 

@@ -31,7 +31,7 @@
     "tail": "node ./scripts/venv.js tail",
     "list": "node ./scripts/venv.js list",
     "status": "node ./scripts/venv.js status",
-    "lint": "echo \"No linter configured\" && exit 0"
+    "lint": "node ./scripts/venv.js exec -m ruff check src/"
   },
   "dependencies": {
     "axios": "^1.6.0",

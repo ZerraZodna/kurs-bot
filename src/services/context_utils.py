@@ -2,7 +2,14 @@
 
 from typing import List
 
-from src.memories.constants import MemoryCategory, MemoryKey
+# Re-export for test compatibility
+try:
+    from src.memories.constants import MemoryCategory, MemoryKey
+except Exception:
+    # Defensive fallback for import-time issues
+    MemoryCategory = None  # type: ignore[misc]
+    MemoryKey = None  # type: ignore[misc]
+
 
 
 class ConversationContextBuilder:

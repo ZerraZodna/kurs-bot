@@ -10,8 +10,7 @@ from typing import Optional, Tuple
 
 from zoneinfo import ZoneInfo
 
-from src.memories import MemoryManager
-from src.models.database import User
+
 
 
 def _normalize_tz_name(tz_name: Optional[str]) -> Optional[str]:
@@ -57,6 +56,7 @@ def get_user_timezone_from_db(session, user_id: int, default: str = "Europe/Oslo
     2. Inferred from User.language if available
     3. Default (UTC)
     """
+    from src.models.database import User  # Import here to avoid circular imports
     try:
         user = session.query(User).filter_by(user_id=user_id).first()
         if user:
@@ -232,9 +232,8 @@ def resolve_timezone_name(tz_name: Optional[str]) -> Optional[str]:
     return None
 
 
-def utc_now() -> datetime:
-    """Return current UTC datetime (timezone-aware). Use everywhere instead of datetime.now(timezone.utc)."""
-    return datetime.now(timezone.utc)
+# Re-export from clock.py (which has zero project imports) to avoid circular imports.
+from src.core.clock import utc_now  # noqa: F401 — re-export
 
 
 def utc_date_now() -> date:

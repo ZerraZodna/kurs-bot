@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 
 def _normalize_sentence_spacing(text: str) -> str:

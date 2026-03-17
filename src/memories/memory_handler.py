@@ -10,7 +10,8 @@ from __future__ import annotations
 import hashlib
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+from src.core.timezone import utc_now
 from typing import List, Optional
 from .types import MemoryEntity, MemoryRecord
 
@@ -118,7 +119,7 @@ class MemoryHandler(MemoryStore):
 
     def get_memory(self, user_id: int, key: str) -> List[MemoryRecord]:
         """Fetch active, non-expired memories for a key."""
-        now = datetime.now(timezone.utc)
+        now = utc_now()
         rows = self.list_active_by_key(user_id=user_id, key=key)
         return [
             self._to_public_dict(row)
@@ -144,7 +145,7 @@ class MemoryHandler(MemoryStore):
             logger.debug(f"Category '{category}' normalized to '{validated_category}' for key '{key}'")
         category = validated_category
         
-        now = datetime.now(timezone.utc)
+        now = utc_now()
         value_hash = self.hash_value(value)
         ttl = now + timedelta(hours=ttl_hours) if ttl_hours else None
 
@@ -229,7 +230,7 @@ class MemoryHandler(MemoryStore):
     def archive_memories(self, user_id: int, memory_ids: List[int]) -> int:
         if not memory_ids:
             return 0
-        now = datetime.now(timezone.utc)
+        now = utc_now()
         updated = (
             self.db.query(Memory)
             .filter(

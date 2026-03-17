@@ -9,9 +9,8 @@ from __future__ import annotations
 import asyncio
 import logging
 from sqlalchemy.orm import Session
-import src.scheduler.execution as scheduler_execution
 from typing import Optional, List
-from datetime import datetime, timezone
+from src.core.timezone import utc_now
 from src.models.database import Lesson, User
 from src.memories import MemoryManager
 from src.lessons.state import get_current_lesson, set_current_lesson, compute_current_lesson_state
@@ -98,7 +97,7 @@ def deliver_lesson(
     if not simulate:
         send_outbound_message(db, user, message)
         set_current_lesson(memory_manager, user_id, target_lesson_id)
-        user.last_active_at = datetime.now(timezone.utc)
+        user.last_active_at = utc_now()
         db.commit()
         logger.info(f"Delivered lesson {target_lesson_id} to user {user_id}")
     else:

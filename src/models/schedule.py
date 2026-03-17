@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from src.models.base import Base
-import datetime
+from src.core.clock import utc_now
 
 
 class Lesson(Base):
@@ -12,7 +12,7 @@ class Lesson(Base):
     content = Column(Text, nullable=False)
     difficulty_level = Column(String(32))
     duration_minutes = Column(Integer)
-    created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     # Relationships
     schedules = relationship('Schedule', back_populates='lesson')
@@ -29,7 +29,7 @@ class Schedule(Base):
     next_send_time = Column(DateTime(timezone=True))
     last_sent_at = Column(DateTime(timezone=True))
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     # Relationships
     user = relationship('User', back_populates='schedules')

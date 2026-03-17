@@ -79,7 +79,6 @@ def compute_next_send_and_cron(time_str: str, tz_name: str = "UTC", now_utc=None
     Returns:
         (next_send_utc: datetime, cron_expression: str)
     """
-    from datetime import datetime, timezone
     from src.core.timezone import parse_local_time_to_utc
 
     hour, minute = parse_time_string(time_str)

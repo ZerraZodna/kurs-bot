@@ -7,14 +7,15 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from src.core.timezone import get_user_timezone_from_db, utc_now
 from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
-from src.models.database import Schedule, User, get_session
+from src.models.database import Schedule, get_session
 
 from . import jobs as schedule_jobs
 from . import manager as schedule_manager
@@ -25,7 +26,6 @@ from .domain import (
     job_id_for_schedule,
 )
 from .time_utils import parse_time_string
-from src.core.timezone import get_user_timezone_from_db
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ def create_daily_schedule(
         # Debug: trace schedule creation attempts
         logger.debug(
             f"create_daily_schedule called user={user_id} "
-            f"time_str={time_str} ts={datetime.now(timezone.utc).isoformat()}"
+            f"time_str={time_str} ts={utc_now().isoformat()}"
         )
         # Compute next send time and cron expression for the user's timezone
         tz_name = get_user_timezone_from_db(s, user_id)
@@ -66,7 +66,7 @@ def create_daily_schedule(
         created_str = (
             created_at.isoformat()
             if created_at is not None
-            else __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
+            else utc_now().isoformat()
         )
         logger.debug(
             f"persisted schedule id=<{getattr(schedule, 'schedule_id', None)}> "
@@ -167,7 +167,7 @@ def create_one_time_schedule(
 ) -> Schedule:
     """Create a one-time reminder schedule."""
     with get_session(session) as s:
-        now = datetime.now(timezone.utc)
+        now = utc_now()
         from src.core.timezone import to_utc
 
         run_at = to_utc(run_at)

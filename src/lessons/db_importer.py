@@ -1,9 +1,9 @@
 """Database import functions for ACIM lessons."""
 from __future__ import annotations
 
-import datetime
 from typing import List, Optional
 
+from src.core.clock import utc_now
 from src.models.database import SessionLocal, Lesson
 
 
@@ -39,7 +39,7 @@ def import_to_db(
                 content=content,
                 difficulty_level='beginner',
                 duration_minutes=15,
-                created_at=datetime.datetime.utcnow(),
+                created_at=utc_now(),
             )
             session.add(lesson)
             try:

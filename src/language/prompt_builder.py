@@ -5,15 +5,12 @@ Supports dynamic context assembly for Ollama LLM with token optimization.
 
 from typing import Dict, List, Optional, Any, Tuple
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone, timedelta
 import re
-from src.core.timezone import get_user_timezone_from_db, format_dt_in_timezone, to_utc
+from src.core.timezone import get_user_timezone_from_db, format_dt_in_timezone, to_utc, utc_now
 from src.models.database import MessageLog, User, Lesson
 from src.memories import MemoryManager
 from src.memories.constants import MemoryKey
-from src.memories.topics import MemoryTopic
-from src.functions.definitions import FunctionDefinitions, get_function_definitions
-import json
+from src.functions.definitions import get_function_definitions
 
 
 class PromptBuilder:
@@ -122,10 +119,10 @@ class PromptBuilder:
         elif is_direct_lesson_request:
             # Add instruction to use function instead of summarizing
             context_parts.append(
-                f"\n-- Lesson Text Request\n"
-                f"The user is asking for the lesson text. "
-                f"DO NOT summarize or describe the lesson. "
-                f"Instead, call the send_todays_lesson function to return the full lesson text."
+                "\n-- Lesson Text Request\n"
+                "The user is asking for the lesson text. "
+                "DO NOT summarize or describe the lesson. "
+                "Instead, call the send_todays_lesson function to return the full lesson text."
             )
 
         # 2. User Profile Context
@@ -353,7 +350,7 @@ class PromptBuilder:
         """
         from src.lessons.state import compute_current_lesson_state
 
-        now = datetime.now(timezone.utc)
+        now = utc_now()
 
         return compute_current_lesson_state(self.memory_manager, user_id, today=now)
 
@@ -371,7 +368,7 @@ class PromptBuilder:
             if not tz_name:
                 return None
 
-            now_utc = datetime.now(timezone.utc)
+            now_utc = utc_now()
             local_dt, resolved_name = format_dt_in_timezone(now_utc, tz_name)
             return f"Local time: {local_dt.strftime('%Y-%m-%d %H:%M')} ({resolved_name})"
         except Exception:
@@ -428,7 +425,7 @@ class PromptBuilder:
         # Add user tenure
         if user.created_at:
             created = to_utc(user.created_at)
-            days_active = (datetime.now(timezone.utc) - created).days
+            days_active = (utc_now() - created).days
             parts.append(f"User since: {days_active} days ago")
         
         # Add local time
@@ -531,7 +528,6 @@ Always transition smoothly to the next onboarding question."""
         """Detect context based on user state."""
         # Check for pending schedule request
         from src.memories.constants import MemoryKey
-        from src.memories.topics import MemoryTopic
         pending_schedule = self.memory_manager.get_memory(user_id, MemoryKey.SCHEDULE_REQUEST_PENDING)
         if pending_schedule:
             return "schedule_setup"
@@ -543,7 +539,7 @@ Always transition smoothly to the next onboarding question."""
         
         # Check if user is new (general onboarding)
         user = self.db.query(User).filter_by(user_id=user_id).first()
-        if user and (datetime.now(timezone.utc) - to_utc(user.created_at)).days < 1:
+        if user and (utc_now() - to_utc(user.created_at)).days < 1:
             return "onboarding"
         
         # Check for morning lesson confirmation

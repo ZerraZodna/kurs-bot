@@ -15,3 +15,4 @@ ollama
 pydantic_core==2.41.5
 pydantic-settings
 pymupdf
+ruff

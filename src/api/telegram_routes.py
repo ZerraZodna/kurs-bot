@@ -8,10 +8,9 @@ from sqlalchemy.exc import OperationalError
 
 from src.config import settings
 from src.integrations.telegram import TelegramHandler, process_telegram_batch
-from src.models.database import get_session, User, MessageLog, BatchLock
+from src.models.database import SessionLocal, get_session, User, MessageLog, BatchLock
 from src.services.admin_notifier import set_admin_chat_id, send_admin_notification
 from src.services.traffic_tracker import record_traffic_event
-from src.models.database import SessionLocal
 from src.core.timezone import utc_now, utc_now_plus
 
 logger = logging.getLogger(__name__)

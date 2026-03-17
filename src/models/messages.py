@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from src.models.base import Base
-import datetime
+from src.core.clock import utc_now
 
 
 class MessageLog(Base):
@@ -17,7 +17,7 @@ class MessageLog(Base):
     error_message = Column(Text)
     conversation_thread_id = Column(String(64))  # For grouping related messages
     message_role = Column(String(16), default="user")  # user|assistant for LLM context
-    created_at = Column(DateTime(timezone=True), default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     processed_at = Column(DateTime(timezone=True))
 
     # Relationships

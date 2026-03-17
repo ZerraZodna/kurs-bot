@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Iterable, Optional, Set
+from typing import Optional, Set
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request

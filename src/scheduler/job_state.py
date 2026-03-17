@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Optional
 
+from src.core.timezone import to_utc, utc_now
 from src.models.database import SessionLocal, JobState, init_db
-from src.core.timezone import to_utc
-
-
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 def get_state(key: str) -> Optional[str]:
@@ -29,9 +25,9 @@ def set_state(key: str, value: Optional[str]) -> None:
         row = db.query(JobState).filter_by(key=key).first()
         if row:
             row.value = value
-            row.updated_at = _utc_now()
+            row.updated_at = utc_now()
         else:
-            row = JobState(key=key, value=value, created_at=_utc_now(), updated_at=_utc_now())
+            row = JobState(key=key, value=value, created_at=utc_now(), updated_at=utc_now())
             db.add(row)
         db.commit()
     finally:

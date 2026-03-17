@@ -7,9 +7,9 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
+from src.core.timezone import utc_now
+from typing import Dict, List, Any
 
-from sqlalchemy.orm import Session
 
 from src.memories.manager import MemoryManager
 from src.memories.topics import (
@@ -19,9 +19,7 @@ from src.memories.topics import (
     TopicFieldValue,
     resolve_canonical_key,
     get_all_keys_for_topic,
-    CANONICAL_KEY_MAP,
 )
-from src.memories.constants import MemoryCategory
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +81,7 @@ class TopicManager:
             current = TopicFieldValue(
                 value=current_mem["value"],
                 source=current_mem.get("source", "unknown"),
-                updated_at=current_mem.get("created_at") or datetime.now(timezone.utc),
+                updated_at=current_mem.get("created_at") or utc_now(),
                 original_key=current_mem["key"],
             )
             
@@ -93,7 +91,7 @@ class TopicManager:
                 history.append(TopicFieldValue(
                     value=old_mem["value"],
                     source=old_mem.get("source", "unknown"),
-                    updated_at=old_mem.get("created_at") or datetime.now(timezone.utc),
+                    updated_at=old_mem.get("created_at") or utc_now(),
                     original_key=old_mem["key"],
                 ))
             

@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import Optional
 from sqlalchemy.orm import Session
 from src.models.database import Lesson
-from src.config import settings
 
 
 def _get_ollama_client():

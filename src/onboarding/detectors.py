@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
-import re
+from typing import Optional
 
 
 def detect_decline_keywords(message: str) -> bool:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
 from sqlalchemy.orm import Session
 import logging
 
@@ -66,14 +65,13 @@ def is_user_new(db: Session, user_id: int, threshold_minutes: int = 10) -> bool:
     Returns:
         True if user created within threshold
     """
-    from datetime import datetime, timezone
     from src.models.database import User
-    from src.core.timezone import to_utc
+    from src.core.timezone import to_utc, utc_now
 
     user = db.query(User).filter_by(user_id=user_id).first()
     if not user:
         return False
 
-    now = datetime.now(timezone.utc)
+    now = utc_now()
     time_diff = now - to_utc(user.created_at)
     return time_diff.total_seconds() < (threshold_minutes * 60)

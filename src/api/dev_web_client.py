@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional
 import os
@@ -7,8 +7,6 @@ import getpass
 
 from src.models.database import SessionLocal, User
 from src.services.dialogue_engine import DialogueEngine
-from src.memories import MemoryManager
-from src.config import settings
 import logging
 from fastapi.responses import StreamingResponse
 from src.integrations.telegram_stream import StreamingFilter

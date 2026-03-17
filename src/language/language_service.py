@@ -90,7 +90,6 @@ async def detect_language(text: str):
 
 
 from src.memories import MemoryManager
-from src.models.database import MessageLog
 
 
 async def detect_and_store_language(

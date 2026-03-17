@@ -7,14 +7,10 @@ import asyncio
 import threading
 
 from sqlalchemy.orm import Session
-from apscheduler.triggers.date import DateTrigger
-from datetime import datetime, timezone, timedelta
 
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.memories.semantic_search import get_semantic_search_service
 from src.memories.memory_handler import MemoryHandler
-from src.scheduler import api as scheduler_api
-from src.scheduler.domain import SCHEDULE_TYPE_DAILY
 from src.services.gdpr_service import (
     export_user_data,
     restrict_processing,
@@ -24,9 +20,7 @@ from src.services.gdpr_service import (
 )
 from src.services.gdpr_verification import create_verification, verify_code
 from src.models.database import PromptTemplate, SessionLocal
-from src.models.schedule import Schedule
 from src.models.user import User
-from src.language.prompt_registry import get_prompt_registry
 
 logger = logging.getLogger(__name__)
 

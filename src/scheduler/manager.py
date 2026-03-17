@@ -5,10 +5,10 @@ This module contains functions that perform CRUD operations on the
 be a thin, testable layer so the APScheduler wiring can live separately.
 """
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timezone
+from datetime import datetime
 
-from src.models.database import SessionLocal, Session, Schedule, get_session
-from src.core.timezone import to_utc
+from src.core.timezone import to_utc, utc_now
+from src.models.database import Session, SessionLocal, Schedule
 from .domain import SCHEDULE_TYPE_DAILY
 
 
@@ -21,7 +21,7 @@ def create_schedule(
     next_send_time: Optional[datetime] = None,
 ) -> Schedule:
     """Requires active Session."""
-    now = datetime.now(timezone.utc)
+    now = utc_now()
 
     # Ensure next_send_time persisted as UTC-aware datetime
     if next_send_time is not None:

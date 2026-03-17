@@ -3,8 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import secrets
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional, Tuple
+from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
 
@@ -12,11 +12,7 @@ from src.config import settings
 from src.models.database import GdprVerification
 
 
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-from src.core.timezone import to_utc
+from src.core.timezone import to_utc, utc_now as _utc_now
 
 
 def _ensure_utc_aware(dt: datetime) -> datetime:

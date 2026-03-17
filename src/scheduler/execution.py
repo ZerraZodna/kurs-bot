@@ -6,11 +6,12 @@ Contains schedule execution paths and missed-job recovery behavior.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from typing import Callable, Optional
 
 from sqlalchemy.orm import Session
 
+from src.core.timezone import utc_now
 from src.memories import MemoryManager
 from src.models.database import Lesson, Schedule, User, get_session
 from src.scheduler.message_utils import send_outbound_message
@@ -79,7 +80,7 @@ def run_recovery_check(
     with get_session() as db:
         recovered = 0
         try:
-            now = datetime.now(timezone.utc)
+            now = utc_now()
             due = (
                 db.query(Schedule)
                 .filter(
@@ -200,7 +201,7 @@ def execute_scheduled_task(schedule_id: int, simulate: bool = False, session: Op
 
     # For recurring lesson schedules, update next_send_time and last_sent
     if not simulate:
-        now = datetime.now(timezone.utc)
+        now = utc_now()
         schedule.last_sent_at = now
         schedule.next_send_time = now + timedelta(days=1)
         user.last_active_at = now
@@ -235,7 +236,7 @@ def _execute_one_time_schedule(
         return messages
 
     # Persist state for executed one-time reminder
-    schedule.last_sent_at = datetime.now(timezone.utc)
+    schedule.last_sent_at = utc_now()
     schedule.next_send_time = None
     schedule.is_active = False
     db.commit()

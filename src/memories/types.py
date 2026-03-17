@@ -1,7 +1,7 @@
 """Type definitions for memory extraction."""
 
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Any
+from typing import Optional, Dict, Any
 
 # Import Memory model for type hints
 from src.models.memory import Memory

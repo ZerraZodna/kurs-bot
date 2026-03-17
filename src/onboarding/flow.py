@@ -5,10 +5,7 @@ from enum import Enum
 from typing import Optional
 
 from sqlalchemy.orm import Session
-from src.models.database import Lesson
 from src.services.gdpr_service import record_consent
-from src.lessons.api import format_lesson_message, set_current_lesson, get_current_lesson
-from src.lessons.handler import translate_text
 from src.onboarding.user_management import delete_user_and_data
 from src.memories.dialogue_helpers import get_user_language
 from src.memories.constants import MemoryCategory, MemoryKey
