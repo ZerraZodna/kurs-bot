@@ -225,7 +225,7 @@ async def gdpr_withdraw_consent(
 
 @router.get("/privacy-notice")
 async def gdpr_privacy_notice() -> Dict[str, Any]:
-    notice_path = Path(__file__).resolve().parents[2] / "docs" / "PRIVACY_NOTICE.md"
+    notice_path = Path(__file__).resolve().parents[2] / "docs" / "gdpr" / "PRIVACY_NOTICE.md"
     if notice_path.exists():
         return {"content": notice_path.read_text(encoding="utf-8")}
     return {"content": "Privacy notice not configured yet."}
