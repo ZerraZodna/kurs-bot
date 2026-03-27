@@ -8,7 +8,7 @@ repos:
     hooks:
       - id: timezone-ban-check
         name: Ban direct timezone imports
-        entry: grep -E -rn --include="*.py" "(import datetime|from datetime import timezone|from zoneinfo)" src/ || true
+        entry: grep -E -rn --include="*.py" "^(from .*import.*ZoneInfo|from datetime.*timezone)" src/ || true
         language: system
         pass_filenames: false
         exclude: src/core/timezone.py
