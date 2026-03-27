@@ -3,6 +3,7 @@ Pytest configuration and global fixtures.
 
 This module provides:
 - Import-time blocking of Ollama/faiss for fast test collection
+- Dotenv loading for test environment variables
 - Database initialization and cleanup
 - Global mock fixtures
 - HTTP request blocking for test safety
@@ -10,11 +11,38 @@ This module provides:
 
 import os
 from pathlib import Path
+import sys
+import types
 
 import pytest
 
+# Load dotenv early so its variables are available to pytest and any imported
+# project modules during collection
+def _load_dotenv_if_present():
+    repo_root = Path(__file__).resolve().parent
+    env_path = repo_root / ".env"
+    if not env_path.exists():
+        return
+    try:
+        with env_path.open("r", encoding="utf8") as f:
+            for raw in f:
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.strip().strip('"')
+                if k and os.getenv(k) is None:
+                    os.environ[k] = v
+    except Exception:
+        pass
+
+_load_dotenv_if_present()
+
 # Register fake modules at import time to prevent real initialization
-from tests.mocks.ollama_mock import register_fake_ollama
+from mocks.ollama_mock import register_fake_ollama
 
 register_fake_ollama()
 
@@ -22,6 +50,7 @@ register_fake_ollama()
 from src.models.database import Base
 
 # Model imports populate registry before fixtures load
+
 
 # Auto-import fixture modules (after model registry populated)
 pytest_plugins = [
@@ -99,6 +128,44 @@ def _block_ollama_http_requests():
             _httpx.Client.request = _orig_sync_request
         if _orig_module_request is not None:
             _httpx.request = _orig_module_request
+    except Exception:
+        pass
+
+
+# Block external HTTP requests unless TEST_USE_REAL_OLLAMA=1
+@pytest.fixture(autouse=True)
+def block_external_http():
+    """Block accidental Ollama calls unless TEST_USE_REAL_OLLAMA=1."""
+    if os.getenv("TEST_USE_REAL_OLLAMA"):
+        yield
+        return
+    orig_request = None
+    try:
+        import httpx
+
+        LOCAL = "localhost:11434"
+        CLOUD = "ollama.com"
+
+        def is_ollama_url(u):
+            s = str(u)
+            return LOCAL in s or CLOUD in s
+
+        orig_request = httpx.request
+
+        def blocked_request(method, url, *args, **kwargs):
+            if is_ollama_url(url):
+                raise RuntimeError("Blocked Ollama HTTP in tests (set TEST_USE_REAL_OLLAMA=1)")
+            return orig_request(method, url, *args, **kwargs)
+
+        httpx.request = blocked_request
+    except Exception:
+        pass
+    yield
+    try:
+        import httpx
+
+        if orig_request:
+            httpx.request = orig_request
     except Exception:
         pass
 
@@ -252,3 +319,95 @@ def session_teardown():
                 pass
     except Exception:
         pass
+
+
+# Module-scoped DB schema creation (idempotent - safe to call multiple times)
+@pytest.fixture(scope="module", autouse=True)
+def module_db_setup(db_engine):
+    """Module-scoped DB schema creation (idempotent - safe to call multiple times)."""
+    from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError
+
+    # Drop all tables first to ensure clean state (handles parallel test conflicts)
+    # Using DROP TABLE IF EXISTS instead of drop_all to avoid transaction issues
+    try:
+        with db_engine.connect() as conn:
+            # Get list of all tables to drop
+            result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
+            tables = [row[0] for row in result.fetchall()]
+
+            # Drop all tables except sqlite_schema (internal)
+            for table in tables:
+                if table != "sqlite_schema":
+                    try:
+                        conn.execute(text(f"DROP TABLE IF EXISTS {table}"))
+                    except OperationalError:
+                        pass  # Table doesn't exist, OK
+
+            conn.commit()
+    except Exception:
+        # If connection fails, just continue - create_all will recreate tables
+        pass
+
+    # Now create all tables fresh
+    Base.metadata.create_all(db_engine)
+
+    yield
+    # No cleanup needed - temp DB is discarded after module
+
+
+# Fast per-test cleanup: DELETE FROM all tables (handles all schema tables). Safe if tables missing.
+@pytest.fixture(scope="function", autouse=True)
+def truncate_test_tables(db_engine):
+    """Fast per-test cleanup: DELETE FROM all tables (handles all schema tables). Safe if tables missing."""
+    from sqlalchemy import text, inspect
+    from sqlalchemy.exc import OperationalError
+
+    with db_engine.connect() as conn:
+        # Get all tables to truncate
+        inspector = inspect(db_engine)
+        all_tables = inspector.get_table_names()
+
+        # Truncate all tables
+        for table in all_tables:
+            try:
+                # Use DELETE instead of TRUNCATE to preserve auto-increment values
+                conn.execute(text(f"DELETE FROM {table}"))
+            except OperationalError as e:
+                # Table doesn't exist or other error - ignore
+                if "already exists" not in str(e).lower() and "no such table" not in str(e).lower():
+                    print(f"Warning: Error truncating {table}: {e}")
+                pass
+        conn.commit()
+
+
+# Serial test handling - collect serial tests last so they run in isolation
+def pytest_collection_modifyitems(config, items):
+    serial_items = [i for i in items if i.get_closest_marker("serial")]
+    other_items = [i for i in items if not i.get_closest_marker("serial")]
+    items[:] = other_items + serial_items
+
+
+# Model overrides for test configuration
+def pytest_configure(config):
+    defaults_model = "llama3.2:3b"
+    overrides = {
+        "OLLAMA_MODEL": os.getenv("TEST_OLLAMA_MODEL", defaults_model),
+        "NON_ENGLISH_OLLAMA_MODEL": os.getenv("TEST_NON_ENGLISH_OLLAMA_MODEL", defaults_model),
+    }
+    changed = False
+    for k, v in overrides.items():
+        if v.endswith(":test"):
+            v = defaults_model
+        os.environ[k] = v
+        changed = True
+    if changed:
+        try:
+            import importlib
+
+            import src.config as cfg
+
+            importlib.reload(cfg)
+            print("🔧 Test Ollama model overrides applied")
+        except Exception:
+            pass
