@@ -59,14 +59,16 @@ npm test
 npm start
 ```
 
-### Option B: Without npm (older Macs)
+### Option B: Without npm (direct Python)
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python -m uvicorn src.api.app:app --host 127.0.0.1 --port 8000
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install --upgrade pip
+pip install -e .[dev]
+uvicorn src.api.app:app --host 127.0.0.1 --port 8000
 ```
+
+**Note**: Uses modern `pyproject.toml` for dependencies (replaces legacy requirements.txt).
 
 > **Note:** Database is auto-initialized on first run.
 

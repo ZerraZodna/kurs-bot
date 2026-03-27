@@ -24,9 +24,9 @@ Common commands:
 
 ```powershell
 cd D:\dev\kurs-bot
-npm install          # installs JS deps and runs `postinstall` to set up Python venv and deps
+npm install          # installs JS deps + Python deps from pyproject.toml via postinstall (editable -e .[dev])
 # or explicitly (if you prefer):
-npm run install:py   # install Python deps into .venv (requirements.txt or editable install)
+npm run install:py   # install Python deps into .venv from pyproject.toml (editable -e .[dev])
 npm test             # runs pytest via the consolidated runner
 npm start            # starts the backend (uvicorn) and ngrok if available (detached)
 npm stop             # stop ngrok and uvicorn processes started by `npm start`
