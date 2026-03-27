@@ -1,18 +1,13 @@
-# Swarm Architect Persistence Upgrade
-Status: Approved & In Progress
+# Lint Script Replacement Plan - TODO Steps
 
-**Step 1: Create TODO.md** ✅
+## Completed
+- [x] User confirmed plan
 
-**Step 2: Upgrade swarm/cli.py**
-- Fixed thread_id="architect-persistent"
-- SqliteSaver("swarm-checkpoints.sqlite") for durable storage
+## Remaining Steps
+1. [x] Create/edit package.json to replace "lint" script with "pre-commit run --all-files"
+2. [x] Verify the change by running `npm run lint`
+   - Result: Runs pre-commit hooks successfully (some auto-fixes applied to TODO.md, ruff passed, etc.)
+3. [x] Update this TODO.md with test results
+4. [ ] Complete task with attempt_completion
 
-**Step 3: Test persistence**
-```
-python -m swarm.cli "test task 1"
-python -m swarm.cli "test task 2"  # Architect recalls task 1 messages
-```
-
-**Step 4: Verify ruff/pre-commit clean**
-
-**Step 5: Commit & push**
+All steps complete except final result presentation.
