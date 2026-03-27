@@ -1,3 +1,8 @@
+minimum_pre_commit_version: '3.0.0'
+
+default_language_version:
+  python: python3.9
+
 repos:
   - repo: local
     hooks:
@@ -7,3 +12,48 @@ repos:
         language: system
         pass_filenames: false
         exclude: src/core/timezone.py
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: debug-statements
+      - id: requirements-txt-fixer
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+
+
+# Offline - requires internet:
+#  - repo: https://github.com/pre-commit/mirrors-safety
+#    rev: v1.11.2
+#    hooks:
+#      - id: safety-check
+#
+#  - repo: https://github.com/Yelp/detect-secrets
+#    rev: v1.5.0
+#    hooks:
+#      - id: detect-secrets
+#        args: [--baseline, .secrets.baseline]
+
+#  - repo: https://github.com/ibidem/markdownlint-cli2-pre-commit
+#    rev: v0.12.0
+#    hooks:
+#      - id: markdownlint-cli2
+#        args: [-c, pyproject.toml]
+
+#  - repo: https://github.com/pre-commit/pre-commit-hooks
+#    rev: v4.6.0
+#    hooks:
+#      - id: no-executable-mode
+#        exclude: ^scripts/
