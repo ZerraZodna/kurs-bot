@@ -6,19 +6,25 @@ anti-drift CODE WRITER functionality for the swarm/ supervisor system.
 """
 
 from typing import Optional, Dict, Any
-from minisweagent.agents.default import DefaultAgent
-from minisweagent.models.litellm_model import LitellmModel
-from minisweagent.environments.local import LocalEnvironment
+from swarm.mini_swe_agent.agents import DefaultAgent
+from swarm.mini_swe_agent.models import LitellmModel
+from swarm.mini_swe_agent.environments import LocalEnvironment
 
-__version__ = "0.1.0"
-__all__ = ["DefaultAgentWrapper", "create_agent", "run_task_with_anti_drift", "plan_task_with_tests", "create_code_with_tests", "run_pre_commit", "execute_extended_workflow"]
+__version__ = "0.2.0"
+__all__ = [
+    "DefaultAgentWrapper", 
+    "create_agent", 
+    "run_task_with_anti_drift",
+    "plan_task_with_tests",
+    "create_code_with_tests",
+    "run_pre_commit",
+    "execute_extended_workflow",
+]
 
 
 class DefaultAgentWrapper(DefaultAgent):
     """
     Wrapped agent with anti-drift rules enforcement.
-    
-    Enforces swarm/ folder scoping and minimal changes.
     """
     
     ANTI_DRIFT_RULES = """
@@ -33,8 +39,6 @@ class DefaultAgentWrapper(DefaultAgent):
     6. DO NOT change existing swarm/ code
     7. Keep changes MINIMAL and focused
     8. DO NOT use markdown in output, just plain diff
-    
-    If you violate any rule, the REVIEWER will reject you.
     """
     
     def __init__(self, model: Optional[LitellmModel] = None, env: Optional[LocalEnvironment] = None):
@@ -52,7 +56,6 @@ class DefaultAgentWrapper(DefaultAgent):
         from minisweagent.agents.default import AgentConfig
         from jinja2 import Template
         
-        # Override system template with anti-drift rules
         anti_drift_template = """
         You are a strict technical coding supervisor for the kurs-bot project.
         
@@ -85,66 +88,41 @@ class DefaultAgentWrapper(DefaultAgent):
         )
     
     def run(self, task: str, **kwargs) -> str:
-        """
-        Run task with anti-drift rules.
-        
-        Returns the unified git diff output.
-        """
+        """Run task with anti-drift rules."""
         return super().run(task, **kwargs)
 
 
 def create_agent(cwd: str = "/home/steen/kurs-bot/swarm/", model_name: str = "qwen2.5:7b-instruct-q4_K_M") -> DefaultAgentWrapper:
-    """
-    Create a configured agent with anti-drift rules.
-    
-    Args:
-        cwd: Working directory (default: swarm/ folder)
-        model_name: LLM model name (default: Qwen)
-    
-    Returns:
-        Configured DefaultAgentWrapper instance
-    """
-    return DefaultAgentWrapper()
+    """Create a configured agent with anti-drift rules."""
+    env = LocalEnvironment(cwd=cwd)
+    model = LitellmModel(model_name=model_name, base_url="http://localhost:8080/v1")
+    return DefaultAgentWrapper(model=model, env=env)
+
+
+def run_task_with_anti_drift(task: str, cwd: str = "/home/steen/kurs-bot/swarm/") -> str:
+    """Run a coding task with anti-drift rules enforced."""
+    agent = create_agent(cwd=cwd)
+    return agent.run(task)
 
 
 def plan_task_with_tests(task: str, cwd: str = "/home/steen/kurs-bot/swarm/") -> Dict[str, Any]:
-    """
-    Plan a coding task with test requirements included.
-    
-    Integrates test creation planning into the architect workflow.
-    
-    Args:
-        task: Task description to execute
-        cwd: Working directory (default: swarm/ folder)
-    
-    Returns:
-        Dictionary with task plan including test requirements
-    """
+    """Plan a coding task with test requirements included."""
     agent = create_agent(cwd=cwd)
     plan_task = f"""
     Task: {task}
     
     Extended Workflow Requirements:
     1. Plan with test creation requirements
-    2. Auto-generate unit tests for the new functionality
-    3. Implement Pre-Commit failure loop
+    2. Identify which files need unit tests
+    3. Plan test file names (use *_test.py pattern)
+    4. Plan test coverage for new functions
+    5. Output ONLY unified git diff for planning
     """
     return agent.run(plan_task)
 
 
 def create_code_with_tests(task: str, cwd: str = "/home/steen/kurs-bot/swarm/") -> Dict[str, Any]:
-    """
-    Create or modify code with auto-generated unit tests.
-    
-    Auto-generates unit tests when creating/modifying code.
-    
-    Args:
-        task: Task description to execute
-        cwd: Working directory (default: swarm/ folder)
-    
-    Returns:
-        Dictionary with code creation result and test file paths
-    """
+    """Create or modify code with auto-generated unit tests."""
     agent = create_agent(cwd=cwd)
     create_task = f"""
     Task: {task}
@@ -152,9 +130,10 @@ def create_code_with_tests(task: str, cwd: str = "/home/steen/kurs-bot/swarm/") 
     Extended Workflow:
     1. Create/modify code inside swarm/ folder
     2. Auto-generate unit tests for the new functionality
+    3. Test file naming: {func_name}_test.py for each new function
+    4. Output ONLY unified git diff
     """
     result = agent.run(create_task)
-    
     return {
         "success": True,
         "diff": result,
@@ -162,78 +141,40 @@ def create_code_with_tests(task: str, cwd: str = "/home/steen/kurs-bot/swarm/") 
     }
 
 
-def run_pre_commit(task: str, cwd: str = "/home/steen/kurs-bot/swarm/") -> Dict[str, Any]:
-    """
-    Run Pre-Commit checks with failure loop.
-    
-    Implements Pre-Commit failure loop - loops back to Code Writer if tests fail.
-    
-    Args:
-        task: Task description to execute
-        cwd: Working directory (default: swarm/ folder)
-    
-    Returns:
-        Dictionary with Pre-Commit result and retry information
-    """
+def run_pre_commit(task: str, cwd: str = "/home/steen/kurs-bot/swarm/", max_retries: int = 3) -> Dict[str, Any]:
+    """Run Pre-Commit checks with failure loop."""
     agent = create_agent(cwd=cwd)
     pre_commit_task = f"""
     Task: Run Pre-Commit checks for task: {task}
     
     Extended Workflow:
-    - Run Pre-Commit checks
-    - If tests fail, loop back to Code Writer
+    - Run Pre-Commit checks (npm test / pytest)
+    - If tests fail, loop back to Code Writer (max {max_retries} retries)
+    - Output: PASS or FAIL with details
     """
     result = agent.run(pre_commit_task)
     
+    needs_retry = "FAIL" in result.upper() or "failed" in result.lower()
+    
     return {
-        "success": "pre-commit passed" in result.lower(),
+        "success": "PASS" in result.upper() and "failed" not in result.lower(),
         "output": result,
-        "needs_retry": "pre-commit failed" in result.lower()
+        "needs_retry": needs_retry,
+        "retries_remaining": max_retries
     }
 
 
-def run_task_with_anti_drift(task: str, cwd: str = "/home/steen/kurs-bot/swarm/") -> str:
-    """
-    Run a coding task with anti-drift rules enforced.
+def execute_extended_workflow(task: str, cwd: str = "/home/steen/kurs-bot/swarm/", max_retries: int = 3) -> Dict[str, Any]:
+    """Execute the full extended workflow."""
+    planning = plan_task_with_tests(task, cwd)
+    code_creation = create_code_with_tests(task, cwd)
+    pre_commit = run_pre_commit(task, cwd, max_retries)
     
-    This is the main entry point for using mini-swe-agent as the CODE WRITER
-    in the swarm/ supervisor workflow.
-    
-    Args:
-        task: Task description to execute
-        cwd: Working directory (default: swarm/ folder)
-    
-    Returns:
-        Unified git diff output
-    
-    Example:
-        >>> diff = run_task_with_anti_drift("Add anti-drift documentation")
-        >>> print(diff)
-    """
-    agent = create_agent(cwd=cwd)
-    return agent.run(task)
-
-
-def execute_extended_workflow(task: str, cwd: str = "/home/steen/kurs-bot/swarm/") -> Dict[str, Any]:
-    """
-    Execute the full extended workflow.
-    
-    Coordinates:
-    1. Test creation planning
-    2. Code creation with auto-generated tests
-    3. Pre-Commit failure loop
-    
-    Args:
-        task: Task description to execute
-        cwd: Working directory (default: swarm/ folder)
-    
-    Returns:
-        Dictionary with workflow results
-    """
     return {
-        "planning": plan_task_with_tests(task, cwd),
-        "code_creation": create_code_with_tests(task, cwd),
-        "pre_commit": run_pre_commit(task, cwd)
+        "planning": planning,
+        "code_creation": code_creation,
+        "pre_commit": pre_commit,
+        "workflow_complete": pre_commit["success"]
     }
 
 
@@ -250,9 +191,15 @@ if __name__ == "__main__":
     print("=" * 80)
     
     try:
-        diff = run_task_with_anti_drift(task)
-        print("\n--- OUTPUT ---")
-        print(diff)
+        result = execute_extended_workflow(task)
+        print("\n--- PLANNING ---")
+        print(result['planning'])
+        print("\n--- CODE CREATION ---")
+        print(result['code_creation'])
+        print("\n--- PRE-COMMIT ---")
+        print(result['pre_commit'])
     except Exception as e:
         print(f"ERROR: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)

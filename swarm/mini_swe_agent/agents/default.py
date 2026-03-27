@@ -7,7 +7,8 @@ import time
 from jinja2 import StrictUndefined, Template
 from pydantic import BaseModel
 
-from minisweagent import Environment, Model
+from ..environments.local import LocalEnvironment
+from ..models.litellm_model import LitellmModel
 
 
 class AgentConfig(BaseModel):
@@ -47,7 +48,7 @@ class LimitsExceeded(TerminatingException):
 
 
 class DefaultAgent:
-    def __init__(self, model: Model, env: Environment, *, config_class: type = AgentConfig, **kwargs):
+    def __init__(self, model: LitellmModel, env: LocalEnvironment, *, config_class: type = AgentConfig, **kwargs):
         self.config = config_class(**kwargs)
         self.messages: list[dict] = []
         self.model = model

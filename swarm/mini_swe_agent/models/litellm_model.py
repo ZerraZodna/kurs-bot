@@ -15,8 +15,12 @@ from tenacity import (
     wait_exponential,
 )
 
-from minisweagent.models import GLOBAL_MODEL_STATS
-from minisweagent.models.utils.cache_control import set_cache_control
+# GLOBAL_MODEL_STATS is not available in our copy - we'll handle this gracefully
+GLOBAL_MODEL_STATS = {}  # Empty stats for our custom version
+# set_cache_control is not available in our copy - we'll handle this gracefully
+def set_cache_control(headers=None):
+    """Placeholder for cache control - not used in our custom version"""
+    pass
 
 logger = logging.getLogger("litellm_model")
 
