@@ -1,6 +1,6 @@
 # Retention Schedule (GDPR)
 
-**Last updated:** 2026-02-04
+**Last updated:** 2024-10-01
 
 ## Purpose
 Define how long each data category is retained and the deletion/anonymization method.

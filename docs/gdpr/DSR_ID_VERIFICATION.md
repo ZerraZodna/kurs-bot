@@ -1,6 +1,6 @@
 # DSR Identity Verification & SLA
 
-**Last updated:** 2026-02-04
+**Last updated:** 2024-10-01
 
 ## Verification Policy
 - Require requestor to prove control of the account or contact channel.
@@ -10,9 +10,9 @@
   - Signed-in session (if applicable)
 
 ## Telegram One-Time Code Flow
-1. User sends a GDPR request in Telegram (e.g., "gdpr export").
+1. User sends a GDPR request in Telegram (e.g., \"gdpr export\").
 2. System generates a 6-digit code and stores a hash + expiry in the DB.
-3. Bot replies with the code and asks the user to send "verify <code>".
+3. Bot replies with the code and asks the user to send \"verify <code>\".
 4. System verifies hash + expiry + attempt limit, then executes the request.
 
 ## SLA

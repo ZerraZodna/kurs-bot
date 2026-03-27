@@ -1,6 +1,6 @@
 # Vendor & Subprocessor List
 
-**Last updated:** 2026-02-04
+**Last updated:** 2024-10-01
 
 | Vendor | Purpose | Data Categories | Region | DPA/SCC Status | Notes |
 |---|---|---|---|---|---|

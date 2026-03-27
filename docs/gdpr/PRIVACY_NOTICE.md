@@ -1,6 +1,6 @@
 # Privacy Notice (GDPR)
 
-**Last updated:** 2026-02-04
+**Last updated:** 2024-10-01
 
 This notice explains how Kurs Bot collects, uses, and protects personal data in compliance with the EU General Data Protection Regulation (GDPR).
 

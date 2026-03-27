@@ -1,6 +1,6 @@
 # Data Protection Impact Assessment (DPIA)
 
-**Last updated:** 2026-02-04
+**Last updated:** 2024-10-01
 
 ## 1) Description of Processing
 - System: Kurs Bot

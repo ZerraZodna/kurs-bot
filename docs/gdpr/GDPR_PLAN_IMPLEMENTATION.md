@@ -1,7 +1,7 @@
 # GDPR Plan & Implementation Checklist
 
 > Scope: All items are required for EU GDPR compliance for this application.
-> Date: 2026-02-04
+> Date: 2024-10-01
 
 ## 1) Governance & Accountability
 - [ ] Appoint a Data Protection Officer (DPO) or document why not required (Art. 37–39).
@@ -14,7 +14,7 @@
 - [ ] Document lawful basis for each processing purpose (Art. 6).
 - [ ] For consent-based processing: implement explicit, granular consent and audit trail (Art. 7).
 - [x] Allow consent withdrawal and ensure it is as easy as giving consent.
-- [ ] Implement age-gating and parental consent if children’s data may be processed (Art. 8).
+- [ ] Implement age-gating and parental consent if children's data may be processed (Art. 8).
 
 ## 3) Transparency & Notices
 - [x] Provide a clear Privacy Notice (Art. 12–14) covering:
@@ -32,7 +32,7 @@
 Implement and document processes + APIs for:
 - [x] Right of access (Art. 15)
 - [x] Right to rectification (Art. 16)
-- [x] Right to erasure / “right to be forgotten” (Art. 17)
+- [x] Right to erasure / \"right to be forgotten\" (Art. 17)
 - [x] Right to restrict processing (Art. 18)
 - [x] Right to data portability (Art. 20)
 - [x] Right to object (Art. 21)
@@ -147,7 +147,7 @@ Implement and document processes + APIs for:
 ## 2) Lawful Basis & Consent
 **What:** Document lawful basis per purpose; implement consent withdrawal; age-gating if applicable.
 **How:**
-- Add a “lawful basis” table in docs (purpose → basis).
+- Add a \"lawful basis\" table in docs (purpose → basis).
 - Add consent withdrawal flow (API/UI) and log to ConsentLog.
 - If children may use the app: implement age-gate + parental consent record.
 

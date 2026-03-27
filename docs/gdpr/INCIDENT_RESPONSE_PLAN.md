@@ -1,6 +1,6 @@
 # Incident & Breach Response Plan
 
-**Last updated:** 2026-02-04
+**Last updated:** 2024-10-01
 
 ## Scope
 Applies to all personal data processing systems and integrations.

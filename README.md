@@ -128,3 +128,11 @@ src/
 ├── memories/     # Persistent memory & RAG
 └── models/       # SQLAlchemy ORM
 ```
+
+## 📚 Documentation
+
+Organized in docs/:
+- [Index](docs/INDEX.md)
+- dev/ (architecture, DB, scripts, NPM)
+- gdpr/ (compliance docs)
+- project/ (onboarding, import, scheduler)
