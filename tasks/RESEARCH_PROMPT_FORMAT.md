@@ -179,7 +179,7 @@ class PromptBuilder:
     def build_prompt(self, ...) -> str:
         # Current format with -- section headers
         pass
-    
+
     # NEW - for OpenAI/Ollama Cloud
     def build_messages(
         self,
@@ -195,11 +195,11 @@ class PromptBuilder:
     ) -> List[Dict[str, str]]:
         """
         Build structured messages for OpenAI/Ollama Cloud.
-        
+
         Returns list of dicts with 'role' and 'content' keys.
         """
         messages = []
-        
+
         # 1. System message (instructions)
         system_content = self._build_system_content(
             system_prompt=system_prompt,
@@ -211,22 +211,22 @@ class PromptBuilder:
             "role": "system",
             "content": system_content
         })
-        
+
         # 2. User context messages (can be multiple)
         context_messages = []
-        
+
         # Add lesson if included
         if include_lesson:
             context_messages.append(self._build_lesson_message(user_id))
-        
+
         # Add profile context
         profile_context = self._build_profile_context(user)
         if profile_context:
             context_messages.append({
-                "role": "user", 
+                "role": "user",
                 "content": f"\n-- User Profile\n{profile_context}"
             })
-        
+
         # Add preferences
         prefs_context = self._build_preferences_context(user_id)
         if prefs_context:
@@ -234,14 +234,14 @@ class PromptBuilder:
                 "role": "user",
                 "content": f"\n-- Preferences\n{prefs_context}"
             })
-        
+
         # Add conversation history (multiple messages)
         if include_conversation_history:
             history_messages = self._build_conversation_history_messages(
                 user_id, history_turns
             )
             messages.extend(history_messages)
-        
+
         # Add semantic memories
         semantic_context = self._build_semantic_memory_context(relevant_memories or [])
         if semantic_context:
@@ -249,17 +249,17 @@ class PromptBuilder:
                 "role": "user",
                 "content": f"\n-- Relevant Memories\n{semantic_context}"
             })
-        
+
         # Add current user input
         current_message = {
             "role": "user",
             "content": f"\n-- Current Message\nUser: {user_input}"
         }
-        
+
         # Combine all context into one user message or keep separate
         # Option A: Combine all into single user message
         # Option B: Keep as separate messages (better for context)
-        
+
         return messages
 ```
 
@@ -290,7 +290,7 @@ async def call_openai(
     max_tokens: Optional[int] = None,
 ) -> str:
     """Call OpenAI with pre-structured messages."""
-    
+
     response = client.chat.completions.create(
         model=model,
         messages=messages,
@@ -298,14 +298,14 @@ async def call_openai(
         max_tokens=max_tokens,
         stream=True  # For streaming
     )
-    
+
     # Stream response
     full_response = ""
     async for chunk in response:
         delta = chunk.choices[0].delta.content or ""
         full_response += delta
         yield delta
-    
+
     return full_response
 ```
 
@@ -327,7 +327,7 @@ async def call_llm(
     ...
 ) -> str:
     """Unified LLM call supporting both Ollama and OpenAI."""
-    
+
     if isinstance(messages, str):
         # Ollama local - use string format
         if provider == "ollama":
@@ -389,7 +389,7 @@ def test_build_messages_includes_lesson():
     assert lesson_found
 
 def test_build_messages_separates_user_and_assistant():
-    messages = builder.build_messages(user_id, user_input, system_prompt, 
+    messages = builder.build_messages(user_id, user_input, system_prompt,
                                       include_conversation_history=True, history_turns=2)
     # Should have multiple user/assistant messages
     user_count = sum(1 for m in messages if m["role"] == "user")
@@ -409,7 +409,7 @@ def test_build_includes_lesson(format_type):
         result = builder.build_prompt(user_id, user_input, system_prompt)
     else:
         result = builder.build_messages(user_id, user_input, system_prompt)
-    
+
     assert "Today's ACIM Lesson" in result
 ```
 

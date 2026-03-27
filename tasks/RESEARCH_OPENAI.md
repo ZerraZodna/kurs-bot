@@ -140,17 +140,17 @@ from typing import AsyncGenerator, Optional
 
 class BaseLLMClient(ABC):
     """Abstract base for all LLM clients."""
-    
+
     def __init__(self, api_key: str, base_url: str, model: str):
         self.api_key = api_key
         self.base_url = base_url
         self.model = model
-    
+
     @abstractmethod
     async def call(self, prompt: str, temperature: float = 0.2) -> str:
         """Make non-streaming call."""
         pass
-    
+
     @abstractmethod
     async def stream(self, prompt: str, temperature: float = 0.2) -> AsyncGenerator[str, None]:
         """Make streaming call."""
@@ -166,11 +166,11 @@ class OpenAIClient(BaseLLMClient):
     def __init__(self, api_key: str, base_url: str = "https://api.openai.com/v1", model: str = "gpt-4o"):
         super().__init__(api_key, base_url, model)
         self.client = OpenAI(api_key=api_key, base_url=base_url)
-    
+
     async def call(self, prompt: str, temperature: float = 0.2) -> str:
         # Implementation using chat.completions.create(stream=False)
         pass
-    
+
     async def stream(self, prompt: str, temperature: float = 0.2) -> AsyncGenerator[str, None]:
         # Implementation using chat.completions.create(stream=True)
         pass
@@ -187,10 +187,10 @@ class UnifiedLLMClient:
             self.client = OllamaClient(settings)
         elif provider == "openai":
             self.client = OpenAIClient(settings)
-    
+
     async def call(self, prompt: str, **kwargs) -> str:
         return await self.client.call(prompt, **kwargs)
-    
+
     async def stream(self, prompt: str, **kwargs) -> AsyncGenerator[str, None]:
         async for token in self.client.stream(prompt, **kwargs):
             yield token
@@ -248,14 +248,14 @@ class Settings(BaseSettings):
     # Existing Ollama settings
     OLLAMA_MODEL: str = "qwen3:latest"
     OLLAMA_API_KEY: str = ""
-    
+
     # New OpenAI settings
     OPENAI_API_KEY: str = ""
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     OPENAI_MODEL: str = "gpt-4o"
     OPENAI_TEMPERATURE: float = 0.7
     OPENAI_MAX_TOKENS: int = 2048
-    
+
     # Provider selection
     DEFAULT_LLM_PROVIDER: str = "ollama"  # or "openai"
 ```
