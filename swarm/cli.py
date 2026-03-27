@@ -2,68 +2,69 @@
 """CLI entry-point for the kurs-bot LangGraph coding supervisor."""
 
 import sys
-
 from dotenv import load_dotenv
 
 load_dotenv()
 
+from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from .graph import build_supervisor_graph
 
 
 def main(task: str) -> None:
-    memory = MemorySaver()
-    supervisor_graph = build_supervisor_graph(memory)
+    checkpointer = MemorySaver()
+    graph = build_supervisor_graph(checkpointer)
 
-    config = {"configurable": {"thread_id": "architect-persistent"}}
+    config = {"configurable": {"thread_id": f"task-{hash(task) % 100000}"}}
 
-    input_state = {
-        "messages": [],
+    initial_state = {
+        "messages": [HumanMessage(content=f"Task: {task}")],
         "current_task": task,
-        "subtasks": [],
-        "proposed_changes": "",
-        "review_feedback": "",
-        "final_decision": "",
+        "subtasks": None,
+        "proposed_changes": None,
+        "review_feedback": None,
+        "final_decision": None,
         "iteration_count": 0,
     }
 
-    print("=" * 60)
-    print("  KURS-BOT SWARM CODING SUPERVISOR")
-    print("  (Technical code only — no spiritual content)")
-    print("=" * 60)
+    print("=" * 80)
+    print("   KURS-BOT SWARM CODING SUPERVISOR")
+    print("   (Technical only — no spiritual content)")
+    print("=" * 80)
     print(f"\nTask: {task}\n")
     print("Running architect → code_writer → reviewer cycle...\n")
 
-    result = supervisor_graph.invoke(input_state, config)
+    result = graph.invoke(initial_state, config)
 
-    decision = result.get("final_decision", "NO DECISION")
-    iterations = result.get("iteration_count", 0)
+    print("=" * 80)
+    print(f"FINAL DECISION: {result.get('final_decision', 'UNKNOWN')}")
+    print("=" * 80)
 
-    print("=" * 60)
-    print(f"  DECISION: {decision}  (after {iterations} iteration(s))")
-    print("=" * 60)
+    # Proposed diff (most important)
+    if result.get("proposed_changes"):
+        print(f"\n--- PROPOSED DIFF ---\n{result['proposed_changes']}")
 
-    # --- Review feedback ---
-    feedback = result.get("review_feedback", "")
-    if feedback:
-        print(f"\n--- REVIEWER FEEDBACK ---\n{feedback}")
+    # Reviewer feedback
+    if result.get("review_feedback"):
+        print(f"\n--- REVIEWER FEEDBACK ---\n{result['review_feedback']}")
 
-    # --- Proposed diff ---
-    changes = result.get("proposed_changes", "")
-    if changes:
-        print(f"\n--- PROPOSED DIFF ---\n{changes}")
-
-    # --- Last 3 node messages ---
+    # Safe node messages (debug info)
     messages = result.get("messages", [])
     if messages:
-        print("\n--- NODE MESSAGES (last 3) ---")
+        print("\n--- LAST 3 NODE MESSAGES ---")
         for msg in messages[-3:]:
-            content = msg.get("content", "")
-            # Truncate long messages for readability
-            preview = content[:500] + ("..." if len(content) > 500 else "")
-            print(f"\n  [{msg.get('role', '?')}]:\n  {preview}")
+            # Safe way to get content from BaseMessage or dict
+            if hasattr(msg, "content"):
+                content = str(msg.content)
+            else:
+                content = str(msg)
+            preview = content[:600] + ("..." if len(content) > 600 else "")
+            role = getattr(msg, "role", "assistant") if hasattr(msg, "role") else "assistant"
+            print(f"\n[{role.upper()}]:")
+            print(preview)
+            print("-" * 60)
 
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 80)
 
 
 if __name__ == "__main__":
