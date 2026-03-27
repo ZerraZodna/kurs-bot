@@ -34,7 +34,7 @@ def _create_user(session):
         email="test@example.com",
         phone_number="+4712345678",
         opted_in=True,
-        created_at=datetime.datetime.utcnow(),
+        created_at=datetime.datetime.now(datetime.UTC),
     )
     session.add(user)
     session.commit()

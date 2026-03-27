@@ -24,7 +24,7 @@ class TestSchedulerManager:
             lesson_id=lesson.lesson_id,
             schedule_type="daily",
             cron_expression="0 9 * * *",
-            next_send_time=datetime.datetime.utcnow(),
+            next_send_time=datetime.datetime.now(datetime.UTC),
             session=db_session,
         )
 

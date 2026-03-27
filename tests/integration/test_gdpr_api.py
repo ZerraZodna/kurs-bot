@@ -56,7 +56,7 @@ def _seed_user(db_session) -> int:
         email="test@example.com",
         phone_number="+4712345678",
         opted_in=True,
-        created_at=datetime.datetime.utcnow(),
+        created_at=datetime.datetime.now(datetime.UTC),
     )
     db_session.add(user)
     db_session.commit()
@@ -69,8 +69,8 @@ def _seed_user(db_session) -> int:
         value="blue",
         is_active=True,
         source="test",
-        created_at=datetime.datetime.utcnow(),
-        updated_at=datetime.datetime.utcnow(),
+        created_at=datetime.datetime.now(datetime.UTC),
+        updated_at=datetime.datetime.now(datetime.UTC),
     )
     db_session.add(memory)
 
@@ -80,7 +80,7 @@ def _seed_user(db_session) -> int:
         channel="test",
         content="hello",
         status="delivered",
-        created_at=datetime.datetime.utcnow(),
+        created_at=datetime.datetime.now(datetime.UTC),
     )
     db_session.add(message)
 
@@ -90,7 +90,7 @@ def _seed_user(db_session) -> int:
         schedule_type="daily",
         cron_expression="0 9 * * *",
         is_active=True,
-        created_at=datetime.datetime.utcnow(),
+        created_at=datetime.datetime.now(datetime.UTC),
     )
     db_session.add(schedule)
 
@@ -99,7 +99,7 @@ def _seed_user(db_session) -> int:
         channel="test",
         reason="user request",
         compliance_required=False,
-        unsubscribed_at=datetime.datetime.utcnow(),
+        unsubscribed_at=datetime.datetime.now(datetime.UTC),
     )
     db_session.add(unsubscribe)
     db_session.commit()

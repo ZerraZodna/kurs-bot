@@ -33,7 +33,7 @@ def _create_user(db_session):
         email="test@example.com",
         phone_number="+4712345678",
         opted_in=True,
-        created_at=datetime.datetime.utcnow(),
+        created_at=datetime.datetime.now(datetime.UTC),
     )
     db_session.add(user)
     db_session.commit()
@@ -49,8 +49,8 @@ def _create_memory(session, user_id: int):
         value="blue",
         is_active=True,
         source="test",
-        created_at=datetime.datetime.utcnow(),
-        updated_at=datetime.datetime.utcnow(),
+        created_at=datetime.datetime.now(datetime.UTC),
+        updated_at=datetime.datetime.now(datetime.UTC),
     )
     session.add(memory)
     session.commit()
@@ -65,7 +65,7 @@ def _create_message(session, user_id: int):
         channel="test",
         content="hello",
         status="delivered",
-        created_at=datetime.datetime.utcnow(),
+        created_at=datetime.datetime.now(datetime.UTC),
     )
     session.add(message)
     session.commit()
@@ -80,7 +80,7 @@ def _create_schedule(session, user_id: int):
         schedule_type="daily",
         cron_expression="0 9 * * *",
         is_active=True,
-        created_at=datetime.datetime.utcnow(),
+        created_at=datetime.datetime.now(datetime.UTC),
     )
     session.add(schedule)
     session.commit()
@@ -158,8 +158,8 @@ def test_gdpr_retention_purges_ttl_memories(db_session):
         value="old",
         is_active=True,
         source="test",
-        created_at=datetime.datetime.utcnow(),
-        updated_at=datetime.datetime.utcnow(),
+        created_at=datetime.datetime.now(datetime.UTC),
+        updated_at=datetime.datetime.now(datetime.UTC),
         ttl_expires_at=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1),
     )
     db_session.add(expired)

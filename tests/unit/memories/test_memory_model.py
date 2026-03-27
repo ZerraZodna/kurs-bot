@@ -23,8 +23,8 @@ class TestMemoryModel:
             key="fav_color",
             value="blue",
             is_active=True,
-            created_at=datetime.datetime.utcnow(),
-            updated_at=datetime.datetime.utcnow(),
+            created_at=datetime.datetime.now(datetime.UTC),
+            updated_at=datetime.datetime.now(datetime.UTC),
         )
         db_session.add(mem)
         db_session.commit()
@@ -41,8 +41,8 @@ class TestMemoryModel:
             key="fav_color",
             value="blue",
             is_active=True,
-            created_at=datetime.datetime.utcnow(),
-            updated_at=datetime.datetime.utcnow(),
+            created_at=datetime.datetime.now(datetime.UTC),
+            updated_at=datetime.datetime.now(datetime.UTC),
         )
         db_session.add(mem)
         db_session.commit()
@@ -62,8 +62,8 @@ class TestMemoryModel:
             key="fav_color",
             value="blue",
             is_active=True,
-            created_at=datetime.datetime.utcnow(),
-            updated_at=datetime.datetime.utcnow(),
+            created_at=datetime.datetime.now(datetime.UTC),
+            updated_at=datetime.datetime.now(datetime.UTC),
         )
         db_session.add(mem)
         db_session.commit()
@@ -86,8 +86,8 @@ class TestMemoryModel:
             key="fav_color",
             value="blue",
             is_active=True,
-            created_at=datetime.datetime.utcnow(),
-            updated_at=datetime.datetime.utcnow(),
+            created_at=datetime.datetime.now(datetime.UTC),
+            updated_at=datetime.datetime.now(datetime.UTC),
         )
         db_session.add(mem)
         db_session.commit()
