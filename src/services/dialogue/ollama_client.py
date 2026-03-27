@@ -11,7 +11,7 @@ clear logging and fallbacks.
 import asyncio
 import logging
 import time as _time
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 import httpx
@@ -42,7 +42,7 @@ OLLAMA_LONG_RETRIES = getattr(settings, "OLLAMA_LONG_RETRIES", 0)
 OLLAMA_TEMPERATURE = getattr(settings, "OLLAMA_TEMPERATURE", 0.2)
 
 
-def _is_cloud_url(url: Optional[str]) -> bool:
+def _is_cloud_url(url: str | None) -> bool:
     if not url:
         return False
     hostname = urlparse(url).hostname or ""
@@ -57,7 +57,7 @@ _IS_TEST_ENV = bool(getattr(settings, "IS_TEST_ENV", False))
 # and will not be attempted locally.
 
 
-def _extract_chat_text(resp: Any) -> Optional[str]:
+def _extract_chat_text(resp: Any) -> str | None:
     """Try several response shapes and return assistant content if found."""
     try:
         # ChatResponse with attribute `message`
@@ -71,7 +71,7 @@ def _extract_chat_text(resp: Any) -> Optional[str]:
 
     # Iterable of parts: dict, tuples, or Message objects
     try:
-        if hasattr(resp, "__iter__") and not isinstance(resp, (str, bytes)):
+        if hasattr(resp, "__iter__") and not isinstance(resp, str | bytes):
             parts = list(resp)
             for p in reversed(parts):
                 if isinstance(p, dict):
@@ -109,7 +109,7 @@ def _extract_chat_text(resp: Any) -> Optional[str]:
     return None
 
 
-async def _call_local_http(model: str, prompt: str, temperature: Optional[float] = None) -> str:
+async def _call_local_http(model: str, prompt: str, temperature: float | None = None) -> str:
     url = LOCAL_OLLAMA_URL
     temp = OLLAMA_TEMPERATURE if temperature is None else temperature
     payload = {"model": model, "prompt": prompt, "stream": False, "temperature": float(temp), "think": False}
@@ -126,7 +126,7 @@ async def _call_local_http(model: str, prompt: str, temperature: Optional[float]
         return str(data)
 
 
-def _cloud_call_sync(host_base: str, api_key: Optional[str], model: str, prompt: str, temperature: float = 0.2) -> Any:
+def _cloud_call_sync(host_base: str, api_key: str | None, model: str, prompt: str, temperature: float = 0.2) -> Any:
     """Sync wrapper executed in a thread: use official `OllamaClient` to call cloud."""
     client = OllamaClient(host=host_base, headers={"Authorization": f"Bearer {api_key}"} if api_key else None)
     messages = [{"role": "user", "content": prompt}]
@@ -140,9 +140,9 @@ def _cloud_call_sync(host_base: str, api_key: Optional[str], model: str, prompt:
 
 async def stream_ollama(
     prompt: str,
-    model: Optional[str] = None,
-    language: Optional[str] = None,
-    temperature: Optional[float] = None,
+    model: str | None = None,
+    language: str | None = None,
+    temperature: float | None = None,
 ):
     """Async generator that yields text chunks from Ollama streaming response.
 
@@ -279,7 +279,7 @@ async def stream_ollama(
 
 
 async def call_ollama(
-    prompt: str, model: Optional[str] = None, language: Optional[str] = None, temperature: Optional[float] = None
+    prompt: str, model: str | None = None, language: str | None = None, temperature: float | None = None
 ) -> str:
     """Top-level async method to call Ollama (cloud or local) and return text.
 

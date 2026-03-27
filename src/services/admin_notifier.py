@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Optional
 
 import httpx
 
@@ -19,7 +18,7 @@ def set_admin_chat_id(chat_id: int) -> None:
     set_state(_ADMIN_CHAT_ID_KEY, str(chat_id))
 
 
-def get_admin_chat_id() -> Optional[int]:
+def get_admin_chat_id() -> int | None:
     raw = get_state(_ADMIN_CHAT_ID_KEY)
     if not raw:
         return None

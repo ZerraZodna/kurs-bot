@@ -2,7 +2,6 @@ import getpass
 import logging
 import os
 import socket
-from typing import Optional
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
@@ -17,7 +16,7 @@ router = APIRouter(prefix="/dev")
 
 class MessagePayload(BaseModel):
     # Keep `user_id` optional for compatibility but it will be ignored by the server.
-    user_id: Optional[int] = None
+    user_id: int | None = None
     text: str
 
 

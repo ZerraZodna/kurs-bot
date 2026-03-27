@@ -20,7 +20,7 @@ Example:
 from __future__ import annotations
 
 from src.core.timezone import datetime
-from typing import Any, List, Optional
+from typing import Any, List
 
 from sqlalchemy.orm import Session
 
@@ -29,10 +29,10 @@ from src.models.database import Schedule
 
 def create_daily_schedule(
     user_id: int,
-    lesson_id: Optional[int],
+    lesson_id: int | None,
     time_str: str,
     schedule_type: str = "daily",
-    session: Optional[Session] = None,
+    session: Session | None = None,
 ) -> Schedule:
     """
     Create a daily schedule for lesson delivery.
@@ -61,8 +61,8 @@ def create_daily_schedule(
 def update_daily_schedule(
     schedule_id: int,
     time_str: str,
-    session: Optional[Session] = None,
-) -> Optional[Schedule]:
+    session: Session | None = None,
+) -> Schedule | None:
     """
     Update an existing daily schedule's time.
 
@@ -87,7 +87,7 @@ def create_one_time_schedule(
     user_id: int,
     run_at: datetime,
     message: str,
-    session: Optional[Session] = None,
+    session: Session | None = None,
 ) -> Schedule:
     """
     Create a one-time reminder schedule.
@@ -113,7 +113,7 @@ def create_one_time_schedule(
 
 def deactivate_schedule(
     schedule_id: int,
-    session: Optional[Session] = None,
+    session: Session | None = None,
 ) -> bool:
     """
     Deactivate a schedule and remove from APScheduler.
@@ -134,7 +134,7 @@ def deactivate_schedule(
 def deactivate_user_schedules(
     user_id: int,
     active_only: bool = True,
-    session: Optional[Session] = None,
+    session: Session | None = None,
 ) -> int:
     """
     Deactivate all schedules for a user.
@@ -160,7 +160,7 @@ def deactivate_user_schedules_by_type(
     user_id: int,
     schedule_type: str,
     active_only: bool = True,
-    session: Optional[Session] = None,
+    session: Session | None = None,
 ) -> int:
     """
     Deactivate schedules filtered by type (one_time or daily).
@@ -187,7 +187,7 @@ def deactivate_user_schedules_by_type(
 def get_user_schedules(
     user_id: int,
     active_only: bool = True,
-    session: Optional[Session] = None,
+    session: Session | None = None,
 ) -> List[Schedule]:
     """
     Get all schedules for a user.
@@ -214,8 +214,8 @@ def get_user_schedules(
 
 def find_active_daily_schedule(
     user_id: int,
-    session: Optional[Session] = None,
-) -> Optional[Schedule]:
+    session: Session | None = None,
+) -> Schedule | None:
     """
     Find the active daily schedule for a user.
 
@@ -237,9 +237,9 @@ def find_active_daily_schedule(
 def find_existing_one_time_reminder(
     user_id: int,
     run_at: datetime,
-    session: Optional[Session] = None,
+    session: Session | None = None,
     tolerance_seconds: int = 60,
-) -> Optional[Schedule]:
+) -> Schedule | None:
     """
     Check if user already has an active one-time reminder at approximately the same time.
 
@@ -299,7 +299,7 @@ def parse_time_string(time_str: str) -> tuple[int, int]:
 def execute_scheduled_task(
     schedule_id: int,
     simulate: bool = False,
-    session: Optional[Session] = None,
+    session: Session | None = None,
 ) -> Any:
     """
     Execute a scheduled task immediately.

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List
 
 from src.core.clock import utc_now
 from src.models.database import Lesson, SessionLocal
@@ -11,7 +11,7 @@ from src.models.database import Lesson, SessionLocal
 def import_to_db(
     lessons: List[tuple[int, str, str]],
     clear: bool = False,
-    limit: Optional[int] = None,
+    limit: int | None = None,
 ) -> int:
     """Import parsed lessons into the database.
 

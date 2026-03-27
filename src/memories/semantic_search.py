@@ -5,7 +5,7 @@ Performs keyword-based search on user memories with recency/relevance scoring.
 """
 
 import logging
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -28,9 +28,9 @@ class SemanticSearchService:
         user_id: int,
         query_text: str,
         session: Session,
-        limit: Optional[int] = None,
-        threshold: Optional[float] = None,
-        categories: Optional[List[str]] = None,
+        limit: int | None = None,
+        threshold: float | None = None,
+        categories: List[str] | None = None,
     ) -> List[Tuple[MemoryEntity, float]]:
         """
         Keyword search for relevant memories.
@@ -94,7 +94,7 @@ class SemanticSearchService:
 
 
 # Global instance
-_semantic_search_service: Optional[SemanticSearchService] = None
+_semantic_search_service: SemanticSearchService | None = None
 
 
 def get_semantic_search_service() -> SemanticSearchService:

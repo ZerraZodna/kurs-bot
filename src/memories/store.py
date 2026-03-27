@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from src.core.timezone import datetime
-from typing import List, Optional
+from typing import List
 
 from .types import MemoryEntity, MemoryRecord
 
@@ -26,7 +26,7 @@ class MemoryStore(ABC):
         key: str,
         value: str,
         source: str = "dialogue_engine",
-        ttl_hours: Optional[int] = None,
+        ttl_hours: int | None = None,
         category: str = "fact",
         allow_duplicates: bool = False,
     ) -> int:
@@ -40,7 +40,7 @@ class MemoryStore(ABC):
     def list_active_memories(
         self,
         user_id: int,
-        categories: Optional[List[str]] = None,
+        categories: List[str] | None = None,
         order_ascending: bool = False,
     ) -> List[MemoryEntity]:
         raise NotImplementedError
@@ -50,8 +50,8 @@ class MemoryStore(ABC):
         self,
         user_id: int,
         query_text: str,
-        categories: Optional[List[str]] = None,
-        limit: Optional[int] = None,
+        categories: List[str] | None = None,
+        limit: int | None = None,
     ) -> List[MemoryEntity]:
         raise NotImplementedError
 
@@ -59,7 +59,7 @@ class MemoryStore(ABC):
     def top_active_memories(
         self,
         user_id: int,
-        categories: Optional[List[str]] = None,
+        categories: List[str] | None = None,
         limit: int = 100,
     ) -> List[MemoryEntity]:
         raise NotImplementedError
@@ -69,7 +69,7 @@ class MemoryStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_user_memory_by_id(self, user_id: int, memory_id: int) -> Optional[MemoryEntity]:
+    def get_user_memory_by_id(self, user_id: int, memory_id: int) -> MemoryEntity | None:
         raise NotImplementedError
 
     @abstractmethod

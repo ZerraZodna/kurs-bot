@@ -13,7 +13,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 
 def load_dotenv(dotenv_path: Path) -> dict:
@@ -31,7 +31,7 @@ def load_dotenv(dotenv_path: Path) -> dict:
     return out
 
 
-def resolve_database_url(db_arg: Optional[str]) -> str:
+def resolve_database_url(db_arg: str | None) -> str:
     """Return a DATABASE_URL string.
 
     Accepts:
@@ -72,7 +72,7 @@ def _ensure_repo_root_on_path() -> None:
         sys.path.insert(0, str(repo_root))
 
 
-def init_db(database_url: str, yes: bool = False, lessons: Optional[str] = None) -> None:
+def init_db(database_url: str, yes: bool = False, lessons: str | None = None) -> None:
     """Initialize the specified database and seed defaults."""
     # Export DATABASE_URL for downstream imports
     os.environ["DATABASE_URL"] = database_url
@@ -120,7 +120,7 @@ def init_db(database_url: str, yes: bool = False, lessons: Optional[str] = None)
         print(f"⚠️  Failed during ACIM lessons import step: {e}")
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Initialize database and seed defaults")
     parser.add_argument("--db", help="Database to initialize. Accepts prod/dev, relative path, or full DATABASE_URL")
     parser.add_argument("--yes", "-y", action="store_true", help="Auto-confirm recreate without prompt")

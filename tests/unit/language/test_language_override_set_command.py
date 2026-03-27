@@ -48,6 +48,6 @@ class TestLanguageOverrideSetCommand:
         # Then: Language should change to 'en'
         lang_memories = mm.get_memory(user.user_id, "user_language")
         assert lang_memories, "No user_language memory stored after override"
-        assert any(m["value"].lower().startswith("en") for m in lang_memories), (
-            f"Expected 'en' to be stored after message '{msg}', got: {[m['value'] for m in lang_memories]}"
-        )
+        assert any(
+            m["value"].lower().startswith("en") for m in lang_memories
+        ), f"Expected 'en' to be stored after message '{msg}', got: {[m['value'] for m in lang_memories]}"

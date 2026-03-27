@@ -54,8 +54,7 @@ def test_name_temporal_resolution(clean_test_data, test_user_id):
 
     # Manually set created_at to be older
     mem = (
-        db
-        .query(Memory)
+        db.query(Memory)
         .filter(Memory.user_id == test_user_id, Memory.key == MemoryKey.FIRST_NAME, Memory.value == "Dev")
         .first()
     )
@@ -74,8 +73,7 @@ def test_name_temporal_resolution(clean_test_data, test_user_id):
 
     # Manually set created_at to be newer
     mem = (
-        db
-        .query(Memory)
+        db.query(Memory)
         .filter(Memory.user_id == test_user_id, Memory.key == MemoryKey.NAME, Memory.value == "Johannes")
         .first()
     )

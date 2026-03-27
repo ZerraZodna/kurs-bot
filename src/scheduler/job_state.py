@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import json
 from src.core.timezone import datetime
-from typing import Any, Optional
+from typing import Any
 
 from src.core.timezone import to_utc, utc_now
 from src.models.database import JobState, SessionLocal, init_db
 
 
-def get_state(key: str) -> Optional[str]:
+def get_state(key: str) -> str | None:
     init_db()
     db = SessionLocal()
     try:
@@ -18,7 +18,7 @@ def get_state(key: str) -> Optional[str]:
         db.close()
 
 
-def set_state(key: str, value: Optional[str]) -> None:
+def set_state(key: str, value: str | None) -> None:
     init_db()
     db = SessionLocal()
     try:
@@ -34,7 +34,7 @@ def set_state(key: str, value: Optional[str]) -> None:
         db.close()
 
 
-def get_state_json(key: str, default: Optional[Any] = None) -> Any:
+def get_state_json(key: str, default: Any | None = None) -> Any:
     raw = get_state(key)
     if raw is None:
         return default
@@ -48,7 +48,7 @@ def set_state_json(key: str, value: Any) -> None:
     set_state(key, json.dumps(value))
 
 
-def get_state_datetime(key: str) -> Optional[datetime]:
+def get_state_datetime(key: str) -> datetime | None:
     raw = get_state(key)
     if not raw:
         return None
@@ -59,7 +59,7 @@ def get_state_datetime(key: str) -> Optional[datetime]:
         return None
 
 
-def set_state_datetime(key: str, value: Optional[datetime]) -> None:
+def set_state_datetime(key: str, value: datetime | None) -> None:
     if value is None:
         set_state(key, None)
     else:

@@ -7,7 +7,7 @@ without native dependencies. It returns a tuple (code, confidence, meta).
 from __future__ import annotations
 
 import re
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 
 _LANG_KEYWORDS = {
     "en": {"the", "and", "is", "you", "do", "search", "please", "hello", "hi", "hey", "thanks", "thank"},
@@ -19,7 +19,7 @@ def _tokens(text: str):
     return [t for t in re.split(r"\W+", text.lower()) if t]
 
 
-def detect_language(text: str) -> Tuple[Optional[str], Optional[float], Dict]:
+def detect_language(text: str) -> Tuple[str | None, float | None, Dict]:
     """Detect language using keyword matches.
 
     Returns (iso_code, confidence [0-1], meta)

@@ -70,7 +70,7 @@ def _parse_run_at(run_at_val) -> datetime:
 
             dt = _dp.parse(run_at_val)
         return to_utc(dt)
-    if isinstance(run_at_val, (int, float)):
+    if isinstance(run_at_val, int | float):
         return to_utc(datetime.fromtimestamp(run_at_val, timezone.utc))
     return None
 

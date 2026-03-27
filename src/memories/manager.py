@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import List
 
 from sqlalchemy.orm import Session
 
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class MemoryManager:
-    def __init__(self, db: Optional[Session] = None, memory_store: Optional[MemoryStore] = None):
+    def __init__(self, db: Session | None = None, memory_store: MemoryStore | None = None):
         self.db = db or SessionLocal()
         self.memory_handler: MemoryStore = memory_store or MemoryHandler(self.db)
         # Lazy initialization of topic_manager
@@ -26,7 +26,7 @@ class MemoryManager:
         key: str,
         value: str,
         source: str = "dialogue_engine",
-        ttl_hours: Optional[int] = None,
+        ttl_hours: int | None = None,
         category: str = "fact",
         allow_duplicates: bool = False,
     ) -> int:

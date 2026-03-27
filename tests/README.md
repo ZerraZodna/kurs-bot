@@ -162,10 +162,10 @@ def test_store_memory_creates_active_memory(self, db_session, test_user):
     """When storing a memory, it should be created as active."""
     # Given: A memory manager and test user
     mm = MemoryManager(db_session)
-    
+
     # When: Storing a new memory
     memory_id = mm.store_memory(...)
-    
+
     # Then: Memory should exist and be active
     assert_memory_stored(db_session, test_user.user_id, ...)
 ```

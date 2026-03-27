@@ -90,9 +90,9 @@ class TestOneTimeReminderUTCConversion:
 
             # The trigger's run_date should be the exact UTC time we specified
             actual_run_date = captured_trigger.run_date
-            assert actual_run_date == run_at, (
-                f"Trigger run_date mismatch! Expected: {run_at} (UTC), Got: {actual_run_date}"
-            )
+            assert (
+                actual_run_date == run_at
+            ), f"Trigger run_date mismatch! Expected: {run_at} (UTC), Got: {actual_run_date}"
 
     def test_create_one_time_schedule_converts_to_utc_once(self):
         """
@@ -272,6 +272,6 @@ class TestSchedulerJobTimezoneHandling:
         utc_from_oslo_1 = to_utc(oslo_dt)
         utc_from_oslo_2 = to_utc(utc_from_oslo_1)
 
-        assert utc_from_oslo_1 == utc_from_oslo_2, (
-            f"to_utc is not idempotent on converted datetime! First: {utc_from_oslo_1}, Second: {utc_from_oslo_2}"
-        )
+        assert (
+            utc_from_oslo_1 == utc_from_oslo_2
+        ), f"to_utc is not idempotent on converted datetime! First: {utc_from_oslo_1}, Second: {utc_from_oslo_2}"

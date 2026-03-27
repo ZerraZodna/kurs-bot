@@ -6,13 +6,13 @@ the health-check logic organized and testable.
 
 import logging
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 from urllib.parse import urlparse
 
 import httpx
 
 
-def _is_cloud_model(model: Optional[str]) -> bool:
+def _is_cloud_model(model: str | None) -> bool:
     try:
         return isinstance(model, str) and str(model).lower().endswith("cloud")
     except Exception:
@@ -42,7 +42,7 @@ def _probe_tags(base: str, timeout: float = 2.0):
         return None
 
 
-def _attempt_generate_ping(base: str, model: Optional[str], timeout: float = 3.0) -> dict:
+def _attempt_generate_ping(base: str, model: str | None, timeout: float = 3.0) -> dict:
     try:
         ping = httpx.post(
             f"{base}/api/generate",

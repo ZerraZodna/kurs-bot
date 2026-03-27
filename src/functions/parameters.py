@@ -7,7 +7,7 @@ Handles validation, type checking, and coercion of function parameters.
 import logging
 import re
 from src.core.timezone import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class ParameterValidator:
     }
 
     @staticmethod
-    def coerce_value(value: Any, target_type: str) -> Tuple[bool, Any, Optional[str]]:
+    def coerce_value(value: Any, target_type: str) -> Tuple[bool, Any, str | None]:
         """
         Coerce a value to the target type.
 
@@ -45,7 +45,7 @@ class ParameterValidator:
             return False, value, f"Cannot coerce {value} to {target_type}: {e}"
 
     @staticmethod
-    def validate_time(time_str: str) -> Tuple[bool, Optional[str], Optional[str]]:
+    def validate_time(time_str: str) -> Tuple[bool, str | None, str | None]:
         """
         Validate time string in HH:MM format.
 
@@ -106,7 +106,7 @@ class ParameterValidator:
         return False, None, f"Invalid time format. Expected HH:MM or H AM/PM, got: {time_str}"
 
     @staticmethod
-    def validate_timezone(tz_str: str) -> Tuple[bool, Optional[str], Optional[str]]:
+    def validate_timezone(tz_str: str) -> Tuple[bool, str | None, str | None]:
         """
         Validate timezone string (IANA format).
 
@@ -169,7 +169,7 @@ class ParameterValidator:
         )
 
     @staticmethod
-    def validate_language(lang_str: str) -> Tuple[bool, Optional[str], Optional[str]]:
+    def validate_language(lang_str: str) -> Tuple[bool, str | None, str | None]:
         """
         Validate language code.
 
@@ -241,7 +241,7 @@ class ParameterValidator:
         return False, None, f"Unknown language: {lang_str}. Please use ISO 639-1 code (e.g., 'en', 'no', 'es')."
 
     @staticmethod
-    def validate_datetime(dt_str: str) -> Tuple[bool, Optional[datetime], Optional[str]]:
+    def validate_datetime(dt_str: str) -> Tuple[bool, datetime | None, str | None]:
         """
         Validate ISO datetime string.
 

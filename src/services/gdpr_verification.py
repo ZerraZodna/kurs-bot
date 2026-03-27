@@ -5,7 +5,7 @@ import json
 import secrets
 from src.core.timezone import datetime
 from datetime import timedelta
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from sqlalchemy.orm import Session
 
@@ -28,7 +28,7 @@ def create_verification(
     user_id: int,
     channel: str,
     request_type: str,
-    payload: Optional[Dict[str, Any]] = None,
+    payload: Dict[str, Any] | None = None,
 ) -> str:
     code = _generate_code(settings.GDPR_VERIFICATION_CODE_LENGTH)
     expires_at = _utc_now() + timedelta(minutes=settings.GDPR_VERIFICATION_TTL_MINUTES)
@@ -53,8 +53,7 @@ def verify_code(
     code: str,
 ) -> GdprVerification:
     verification = (
-        session
-        .query(GdprVerification)
+        session.query(GdprVerification)
         .filter(
             GdprVerification.user_id == user_id,
             GdprVerification.verified_at == None,

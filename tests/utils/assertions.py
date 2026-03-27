@@ -4,7 +4,7 @@ Provides standardized assertion functions for common test scenarios.
 These make tests more readable and reduce duplication.
 """
 
-from typing import List, Optional
+from typing import List
 
 from sqlalchemy.orm import Session
 
@@ -15,8 +15,8 @@ def assert_memory_stored(
     db: Session,
     user_id: int,
     key: str,
-    expected_value: Optional[str] = None,
-    category: Optional[str] = None,
+    expected_value: str | None = None,
+    category: str | None = None,
     is_active: bool = True,
 ) -> Memory:
     """Assert that a memory exists with the given criteria.
@@ -42,14 +42,14 @@ def assert_memory_stored(
     assert memory is not None, f"Memory with key '{key}' not found for user {user_id} (is_active={is_active})"
 
     if expected_value is not None:
-        assert memory.value == expected_value, (
-            f"Memory value mismatch for key '{key}': expected '{expected_value}', got '{memory.value}'"
-        )
+        assert (
+            memory.value == expected_value
+        ), f"Memory value mismatch for key '{key}': expected '{expected_value}', got '{memory.value}'"
 
     if category is not None:
-        assert memory.category == category, (
-            f"Memory category mismatch for key '{key}': expected '{category}', got '{memory.category}'"
-        )
+        assert (
+            memory.category == category
+        ), f"Memory category mismatch for key '{key}': expected '{category}', got '{memory.category}'"
 
     return memory
 
@@ -58,8 +58,8 @@ def assert_memory_count(
     db: Session,
     user_id: int,
     expected_count: int,
-    key: Optional[str] = None,
-    is_active: Optional[bool] = None,
+    key: str | None = None,
+    is_active: bool | None = None,
 ) -> List[Memory]:
     """Assert that a specific number of memories exist.
 
@@ -119,9 +119,9 @@ def assert_schedule_created(
     """
     schedule = db.query(Schedule).filter_by(user_id=user_id, schedule_type=schedule_type, is_active=is_active).first()
 
-    assert schedule is not None, (
-        f"Schedule of type '{schedule_type}' not found for user {user_id} (is_active={is_active})"
-    )
+    assert (
+        schedule is not None
+    ), f"Schedule of type '{schedule_type}' not found for user {user_id} (is_active={is_active})"
 
     return schedule
 
@@ -130,7 +130,7 @@ def assert_schedule_count(
     db: Session,
     user_id: int,
     expected_count: int,
-    is_active: Optional[bool] = None,
+    is_active: bool | None = None,
 ) -> List[Schedule]:
     """Assert that a specific number of schedules exist.
 
@@ -163,7 +163,7 @@ def assert_message_logged(
     db: Session,
     user_id: int,
     direction: str,
-    content_contains: Optional[str] = None,
+    content_contains: str | None = None,
 ) -> MessageLog:
     """Assert that a message was logged.
 
@@ -180,8 +180,7 @@ def assert_message_logged(
         AssertionError: If message not found
     """
     log = (
-        db
-        .query(MessageLog)
+        db.query(MessageLog)
         .filter_by(user_id=user_id, direction=direction)
         .order_by(MessageLog.created_at.desc())
         .first()
@@ -235,9 +234,9 @@ def assert_onboarding_complete(db: Session, user_id: int) -> None:
     status = onboarding.get_onboarding_status(user_id)
 
     is_complete = status.get("onboarding_complete", False)
-    assert is_complete, (
-        f"Expected onboarding to be complete for user {user_id}, but current_step is '{status.get('current_step')}'"
-    )
+    assert (
+        is_complete
+    ), f"Expected onboarding to be complete for user {user_id}, but current_step is '{status.get('current_step')}'"
 
 
 def assert_user_exists(db: Session, external_id: str) -> User:

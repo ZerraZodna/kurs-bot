@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, cast
 
 from sqlalchemy.orm import Session
 
@@ -30,7 +30,7 @@ def record_consent(
     scope: str,
     granted: bool,
     source: str,
-    consent_version: Optional[str] = None,
+    consent_version: str | None = None,
 ) -> ConsentLog:
     consent = ConsentLog(
         user_id=user_id,
@@ -47,12 +47,12 @@ def record_consent(
 
 def record_gdpr_request(
     session: Session,
-    user_id: Optional[int],
+    user_id: int | None,
     request_type: str,
     status: str,
     actor: str,
-    reason: Optional[str] = None,
-    details: Optional[Dict[str, Any]] = None,
+    reason: str | None = None,
+    details: Dict[str, Any] | None = None,
 ) -> GdprRequest:
     request = GdprRequest(
         user_id=user_id,
@@ -71,10 +71,10 @@ def record_gdpr_request(
 
 def record_gdpr_audit(
     session: Session,
-    user_id: Optional[int],
+    user_id: int | None,
     action: str,
     actor: str,
-    details: Optional[Dict[str, Any]] = None,
+    details: Dict[str, Any] | None = None,
 ) -> GdprAuditLog:
     audit = GdprAuditLog(
         user_id=user_id,
@@ -215,7 +215,7 @@ def export_user_data(session: Session, user_id: int) -> Dict[str, Any]:
 def restrict_processing(
     session: Session,
     user_id: int,
-    reason: Optional[str],
+    reason: str | None,
     actor: str,
 ) -> None:
     user = session.query(User).filter_by(user_id=user_id).first()
@@ -249,7 +249,7 @@ def restrict_processing(
 def object_to_processing(
     session: Session,
     user_id: int,
-    reason: Optional[str],
+    reason: str | None,
     actor: str,
 ) -> None:
     """Handle GDPR right to object by restricting processing."""
@@ -286,7 +286,7 @@ def withdraw_consent(
     user_id: int,
     scope: str,
     actor: str,
-    reason: Optional[str] = None,
+    reason: str | None = None,
 ) -> None:
     """Withdraw consent for a scope and restrict processing."""
     user = session.query(User).filter_by(user_id=user_id).first()
@@ -329,7 +329,7 @@ def rectify_user(
     session: Session,
     user_id: int,
     updates: Dict[str, Any],
-    memory_updates: Optional[List[Dict[str, Any]]],
+    memory_updates: List[Dict[str, Any]] | None,
     actor: str,
 ) -> None:
     user = session.query(User).filter_by(user_id=user_id).first()
@@ -380,7 +380,7 @@ def rectify_user(
 def erase_user_data(
     session: Session,
     user_id: int,
-    reason: Optional[str],
+    reason: str | None,
     actor: str,
 ) -> None:
     from src.services.admin_notifier import send_admin_notification
@@ -429,7 +429,7 @@ def erase_user_data(
 def clean_user_data(
     session: Session,
     user_id: int,
-    reason: Optional[str],
+    reason: str | None,
     actor: str,
 ) -> None:
     """Erase user PII and records like `erase_user_data` but keep the

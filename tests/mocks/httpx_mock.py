@@ -1,14 +1,14 @@
 """HTTPX client mocking utilities."""
 
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 from unittest.mock import MagicMock
 
 
 class DummyResponse:
     """Mock HTTPX response for testing."""
 
-    def __init__(self, json_data: Optional[Dict] = None, status_code: int = 200, text: str = ""):
+    def __init__(self, json_data: Dict | None = None, status_code: int = 200, text: str = ""):
         self.status_code = status_code
         self._text = text
 
@@ -29,7 +29,7 @@ class DummyResponse:
 class DummyAsyncClient:
     """Mock async HTTPX client for testing."""
 
-    def __init__(self, response: Optional[DummyResponse] = None, block_ollama: bool = True):
+    def __init__(self, response: DummyResponse | None = None, block_ollama: bool = True):
         self._response = response or DummyResponse()
         self._block_ollama = block_ollama
 
@@ -64,7 +64,7 @@ class DummyAsyncClient:
         return self._response
 
 
-def patch_httpx_client(monkeypatch, response: Optional[DummyResponse] = None, block_ollama: bool = True) -> MagicMock:
+def patch_httpx_client(monkeypatch, response: DummyResponse | None = None, block_ollama: bool = True) -> MagicMock:
     """Patch HTTPX AsyncClient.
 
     Usage:
@@ -102,13 +102,13 @@ class HttpxMock:
         self._block_ollama = True
 
     def set_response(
-        self, url_pattern: str, json_data: Optional[Dict] = None, status_code: int = 200, text: str = ""
+        self, url_pattern: str, json_data: Dict | None = None, status_code: int = 200, text: str = ""
     ) -> "HttpxMock":
         """Set a response for a URL pattern."""
         self._responses[url_pattern] = DummyResponse(json_data, status_code, text)
         return self
 
-    def set_default_response(self, json_data: Optional[Dict] = None, status_code: int = 200) -> "HttpxMock":
+    def set_default_response(self, json_data: Dict | None = None, status_code: int = 200) -> "HttpxMock":
         """Set the default response."""
         self._default_response = DummyResponse(json_data, status_code)
         return self

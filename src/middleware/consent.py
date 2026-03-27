@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Optional, Set
+from typing import Set
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -77,14 +77,14 @@ async def _extract_user_ids(request: Request) -> Set[int]:
     return user_ids
 
 
-def _extract_user_id_from_path(path: str) -> Optional[int]:
+def _extract_user_id_from_path(path: str) -> int | None:
     match = re.match(r"^/api/v1/dialogue/(?:context|memory)/(\d+)", path)
     if match:
         return int(match.group(1))
     return None
 
 
-def _add_user_id(target: Set[int], value: Optional[object]) -> None:
+def _add_user_id(target: Set[int], value: object | None) -> None:
     if value is None:
         return
     try:

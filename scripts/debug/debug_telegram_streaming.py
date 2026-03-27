@@ -12,7 +12,7 @@ if str(repo_root) not in sys.path:
 
 Simulates the exact Telegram streaming flow:
 1. process_message_for_telegram() → streaming generator
-2. StreamingFilter → clean tokens for Telegram  
+2. StreamingFilter → clean tokens for Telegram
 3. Collect remaining_for_functions → post_hook for functions
 4. Prints diagnostics for send_todays_lesson execution
 

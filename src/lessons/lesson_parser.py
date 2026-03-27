@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 from .text_normalizer import (
     _normalize_lesson_content_header,
@@ -43,7 +43,7 @@ def _normalize_header_line(s: str) -> str:
     return s
 
 
-def _extract_id_from_line(s: str) -> Optional[int | Tuple[int, int]]:
+def _extract_id_from_line(s: str) -> int | Tuple[int, int] | None:
     """Extract lesson ID(s) from a normalized header line.
 
     Returns:

@@ -7,7 +7,7 @@ including JSON format instructions and examples.
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from .registry import FunctionRegistry, get_function_registry
 
@@ -60,7 +60,7 @@ Query: query_schedule() to list before deleting""",
 Multiple facts in one message → multiple function calls""",
     }
 
-    def __init__(self, registry: Optional[FunctionRegistry] = None):
+    def __init__(self, registry: FunctionRegistry | None = None):
         self.registry = registry or get_function_registry()
 
     def for_context(self, context: str) -> str:
@@ -147,7 +147,7 @@ Multiple facts in one message → multiple function calls""",
 
 Remember: Always return valid JSON with "response" and "functions" fields."""
 
-    def get_function_example(self, function_name: str) -> Optional[Dict[str, Any]]:
+    def get_function_example(self, function_name: str) -> Dict[str, Any] | None:
         """Get an example call for a specific function."""
         func = self.registry.get(function_name)
         if not func or not func.examples:
@@ -158,7 +158,7 @@ Remember: Always return valid JSON with "response" and "functions" fields."""
             "parameters": func.examples[0],
         }
 
-    def validate_response_format(self, response_text: str) -> tuple[bool, Optional[str]]:
+    def validate_response_format(self, response_text: str) -> tuple[bool, str | None]:
         """Validate that a response follows the expected JSON format."""
         try:
             data = json.loads(response_text)
@@ -205,10 +205,10 @@ Remember: Always return valid JSON with "response" and "functions" fields."""
 
 
 # Global instance
-_definitions: Optional[FunctionDefinitions] = None
+_definitions: FunctionDefinitions | None = None
 
 
-def get_function_definitions(registry: Optional[FunctionRegistry] = None) -> FunctionDefinitions:
+def get_function_definitions(registry: FunctionRegistry | None = None) -> FunctionDefinitions:
     """Get the global function definitions instance."""
     global _definitions
     if _definitions is None:

@@ -2,7 +2,6 @@
 
 import datetime
 from collections.abc import Generator
-from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -63,7 +62,7 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
 
     mock_client = MagicMock()
 
-    async def mock_call_ollama(prompt: str, model: Optional[str] = None, language: Optional[str] = None) -> str:
+    async def mock_call_ollama(prompt: str, model: str | None = None, language: str | None = None) -> str:
         import sys
 
         prompt_lower = prompt.lower()

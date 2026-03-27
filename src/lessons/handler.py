@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from sqlalchemy.orm import Session
 
@@ -19,7 +18,7 @@ def _get_ollama_client():
 logger = logging.getLogger(__name__)
 
 
-def _find_lesson_by_id(session: Session, lesson_id: int) -> Optional[Lesson]:
+def _find_lesson_by_id(session: Session, lesson_id: int) -> Lesson | None:
     """Lookup lesson by id and best-effort import bundled lessons when missing."""
     lesson = session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
     if lesson:
@@ -33,7 +32,7 @@ def _find_lesson_by_id(session: Session, lesson_id: int) -> Optional[Lesson]:
     return session.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
 
 
-async def format_lesson_message(lesson: Lesson, language: Optional[str], call_ollama_fn=None) -> str:
+async def format_lesson_message(lesson: Lesson, language: str | None, call_ollama_fn=None) -> str:
     """
     Format lesson for display with optional translation.
 

@@ -4,14 +4,14 @@ Uses users.lesson for current lesson state memory for completion history.
 """
 
 from datetime import date
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from src.core.timezone import date_is_past
 from src.memories.manager import MemoryManager
 from src.models.user import User
 
 
-def _parse_int(value: Optional[str]) -> Optional[int]:
+def _parse_int(value: str | None) -> int | None:
     if value is None:
         return None
     s = str(value).strip()
@@ -21,7 +21,7 @@ def _parse_int(value: Optional[str]) -> Optional[int]:
         return None
 
 
-def get_current_lesson(memory_manager: MemoryManager, user_id: int) -> Optional[Any]:
+def get_current_lesson(memory_manager: MemoryManager, user_id: int) -> Any | None:
     """Get current lesson from users.lesson."""
     user = memory_manager.db.query(User).filter(User.user_id == user_id).first()
     if not user:
@@ -51,7 +51,7 @@ def has_lesson_status(memory_manager: MemoryManager, user_id: int) -> bool:
 
 
 def compute_current_lesson_state(
-    memory_manager: MemoryManager, user_id: int, today: Optional[date] = None
+    memory_manager: MemoryManager, user_id: int, today: date | None = None
 ) -> Dict[str, Any]:
     """Compute lesson state from users.lesson and last_active_at for daily advancement."""
     lesson_id = get_current_lesson(memory_manager, user_id)

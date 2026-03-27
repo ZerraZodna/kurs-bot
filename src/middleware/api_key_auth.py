@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
 
 from fastapi import HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -39,7 +38,7 @@ class ApiKeyAuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-def _extract_token(request: Request) -> Optional[str]:
+def _extract_token(request: Request) -> str | None:
     auth = request.headers.get("Authorization")
     if auth and auth.startswith("Bearer "):
         return auth.split(" ", 1)[1].strip()

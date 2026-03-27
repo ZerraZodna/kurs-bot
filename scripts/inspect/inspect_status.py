@@ -20,8 +20,7 @@ def main() -> int:
     db = SessionLocal()
     try:
         active_users = (
-            db
-            .query(User)
+            db.query(User)
             .filter(
                 User.opted_in.is_(True),
                 User.processing_restricted.is_(False),

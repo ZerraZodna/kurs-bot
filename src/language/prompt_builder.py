@@ -4,7 +4,7 @@ Supports dynamic context assembly for Ollama LLM with token optimization.
 """
 
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -64,7 +64,7 @@ class PromptBuilder:
         "- Return only the lesson body."
     )
 
-    def __init__(self, db: Session, memory_manager: Optional[MemoryManager] = None):
+    def __init__(self, db: Session, memory_manager: MemoryManager | None = None):
         self.db = db
         self.memory_manager = memory_manager or MemoryManager(db)
         self.function_definitions = get_function_definitions()
@@ -77,7 +77,7 @@ class PromptBuilder:
         include_lesson: bool = True,
         include_conversation_history: bool = True,
         history_turns: int = 4,
-        relevant_memories: Optional[List[Dict[str, Any]]] = None,
+        relevant_memories: List[Dict[str, Any]] | None = None,
         context_type: str = "general_chat",
         include_functions: bool = True,
     ) -> str:
@@ -197,7 +197,7 @@ class PromptBuilder:
         user_id: int,
         user_input: str,
         system_prompt: str,
-        relevant_memories: Optional[List[Dict[str, Any]]] = None,
+        relevant_memories: List[Dict[str, Any]] | None = None,
         include_conversation_history: bool = True,
         history_turns: int = 2,
         max_memories: int = 5,
@@ -305,7 +305,7 @@ class PromptBuilder:
 
         return "\n".join(lines)
 
-    def _get_today_lesson(self, user_id: int, max_chars: int = 800) -> Tuple[str, Optional[str]]:
+    def _get_today_lesson(self, user_id: int, max_chars: int = 800) -> Tuple[str, str | None]:
         """Return today's lesson text based on user progress.
 
         Defaults to Lesson 1 unless the user is explicitly on another lesson.
@@ -356,7 +356,7 @@ class PromptBuilder:
 
         return compute_current_lesson_state(self.memory_manager, user_id, today=now)
 
-    def _get_user_local_time_str(self, user: Any) -> Optional[str]:
+    def _get_user_local_time_str(self, user: Any) -> str | None:
         """Return a compact local time string for the user, or None if unavailable.
 
         Example: "Local time: 2026-02-06 18:30 (Europe/Oslo)"
@@ -376,11 +376,10 @@ class PromptBuilder:
         except Exception:
             return None
 
-    def _get_last_lesson_from_logs(self, user_id: int) -> Optional[Dict[str, Any]]:
+    def _get_last_lesson_from_logs(self, user_id: int) -> Dict[str, Any] | None:
         """Fallback: infer last sent lesson from message logs."""
         messages = (
-            self.db
-            .query(MessageLog)
+            self.db.query(MessageLog)
             .filter(MessageLog.user_id == user_id, MessageLog.direction == "outbound")
             .order_by(MessageLog.created_at.desc())
             .limit(20)
@@ -399,7 +398,7 @@ class PromptBuilder:
 
         return None
 
-    def _parse_lesson_id(self, value: str) -> Optional[int]:
+    def _parse_lesson_id(self, value: str) -> int | None:
         """Parse lesson id from memory value (e.g., '1' or 'Lesson 1')."""
         if not value:
             return None
@@ -452,8 +451,7 @@ class PromptBuilder:
         """Retrieve recent conversation history for multi-turn context."""
         # Query recent messages for this user, ordered by creation date
         messages = (
-            self.db
-            .query(MessageLog)
+            self.db.query(MessageLog)
             .filter(
                 MessageLog.user_id == user_id,
                 MessageLog.status.in_(["delivered", "sent"]),  # Only successful messages
@@ -519,7 +517,7 @@ Important: Combine your acknowledgment with the next question naturally. For exa
 
 Always transition smoothly to the next onboarding question."""
 
-    def _detect_onboarding_stage(self, user_id: int) -> Optional[str]:
+    def _detect_onboarding_stage(self, user_id: int) -> str | None:
         """Detect specific onboarding stage from pending step memory."""
         from src.functions.definitions import FunctionDefinitions
         from src.memories.constants import MemoryKey

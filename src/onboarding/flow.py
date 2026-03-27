@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy.orm import Session
 
@@ -29,7 +28,7 @@ class OnboardingFlow:
         self.onboarding = onboarding_service
         self.call_ollama = call_ollama
 
-    def _get_pending_step(self, user_id: int) -> Optional[str]:
+    def _get_pending_step(self, user_id: int) -> str | None:
         pending_step = self.memory_manager.get_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING)
         # Debug trace
         logger.debug(f"_get_pending_step - user_id={user_id} -> {pending_step}")
@@ -69,7 +68,7 @@ class OnboardingFlow:
         value: str,
         category: str = MemoryCategory.CONVERSATION.value,
         source: str = "dialogue_engine",
-        ttl_hours: Optional[float] = None,
+        ttl_hours: float | None = None,
     ):
         self.memory_manager.store_memory(
             user_id=user_id,
@@ -94,12 +93,12 @@ class OnboardingFlow:
         logger.debug(f"_get_user_name - user_id={user_id} -> {name}")
         return name
 
-    def _handle_declined(self, status: dict) -> Optional[str]:
+    def _handle_declined(self, status: dict) -> str | None:
         if status.get("declined_consent"):
             return None
         return None
 
-    def _handle_consent_pending(self, user_id: int, text: str, session: Session) -> Optional[str]:
+    def _handle_consent_pending(self, user_id: int, text: str, session: Session) -> str | None:
         logger.debug(f"_handle_consent_pending - user_id={user_id} text={text}")
         consent = self.onboarding.detect_consent_keywords(text)
         if consent is True:
@@ -120,7 +119,7 @@ class OnboardingFlow:
             return self._get_message("consent_declined")
         return None
 
-    async def handle_onboarding(self, user_id: int, text: str, session: Session) -> Optional[str]:
+    async def handle_onboarding(self, user_id: int, text: str, session: Session) -> str | None:
         """
         Handle onboarding flow.
 

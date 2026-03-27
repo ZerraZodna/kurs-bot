@@ -4,7 +4,6 @@ import json
 import os
 import sys
 import types
-from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
 
@@ -55,7 +54,7 @@ def create_mock_call_ollama() -> AsyncMock:
     Returns predictable responses for testing.
     """
 
-    async def _mock_call_ollama(prompt: str, model: Optional[str] = None, language: Optional[str] = None) -> str:
+    async def _mock_call_ollama(prompt: str, model: str | None = None, language: str | None = None) -> str:
         short = (prompt[:160] + "...") if prompt and len(prompt) > 160 else (prompt or "")
         return f"[MOCK_OLLAMA_REPLY] model={model or 'default'} lang={language or 'en'} text={short}"
 
@@ -118,7 +117,7 @@ class OllamaMock:
         self._default_response = response
         return self
 
-    async def _mock_call(self, prompt: str, model: Optional[str] = None, language: Optional[str] = None) -> str:
+    async def _mock_call(self, prompt: str, model: str | None = None, language: str | None = None) -> str:
         prompt_lower = prompt.lower()
 
         for key, response in self._responses.items():
@@ -127,7 +126,7 @@ class OllamaMock:
 
         return self._default_response
 
-    async def _mock_stream(self, prompt: str, model: Optional[str] = None, language: Optional[str] = None):
+    async def _mock_stream(self, prompt: str, model: str | None = None, language: str | None = None):
         """Mock stream_ollama yielding Ollama JSON chunks: lesson text, tool_calls, or default."""
         prompt_lower = prompt.lower()
 

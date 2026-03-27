@@ -5,7 +5,7 @@ Alternative to ngrok/webhook for local development.
 
 import asyncio
 import logging
-from typing import Optional, Set
+from typing import Set
 
 import httpx
 
@@ -57,7 +57,7 @@ async def poll_updates(offset: int = 0) -> list[dict]:
             return []
 
 
-async def _ensure_user(user_id: str, first_name: Optional[str], last_name: Optional[str]) -> Optional[int]:
+async def _ensure_user(user_id: str, first_name: str | None, last_name: str | None) -> int | None:
     """Ensure user exists in DB, return user_id."""
     db = SessionLocal()
     try:
@@ -109,8 +109,7 @@ async def _trigger_batch(user_id: int, external_id: str) -> None:
     db = SessionLocal()
     try:
         existing = (
-            db
-            .query(BatchLock)
+            db.query(BatchLock)
             .filter(
                 BatchLock.user_id == user_id,
                 BatchLock.expires_at > utc_now(),
@@ -224,7 +223,7 @@ async def start_polling() -> None:
             await asyncio.sleep(5)
 
 
-def start_polling_task() -> Optional[asyncio.Task]:
+def start_polling_task() -> asyncio.Task | None:
     """Start polling as background task."""
     if not settings.USE_TELEGRAM_LONG_POLLING:
         return None

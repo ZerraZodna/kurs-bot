@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 from sqlalchemy.orm import Session
 
@@ -48,7 +47,7 @@ async def maybe_send_next_lesson(
     prompt_builder,
     memory_manager,
     call_ollama,
-) -> Optional[str]:
+) -> str | None:
     """Possibly return today's lesson message when user sends a simple greeting on new day.
 
     Sends lesson if new day (advanced_by_day) + greeting.

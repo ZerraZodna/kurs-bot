@@ -9,7 +9,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from .registry import FunctionRegistry, get_function_registry
 
@@ -41,7 +41,7 @@ class ParseResult:
 class IntentParser:
     """Parse AI responses and extract function calls."""
 
-    def __init__(self, registry: Optional[FunctionRegistry] = None):
+    def __init__(self, registry: FunctionRegistry | None = None):
         self.registry = registry or get_function_registry()
 
     def parse(self, response_text: str) -> ParseResult:
@@ -91,7 +91,7 @@ class IntentParser:
             logger.error(f"Unexpected parse error: {e}")
             return self._create_fallback_result(response_text, [f"Parse error: {str(e)}"])
 
-    def _extract_json(self, text: str) -> Optional[str]:
+    def _extract_json(self, text: str) -> str | None:
         """Extract JSON from text, handling markdown code blocks."""
         text = text.strip()
 
@@ -115,7 +115,7 @@ class IntentParser:
 
         return None
 
-    def _attempt_json_repair(self, json_str: str) -> Optional[str]:
+    def _attempt_json_repair(self, json_str: str) -> str | None:
         """Attempt to fix common JSON formatting issues."""
         # 1) Targeted fix for malformed leading key:
         #    {functions"...} or {functions:...} -> {"functions":...}
@@ -230,7 +230,7 @@ class IntentParser:
 
         return errors
 
-    def _create_fallback_result(self, response_text: str, errors: Optional[List[str]] = None) -> ParseResult:
+    def _create_fallback_result(self, response_text: str, errors: List[str] | None = None) -> ParseResult:
         """Create a fallback result treating response as natural language."""
         return ParseResult(
             success=True,  # Still success - we have text to show
@@ -245,7 +245,7 @@ class IntentParser:
         """Parse multiple responses."""
         return [self.parse(r) for r in responses]
 
-    def extract_single_function(self, response_text: str, function_name: str) -> Optional[Dict[str, Any]]:
+    def extract_single_function(self, response_text: str, function_name: str) -> Dict[str, Any] | None:
         """
         Extract a specific function call from response.
 
@@ -267,10 +267,10 @@ class IntentParser:
 
 
 # Global instance
-_parser: Optional[IntentParser] = None
+_parser: IntentParser | None = None
 
 
-def get_intent_parser(registry: Optional[FunctionRegistry] = None) -> IntentParser:
+def get_intent_parser(registry: FunctionRegistry | None = None) -> IntentParser:
     """Get the global intent parser instance."""
     global _parser
     if _parser is None:

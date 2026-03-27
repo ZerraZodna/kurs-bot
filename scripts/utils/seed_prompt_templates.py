@@ -4,8 +4,6 @@ Exposes a `seed()` function for programmatic use and prints concise
 progress messages when run as a script.
 """
 
-from typing import Optional
-
 from src.models.database import PromptTemplate, SessionLocal, init_db
 
 
@@ -91,7 +89,7 @@ def seed(delete_existing_system: bool = False) -> None:
         db.close()
 
 
-def main(argv: Optional[list] = None) -> int:
+def main(argv: list | None = None) -> int:
     try:
         delete_flag = False
         # When run as a script interactively, ask the user whether to delete existing system prompts

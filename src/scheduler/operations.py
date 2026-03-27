@@ -8,7 +8,6 @@ from __future__ import annotations
 import json
 import logging
 from src.core.timezone import datetime
-from typing import Optional
 
 from sqlalchemy.orm import Session
 
@@ -32,10 +31,10 @@ logger = logging.getLogger(__name__)
 
 def create_daily_schedule(
     user_id: int,
-    lesson_id: Optional[int],
+    lesson_id: int | None,
     time_str: str,
     schedule_type: str = SCHEDULE_TYPE_DAILY,
-    session: Optional[Session] = None,
+    session: Session | None = None,
 ) -> Schedule:
     """Create a daily schedule for lesson delivery."""
     with get_session(session) as s:
@@ -92,8 +91,8 @@ def create_daily_schedule(
 def update_daily_schedule(
     schedule_id: int,
     time_str: str,
-    session: Optional[Session] = None,
-) -> Optional[Schedule]:
+    session: Session | None = None,
+) -> Schedule | None:
     """Update an existing daily schedule in-place (cron_expression and next_send_time).
 
     This avoids creating duplicate Schedule rows when a user updates their
@@ -154,7 +153,7 @@ def create_one_time_schedule(
     user_id: int,
     run_at: datetime,
     message: str,
-    session: Optional[Session] = None,
+    session: Session | None = None,
 ) -> Schedule:
     """Create a one-time reminder schedule."""
     with get_session(session) as s:
@@ -217,7 +216,7 @@ def create_one_time_schedule(
         return schedule
 
 
-def get_user_schedules(user_id: int, active_only: bool = True, session: Optional[Session] = None) -> list:
+def get_user_schedules(user_id: int, active_only: bool = True, session: Session | None = None) -> list:
     """Get all schedules for a user."""
     # Delegate to manager for pure-DB access
     with get_session(session) as s:
@@ -227,7 +226,7 @@ def get_user_schedules(user_id: int, active_only: bool = True, session: Optional
 def deactivate_user_schedules(
     user_id: int,
     active_only: bool = True,
-    session: Optional[Session] = None,
+    session: Session | None = None,
 ) -> int:
     """Deactivate all schedules for a user and remove their jobs."""
     with get_session(session) as s:
@@ -239,7 +238,7 @@ def deactivate_user_schedules(
         return count
 
 
-def deactivate_schedule(schedule_id: int, session: Optional[Session] = None) -> None:
+def deactivate_schedule(schedule_id: int, session: Session | None = None) -> None:
     """Deactivate a schedule and remove from APScheduler."""
     with get_session(session) as s:
         try:

@@ -8,7 +8,7 @@ with results from executed function calls.
 import logging
 from dataclasses import dataclass, field
 from src.core.timezone import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -30,7 +30,7 @@ class BuiltResponse:
     has_function_results: bool = False
     successful_functions: List[str] = field(default_factory=list)
     failed_functions: List[str] = field(default_factory=list)
-    follow_up_prompt: Optional[str] = None
+    follow_up_prompt: str | None = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -260,7 +260,7 @@ class ResponseBuilder:
             return f"⚠ {result.function_name} failed: {result.error}"
 
     def _format_cron_expression(
-        self, cron_expr: str, next_send_time: Optional[datetime] = None, tz_name: str = "UTC"
+        self, cron_expr: str, next_send_time: datetime | None = None, tz_name: str = "UTC"
     ) -> str:
         """
         Format a cron expression or special time format into human-readable time.
@@ -296,7 +296,7 @@ class ResponseBuilder:
         successful: List[ExecutionResult],
         failed: List[ExecutionResult],
         user_text: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Determine if a follow-up prompt is needed."""
         # If there are failures, suggest retry or clarification
         if failed:
@@ -324,7 +324,7 @@ class ResponseBuilder:
     def build_simple_response(
         self,
         ai_response_text: str,
-        function_results: Optional[BatchExecutionResult] = None,
+        function_results: BatchExecutionResult | None = None,
     ) -> str:
         """
         Build a simple text response (convenience method).
@@ -342,15 +342,13 @@ class ResponseBuilder:
         built = self.build("", ai_response_text, function_results)
         return built.text
 
-    def add_custom_template(
-        self, function_name: str, success_template: str, error_template: Optional[str] = None
-    ) -> None:
+    def add_custom_template(self, function_name: str, success_template: str, error_template: str | None = None) -> None:
         """Add or override a template for a function."""
         self.success_templates[function_name] = success_template
         if error_template:
             self.error_templates[function_name] = error_template
 
-    def build_error_response(self, error_message: str, suggestion: Optional[str] = None) -> BuiltResponse:
+    def build_error_response(self, error_message: str, suggestion: str | None = None) -> BuiltResponse:
         """
         Build a response for when something went wrong.
 
@@ -376,7 +374,7 @@ class ResponseBuilder:
 
 
 # Global instance
-_builder: Optional[ResponseBuilder] = None
+_builder: ResponseBuilder | None = None
 
 
 def get_response_builder() -> ResponseBuilder:

@@ -7,7 +7,7 @@ function unescapeJsonString(text) {
   if (!text) return text
   // Mirror Python _unescape_json_string
   let result = text
-  result = result.replace(/\\\\/g, '\\\\')  // \\\\ -> \\ first? No, Python does \\\\ -> \\ 
+  result = result.replace(/\\\\/g, '\\\\')  // \\\\ -> \\ first? No, Python does \\\\ -> \\
   result = result.replace(/\\\\n/g, '\\n')   // \\n -> \n (escaped newline)
   result = result.replace(/\\n/g, '\n')      // \n -> actual newline
   result = result.replace(/\\r/g, '\r')
@@ -46,7 +46,7 @@ async function* streamReader(reader) {
     const { done, value } = await reader.read()
     if (done) break
     buffer += new TextDecoder().decode(value)
-    
+
     // Process complete lines (simulate buffering for escapes)
     let lines = buffer.split('\n')
     buffer = lines.pop() || ''  // last incomplete line to buffer
@@ -66,7 +66,7 @@ async function send() {
   const user_id = parseInt(userIdInput.value || '1')
   const text = textInput.value || ''
   if (!text) return
-  
+
   // Add user message
   appendMessage('user', text)
   textInput.value = ''
@@ -86,7 +86,7 @@ async function send() {
     const apiBaseRaw = (window.__DEV_API_BASE || '').trim()
     const apiBase = apiBaseRaw.endsWith('/') ? apiBaseRaw.slice(0, -1) : apiBaseRaw
     const url = `${apiBase}/dev/message` || '/dev/message'
-    
+
     const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -105,7 +105,7 @@ async function send() {
     }
 
     botEl.classList.remove('streaming')
-    
+
   } catch (e) {
     streamingText.textContent = `Error: ${e.message}`
     console.error('Stream error', e)

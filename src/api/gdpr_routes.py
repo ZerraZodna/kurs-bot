@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
@@ -22,14 +22,14 @@ router = APIRouter(prefix="/gdpr", tags=["gdpr"])
 
 
 def require_gdpr_admin(
-    x_gdpr_token: Optional[str] = Header(default=None, alias="X-GDPR-Token"),
-    authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    x_gdpr_token: str | None = Header(default=None, alias="X-GDPR-Token"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
 ) -> None:
     expected = settings.GDPR_ADMIN_TOKEN
     if not expected:
         raise HTTPException(status_code=503, detail="GDPR admin token not configured")
 
-    token: Optional[str] = None
+    token: str | None = None
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ", 1)[1].strip()
     elif x_gdpr_token:
@@ -47,7 +47,7 @@ class GdprExportRequest(BaseModel):
 
 class GdprRestrictRequest(BaseModel):
     user_id: int
-    reason: Optional[str] = None
+    reason: str | None = None
     actor: str = "user"
 
 
@@ -59,32 +59,32 @@ class MemoryRectifyItem(BaseModel):
 class GdprRectifyRequest(BaseModel):
     user_id: int
     updates: Dict[str, Any] = {}
-    memory_updates: Optional[List[MemoryRectifyItem]] = None
+    memory_updates: List[MemoryRectifyItem] | None = None
     actor: str = "user"
 
 
 class GdprEraseRequest(BaseModel):
     user_id: int
-    reason: Optional[str] = None
+    reason: str | None = None
     actor: str = "user"
 
 
 class GdprCleanRequest(BaseModel):
     user_id: int
-    reason: Optional[str] = None
+    reason: str | None = None
     actor: str = "user"
 
 
 class GdprObjectRequest(BaseModel):
     user_id: int
-    reason: Optional[str] = None
+    reason: str | None = None
     actor: str = "user"
 
 
 class GdprWithdrawConsentRequest(BaseModel):
     user_id: int
     scope: str = "data_storage"
-    reason: Optional[str] = None
+    reason: str | None = None
     actor: str = "user"
 
 

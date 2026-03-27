@@ -8,7 +8,6 @@ Prototype implementation:
 """
 
 import logging
-from typing import Optional
 
 from src.config import settings
 from src.memories import MemoryManager
@@ -54,7 +53,7 @@ class PromptRegistry:
         return settings.SYSTEM_PROMPT_RAG
 
 
-_prompt_registry: Optional[PromptRegistry] = None
+_prompt_registry: PromptRegistry | None = None
 
 
 def get_prompt_registry() -> PromptRegistry:

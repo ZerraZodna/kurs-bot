@@ -10,7 +10,6 @@ The implementation intentionally avoids old ad-hoc mappings and string conversio
 """
 
 import re
-from typing import Optional
 
 from langdetect import detect_langs
 
@@ -265,7 +264,7 @@ async def detect_and_store_language(
     memory_manager: MemoryManager,
     user_id: int,
     user_message: str,
-) -> Optional[str]:
+) -> str | None:
     """Detect language for `user_message` and store `user_language` memory."""
 
     # Keep only Norwegian/English support. If user has an existing preference,

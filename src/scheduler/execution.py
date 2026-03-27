@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
-from typing import Callable, Optional
+from typing import Callable
 
 from sqlalchemy.orm import Session
 
@@ -24,7 +24,7 @@ from .memory_helpers import get_schedule_message, get_user_language
 logger = logging.getLogger(__name__)
 
 
-def _parse_lesson_int(value) -> Optional[int]:
+def _parse_lesson_int(value) -> int | None:
     """Safely parse a lesson id to int without using exceptions."""
     if value is None:
         return None
@@ -37,7 +37,7 @@ def _parse_lesson_int(value) -> Optional[int]:
     return None
 
 
-def _load_lesson(db: Session, lesson_id: int) -> Optional[Lesson]:
+def _load_lesson(db: Session, lesson_id: int) -> Lesson | None:
     """Delegates to lessons.delivery.get_lesson_or_import."""
     return get_lesson_or_import(db, lesson_id)
 
@@ -46,7 +46,7 @@ def _build_schedule_message(
     db: Session,
     schedule: Schedule,
     memory_manager: MemoryManager,
-) -> Optional[str]:
+) -> str | None:
     """Build the outbound message for a schedule (without sending)."""
     if is_one_time_schedule_type(schedule.schedule_type):
         message = get_schedule_message(memory_manager, schedule.user_id, schedule.schedule_id)
@@ -72,7 +72,7 @@ def _build_schedule_message(
 
 
 def run_recovery_check(
-    get_scheduler_fn: Optional[Callable[[], object]] = None,
+    get_scheduler_fn: Callable[[], object] | None = None,
 ) -> int:
     """Send any missed schedules and update their state."""
     if get_scheduler_fn is None:
@@ -83,8 +83,7 @@ def run_recovery_check(
         try:
             now = utc_now()
             due = (
-                db
-                .query(Schedule)
+                db.query(Schedule)
                 .filter(
                     Schedule.is_active,
                     Schedule.next_send_time is not None,
@@ -164,7 +163,7 @@ def run_recovery_check(
         return recovered
 
 
-def execute_scheduled_task(schedule_id: int, simulate: bool = False, session: Optional[Session] = None):
+def execute_scheduled_task(schedule_id: int, simulate: bool = False, session: Session | None = None):
     """Execute a scheduled task (send lesson or reminder).
 
     This is called by APScheduler when a job triggers.

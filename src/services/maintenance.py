@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import time
 from datetime import timedelta
-from typing import Optional
 
 from sqlalchemy.orm import Session
 
@@ -21,7 +20,7 @@ from src.scheduler.maintenance import (
 logger = logging.getLogger(__name__)
 
 
-def purge_archived_memories(days_keep: int = 365, session: Optional[Session] = None) -> int:
+def purge_archived_memories(days_keep: int = 365, session: Session | None = None) -> int:
     """Purge archived memories older than days_keep. Returns number deleted."""
     with get_session(session) as s:
         cutoff = utc_now() - timedelta(days=days_keep)
@@ -30,7 +29,7 @@ def purge_archived_memories(days_keep: int = 365, session: Optional[Session] = N
         return deleted
 
 
-def purge_expired_ttl_memories(session: Optional[Session] = None) -> int:
+def purge_expired_ttl_memories(session: Session | None = None) -> int:
     """Delete memories whose TTL has expired. Returns number deleted."""
     with get_session(session) as s:
         cutoff = utc_now()
@@ -60,7 +59,7 @@ def purge_expired_batch_locks() -> None:
         logger.warning("Batch lock purge error: %s", e)
 
 
-def purge_message_logs(days_keep: int = 30, session: Optional[Session] = None) -> int:
+def purge_message_logs(days_keep: int = 30, session: Session | None = None) -> int:
     """Delete message logs older than days_keep. Returns number deleted."""
     with get_session(session) as s:
         cutoff = utc_now() - timedelta(days=days_keep)
@@ -72,12 +71,12 @@ def purge_message_logs(days_keep: int = 30, session: Optional[Session] = None) -
         return deleted
 
 
-def purge_inactive_schedules(days_keep: int = 7, session: Optional[Session] = None) -> int:
+def purge_inactive_schedules(days_keep: int = 7, session: Session | None = None) -> int:
     """Compatibility wrapper for scheduler-owned purge helper."""
     return _scheduler_purge_inactive_schedules(days_keep=days_keep, session=session)
 
 
-def purge_job_states(days_keep: int = 30, session: Optional[Session] = None) -> int:
+def purge_job_states(days_keep: int = 30, session: Session | None = None) -> int:
     """Compatibility wrapper for scheduler-owned purge helper."""
     return _scheduler_purge_job_states(days_keep=days_keep, session=session)
 

@@ -7,7 +7,7 @@ lesson modules.
 
 import logging
 from datetime import date
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from sqlalchemy.orm import Session
 
@@ -38,12 +38,12 @@ from src.models.database import Lesson
 logger = logging.getLogger(__name__)
 
 
-def get_lesson(lesson_id: int, session: Session) -> Optional[Lesson]:
+def get_lesson(lesson_id: int, session: Session) -> Lesson | None:
     """Retrieve a lesson by ID."""
     return _find_lesson(session, lesson_id)
 
 
-def format_lesson_message(lesson: Lesson, language: Optional[str] = None) -> str:
+def format_lesson_message(lesson: Lesson, language: str | None = None) -> str:
     """Format a lesson for display."""
     import asyncio
 
@@ -61,7 +61,7 @@ async def maybe_send_next_lesson(
     prompt_builder: Any,
     memory_manager: MemoryManager,
     call_ollama: Any,
-) -> Optional[str]:
+) -> str | None:
     """Check if we should auto-send the next lesson on a new day."""
     return await _maybe_send_next_lesson(
         user_id=user_id,
@@ -74,7 +74,7 @@ async def maybe_send_next_lesson(
 
 
 # Re-export state functions
-def get_current_lesson(memory_manager: MemoryManager, user_id: int) -> Optional[Any]:
+def get_current_lesson(memory_manager: MemoryManager, user_id: int) -> Any | None:
     """Get the user's current lesson."""
     return _get_current_lesson(memory_manager, user_id)
 
@@ -90,7 +90,7 @@ def has_lesson_status(memory_manager: MemoryManager, user_id: int) -> bool:
 
 
 def compute_current_lesson_state(
-    memory_manager: MemoryManager, user_id: int, today: Optional[date] = None
+    memory_manager: MemoryManager, user_id: int, today: date | None = None
 ) -> Dict[str, Any]:
     """Compute current lesson state."""
     return _compute_current_lesson_state(memory_manager, user_id, today)

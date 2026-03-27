@@ -89,7 +89,7 @@ class MemoryHandler:
 
         # Route lesson state writes through centralized helpers
         if key == MemoryKey.LESSON_CURRENT:
-            parsed = int(value) if isinstance(value, (str, int)) and str(value).isdigit() else value
+            parsed = int(value) if isinstance(value, str | int) and str(value).isdigit() else value
             set_current_lesson(memory_manager, user_id, parsed)
             return self.executor._ok_response(key=key, value=value, updated=True)
 

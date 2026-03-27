@@ -7,7 +7,7 @@ detectors, prompt generation, schedule setup, and user management.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from sqlalchemy.orm import Session
 
@@ -62,7 +62,7 @@ class OnboardingService:
             declined_consent=declined_consent,
         )
 
-    def get_onboarding_prompt(self, user_id: int) -> Optional[str]:
+    def get_onboarding_prompt(self, user_id: int) -> str | None:
         """Get the next onboarding prompt for the user in their language."""
         status = self.get_onboarding_status(user_id)
 
@@ -153,7 +153,7 @@ class OnboardingService:
         """Detect if user declines ACIM or consent."""
         return detect_decline_keywords(message)
 
-    def detect_consent_keywords(self, message: str) -> Optional[bool]:
+    def detect_consent_keywords(self, message: str) -> bool | None:
         """Return True if consent given, False if declined, None if unclear."""
         return detect_consent_keywords(message)
 

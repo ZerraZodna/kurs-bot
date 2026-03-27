@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from src.core.timezone import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from src.core.timezone import utc_now
 from src.scheduler.job_state import get_state_json, set_state_datetime, set_state_json
@@ -41,7 +41,7 @@ def record_traffic_event() -> None:
     set_state_datetime(_LAST_MESSAGE_KEY, utc_now())
 
 
-def get_last_message_at() -> Optional[datetime]:
+def get_last_message_at() -> datetime | None:
     from src.scheduler.job_state import get_state_datetime
 
     return get_state_datetime(_LAST_MESSAGE_KEY)

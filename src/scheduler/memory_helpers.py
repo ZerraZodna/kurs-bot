@@ -1,13 +1,12 @@
 """Memory helpers for scheduler."""
 
 import json
-from typing import Optional
 
 from src.memories.constants import MemoryKey
 from src.memories.manager import MemoryManager
 
 
-def get_schedule_message(memory_manager: MemoryManager, user_id: int, schedule_id: int) -> Optional[str]:
+def get_schedule_message(memory_manager: MemoryManager, user_id: int, schedule_id: int) -> str | None:
     memories = memory_manager.get_memory(user_id=user_id, key=MemoryKey.SCHEDULE_MESSAGE)
     for memory in memories:
         try:

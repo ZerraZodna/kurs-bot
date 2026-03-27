@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Callable, Optional
+from typing import Callable
 
 from sqlalchemy.orm import Session
 
@@ -22,9 +22,9 @@ async def handle_schedule_messages(
     session: Session,
     memory_manager,
     onboarding_service,
-    schedule_request_handler: Callable[[int, str, Session], Optional[str]],
+    schedule_request_handler: Callable[[int, str, Session], str | None],
     call_ollama,
-) -> Optional[str]:
+) -> str | None:
     # NOTE: We no longer pre-process schedule queries or one-time reminder keywords here.
     # Schedule queries, one-time reminders, and schedule changes should be handled by the
     # assistant (LLM) first and then dispatched via the trigger system.

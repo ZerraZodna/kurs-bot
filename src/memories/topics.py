@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from src.core.timezone import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 
 class MemoryTopic(str, Enum):
@@ -97,7 +97,7 @@ class TopicData:
         return {name: field.current.value for name, field in self.fields.items()}
 
 
-def resolve_canonical_key(key: str) -> Optional[tuple[MemoryTopic, str]]:
+def resolve_canonical_key(key: str) -> tuple[MemoryTopic, str] | None:
     """Resolve any key synonym to its canonical (topic, field) tuple.
 
     Returns None if key is not recognized.
@@ -106,7 +106,7 @@ def resolve_canonical_key(key: str) -> Optional[tuple[MemoryTopic, str]]:
     return CANONICAL_KEY_MAP.get(key_lower)
 
 
-def get_topic_for_key(key: str) -> Optional[MemoryTopic]:
+def get_topic_for_key(key: str) -> MemoryTopic | None:
     """Get the topic for a given key synonym."""
     resolved = resolve_canonical_key(key)
     if resolved:

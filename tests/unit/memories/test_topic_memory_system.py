@@ -99,8 +99,7 @@ def test_temporal_resolution(memory_manager, clean_test_data, test_user_id):
         )
         # Update created_at
         mem = (
-            db
-            .query(Memory)
+            db.query(Memory)
             .filter(Memory.user_id == test_user_id, Memory.key == MemoryKey.NAME, Memory.value == value)
             .first()
         )

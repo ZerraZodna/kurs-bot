@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 
 from pydantic import BaseModel
 
@@ -23,7 +23,7 @@ class MemoryRequest(BaseModel):
     key: str
     value: str
     category: str = "profile"
-    ttl_hours: Optional[int] = None
+    ttl_hours: int | None = None
 
 
 class UserContextResponse(BaseModel):
@@ -45,9 +45,9 @@ class LessonResponse(BaseModel):
 class SemanticSearchRequest(BaseModel):
     user_id: int
     query: str
-    categories: Optional[List[str]] = None
-    limit: Optional[int] = None
-    threshold: Optional[float] = None
+    categories: List[str] | None = None
+    limit: int | None = None
+    threshold: float | None = None
 
 
 class MemoryWithScore(BaseModel):

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import List, Optional
+from typing import List
 
 from sqlalchemy.orm import Session
 
@@ -23,7 +23,7 @@ from src.scheduler.message_utils import send_outbound_message
 logger = logging.getLogger(__name__)
 
 
-def _parse_lesson_int(value) -> Optional[int]:
+def _parse_lesson_int(value) -> int | None:
     """Safely parse lesson id to int."""
     if value is None:
         return None
@@ -36,7 +36,7 @@ def _parse_lesson_int(value) -> Optional[int]:
     return None
 
 
-def get_lesson_or_import(db: Session, lesson_id: int) -> Optional[Lesson]:
+def get_lesson_or_import(db: Session, lesson_id: int) -> Lesson | None:
     """Load lesson; auto-import if missing (formerly scheduler._load_lesson)."""
     lesson = db.query(Lesson).filter(Lesson.lesson_id == lesson_id).first()
     if lesson:
@@ -51,7 +51,7 @@ def build_lesson_preview(
     memory_manager: MemoryManager,
     user_id: int,
     language: str,
-) -> Optional[str]:
+) -> str | None:
     """Build preview message for no-last-sent (formerly scheduler._preview_build_for_no_last_sent)."""
     cur = get_current_lesson(memory_manager, user_id)
     lesson_id = _parse_lesson_int(cur)
@@ -70,10 +70,10 @@ def build_lesson_preview(
 def deliver_lesson(
     db: Session,
     user_id: int,
-    target_lesson_id: Optional[int],
+    target_lesson_id: int | None,
     memory_manager: MemoryManager,
     simulate: bool = False,
-    language: Optional[str] = None,
+    language: str | None = None,
 ) -> List[str]:
     """Deliver lesson: load, format, send, advance state (formerly scheduler._execute_lesson_schedule)."""
     messages = []

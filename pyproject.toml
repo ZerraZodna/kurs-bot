@@ -7,7 +7,7 @@ name = "kurs-bot"
 version = "0.1.0"
 description = "Kurs-bot: ACIM lesson delivery bot"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = {file = "LICENSE"}
 authors = [{name = "Johannes Steen"}]
 dependencies = [
@@ -38,7 +38,7 @@ dev = [
 
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 120
 src = ["src", "tests"]
 
@@ -56,7 +56,7 @@ select = [
     "DTZ",    # flake8-datetimez — BANS naive datetime construction
     "B",      # flake8-bugbear — common Python gotchas
     "E4", "E7", "E9",  # try/except improvements
-    "UP",          # pyupgrade: modern Python features
+    "UP", "UP007", # pyupgrade: modern Python features (add UP007 for | union)
     "C4", "ERA001", # comprehensions: readability/performance
     "Q",            # docstring quotes consistency
     "I",            # isort: import sorting
@@ -69,7 +69,7 @@ ignore = [
     "SLF001", # self not first (dunder methods)
     "UP006",  # Use: List -> use list
     "UP035",  # Use: Dict -> use dict
-    "UP045",  # Optional for Py 3.9
+
     "ERA001", # Commented out code (that is pure comment)
     "E402",   # import inside code
     "E711",   # compare == True
@@ -103,7 +103,7 @@ preview = true
 indent-style = "space"
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

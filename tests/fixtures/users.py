@@ -2,7 +2,6 @@
 
 import datetime
 from collections.abc import Generator
-from typing import Optional
 
 import pytest
 from sqlalchemy.orm import Session
@@ -100,12 +99,12 @@ class UserFactory:
 
     def create(
         self,
-        external_id: Optional[str] = None,
-        first_name: Optional[str] = None,
+        external_id: str | None = None,
+        first_name: str | None = None,
         last_name: str = "User",
         channel: str = DEFAULT_CHANNEL,
         opted_in: bool = True,
-        language: Optional[str] = None,
+        language: str | None = None,
         with_onboarding_complete: bool = False,
     ) -> User:
         """Create a test user with specified attributes."""
@@ -138,7 +137,7 @@ class UserFactory:
 
         return user
 
-    def create_ready_user(self, external_id: Optional[str] = None, first_name: str = "Test") -> User:
+    def create_ready_user(self, external_id: str | None = None, first_name: str = "Test") -> User:
         """Create a user with onboarding complete (ready for normal use)."""
         return self.create(
             external_id=external_id,
@@ -153,7 +152,7 @@ def user_factory(db_session: Session) -> UserFactory:
     return UserFactory(db_session)
 
 
-def create_test_user(db: Session, external_id: str, first_name: Optional[str] = None) -> int:
+def create_test_user(db: Session, external_id: str, first_name: str | None = None) -> int:
     """Legacy helper: Create a fresh user row for tests.
 
     Removes any existing user with the same external_id, creates a new
@@ -190,7 +189,7 @@ def create_test_user(db: Session, external_id: str, first_name: Optional[str] = 
     return user.user_id
 
 
-def make_ready_user(db: Session, external_id: str, first_name: str = "Test", timezone: Optional[str] = "UTC") -> int:
+def make_ready_user(db: Session, external_id: str, first_name: str = "Test", timezone: str | None = "UTC") -> int:
     """Legacy helper: Create a fresh user and mark onboarding complete for tests.
 
     This helper calls `create_test_user` then stores the minimum memories

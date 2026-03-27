@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from sqlalchemy.orm import Session
 
@@ -15,7 +14,7 @@ from src.scheduler.domain import SCHEDULE_TYPE_DAILY
 logger = logging.getLogger(__name__)
 
 
-def check_existing_schedule(db: Session, user_id: int) -> Optional[tuple]:
+def check_existing_schedule(db: Session, user_id: int) -> tuple | None:
     """
     Check if user already has an active schedule.
 

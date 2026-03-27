@@ -167,11 +167,11 @@ uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
 
 ## 🔒 Multi-User Safety
 
-✅ All queries filtered by user_id  
-✅ User validation before processing  
-✅ Database transaction consistency  
-✅ Error logging for debugging  
-✅ Thread-safe session management  
+✅ All queries filtered by user_id
+✅ User validation before processing
+✅ Database transaction consistency
+✅ Error logging for debugging
+✅ Thread-safe session management
 
 
 ## 🎓 Learning Path

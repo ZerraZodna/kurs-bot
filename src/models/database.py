@@ -9,7 +9,7 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, futu
 
 
 @contextmanager
-def get_session(session: Optional[Session] = None):
+def get_session(session: Session | None = None):
     """Context manager for DB sessions. Uses provided session or creates/closes new one."""
     if session is not None:
         yield session

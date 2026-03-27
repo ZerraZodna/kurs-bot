@@ -12,7 +12,7 @@ to provide clean text for Telegram streaming, handling:
 import logging
 import re
 from collections.abc import AsyncIterator
-from typing import Optional, Tuple
+from typing import Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,7 @@ class StreamingFilter:
         self._buffer = ""
         self._json_prefix_skipped = False
         self._functions_boundary_reached = False
-        self._remaining_for_functions: Optional[str] = None
+        self._remaining_for_functions: str | None = None
 
     def _is_incomplete_tag(self, text: str) -> bool:
         """Check if text ends with an incomplete HTML tag.
@@ -273,7 +273,7 @@ class StreamingFilter:
                 yield self._unescape_json_string(self._buffer)
             self._buffer = ""
 
-    def get_remaining_for_functions(self) -> Optional[str]:
+    def get_remaining_for_functions(self) -> str | None:
         """Get any remaining content that should be used for function processing.
 
         This includes the "functions": [...] part and anything after it.

@@ -12,7 +12,6 @@ Supports:
 from __future__ import annotations
 
 from src.core.timezone import datetime
-from typing import Optional
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.orm import Session
@@ -31,7 +30,7 @@ class SchedulerService:
     """Manages background scheduling for lessons and reminders."""
 
     @staticmethod
-    def _parse_lesson_int(value) -> Optional[int]:
+    def _parse_lesson_int(value) -> int | None:
         from src.lessons.delivery import _parse_lesson_int
 
         return _parse_lesson_int(value)
@@ -42,7 +41,7 @@ class SchedulerService:
         memory_manager: MemoryManager,
         user_id: int,
         language: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         from src.lessons.delivery import build_lesson_preview
 
         return build_lesson_preview(db, memory_manager, user_id, language)
@@ -52,7 +51,7 @@ class SchedulerService:
         db: Session,
         schedule: Schedule,
         memory_manager: MemoryManager,
-    ) -> Optional[str]:
+    ) -> str | None:
         from src.scheduler.execution import _build_schedule_message
 
         return _build_schedule_message(db, schedule, memory_manager)
@@ -80,10 +79,10 @@ class SchedulerService:
     @staticmethod
     def create_daily_schedule(
         user_id: int,
-        lesson_id: Optional[int],
+        lesson_id: int | None,
         time_str: str,
         schedule_type: str = SCHEDULE_TYPE_DAILY,
-        session: Optional[Session] = None,
+        session: Session | None = None,
     ) -> Schedule:
         return scheduler_operations.create_daily_schedule(
             user_id=user_id,
@@ -97,8 +96,8 @@ class SchedulerService:
     def update_daily_schedule(
         schedule_id: int,
         time_str: str,
-        session: Optional[Session] = None,
-    ) -> Optional[Schedule]:
+        session: Session | None = None,
+    ) -> Schedule | None:
         return scheduler_operations.update_daily_schedule(
             schedule_id=schedule_id,
             time_str=time_str,
@@ -110,7 +109,7 @@ class SchedulerService:
         user_id: int,
         run_at: datetime,
         message: str,
-        session: Optional[Session] = None,
+        session: Session | None = None,
     ) -> Schedule:
         return scheduler_operations.create_one_time_schedule(
             user_id=user_id,
@@ -123,7 +122,7 @@ class SchedulerService:
     def execute_scheduled_task(
         schedule_id: int,
         simulate: bool = False,
-        session: Optional[Session] = None,
+        session: Session | None = None,
     ):
         return scheduler_execution.execute_scheduled_task(
             schedule_id=schedule_id,
@@ -171,7 +170,7 @@ class SchedulerService:
     def deactivate_user_schedules(
         user_id: int,
         active_only: bool = True,
-        session: Optional[Session] = None,
+        session: Session | None = None,
     ) -> int:
         return scheduler_operations.deactivate_user_schedules(
             user_id=user_id,
@@ -184,7 +183,7 @@ class SchedulerService:
         user_id: int,
         schedule_type: str,
         active_only: bool = True,
-        session: Optional[Session] = None,
+        session: Session | None = None,
     ) -> int:
         """Deactivate schedules filtered by type (one_time or daily)."""
         from . import manager as schedule_manager

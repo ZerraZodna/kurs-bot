@@ -4,7 +4,7 @@ import re
 import time
 from collections.abc import AsyncIterator
 from src.core.timezone import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import httpx
 
@@ -101,7 +101,7 @@ def _strip_unsupported_tags(text: str) -> str:
 
 class TelegramHandler:
     @staticmethod
-    def parse_webhook(request: dict) -> Optional[Dict[str, Any]]:
+    def parse_webhook(request: dict) -> Dict[str, Any] | None:
         # Handles both message and edited_message
         msg = request.get("message") or request.get("edited_message")
         if not msg:
@@ -146,7 +146,7 @@ async def send_typing_action(chat_id: int) -> bool:
             return False
 
 
-async def edit_message(chat_id: int, message_id: int, text: str) -> Optional[dict]:
+async def edit_message(chat_id: int, message_id: int, text: str) -> dict | None:
     """Edit an existing Telegram message with new text."""
     if not TELEGRAM_BOT_TOKEN:
         return None
@@ -235,7 +235,7 @@ async def send_message_streaming(
     chat_id: int,
     token_generator: AsyncIterator[str],
     min_update_interval: float = None,
-) -> tuple[str, Optional[int]]:
+) -> tuple[str, int | None]:
     """Stream tokens to Telegram by sending an initial message then editing it.
 
     Args:
@@ -251,7 +251,7 @@ async def send_message_streaming(
         min_update_interval = getattr(settings, "TELEGRAM_STREAM_UPDATE_INTERVAL", 1.0)
 
     accumulated = ""
-    message_id: Optional[int] = None
+    message_id: int | None = None
     last_edit_time: float = 0.0
     last_sent_text: str = ""
     _tg_start = time.monotonic()
@@ -300,7 +300,7 @@ async def send_message_streaming(
     return accumulated, message_id
 
 
-async def send_message(chat_id: int, text: str) -> Optional[dict]:
+async def send_message(chat_id: int, text: str) -> dict | None:
     if not TELEGRAM_BOT_TOKEN:
         print("[telegram] TELEGRAM_BOT_TOKEN not set")
         return None
@@ -391,8 +391,7 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
 
             try:
                 unprocessed = (
-                    db
-                    .query(MessageLog)
+                    db.query(MessageLog)
                     .filter(
                         MessageLog.user_id == user_id,
                         MessageLog.direction == "inbound",

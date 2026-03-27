@@ -11,4 +11,3 @@ Adapter file for Claude Code.
 - Keep this file minimal; do not duplicate shared policies here.
 
 - MANDATORY: Timezone handling ONLY via `src.core.timezone`. No direct imports of `datetime.timezone` or `zoneinfo`.
-

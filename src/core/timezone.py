@@ -6,11 +6,11 @@ This module centralizes timezone helpers for reuse across packages.
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
-from typing import Optional, Tuple
+from typing import Tuple
 from zoneinfo import ZoneInfo
 
 
-def _normalize_tz_name(tz_name: Optional[str]) -> Optional[str]:
+def _normalize_tz_name(tz_name: str | None) -> str | None:
     if not tz_name:
         return None
     normalized = tz_name.strip()
@@ -34,7 +34,7 @@ def _get_local_timezone_name() -> str:
         return "UTC"
 
 
-def infer_timezone_from_language(language: Optional[str]) -> str:
+def infer_timezone_from_language(language: str | None) -> str:
     if not language:
         return _get_local_timezone_name()
     lang = language.strip().lower()
@@ -71,7 +71,7 @@ def get_user_timezone_from_db(session, user_id: int, default: str = "Europe/Oslo
     return default
 
 
-def format_dt_in_timezone(dt: datetime, tz_name: Optional[str]) -> Tuple[datetime, str]:
+def format_dt_in_timezone(dt: datetime, tz_name: str | None) -> Tuple[datetime, str]:
     resolved_name = tz_name or "UTC"
     try:
         tzinfo = ZoneInfo(resolved_name)
@@ -85,7 +85,7 @@ def format_dt_in_timezone(dt: datetime, tz_name: Optional[str]) -> Tuple[datetim
     return dt.astimezone(tzinfo), resolved_name
 
 
-def to_utc(dt: datetime, tz_name: Optional[str] = None) -> datetime:
+def to_utc(dt: datetime, tz_name: str | None = None) -> datetime:
     """Return an aware UTC datetime.
 
     - If ``dt`` has tzinfo, convert it to UTC.
@@ -112,7 +112,7 @@ def to_utc(dt: datetime, tz_name: Optional[str] = None) -> datetime:
     return dt.replace(tzinfo=timezone.utc)
 
 
-def from_utc(dt: datetime, tz_name: Optional[str]) -> datetime:
+def from_utc(dt: datetime, tz_name: str | None) -> datetime:
     """Convert an aware UTC datetime to the given timezone.
 
     If dt is naive it is assumed to be UTC.
@@ -132,7 +132,7 @@ def from_utc(dt: datetime, tz_name: Optional[str]) -> datetime:
     return dt.astimezone(tz)
 
 
-def parse_local_time_to_utc(time_str: str, tz_name: str, now_utc: Optional[datetime] = None) -> datetime:
+def parse_local_time_to_utc(time_str: str, tz_name: str, now_utc: datetime | None = None) -> datetime:
     """Parse a user-local time string and return the next occurrence in UTC.
 
     Uses the scheduler's simple parser to interpret strings like "9:00", "10:15 AM",
@@ -171,7 +171,7 @@ def parse_local_time_to_utc(time_str: str, tz_name: str, now_utc: Optional[datet
     return local_next.astimezone(timezone.utc)
 
 
-def validate_timezone_name(tz_name: Optional[str]) -> bool:
+def validate_timezone_name(tz_name: str | None) -> bool:
     """Return True if tz_name is a valid IANA timezone (or UTC), False otherwise."""
     if not tz_name:
         return False
@@ -183,7 +183,7 @@ def validate_timezone_name(tz_name: Optional[str]) -> bool:
         return False
 
 
-def resolve_timezone_name(tz_name: Optional[str]) -> Optional[str]:
+def resolve_timezone_name(tz_name: str | None) -> str | None:
     """Try to resolve a user-provided timezone to a canonical IANA name.
 
     Strategy:
@@ -260,7 +260,7 @@ def utc_now_plus(minutes: int = 0, hours: int = 0, days: int = 0) -> datetime:
     return utc_now() + td
 
 
-def format_datetime_for_display(iso_string: Optional[str]) -> str:
+def format_datetime_for_display(iso_string: str | None) -> str:
     """Format an ISO8601 datetime string for user display.
 
     Converts '2026-03-02T15:14:00' to '2026-03-02 15:14' format.

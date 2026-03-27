@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import logging
 from src.core.timezone import timezone
-from typing import Optional
 
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -17,7 +16,7 @@ from src.config import settings
 logger = logging.getLogger(__name__)
 
 # Global scheduler instance
-_scheduler: Optional[BackgroundScheduler] = None
+_scheduler: BackgroundScheduler | None = None
 
 
 def init_scheduler() -> BackgroundScheduler:

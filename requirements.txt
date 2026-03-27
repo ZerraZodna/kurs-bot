@@ -1,11 +1,11 @@
-fastapi
-uvicorn
-sqlalchemy
 alembic
-httpx
 apscheduler
+fastapi
+httpx
 langdetect
 ollama
 pydantic-settings
-pymupdf
 pydantic_core==2.41.5
+pymupdf
+sqlalchemy
+uvicorn

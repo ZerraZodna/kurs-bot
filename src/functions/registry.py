@@ -8,7 +8,7 @@ metadata, parameters, and validation schemas.
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +33,10 @@ class ParameterSchema:
     description: str
     type: ParameterType
     required: bool = True
-    default: Optional[Any] = None
+    default: Any | None = None
     examples: List[str] = field(default_factory=list)
 
-    def validate(self, value: Any) -> Tuple[bool, Optional[str]]:
+    def validate(self, value: Any) -> Tuple[bool, str | None]:
         """Validate a parameter value with type coercion for common cases."""
         if value is None:
             if self.required:
@@ -72,7 +72,7 @@ class ParameterSchema:
                     float(value)
                 except (ValueError, TypeError):
                     return False, f"Parameter '{self.name}' must be a number"
-            elif not isinstance(value, (int, float)):
+            elif not isinstance(value, int | float):
                 return False, f"Parameter '{self.name}' must be a number"
         elif self.type == ParameterType.BOOLEAN:
             # Be tolerant: accept string "true"/"false" or numeric 0/1
@@ -581,7 +581,7 @@ class FunctionRegistry:
         self._functions[function.name] = function
         logger.debug(f"Registered function: {function.name}")
 
-    def get(self, name: str) -> Optional[FunctionMetadata]:
+    def get(self, name: str) -> FunctionMetadata | None:
         """Get a function by name."""
         return self._functions.get(name)
 
@@ -607,7 +607,7 @@ class FunctionRegistry:
 
 
 # Global registry instance
-_registry: Optional[FunctionRegistry] = None
+_registry: FunctionRegistry | None = None
 
 
 def get_function_registry() -> FunctionRegistry:

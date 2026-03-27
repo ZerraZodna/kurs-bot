@@ -20,7 +20,7 @@ print(os.environ.get("OLLAMA_API_KEY"))
 
 try:
     resp = client.chat("gpt-oss:120b", messages=messages, stream=False)
-    if hasattr(resp, "__iter__") and not isinstance(resp, (str, bytes)):
+    if hasattr(resp, "__iter__") and not isinstance(resp, str | bytes):
         parts = list(resp)
         text = "".join(p.get("message", {}).get("content", "") for p in parts if isinstance(p, dict))
         print("text:", text)

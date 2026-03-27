@@ -44,6 +44,6 @@ class TestDetectLanguageRegressionPortuguese:
         # Then: Should store English, not Portuguese
         lang_memories = mm.get_memory(user.user_id, "user_language")
         assert lang_memories, "No user_language memory stored"
-        assert any(m["value"].lower().startswith("en") for m in lang_memories), (
-            f"Expected English to be stored for message '{problematic_msg}', got: {[m['value'] for m in lang_memories]}"
-        )
+        assert any(
+            m["value"].lower().startswith("en") for m in lang_memories
+        ), f"Expected English to be stored for message '{problematic_msg}', got: {[m['value'] for m in lang_memories]}"

@@ -9,7 +9,6 @@ The fix: Run post_hook FIRST, then decide what to send:
 - Otherwise → send only ai_response
 """
 
-from typing import Optional
 from unittest.mock import AsyncMock
 
 import pytest
@@ -27,8 +26,8 @@ async def mock_generator(tokens):
 async def simulate_streaming_send_logic(
     full_response: str,
     ai_response: str,
-    post_hook_diagnostics: Optional[dict],
-    function_response_text: Optional[str],
+    post_hook_diagnostics: dict | None,
+    function_response_text: str | None,
     send_message_mock,
     chat_id: int = 12345,
     combined_text: str = "test message",

@@ -39,7 +39,6 @@ def _load_dotenv_if_present():
 _load_dotenv_if_present()
 import sys
 import types
-from typing import Optional
 
 # Fake Ollama for fast collection
 _test_use_real = os.getenv("TEST_USE_REAL_OLLAMA")
@@ -48,12 +47,12 @@ if not _test_use_real or str(_test_use_real).strip().lower() not in ("1", "true"
     if mod_name not in sys.modules:
         _fake = types.ModuleType(mod_name)
 
-        async def _fake_call_ollama(prompt: str, model: Optional[str] = None, language: Optional[str] = None) -> str:
+        async def _fake_call_ollama(prompt: str, model: str | None = None, language: str | None = None) -> str:
             short = (prompt[:160] + "...") if len(prompt) > 160 else prompt
             return f"[MOCK_OLLAMA_REPLY] model={model or 'default'} lang={language or 'en'} text={short}"
 
         async def _fake_stream_ollama(
-            prompt: str, model: Optional[str] = None, language: Optional[str] = None, temperature=None
+            prompt: str, model: str | None = None, language: str | None = None, temperature=None
         ):
             short = (prompt[:160] + "...") if len(prompt) > 160 else prompt
             yield f"[MOCK_OLLAMA_STREAM] model={model or 'default'} lang={language or 'en'} text={short}"

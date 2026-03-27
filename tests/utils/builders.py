@@ -4,7 +4,7 @@ Provides builder patterns for creating test data with clean, readable syntax.
 """
 
 import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from sqlalchemy.orm import Session
 
@@ -29,8 +29,8 @@ class MemoryBuilder:
         self._value = "test_value"
         self._category = "fact"
         self._is_active = True
-        self._archived_at: Optional[datetime.datetime] = None
-        self._created_at: Optional[datetime.datetime] = None
+        self._archived_at: datetime.datetime | None = None
+        self._created_at: datetime.datetime | None = None
         self._source = "test"
 
     def with_key(self, key: str) -> "MemoryBuilder":
@@ -49,7 +49,7 @@ class MemoryBuilder:
         self._is_active = False
         return self
 
-    def archived(self, archived_at: Optional[datetime.datetime] = None) -> "MemoryBuilder":
+    def archived(self, archived_at: datetime.datetime | None = None) -> "MemoryBuilder":
         self._is_active = False
         self._archived_at = archived_at or datetime.datetime.now(datetime.timezone.utc)
         return self
@@ -112,8 +112,8 @@ class ScheduleBuilder:
         self._schedule_type = "daily"
         self._cron_expression = "0 9 * * *"
         self._is_active = True
-        self._lesson_id: Optional[int] = None
-        self._next_send_time: Optional[datetime.datetime] = None
+        self._lesson_id: int | None = None
+        self._next_send_time: datetime.datetime | None = None
 
     def daily(self) -> "ScheduleBuilder":
         self._schedule_type = "daily"
@@ -186,7 +186,7 @@ class MessageBuilder:
         self._content = "Test message"
         self._direction = "inbound"
         self._channel: str = "telegram"
-        self._external_message_id: Optional[str] = None
+        self._external_message_id: str | None = None
         self._status: str = "delivered"
 
     def from_user(self, content: str) -> "MessageBuilder":
@@ -299,7 +299,7 @@ class LessonBuilder:
         self._lesson_id = 1
         self._title = "Test Lesson"
         self._content = "Test lesson content."
-        self._created_at: Optional[datetime.datetime] = None
+        self._created_at: datetime.datetime | None = None
 
     def with_id(self, lesson_id: int) -> "LessonBuilder":
         self._lesson_id = lesson_id

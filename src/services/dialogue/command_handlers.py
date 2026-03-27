@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 import threading
-from typing import Optional, Tuple
+from typing import Tuple
 
 from sqlalchemy.orm import Session
 
@@ -79,7 +79,7 @@ async def handle_gdpr_commands(
     session: Session,
     user_id: int,
     channel: str,
-) -> Optional[str]:
+) -> str | None:
     text_lower = text.strip().lower()
 
     if text_lower.startswith("verify "):
@@ -142,7 +142,7 @@ async def handle_gdpr_commands(
     return f"{description}\n\nTo proceed, reply with: verify {code}\n(Code expires in 10 minutes)"
 
 
-def handle_list_memories(text: str, memory_manager, session: Session, user_id: int) -> Optional[str]:
+def handle_list_memories(text: str, memory_manager, session: Session, user_id: int) -> str | None:
     """Handle user commands that request listing memories.
 
     Recognizes aliases like `list memories`, `list my memories`, `list_memories`.
@@ -282,7 +282,7 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
         return "Failed to list memories."
 
 
-def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> Optional[str]:
+def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> str | None:
     """Handle `rag_prompt` CLI-style commands from users.
 
     Supported commands:
@@ -344,8 +344,7 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> Option
             # Include private templates owned by this user (owner stored as str(user_id))
             try:
                 private_templates = (
-                    db
-                    .query(PromptTemplate)
+                    db.query(PromptTemplate)
                     .filter(
                         PromptTemplate.visibility == "private",
                         PromptTemplate.owner == str(user_id),

@@ -12,7 +12,7 @@ from src.models.database import JobState, Schedule, SessionLocal, get_session
 logger = logging.getLogger(__name__)
 
 
-def purge_inactive_schedules(days_keep: int = 7, session: Optional[Session] = None) -> int:
+def purge_inactive_schedules(days_keep: int = 7, session: Session | None = None) -> int:
     """Delete schedules that are inactive and older than days_keep. Returns number deleted."""
     with get_session(session) as s:
         cutoff = utc_now() - timedelta(days=days_keep)
@@ -27,7 +27,7 @@ def purge_inactive_schedules(days_keep: int = 7, session: Optional[Session] = No
         return deleted
 
 
-def purge_job_states(days_keep: int = 30, session: Optional[Session] = None) -> int:
+def purge_job_states(days_keep: int = 30, session: Session | None = None) -> int:
     """Delete JobState rows older than days_keep. Returns number deleted.
 
     Note: `JobState` is a simple key/value table; ensure callers are ok with

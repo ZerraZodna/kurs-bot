@@ -12,7 +12,7 @@ import logging
 import uuid
 from src.core.timezone import datetime
 from datetime import timedelta
-from typing import List, Optional
+from typing import List
 
 from sqlalchemy.orm import Session
 
@@ -36,7 +36,7 @@ class MemoryHandler(MemoryStore):
         return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
     @staticmethod
-    def build_active_query(session: Session, user_id: int, categories: Optional[List[str]] = None):
+    def build_active_query(session: Session, user_id: int, categories: List[str] | None = None):
         """Build a base query for active user memories."""
         q = session.query(Memory).filter(Memory.user_id == user_id).filter(Memory.is_active)
         if categories:
@@ -49,7 +49,7 @@ class MemoryHandler(MemoryStore):
     def list_active_memories(
         self,
         user_id: int,
-        categories: Optional[List[str]] = None,
+        categories: List[str] | None = None,
         order_ascending: bool = False,
     ) -> List[MemoryEntity]:
         q = self.build_active_query(session=self.db, user_id=user_id, categories=categories)
@@ -61,13 +61,12 @@ class MemoryHandler(MemoryStore):
         self,
         user_id: int,
         query_text: str,
-        categories: Optional[List[str]] = None,
-        limit: Optional[int] = None,
+        categories: List[str] | None = None,
+        limit: int | None = None,
     ) -> List[MemoryEntity]:
         like_pattern = f"%{query_text.strip()}%"
         rows = (
-            self
-            .build_active_query(session=self.db, user_id=user_id, categories=categories)
+            self.build_active_query(session=self.db, user_id=user_id, categories=categories)
             .filter(Memory.value.ilike(like_pattern))
             .all()
         )
@@ -78,7 +77,7 @@ class MemoryHandler(MemoryStore):
     def top_active_memories(
         self,
         user_id: int,
-        categories: Optional[List[str]] = None,
+        categories: List[str] | None = None,
         limit: int = 100,
     ) -> List[MemoryEntity]:
         rows = self.list_active_memories(user_id=user_id, categories=categories)
@@ -87,11 +86,11 @@ class MemoryHandler(MemoryStore):
     def list_user_memories(self, user_id: int) -> List[MemoryEntity]:
         return self.db.query(Memory).filter(Memory.user_id == user_id).all()
 
-    def get_user_memory_by_id(self, user_id: int, memory_id: int) -> Optional[MemoryEntity]:
+    def get_user_memory_by_id(self, user_id: int, memory_id: int) -> MemoryEntity | None:
         return self.db.query(Memory).filter(Memory.memory_id == memory_id, Memory.user_id == user_id).first()
 
     @staticmethod
-    def _is_expired(ttl_expires_at: Optional[datetime], now_utc: datetime) -> bool:
+    def _is_expired(ttl_expires_at: datetime | None, now_utc: datetime) -> bool:
         if not ttl_expires_at:
             return False
         ttl = ttl_expires_at
@@ -124,7 +123,7 @@ class MemoryHandler(MemoryStore):
         key: str,
         value: str,
         source: str = "dialogue_engine",
-        ttl_hours: Optional[int] = None,
+        ttl_hours: int | None = None,
         category: str = "fact",
         allow_duplicates: bool = False,
     ) -> int:
@@ -145,8 +144,7 @@ class MemoryHandler(MemoryStore):
         init_db()
 
         existing = (
-            self.db
-            .query(Memory)
+            self.db.query(Memory)
             .filter(
                 Memory.user_id == user_id,
                 Memory.key == key,
@@ -225,8 +223,7 @@ class MemoryHandler(MemoryStore):
             return 0
         now = utc_now()
         updated = (
-            self.db
-            .query(Memory)
+            self.db.query(Memory)
             .filter(
                 Memory.user_id == user_id,
                 Memory.memory_id.in_(memory_ids),

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 
 def detect_decline_keywords(message: str) -> bool:
     message_lower = message.lower()
@@ -26,7 +24,7 @@ def detect_decline_keywords(message: str) -> bool:
     return any(keyword in message_lower for keyword in decline_keywords)
 
 
-def detect_consent_keywords(message: str) -> Optional[bool]:
+def detect_consent_keywords(message: str) -> bool | None:
     message_lower = message.lower()
     yes_keywords = [
         "yes",

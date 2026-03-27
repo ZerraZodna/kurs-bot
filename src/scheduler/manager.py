@@ -16,11 +16,11 @@ from .domain import SCHEDULE_TYPE_DAILY
 
 def create_schedule(
     user_id: int,
-    lesson_id: Optional[int],
+    lesson_id: int | None,
     schedule_type: str,
     cron_expression: str,
     session: Session,
-    next_send_time: Optional[datetime] = None,
+    next_send_time: datetime | None = None,
 ) -> Schedule:
     """Requires active Session."""
     now = utc_now()
@@ -44,7 +44,7 @@ def create_schedule(
     return sched
 
 
-def update_schedule(schedule_id: int, updates: Dict[str, Any], session: Session) -> Optional[Schedule]:
+def update_schedule(schedule_id: int, updates: Dict[str, Any], session: Session) -> Schedule | None:
     """Apply safe updates to a schedule and return the updated object.
 
     Supported update keys: `cron_expression`, `next_send_time`, `is_active`, `lesson_id`.
@@ -90,10 +90,9 @@ def get_user_schedules(user_id: int, session: Session, active_only: bool = True)
     return query.order_by(Schedule.created_at).all()
 
 
-def find_active_daily_schedule(user_id: int, session: Session) -> Optional[Schedule]:
+def find_active_daily_schedule(user_id: int, session: Session) -> Schedule | None:
     return (
-        session
-        .query(Schedule)
+        session.query(Schedule)
         .filter_by(user_id=user_id, is_active=True, schedule_type=SCHEDULE_TYPE_DAILY)
         .order_by(Schedule.created_at)
         .first()
@@ -102,16 +101,16 @@ def find_active_daily_schedule(user_id: int, session: Session) -> Optional[Sched
 
 def find_existing_one_time_reminder(
     user_id: int, run_at: datetime, session: Session, tolerance_seconds: int = 60
-) -> Optional[Schedule]:
+) -> Schedule | None:
     """Requires active Session."""
     """Check if user already has an active one-time reminder at approximately the same time.
-    
+
     Args:
         user_id: The user ID
         run_at: The target datetime to check
         session: Optional DB session
         tolerance_seconds: Time tolerance for matching (default 60 seconds)
-    
+
     Returns:
         Existing Schedule if found, None otherwise
     """
@@ -157,13 +156,13 @@ def deactivate_user_schedules_by_type(
 ) -> int:
     """Requires active Session."""
     """Deactivate a user's schedules filtered by type. Returns number deactivated.
-    
+
     Args:
         user_id: The user ID
         schedule_type: Type filter - 'one_time' or 'daily'
         active_only: If True, only deactivate active schedules
         session: Optional DB session
-    
+
     Returns:
         Number of schedules deactivated
     """

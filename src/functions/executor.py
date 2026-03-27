@@ -8,7 +8,7 @@ error handling, and result collection.
 import logging
 from dataclasses import dataclass, field
 from src.core.timezone import datetime
-from typing import Any, Callable, Dict, List, Optional, Protocol, TypeVar
+from typing import Any, Callable, Dict, List, Protocol, TypeVar
 
 from src.models.database import Session as DBSession
 from src.models.schedule import Lesson
@@ -34,7 +34,7 @@ class ExecutionResult:
     function_name: str
     success: bool
     result: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     execution_time_ms: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
@@ -76,7 +76,7 @@ class BatchExecutionResult:
 class FunctionExecutor:
     """Executes function calls with error handling and result collection."""
 
-    def __init__(self, registry: Optional[FunctionRegistry] = None):
+    def __init__(self, registry: FunctionRegistry | None = None):
         self.registry = registry or get_function_registry()
         self._handlers: Dict[str, Callable] = {}
         self.schedule_handler = ScheduleHandler(self)
@@ -127,23 +127,23 @@ class FunctionExecutor:
         """Build an error response."""
         return {"ok": False, "error": error, **kwargs}
 
-    def _validate_time(self, time_str: str) -> tuple[bool, Optional[str], Optional[str]]:
+    def _validate_time(self, time_str: str) -> tuple[bool, str | None, str | None]:
         """Validate and normalize time string. Returns (is_valid, normalized, error)."""
         return ParameterValidator.validate_time(time_str)
 
-    def _validate_timezone(self, tz_str: str) -> tuple[bool, Optional[str], Optional[str]]:
+    def _validate_timezone(self, tz_str: str) -> tuple[bool, str | None, str | None]:
         """Validate and normalize timezone string. Returns (is_valid, normalized, error)."""
         return ParameterValidator.validate_timezone(tz_str)
 
-    def _validate_language(self, lang_str: str) -> tuple[bool, Optional[str], Optional[str]]:
+    def _validate_language(self, lang_str: str) -> tuple[bool, str | None, str | None]:
         """Validate and normalize language string. Returns (is_valid, normalized, error)."""
         return ParameterValidator.validate_language(lang_str)
 
-    def _validate_datetime(self, dt_str: str) -> tuple[bool, Optional[datetime], Optional[str]]:
+    def _validate_datetime(self, dt_str: str) -> tuple[bool, datetime | None, str | None]:
         """Validate and normalize datetime string. Returns (is_valid, datetime_obj, error)."""
         return ParameterValidator.validate_datetime(dt_str)
 
-    def _get_lesson_by_id(self, lesson_id: int, session: DBSession) -> Optional[Lesson]:
+    def _get_lesson_by_id(self, lesson_id: int, session: DBSession) -> Lesson | None:
         """Get lesson by ID from database."""
         return session.query(Lesson).filter_by(lesson_id=lesson_id).first()
 
@@ -160,7 +160,7 @@ class FunctionExecutor:
             return MemoryCategory.CONVERSATION.value
 
     async def safe_db_wrapper(
-        self, session: Optional[DBSession], func: Callable[..., Dict[str, Any]], *args: Any, **kwargs: Any
+        self, session: DBSession | None, func: Callable[..., Dict[str, Any]], *args: Any, **kwargs: Any
     ) -> Dict[str, Any]:
         try:
             return await func(*args, session=session, **kwargs)
@@ -169,7 +169,7 @@ class FunctionExecutor:
             return self._error_response(f"DB operation failed: {str(e)}")
 
     async def safe_memory_wrapper(
-        self, memory_manager: Optional[Any], func: Callable[..., Dict[str, Any]], *args: Any, **kwargs: Any
+        self, memory_manager: Any | None, func: Callable[..., Dict[str, Any]], *args: Any, **kwargs: Any
     ) -> Dict[str, Any]:
         try:
             return await func(*args, memory_manager=memory_manager, **kwargs)
@@ -326,10 +326,10 @@ class FunctionExecutor:
 
 
 # Global instance
-_executor: Optional[FunctionExecutor] = None
+_executor: FunctionExecutor | None = None
 
 
-def get_function_executor(registry: Optional[FunctionRegistry] = None) -> FunctionExecutor:
+def get_function_executor(registry: FunctionRegistry | None = None) -> FunctionExecutor:
     """Get global executor instance."""
     global _executor
     if _executor is None:

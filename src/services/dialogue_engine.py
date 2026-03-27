@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Optional
+from typing import Dict
 
 from sqlalchemy.orm import Session
 
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class DialogueEngine:
-    def __init__(self, db: Optional[Session] = None, memory_manager: Optional[MemoryManager] = None):
+    def __init__(self, db: Session | None = None, memory_manager: MemoryManager | None = None):
         if db is None:
             raise ValueError("DialogueEngine requires an active DB session")
 
@@ -38,7 +38,7 @@ class DialogueEngine:
         """Expose MemoryJudge from memory_manager for memory extraction."""
         return self.memory_manager.ai_judge
 
-    async def call_ollama(self, prompt: str, model: Optional[str] = None, language: Optional[str] = None) -> str:
+    async def call_ollama(self, prompt: str, model: str | None = None, language: str | None = None) -> str:
         """Delegate to dialogue.ollama_client with optional language hint."""
         from src.services.dialogue import call_ollama
 
@@ -49,7 +49,7 @@ class DialogueEngine:
         user_id: int,
         text: str,
         session: Session,
-        chat_id: Optional[int] = None,
+        chat_id: int | None = None,
         include_history: bool = True,
         history_turns: int = 4,
         include_lesson: bool = True,
@@ -108,7 +108,7 @@ class DialogueEngine:
 
         return await detect_and_store_language(self.memory_manager, user_id, text)
 
-    async def _check_user_restrictions(self, user_id: int, text: str, user: User, session: Session) -> Optional[str]:
+    async def _check_user_restrictions(self, user_id: int, text: str, user: User, session: Session) -> str | None:
         """Handle GDPR commands and check if user is deleted or restricted."""
         from src.services.dialogue import handle_gdpr_commands
 
@@ -127,7 +127,7 @@ class DialogueEngine:
             return "Your data processing is restricted. If you want to resume, please update your consent settings."
         return None
 
-    def _setup_rag_configuration(self, user_id: int, text: str) -> tuple[str, bool, Optional[str]]:
+    def _setup_rag_configuration(self, user_id: int, text: str) -> tuple[str, bool, str | None]:
         """Detect and configure RAG mode for the current message."""
         from src.services.dialogue import parse_rag_prefix
 
@@ -135,7 +135,7 @@ class DialogueEngine:
 
         return text, use_rag, None
 
-    async def _handle_commands(self, user_id: int, text: str, session: Session, use_rag: bool) -> Optional[str]:
+    async def _handle_commands(self, user_id: int, text: str, session: Session, use_rag: bool) -> str | None:
         """Handle various specialized commands."""
         from src.services.dialogue import handle_list_memories, handle_rag_prompt_command
 
@@ -150,7 +150,7 @@ class DialogueEngine:
 
         return None
 
-    async def _handle_onboarding_stage(self, user_id: int, text: str, session: Session, use_rag: bool) -> Optional[str]:
+    async def _handle_onboarding_stage(self, user_id: int, text: str, session: Session, use_rag: bool) -> str | None:
         """Handle onboarding flow."""
         if self.onboarding_flow and self.onboarding.should_show_onboarding(user_id) and not use_rag:
             # from src.memories.constants import MemoryKey
@@ -162,7 +162,7 @@ class DialogueEngine:
 
     async def _handle_lesson_and_schedule_stage(
         self, user_id: int, text: str, session: Session, user_lang: str, include_lesson: bool, use_rag: bool
-    ) -> Optional[str]:
+    ) -> str | None:
         from src.services.dialogue import handle_schedule_messages, maybe_send_next_lesson
 
         schedule_response = await handle_schedule_messages(
@@ -322,7 +322,7 @@ class DialogueEngine:
         ]
         return relevant_memories
 
-    async def _handle_schedule_request(self, user_id: int, text: str, session: Session) -> Optional[str]:
+    async def _handle_schedule_request(self, user_id: int, text: str, session: Session) -> str | None:
         """Handle explicit schedule requests (unchanged helper)."""
         from src.scheduler.schedule_query_handler import build_schedule_status_response
         from src.services.dialogue import get_user_language, translate_text

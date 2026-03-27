@@ -1,7 +1,7 @@
 """Type definitions for memory extraction."""
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 # Import Memory model for type hints
 from src.models.memory import Memory
@@ -19,12 +19,11 @@ class ExtractedMemory:
 
     key: str
     value: str
-    cleaned_value: Optional[str] = None
+    cleaned_value: str | None = None
     reasoning: str = ""
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ExtractedMemory":
-
         return cls(
             key=data.get("key", ""),
             value=data.get("value", ""),
