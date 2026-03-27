@@ -25,7 +25,6 @@ class TestSchedulerJobs:
     These tests initialize the global APScheduler and must run serially.
     """
 
-    @pytest.mark.serial
     def test_init_scheduler(self):
         """Should initialize the scheduler."""
         # Given: The scheduler module
@@ -38,7 +37,6 @@ class TestSchedulerJobs:
         # Cleanup
         jobs.shutdown_scheduler()
 
-    @pytest.mark.serial
     def test_sync_and_remove_one_time_job(self):
         """Should sync and remove one-time reminder jobs."""
         # Given: An initialized scheduler
@@ -63,7 +61,6 @@ class TestSchedulerJobs:
         # Cleanup
         jobs.shutdown_scheduler()
 
-    @pytest.mark.serial
     def test_sync_and_remove_cron_job(self):
         """Should sync and remove cron-based daily jobs."""
         # Given: An initialized scheduler
@@ -87,7 +84,6 @@ class TestSchedulerJobs:
         # Cleanup
         jobs.shutdown_scheduler()
 
-    @pytest.mark.serial
     def test_sync_job_without_time_returns_early(self):
         """Should handle one-time schedule without next_send_time."""
         # Given: An initialized scheduler
@@ -104,7 +100,6 @@ class TestSchedulerJobs:
         # Cleanup
         jobs.shutdown_scheduler()
 
-    @pytest.mark.serial
     def test_sync_job_without_cron_returns_early(self):
         """Should handle non-cron schedule without cron_expression."""
         # Given: An initialized scheduler
