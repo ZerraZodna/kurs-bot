@@ -189,9 +189,9 @@ class TestEnsureUserTimezoneBug:
         result_tz = get_user_timezone_from_db(db_session, user_id, default="UTC")
 
         # Then: Should return Europe/Oslo from DB, not UTC
-        assert (
-            result_tz == "Europe/Oslo"
-        ), f"Expected Europe/Oslo from DB, got {result_tz}. Bug: language overrides DB timezone!"
+        assert result_tz == "Europe/Oslo", (
+            f"Expected Europe/Oslo from DB, got {result_tz}. Bug: language overrides DB timezone!"
+        )
 
     def test_ensure_user_timezone_with_norwegian_user_english_language(self, db_session):
         """Given: Norwegian user with Oslo timezone but English UI language

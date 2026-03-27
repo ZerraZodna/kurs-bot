@@ -344,7 +344,8 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> str | 
             # Include private templates owned by this user (owner stored as str(user_id))
             try:
                 private_templates = (
-                    db.query(PromptTemplate)
+                    db
+                    .query(PromptTemplate)
                     .filter(
                         PromptTemplate.visibility == "private",
                         PromptTemplate.owner == str(user_id),

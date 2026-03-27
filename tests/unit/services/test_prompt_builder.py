@@ -318,7 +318,8 @@ class TestConversationHistory:
 
         # Verify both messages are logged
         messages = (
-            db_session.query(MessageLog)
+            db_session
+            .query(MessageLog)
             .filter_by(
                 user_id=test_user.user_id,
                 conversation_thread_id=thread_id,

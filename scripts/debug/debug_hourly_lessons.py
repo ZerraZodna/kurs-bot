@@ -56,7 +56,8 @@ def dump_user_state(db, user_id):
     print("\\nSchedule memories:")
     relevant_keys = ["schedule_message", "preferred_daily_time", "schedule_request_pending"]
     sm = (
-        db.query(Memory)
+        db
+        .query(Memory)
         .filter(Memory.user_id == user_id, Memory.key.in_(relevant_keys))
         .order_by(Memory.created_at.desc())
         .limit(10)

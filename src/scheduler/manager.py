@@ -92,7 +92,8 @@ def get_user_schedules(user_id: int, session: Session, active_only: bool = True)
 
 def find_active_daily_schedule(user_id: int, session: Session) -> Schedule | None:
     return (
-        session.query(Schedule)
+        session
+        .query(Schedule)
         .filter_by(user_id=user_id, is_active=True, schedule_type=SCHEDULE_TYPE_DAILY)
         .order_by(Schedule.created_at)
         .first()

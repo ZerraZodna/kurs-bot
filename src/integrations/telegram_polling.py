@@ -109,7 +109,8 @@ async def _trigger_batch(user_id: int, external_id: str) -> None:
     db = SessionLocal()
     try:
         existing = (
-            db.query(BatchLock)
+            db
+            .query(BatchLock)
             .filter(
                 BatchLock.user_id == user_id,
                 BatchLock.expires_at > utc_now(),

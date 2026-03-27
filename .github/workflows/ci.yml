@@ -32,6 +32,12 @@ jobs:
         run: |
           ruff check . --output-format=github
           ruff format --check .
+      - name: Security audit
+        run: |
+          pip install pip-audit
+          pip-audit --ignore-vuln CVE-2026-4539
+      - name: Pre-commit
+        uses: pre-commit/action@v3
       # No model pre-download needed (embeddings removed)
       - name: Prepare env
         run: |
@@ -44,4 +50,4 @@ jobs:
             echo ".env.template not found, skipping copy"
           fi
       - name: Run tests
-        run: pytest -q
+        run: python -m pytest -q

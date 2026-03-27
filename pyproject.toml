@@ -29,7 +29,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "ruff==0.6.9",
+    "pip>=26.0",
+    "ruff==0.6.8",
     "pre-commit",
     "pytest",
     "pytest-cov",
@@ -37,9 +38,8 @@ dev = [
     "pytest-xdist",
     "httpx",
     "mypy",
+    "pip-audit",
 ]
-
-
 
 [tool.ruff]
 target-version = "py310"

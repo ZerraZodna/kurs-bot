@@ -391,7 +391,8 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
 
             try:
                 unprocessed = (
-                    db.query(MessageLog)
+                    db
+                    .query(MessageLog)
                     .filter(
                         MessageLog.user_id == user_id,
                         MessageLog.direction == "inbound",

@@ -37,9 +37,9 @@ These practice ideas should also be applied in a broad and consistent way.
 
     assert lesson_rows, "Expected parsed lesson rows"
     for lesson_id, _title, content in lesson_rows:
-        assert content.startswith(
-            f"Lesson {lesson_id}"
-        ), f"Lesson {lesson_id} content must start with canonical header; got: {content[:50]!r}"
+        assert content.startswith(f"Lesson {lesson_id}"), (
+            f"Lesson {lesson_id} content must start with canonical header; got: {content[:50]!r}"
+        )
 
 
 def test_does_not_treat_phrase_lesson_a_day_as_header():
@@ -67,9 +67,9 @@ def test_full_pdf_lessons_start_with_capital_lesson_header(acim_pdf_text):
 
     assert lesson_rows, "No lessons parsed from full PDF"
     for lesson_id, _title, content in lesson_rows:
-        assert content.startswith(
-            f"Lesson {lesson_id}"
-        ), f"Lesson {lesson_id} must start with canonical header; got: {content[:80]!r}"
+        assert content.startswith(f"Lesson {lesson_id}"), (
+            f"Lesson {lesson_id} must start with canonical header; got: {content[:80]!r}"
+        )
 
 
 def test_full_pdf_lesson_1_title_not_intro_bleed(acim_pdf_text):
@@ -79,9 +79,9 @@ def test_full_pdf_lesson_1_title_not_intro_bleed(acim_pdf_text):
     assert 1 in by_id, "Lesson 1 missing from parsed output"
     title, content = by_id[1]
     assert "Nothing I see" in title, f"Unexpected lesson 1 title: {title!r}"
-    assert not content.lower().startswith(
-        "lesson 1\\n\\nlesson a day"
-    ), "Lesson 1 should not start with 'lesson a day' intro bleed"
+    assert not content.lower().startswith("lesson 1\\n\\nlesson a day"), (
+        "Lesson 1 should not start with 'lesson a day' intro bleed"
+    )
 
 
 def test_spacing_normalizer_repairs_missing_spaces_after_punctuation():

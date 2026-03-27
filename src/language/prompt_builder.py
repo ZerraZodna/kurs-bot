@@ -379,7 +379,8 @@ class PromptBuilder:
     def _get_last_lesson_from_logs(self, user_id: int) -> Dict[str, Any] | None:
         """Fallback: infer last sent lesson from message logs."""
         messages = (
-            self.db.query(MessageLog)
+            self.db
+            .query(MessageLog)
             .filter(MessageLog.user_id == user_id, MessageLog.direction == "outbound")
             .order_by(MessageLog.created_at.desc())
             .limit(20)
@@ -451,7 +452,8 @@ class PromptBuilder:
         """Retrieve recent conversation history for multi-turn context."""
         # Query recent messages for this user, ordered by creation date
         messages = (
-            self.db.query(MessageLog)
+            self.db
+            .query(MessageLog)
             .filter(
                 MessageLog.user_id == user_id,
                 MessageLog.status.in_(["delivered", "sent"]),  # Only successful messages

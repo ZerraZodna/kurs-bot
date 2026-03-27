@@ -14,31 +14,35 @@ repos:
         exclude: src/core/timezone.py
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
-
       - id: check-added-large-files
       - id: check-merge-conflict
       - id: debug-statements
       - id: requirements-txt-fixer
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.9
+    rev: v0.15.8
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
 
+  - repo: local
+    hooks:
+      - id: pip-audit
+        name: Pip-audit security scan
+        entry: bash -c 'pip install pip-audit >/dev/null 2>&1 || true; pip-audit --ignore-vuln CVE-2026-4539'
+        language: system
+        pass_filenames: false
+        always_run: true
+        verbose: true
 
-
-# Offline - requires internet:
+# Offline - requires internet (legacy)
 #  - repo: https://github.com/pre-commit/mirrors-safety
-#    rev: v1.11.2
-#    hooks:
-#      - id: safety-check
 #
 #  - repo: https://github.com/Yelp/detect-secrets
 #    rev: v1.5.0
