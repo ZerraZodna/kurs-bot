@@ -11,10 +11,9 @@ This module provides:
 
 import os
 from pathlib import Path
-import sys
-import types
 
 import pytest
+
 
 # Load dotenv early so its variables are available to pytest and any imported
 # project modules during collection
@@ -38,6 +37,7 @@ def _load_dotenv_if_present():
                     os.environ[k] = v
     except Exception:
         pass
+
 
 _load_dotenv_if_present()
 

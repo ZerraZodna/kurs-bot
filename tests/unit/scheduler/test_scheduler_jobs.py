@@ -3,7 +3,6 @@
 Migrated from tests/test_scheduler_jobs.py to use new test fixtures.
 """
 
-import pytest
 from datetime import datetime, timedelta, timezone
 
 from src.scheduler import jobs
