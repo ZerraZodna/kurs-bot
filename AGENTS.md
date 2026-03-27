@@ -5,6 +5,29 @@
 - `README.md` remains the source of truth for setup, runtime, and deployment.
 - `CLAUDE.md` and `GEMINI.md` are adapter files and should only contain tool-specific deltas.
 
+## Task Management System (NEW)
+
+### Master Task Tracker
+- **Location**: `tasks/TODO_MASTER.md` — Central queue for ALL work items
+- **Purpose**: Never lose context — see every bug/feature at a glance
+- **Format**: Individual TODO files linked to master file
+
+### Workflow
+1. **Simple Bug Fixes (1-2 steps)**:
+   - Create individual file: `tasks/TODO-fix_<name>.md`
+   - Add entry to `tasks/TODO_MASTER.md`
+   - Fix directly (no approval needed)
+
+2. **Complex Changes (>2 steps)**:
+   - Create detailed TODO.md in `tasks/`
+   - Add entry to `tasks/TODO_MASTER.md`
+   - Get approval before executing steps
+
+3. **Multiple Bugs**:
+   - Each bug gets its own individual TODO file
+   - All tracked in `tasks/TODO_MASTER.md`
+   - No context lost — everything visible!
+
 ## Project Structure & Module Organization
 - Main app code: `src/`.
 - API and webhooks: `src/api/`; business logic: `src/services/`; memory stack: `src/memories/`; scheduling: `src/scheduler/`; integrations: `src/integrations/`; data models: `src/models/`.
@@ -22,15 +45,32 @@
 - On this machine, prefer `npm test` / `node ./scripts/venv.js test` (see `tasks/lessons.md`).
 
 ## Engineering Workflow (All Contributors)
-- **Read relevant files first** to understand existing code, patterns, and infrastructure.
-- **For non-trivial changes (>2 steps or potential deps):**
-  1. IMMEDIATELY create `tasks/TODO.md` with DETAILED numbered step-by-step checklist from your analysis/plan.
-  2. Response text: KEEP MINIMAL (e.g., "Created TODO.md for fix. Approve to proceed?").
-  3. If TODO.md has more than 4 steps, ask **ONE** confirmation: "Approve TODO.md steps?". Simple bugs - JUST FIX!
-  4. After approval: Execute steps, mark `[x]` in TODO.md per completion.
-  5. Update TODO.md progressively to track progress.
-- **Bugfixes/simple (1-2 steps):** Directly implement with tools (no TODO needed).
-- **Always:** DRY – leverage existing code; no new solutions if current handles it.
+
+### Task Registration (REQUIRED)
+- **Before starting ANY work**, add entry to `tasks/TODO_MASTER.md`
+- **Create individual TODO file** in `tasks/` for each work item
+- **Never lose context** — master file shows ALL work in progress
+
+### Simple Bug Fixes (1-2 steps)
+- Create individual file: `tasks/TODO-fix_<name>.md`
+- Add entry to `tasks/TODO_MASTER.md`
+- Fix directly with tools (no approval needed)
+
+### Non-Trivial Changes (>2 steps or potential deps)
+- Create detailed `tasks/TODO_<name>.md` with numbered steps
+- Add entry to `tasks/TODO_MASTER.md`
+- Response: "Created TODO.md for [task]. Approve to proceed?"
+- If >4 steps, ask: "Approve TODO.md steps?"
+- After approval: Execute steps, mark `[x]` in TODO.md per completion
+
+### Multiple Bugs
+- Each bug gets its own individual TODO file
+- All tracked in `tasks/TODO_MASTER.md`
+- Fix them one at a time (no context lost!)
+
+### Always
+- **DRY** – leverage existing code; no new solutions if current handles it.
+- **Check `tasks/TODO_MASTER.md` first** before starting work
 
 
 ## Coding Style & Safety Rules

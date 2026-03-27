@@ -22,6 +22,25 @@ def get_session(session: Session | None = None):
 
 
 def init_db():
+    """Initialize database schema.
+    
+    Idempotent - safe to call multiple times.
+    Creates all tables if they don't exist.
+    """
+    # Check if tables already exist
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(engine)
+        existing_tables = inspector.get_table_names()
+        
+        if existing_tables:
+            # Tables already exist - nothing to do
+            return
+    except Exception:
+        # If inspection fails (e.g., connection error), just try to create tables
+        pass
+    
+    # Create all tables
     Base.metadata.create_all(bind=engine)
 
 

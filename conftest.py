@@ -80,24 +80,59 @@ from src.models.database import Base
 
 @pytest.fixture(scope="module", autouse=True)
 def module_db_setup(db_engine):
-    """Module-scoped DB schema creation (once per test file/module)."""
+    """Module-scoped DB schema creation (idempotent - safe to call multiple times)."""
+    from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError
+    
+    # Drop all tables first to ensure clean state (handles parallel test conflicts)
+    # Using DROP TABLE IF EXISTS instead of drop_all to avoid transaction issues
+    try:
+        with db_engine.connect() as conn:
+            # Get list of all tables to drop
+            result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
+            tables = [row[0] for row in result.fetchall()]
+            
+            # Drop all tables except sqlite_schema (internal)
+            for table in tables:
+                if table != "sqlite_schema":
+                    try:
+                        conn.execute(text(f"DROP TABLE IF EXISTS {table}"))
+                    except OperationalError:
+                        pass  # Table doesn't exist, OK
+            
+            conn.commit()
+    except Exception:
+        # If connection fails, just continue - create_all will recreate tables
+        pass
+    
+    # Now create all tables fresh
     Base.metadata.create_all(db_engine)
+    
     yield
-    # Temp DB cleaned by fixture, no drop_all needed
+    # No cleanup needed - temp DB is discarded after module
 
 
 @pytest.fixture(scope="function", autouse=True)
 def truncate_test_tables(db_engine):
-    """Fast per-test cleanup: DELETE FROM key tables (100x faster than drop_all). Safe if tables missing."""
-    from sqlalchemy import text
+    """Fast per-test cleanup: DELETE FROM all tables (handles all schema tables). Safe if tables missing."""
+    from sqlalchemy import text, inspect
     from sqlalchemy.exc import OperationalError
 
     with db_engine.connect() as conn:
-        for table in ["schedule", "message_log", "memory", "user"]:
+        # Get all tables to truncate
+        inspector = inspect(db_engine)
+        all_tables = inspector.get_table_names()
+        
+        # Truncate all tables
+        for table in all_tables:
             try:
+                # Use DELETE instead of TRUNCATE to preserve auto-increment values
                 conn.execute(text(f"DELETE FROM {table}"))
-            except OperationalError:
-                pass  # Table not exists OK
+            except OperationalError as e:
+                # Table doesn't exist or other error - ignore
+                if "already exists" not in str(e).lower() and "no such table" not in str(e).lower():
+                    print(f"Warning: Error truncating {table}: {e}")
+                pass
         conn.commit()
 
 
