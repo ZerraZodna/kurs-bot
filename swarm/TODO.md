@@ -29,6 +29,12 @@ Each tier has specific responsibilities and communicates in a controlled manner 
    - Ensure anti-drift compliance
    - Approve or request corrections
 
+4. **Pre-Commit Runner** (NEW):
+   - Run `npm test` on the changes
+   - Verify no test failures introduced
+   - Ensure type checking passes
+   - Only approved changes to be committed
+
 ### Example Workflow
 
 ```
@@ -39,6 +45,10 @@ Architect: "Create TODO.md documenting the architecture"
 Code Writer: "Create swarm/TODO.md with required content"
   ↓
 Reviewer: "Verify file exists and content matches specification"
+  ↓
+Pre-Commit: "Run npm test to verify no failures introduced"
+  ↓
+You: Final approval to commit
 ```
 
 ## Anti-Drift Rules
@@ -68,6 +78,14 @@ Reviewer: "Verify file exists and content matches specification"
 - No extra files created
 - No unrelated modifications
 - Anti-drift rules followed
+
+### Pre-Commit Checklist (Step 4)
+
+- Run `npm test` or `pytest` on changes
+- Verify no new test failures introduced
+- Check type checking passes (if configured)
+- Ensure pre-commit hooks pass
+- Only approved changes to be committed
 
 ## Example Tasks
 
@@ -99,19 +117,20 @@ Reviewer: "Verify file exists and content matches specification"
 2. **Anti-Drift Protection**: Rules prevent scope creep
 3. **Minimal Changes**: Targeted edits reduce risk
 4. **Quality Assurance**: Reviewer validates compliance
-5. **Documentation**: Architecture is self-documenting
+5. **Safety Net**: Pre-Commit step catches test failures before merge
+6. **Documentation**: Architecture is self-documenting
 
 ### Workflow
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  Architect  │────▶│  Code Writer│────▶│  Reviewer   │
-└─────────────┘     └─────────────┘     └─────────────┘
-      │                    │                    │
-      │                    │                    │
-      ▼                    ▼                    ▼
-  Plan Task             Execute           Validate
-  (High-Level)         (Anti-Drift)      (Compliance)
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  Architect  │────▶│  Code Writer│────▶│  Reviewer   │────▶│ Pre-Commit  │
+└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
+      │                    │                    │                    │
+      │                    │                    │                    │
+      ▼                    ▼                    ▼                    ▼
+  Plan Task             Execute           Validate           Run Tests
+  (High-Level)         (Anti-Drift)      (Compliance)      (Safety Net)
 ```
 
 ### Key Principles
@@ -120,4 +139,5 @@ Reviewer: "Verify file exists and content matches specification"
 - **Controlled Communication**: Messages flow in one direction
 - **Rule Enforcement**: Anti-drift rules are strict and mandatory
 - **Validation First**: Reviewer checks before acceptance
+- **Safety First**: Pre-Commit step runs tests before final approval
 - **Documentation**: Architecture is documented for clarity
