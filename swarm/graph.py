@@ -6,7 +6,6 @@ from .nodes import (
     code_writer_node,
     reviewer_node,
     pre_commit_node,
-    run_pre_commit_with_retry,
 )
 import logging
 
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 def build_supervisor_graph(checkpointer=None):
     """
     Build supervisor workflow with mini-swe-agent as CODE WRITER and pre-commit automation.
-    
+
     Workflow:
     1. ARCHITECT - Plans task with strict constraints
     2. CODE WRITER - Uses mini-swe-agent to generate code (auto-runs tests)
@@ -44,15 +43,15 @@ def build_supervisor_graph(checkpointer=None):
         Decide next step: APPROVE -> end, REJECT -> back to architect.
         """
         decision = state.get("final_decision", "")
-        
+
         if decision == "APPROVE":
             logger.info("Review approved, moving to pre-commit")
             return "pre_commit"
-        
+
         if state.get("iteration_count", 0) >= 3:
             logger.warning("Max iterations reached (3), aborting")
             return "end"
-        
+
         logger.info(f"Review rejected, looping back to architect (attempt {state.get('iteration_count', 0) + 1}/3)")
         return "architect"
 
@@ -63,11 +62,11 @@ def build_supervisor_graph(checkpointer=None):
         if state.get("pre_commit_success"):
             logger.info("Pre-commit passed, ending workflow")
             return "end"
-        
+
         if state.get("pre_commit_attempts", 0) >= 3:
             logger.error(f"All {3} pre-commit attempts failed, aborting")
             return "end"
-        
+
         logger.warning(f"Pre-commit failed, retrying (attempt {state.get('pre_commit_attempts', 0) + 1}/3)")
         return "code_writer"
 

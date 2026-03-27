@@ -2,9 +2,9 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage
 import os
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
-from swarm.mini_swe_agent import run_task_with_anti_drift, create_agent
+from swarm.mini_swe_agent import run_task_with_anti_drift
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -62,11 +62,11 @@ def code_writer_node(state: dict[str, Any]) -> dict[str, Any]:
     Replaces LLM-based code writer with battle-tested mini-swe-agent.
     """
     task = state.get("current_task", "Write code changes")
-    
+
     try:
         # Use mini-swe-agent to generate code changes
         diff = run_task_with_anti_drift(task, cwd="/home/steen/kurs-bot/swarm/")
-        
+
         return {
             "proposed_changes": diff,
             "messages": state.get("messages", []) + [f"mini-swe-agent generated: {diff[:100]}..."],
@@ -77,7 +77,8 @@ def code_writer_node(state: dict[str, Any]) -> dict[str, Any]:
         logger.warning(f"mini-swe-agent failed, falling back to LLM: {e}")
         llm = get_cheap_llm()
         prompt = SystemMessage(
-            content=SYSTEM_PROMPT + "\n\nYou are the Code Writer. Output ONLY a clean unified git diff for files inside swarm/. Do not add extra functions."
+            content=SYSTEM_PROMPT
+            + "You are the Code Writer. Output ONLY a clean unified git diff for files inside swarm/. Do not add extra functions."
         )
         response = llm.invoke([prompt] + state.get("messages", []))
         return {
@@ -92,23 +93,21 @@ def pre_commit_node(state: dict[str, Any]) -> dict[str, Any]:
     Run pre-commit checks after Code Writer.
     Auto-runs tests to verify changes don't break anything.
     """
-    task = state.get("current_task", "Run pre-commit checks")
-    
+    state.get("current_task", "Run pre-commit checks")
+    # task = state.get("current_task", "Run pre-commit checks")
+
     try:
         # Run pre-commit checks
         import subprocess
+
         result = subprocess.run(
-            ["npm", "test"],
-            cwd="/home/steen/kurs-bot/swarm/",
-            capture_output=True,
-            text=True,
-            timeout=60
+            ["npm", "test"], cwd="/home/steen/kurs-bot/swarm/", capture_output=True, text=True, timeout=60
         )
-        
+
         success = result.returncode == 0
-        
+
         feedback = result.stdout if success else result.stderr
-        
+
         return {
             "pre_commit_result": "PASS" if success else "FAIL",
             "pre_commit_feedback": feedback[:500],  # Truncate for state
@@ -140,25 +139,25 @@ def run_pre_commit_with_retry(state: dict[str, Any], max_retries: int = 3) -> di
     Loops back to Code Writer if tests fail.
     """
     iteration_count = state.get("iteration_count", 0)
-    
+
     for attempt in range(max_retries):
         logger.info(f"Pre-commit attempt {attempt + 1}/{max_retries}")
-        
+
         result = pre_commit_node(state)
-        
+
         if result["pre_commit_success"]:
             logger.info("Pre-commit passed on attempt 1")
             return result
-        
+
         logger.warning(f"Pre-commit failed on attempt {attempt + 1}, will retry...")
-        
+
         # If we have retries left, loop back to Code Writer
         if attempt < max_retries - 1:
             # Update state with retry attempt
             state["iteration_count"] = iteration_count + 1
             state["pre_commit_attempts"] = attempt + 1
             state["messages"].append(f"Pre-commit attempt {attempt + 1} failed, retrying...")
-    
+
     # All retries exhausted
     logger.error(f"All {max_retries} pre-commit attempts failed")
     return {
