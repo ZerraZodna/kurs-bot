@@ -1,19 +1,8 @@
-# Documentation Update TODO
+# Swarm Supervisor Fix — TODO
 
-## Approved Plan Breakdown
-Status: In Progress
-
-### Step 1: Create TODO.md [✅ Complete]
-
-### Step 2: Update docs/INDEX.md [✅ Complete]
-- Remove outdated project/ section
-
-### Step 3: Fix dates in all docs/gdpr/*.md [✅ Complete]
-- 2026-02-04 → 2024-10-01
-
-### Step 4: Review/update checkboxes in GDPR_PLAN_IMPLEMENTATION.md [✅ Complete]
-- Checkboxes preserved (accurate to current implementation)
-
-### Step 5: Verify all changes [✅ Complete]
-
-### Step 6: Complete task [✅ Complete]
+- [x] 1. Update `swarm/state.py` — Add `iteration_count`, remove `project_rules`
+- [x] 2. Update `swarm/nodes.py` — Rewrite prompts to be strictly technical, remove ACIM/Enneagram confusion
+- [x] 3. Update `swarm/graph.py` — Add max-iteration guard (3 cycles)
+- [x] 4. Update `swarm/cli.py` — Initialize `iteration_count`, improve output formatting
+- [x] 5. Verify imports and graph compilation — ALL PASS
+- [ ] 6. Full CLI test (requires LLM backend): `python -m swarm.cli "Test task: Create a simple echo function"`
