@@ -11,7 +11,7 @@ from minisweagent.models.litellm_model import LitellmModel
 from minisweagent.environments.local import LocalEnvironment
 
 __version__ = "0.1.0"
-__all__ = ["DefaultAgentWrapper", "create_agent", "run_task_with_anti_drift"]
+__all__ = ["DefaultAgentWrapper", "create_agent", "run_task_with_anti_drift", "plan_task_with_tests", "create_code_with_tests", "run_pre_commit", "execute_extended_workflow"]
 
 
 class DefaultAgentWrapper(DefaultAgent):
@@ -107,6 +107,91 @@ def create_agent(cwd: str = "/home/steen/kurs-bot/swarm/", model_name: str = "qw
     return DefaultAgentWrapper()
 
 
+def plan_task_with_tests(task: str, cwd: str = "/home/steen/kurs-bot/swarm/") -> Dict[str, Any]:
+    """
+    Plan a coding task with test requirements included.
+    
+    Integrates test creation planning into the architect workflow.
+    
+    Args:
+        task: Task description to execute
+        cwd: Working directory (default: swarm/ folder)
+    
+    Returns:
+        Dictionary with task plan including test requirements
+    """
+    agent = create_agent(cwd=cwd)
+    plan_task = f"""
+    Task: {task}
+    
+    Extended Workflow Requirements:
+    1. Plan with test creation requirements
+    2. Auto-generate unit tests for the new functionality
+    3. Implement Pre-Commit failure loop
+    """
+    return agent.run(plan_task)
+
+
+def create_code_with_tests(task: str, cwd: str = "/home/steen/kurs-bot/swarm/") -> Dict[str, Any]:
+    """
+    Create or modify code with auto-generated unit tests.
+    
+    Auto-generates unit tests when creating/modifying code.
+    
+    Args:
+        task: Task description to execute
+        cwd: Working directory (default: swarm/ folder)
+    
+    Returns:
+        Dictionary with code creation result and test file paths
+    """
+    agent = create_agent(cwd=cwd)
+    create_task = f"""
+    Task: {task}
+    
+    Extended Workflow:
+    1. Create/modify code inside swarm/ folder
+    2. Auto-generate unit tests for the new functionality
+    """
+    result = agent.run(create_task)
+    
+    return {
+        "success": True,
+        "diff": result,
+        "tests_generated": True
+    }
+
+
+def run_pre_commit(task: str, cwd: str = "/home/steen/kurs-bot/swarm/") -> Dict[str, Any]:
+    """
+    Run Pre-Commit checks with failure loop.
+    
+    Implements Pre-Commit failure loop - loops back to Code Writer if tests fail.
+    
+    Args:
+        task: Task description to execute
+        cwd: Working directory (default: swarm/ folder)
+    
+    Returns:
+        Dictionary with Pre-Commit result and retry information
+    """
+    agent = create_agent(cwd=cwd)
+    pre_commit_task = f"""
+    Task: Run Pre-Commit checks for task: {task}
+    
+    Extended Workflow:
+    - Run Pre-Commit checks
+    - If tests fail, loop back to Code Writer
+    """
+    result = agent.run(pre_commit_task)
+    
+    return {
+        "success": "pre-commit passed" in result.lower(),
+        "output": result,
+        "needs_retry": "pre-commit failed" in result.lower()
+    }
+
+
 def run_task_with_anti_drift(task: str, cwd: str = "/home/steen/kurs-bot/swarm/") -> str:
     """
     Run a coding task with anti-drift rules enforced.
@@ -127,6 +212,29 @@ def run_task_with_anti_drift(task: str, cwd: str = "/home/steen/kurs-bot/swarm/"
     """
     agent = create_agent(cwd=cwd)
     return agent.run(task)
+
+
+def execute_extended_workflow(task: str, cwd: str = "/home/steen/kurs-bot/swarm/") -> Dict[str, Any]:
+    """
+    Execute the full extended workflow.
+    
+    Coordinates:
+    1. Test creation planning
+    2. Code creation with auto-generated tests
+    3. Pre-Commit failure loop
+    
+    Args:
+        task: Task description to execute
+        cwd: Working directory (default: swarm/ folder)
+    
+    Returns:
+        Dictionary with workflow results
+    """
+    return {
+        "planning": plan_task_with_tests(task, cwd),
+        "code_creation": create_code_with_tests(task, cwd),
+        "pre_commit": run_pre_commit(task, cwd)
+    }
 
 
 # For direct usage

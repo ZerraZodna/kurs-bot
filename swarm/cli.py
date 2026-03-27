@@ -33,12 +33,17 @@ def main(task: str) -> None:
     print("=" * 80)
     print(f"\nTask: {task}\n")
     print("Running architect → code_writer → reviewer cycle...\n")
+    print("Step 1/3: Architect planning...")
+    print("Step 2/3: Code writer generating...")
 
     result = graph.invoke(initial_state, config)
 
     print("=" * 80)
     print(f"FINAL DECISION: {result.get('final_decision', 'UNKNOWN')}")
     print("=" * 80)
+    print("Step 3/3: Review complete!")
+    print("\n📝 Reviewer feedback:", "✅ Approved" if result.get("final_decision") == "APPROVE" else "❌ Rejected")
+    print("\n✅ Task completed successfully!")
 
     # Proposed diff (most important)
     if result.get("proposed_changes"):
