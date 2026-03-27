@@ -1,8 +1,18 @@
-# Swarm Supervisor Fix — TODO
+# Swarm Architect Persistence Upgrade
+Status: Approved & In Progress
 
-- [x] 1. Update `swarm/state.py` — Add `iteration_count`, remove `project_rules`
-- [x] 2. Update `swarm/nodes.py` — Rewrite prompts to be strictly technical, remove ACIM/Enneagram confusion
-- [x] 3. Update `swarm/graph.py` — Add max-iteration guard (3 cycles)
-- [x] 4. Update `swarm/cli.py` — Initialize `iteration_count`, improve output formatting
-- [x] 5. Verify imports and graph compilation — ALL PASS
-- [ ] 6. Full CLI test (requires LLM backend): `python -m swarm.cli "Test task: Create a simple echo function"`
+**Step 1: Create TODO.md** ✅
+
+**Step 2: Upgrade swarm/cli.py**
+- Fixed thread_id="architect-persistent"
+- SqliteSaver("swarm-checkpoints.sqlite") for durable storage
+
+**Step 3: Test persistence**
+```
+python -m swarm.cli "test task 1"
+python -m swarm.cli "test task 2"  # Architect recalls task 1 messages
+```
+
+**Step 4: Verify ruff/pre-commit clean**
+
+**Step 5: Commit & push**

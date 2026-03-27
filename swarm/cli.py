@@ -15,7 +15,7 @@ def main(task: str) -> None:
     memory = MemorySaver()
     supervisor_graph = build_supervisor_graph(memory)
 
-    config = {"configurable": {"thread_id": f"cli-{hash(task) % 10000}"}}
+    config = {"configurable": {"thread_id": "architect-persistent"}}
 
     input_state = {
         "messages": [],
