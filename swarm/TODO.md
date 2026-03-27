@@ -109,6 +109,42 @@ You: Final approval to commit
 
 **Reviewer**: "Verify only the retry config changed, no other modifications"
 
+### Task 3: Pre-Commit Runner Verification
+
+**Goal**: Test changes before final commit
+
+**Architect**: "Add a new validation function to swarm/utils.py and run tests before committing"
+
+**Code Writer**: "Create a new function validate_input() in swarm/utils.py using patch to add minimal changes"
+
+**Pre-Commit Runner**: "Run npm test or pytest on specific changes to verify no test failures"
+
+**Command**: "npm test -- --testPathPattern=utils.test.js"
+
+**Pre-Commit Checklist Verification**:
+- Run `npm test` to verify no test failures introduced
+- Check type checking passes with `npm run lint`
+- Verify pre-commit hooks pass
+- Ensure no breaking changes to existing functionality
+
+**Expected Output**:
+```
+PASS  utils.test.js
+  validate_input
+    ✓ should return true for valid input
+    ✓ should return false for invalid input
+    ✓ should handle edge cases
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Duration:    0.5s
+
+Pre-commit hooks: PASSED
+Type checking: PASSED
+```
+
+**Reviewer**: "Verify tests pass, type checking passes, and only the intended function was added"
+
 ## Benefits and Workflow
 
 ### Benefits
@@ -124,7 +160,7 @@ You: Final approval to commit
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  Architect  │────▶│  Code Writer│────▶│  Reviewer   │────▶│ Pre-Commit  │
+│  Architect  │───▶│  Code Writer│────▶│  Reviewer   │────▶│ Pre-Commit  │
 └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
       │                    │                    │                    │
       │                    │                    │                    │
