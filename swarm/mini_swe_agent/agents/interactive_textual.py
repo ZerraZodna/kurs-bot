@@ -92,7 +92,7 @@ class _TextualAgent(DefaultAgent):
                     "[bold green]Agent wants to finish.[/bold green] "
                     "[green]Type a comment to give it a new task or press enter to quit.\n"
                 ).strip():
-                    raise NonTerminatingException(f"The user added a new task: {new_task}")
+                    raise NonTerminatingException(f"The user added a new task: {new_task}") from None
             raise e
 
 

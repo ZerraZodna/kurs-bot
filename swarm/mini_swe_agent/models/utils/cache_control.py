@@ -42,7 +42,9 @@ def set_cache_control(
     if mode != "default_end":
         raise ValueError(f"Invalid mode: {mode}")
     if last_n_messages_offset:
-        warnings.warn("last_n_messages_offset is deprecated and will be removed in the future. It has no effect.")
+        warnings.warn(
+            "last_n_messages_offset is deprecated and will be removed in the future. It has no effect.", stacklevel=2
+        )
 
     messages = copy.deepcopy(messages)
     new_messages = []

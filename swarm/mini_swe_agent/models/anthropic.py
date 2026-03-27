@@ -28,7 +28,8 @@ class AnthropicModel(LitellmModel):
             warnings.warn(
                 "ANTHROPIC_API_KEYS is deprecated and will be removed in the future. "
                 "Simply use the ANTHROPIC_API_KEY environment variable instead. "
-                "Key rotation is no longer required."
+                "Key rotation is no longer required.",
+                stacklevel=2,
             )
             api_key = get_key_per_thread(rotating_keys.split("::"))
         messages = set_cache_control(messages, mode="default_end")

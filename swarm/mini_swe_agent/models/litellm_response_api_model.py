@@ -31,17 +31,15 @@ class LitellmResponseAPIModel(LitellmModel):
         stop=stop_after_attempt(10),
         wait=wait_exponential(multiplier=1, min=4, max=60),
         before_sleep=before_sleep_log(logger, logging.WARNING),
-        retry=retry_if_not_exception_type(
-            (
-                litellm.exceptions.UnsupportedParamsError,
-                litellm.exceptions.NotFoundError,
-                litellm.exceptions.PermissionDeniedError,
-                litellm.exceptions.ContextWindowExceededError,
-                litellm.exceptions.APIError,
-                litellm.exceptions.AuthenticationError,
-                KeyboardInterrupt,
-            )
-        ),
+        retry=retry_if_not_exception_type((
+            litellm.exceptions.UnsupportedParamsError,
+            litellm.exceptions.NotFoundError,
+            litellm.exceptions.PermissionDeniedError,
+            litellm.exceptions.ContextWindowExceededError,
+            litellm.exceptions.APIError,
+            litellm.exceptions.AuthenticationError,
+            KeyboardInterrupt,
+        )),
     )
     def _query(self, messages: list[dict[str, str]], **kwargs):
         try:

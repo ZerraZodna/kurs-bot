@@ -11,7 +11,7 @@ _THREADS_THAT_USED_API_KEYS: list[Any] = []
 
 def get_key_per_thread(api_keys: list[Any]) -> Any:
     """Choose key based on thread name. Returns None if no keys are available."""
-    warnings.warn("get_key_per_thread is deprecated and will be removed in the future")
+    warnings.warn("get_key_per_thread is deprecated and will be removed in the future", stacklevel=2)
     thread_name = threading.current_thread().name
     if thread_name not in _THREADS_THAT_USED_API_KEYS:
         _THREADS_THAT_USED_API_KEYS.append(thread_name)

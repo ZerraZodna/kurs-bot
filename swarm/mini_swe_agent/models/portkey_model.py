@@ -24,7 +24,7 @@ try:
 except ImportError:
     raise ImportError(
         "The portkey-ai package is required to use PortkeyModel. Please install it with: pip install portkey-ai"
-    )
+    ) from None
 
 
 class PortkeyModelConfig(BaseModel):

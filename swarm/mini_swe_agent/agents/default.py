@@ -112,7 +112,7 @@ class DefaultAgent:
             output = e.output.decode("utf-8", errors="replace") if getattr(e, "output", None) else ""
             raise ExecutionTimeoutError(
                 self.render_template(self.config.timeout_template, action=action, output=output)
-            )
+            ) from e
         self.has_finished(output)
         return output | {"action": action["action"]}
 

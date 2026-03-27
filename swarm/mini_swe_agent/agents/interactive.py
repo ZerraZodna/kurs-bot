@@ -86,7 +86,7 @@ class InteractiveAgent(DefaultAgent):
             ).strip()
             if not interruption_message or interruption_message in self._MODE_COMMANDS_MAPPING:
                 interruption_message = "Temporary interruption caught."
-            raise NonTerminatingException(f"Interrupted by user: {interruption_message}")
+            raise NonTerminatingException(f"Interrupted by user: {interruption_message}") from None
 
     def execute_action(self, action: dict) -> dict:
         # Override the execute_action method to handle user confirmation
@@ -147,5 +147,5 @@ class InteractiveAgent(DefaultAgent):
                     end="",
                 )
                 if new_task := self._prompt_and_handle_special("").strip():
-                    raise NonTerminatingException(f"The user added a new task: {new_task}")
+                    raise NonTerminatingException(f"The user added a new task: {new_task}") from None
             raise e
