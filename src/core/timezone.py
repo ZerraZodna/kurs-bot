@@ -10,6 +10,16 @@ from typing import Tuple
 from zoneinfo import ZoneInfo
 
 
+def utc_now() -> datetime:
+    """Return current UTC datetime (timezone-aware).
+
+    This is the ONE canonical way to get "now" in this project.
+    Never use datetime.now(), datetime.utcnow(), or
+    datetime.now(timezone.utc) directly.
+    """
+    return datetime.now(timezone.utc)
+
+
 def _normalize_tz_name(tz_name: str | None) -> str | None:
     if not tz_name:
         return None
@@ -229,10 +239,6 @@ def resolve_timezone_name(tz_name: str | None) -> str | None:
 
     # Not resolved
     return None
-
-
-# Re-export from clock.py (which has zero project imports) to avoid circular imports.
-from src.core.clock import utc_now  # noqa: F401 — re-export
 
 
 def utc_date_now() -> date:

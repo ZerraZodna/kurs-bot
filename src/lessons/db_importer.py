@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import List
 
-from src.core.clock import utc_now
+from src.core.timezone import utc_now
 from src.models.database import Lesson, SessionLocal
 
 

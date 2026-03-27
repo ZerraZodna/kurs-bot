@@ -1,6 +1,6 @@
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 
-from src.core.clock import utc_now
+from src.core.timezone import utc_now
 from src.models.base import Base
 
 
