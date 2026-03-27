@@ -37,7 +37,7 @@ jobs:
           pip install pip-audit
           pip-audit --ignore-vuln CVE-2026-4539
       - name: Pre-commit
-        uses: pre-commit/action@v3
+        uses: pre-commit/action@v2
       # No model pre-download needed (embeddings removed)
       - name: Prepare env
         run: |
