@@ -2,7 +2,7 @@
 It's identical to the one used in swe-agent.
 """
 
-import collections
+import collections.abc as collections
 import time
 from datetime import timedelta
 from pathlib import Path

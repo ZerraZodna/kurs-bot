@@ -83,7 +83,7 @@ def code_writer_node(state: dict[str, Any]) -> dict[str, Any]:
             content=SYSTEM_PROMPT
             + "You are the Code Writer. Output ONLY a clean unified git diff for files inside swarm/. Do not add extra functions."
         )
-        response = llm.invoke([prompt] + state.get("messages", []))
+        response = llm.invoke([prompt] + state.get("messages", []), {"stream": False})
         return {
             "proposed_changes": response.content,
             "messages": state.get("messages", []) + [response],

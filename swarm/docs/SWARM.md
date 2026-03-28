@@ -18,29 +18,34 @@ This system implements a 9-step human-centered automation workflow that uses the
 3. HUMAN
    └─ Reads and approves prompts. If not, back to 2. or Cancel
       ↓
-4. ARCHITECT in swarm
+4. ARCHITECT in swarm  ← AI NODE
    └─ Define task with STRICT constraints
       ↓
-5. CODE WRITER (mini-swe-agent)
+5. CODE WRITER (mini-swe-agent)  ← AI NODE
    └─ Execute bash commands
    └─ Output unified git diff
    └─ Stay in swarm/ folder
       ↓
-6. REVIEWER
+6. REVIEWER  ← AI NODE (anti-drift validation)
    └─ Validate anti-drift compliance
    └─ Approve or reject
       ↓
-7. PRE-COMMIT
-   └─ Run tests (npm test / pytest)
+7. PRE-COMMIT  ← Automated tests
+   └─ Run tests (pytest)
    └─ Verify no failures - if failures back to 5.
       ↓
-8. HERMES AGENT evaluates result from Swarm
-   └─ Informs human that job is finished
-   └─ Commit
+8. TESTING & VALIDATION
+   └─ Execute unit tests AND integration tests
+   └─ RUN THE APPLICATION in live environment
+   └─ Verify ALL runtime dependencies work properly
+   └─ Confirm no runtime errors exist
+   └─ Execute end-to-end scenarios
       ↓
 9. FINAL APPROVAL
-   └─ Human review
-   └─ Push
+   └─ HERMES AGENT evaluates result from Swarm + awaits Telegram approval
+   └─ Human final review and approval via TELEGRAM command
+   └─ Git commit and push if approved by Telegram command
+```
 ```
 
 ### Core Components Within the Workflow
@@ -144,4 +149,3 @@ agent = create_agent(
 ## License
 
 Same as mini-swe-agent (MIT)
-

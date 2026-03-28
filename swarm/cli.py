@@ -1,14 +1,55 @@
 #!/usr/bin/env python
-"""CLI entry-point for the kurs-bot LangGraph coding supervisor."""
+"""CLI entry-point for the kurs-bot LangGraph coding supervisor with Telegram approval integration."""
 
-import sys
+import os
+import logging
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from .graph import build_supervisor_graph
+
+# Import telegram integration
+from .telegram import integration
+
+
+def request_swarm_approval(state: dict, summary: str, stage: str = "start") -> bool:
+    """
+    Request approval from user via Telegram.
+
+    Args:
+        state: Current swarm state
+        summary: Summary of what needs approval
+        stage: "start" for prompt approval, "end" for final approval
+
+    Returns:
+        True if approval request sent successfully
+    """
+    chat_id = state.get("telegram_chat_id")
+    user_id = state.get("telegram_user_id")
+    request_id = state.get("telegram_request_id")
+
+    if not chat_id or not user_id:
+        logger.warning("[swarm-cli] Telegram chat_id or user_id not set, skipping approval request")
+        return False
+
+    # Send approval request
+    result = integration.request_approval(
+        chat_id=chat_id, user_id=user_id, workflow_instance=None, stage=stage, summary=summary, request_id=request_id
+    )
+
+    if result:
+        # Update state with request ID
+        state["telegram_request_id"] = result
+        logger.info(f"[swarm-cli] Approval request sent: {result}")
+        return True
+
+    logger.error("[swarm-cli] Failed to send approval request")
+    return False
 
 
 def main(task: str) -> None:
@@ -25,7 +66,23 @@ def main(task: str) -> None:
         "review_feedback": None,
         "final_decision": None,
         "iteration_count": 0,
+        # Telegram integration fields
+        "telegram_chat_id": int(os.getenv("TELEGRAM_CHAT_ID", "0")),
+        "telegram_user_id": int(os.getenv("TELEGRAM_USER_ID", "0")),
+        "telegram_request_id": None,
     }
+
+    # Check if Telegram is configured
+    chat_id = initial_state.get("telegram_chat_id")
+    user_id = initial_state.get("telegram_user_id")
+
+    if chat_id and user_id and chat_id != 0:
+        # Register authorization
+        integration.register_chat_authorization(chat_id, user_id)
+
+        # Update state with registered values
+        initial_state["telegram_chat_id"] = chat_id
+        initial_state["telegram_user_id"] = user_id
 
     print("=" * 80)
     print("   KURS-BOT SWARM CODING SUPERVISOR")
@@ -36,44 +93,91 @@ def main(task: str) -> None:
     print("Step 1/3: Architect planning...")
     print("Step 2/3: Code writer generating...")
 
-    result = graph.invoke(initial_state, config)
+    try:
+        result = graph.invoke(initial_state, config)
 
-    print("=" * 80)
-    print(f"FINAL DECISION: {result.get('final_decision', 'UNKNOWN')}")
-    print("=" * 80)
-    print("Step 3/3: Review complete!")
-    print("\n📝 Reviewer feedback:", "✅ Approved" if result.get("final_decision") == "APPROVE" else "❌ Rejected")
-    print("\n✅ Task completed successfully!")
+        print("=" * 80)
+        print(f"FINAL DECISION: {result.get('final_decision', 'UNKNOWN')}")
+        print("=" * 80)
+        print("Step 3/3: Review complete!")
+        print("\n📝 Reviewer feedback:", "✅ Approved" if result.get("final_decision") == "APPROVE" else "❌ Rejected")
+        print("\n✅ Task completed successfully!")
 
-    # Proposed diff (most important)
-    if result.get("proposed_changes"):
-        print(f"\n--- PROPOSED DIFF ---\n{result['proposed_changes']}")
+        # Proposed diff (most important)
+        if result.get("proposed_changes"):
+            print(f"\n--- PROPOSED DIFF ---\n{result['proposed_changes']}")
 
-    # Reviewer feedback
-    if result.get("review_feedback"):
-        print(f"\n--- REVIEWER FEEDBACK ---\n{result['review_feedback']}")
+        # Reviewer feedback
+        if result.get("review_feedback"):
+            print(f"\n--- REVIEWER FEEDBACK ---\n{result['review_feedback']}")
 
-    # Safe node messages (debug info)
-    messages = result.get("messages", [])
-    if messages:
-        print("\n--- LAST 3 NODE MESSAGES ---")
-        for msg in messages[-3:]:
-            # Safe way to get content from BaseMessage or dict
-            if hasattr(msg, "content"):
-                content = str(msg.content)
+        # Safe node messages (debug info)
+        messages = result.get("messages", [])
+        if messages:
+            print("\n--- LAST 3 NODE MESSAGES ---")
+            for msg in messages[-3:]:
+                # Safe way to get content from BaseMessage or dict
+                if hasattr(msg, "content"):
+                    content = str(msg.content)
+                else:
+                    content = str(msg)
+                preview = content[:600] + ("..." if len(content) > 600 else "")
+                role = getattr(msg, "role", "assistant") if hasattr(msg, "role") else "assistant"
+                print(f"\n[{role.upper()}]:")
+                print(preview)
+                print("-" * 60)
+
+        print("\n" + "=" * 80)
+
+        # If final decision is APPROVE and we have Telegram configured, request final approval
+        if result.get("final_decision") == "APPROVE":
+            chat_id = initial_state.get("telegram_chat_id")
+            user_id = initial_state.get("telegram_user_id")
+
+            if chat_id and user_id and chat_id != 0:
+                print("\n🔄 REQUESTING FINAL APPROVAL via Telegram...")
+                print("Please use /approve to commit changes or /decline to cancel")
+
+                # Request final approval with summary
+                approval_summary = f"""
+SWARM OPERATION COMPLETE - READY FOR COMMIT
+
+Summary:
+- Task: {task}
+- Review Decision: APPROVED
+- Proposed Changes: {result.get("proposed_changes", "")[:500]}
+
+Please review and approve via Telegram bot to proceed with git commit.
+
+Commands:
+- /approve - Commit and push changes
+- /decline - Cancel without committing
+- /retry - Request adjustments before commit
+- /help - Show help
+                """.strip()
+
+                # Send final approval request
+                integration.request_final_approval(
+                    chat_id=chat_id,
+                    user_id=user_id,
+                    summary=approval_summary,
+                    request_id=initial_state.get("telegram_request_id"),
+                )
+
+                print("\n✅ Final approval request sent to Telegram!")
+                print("Waiting for user response...")
+
             else:
-                content = str(msg)
-            preview = content[:600] + ("..." if len(content) > 600 else "")
-            role = getattr(msg, "role", "assistant") if hasattr(msg, "role") else "assistant"
-            print(f"\n[{role.upper()}]:")
-            print(preview)
-            print("-" * 60)
+                print("\nℹ️ No Telegram configured for final approval")
+                print("Proceeding with git commit without approval...")
+                # TODO: Implement git commit here
 
-    print("\n" + "=" * 80)
+        # If we're here and have a proposal, show it
+        if result.get("proposed_changes"):
+            print(f"\n--- PROPOSED DIFF ---\n{result['proposed_changes']}")
 
+    except Exception as e:
+        print(f"\n❌ Error during swarm execution: {e}")
+        import traceback
 
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print('Usage: python -m swarm.cli "Your test task description"')
-        sys.exit(1)
-    main(sys.argv[1])
+        traceback.print_exc()

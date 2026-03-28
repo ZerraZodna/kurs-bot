@@ -1,224 +1,161 @@
 # TODO: Human-In-The-Loop Swarm Integration
 
 ## Overview
+See master document docs/dev/SWARM.md
+
 Current swarm implementation operates as a closed automation cycle without explicit human intervention points. This document tracks necessary work to implement a complete 9-step human-in-the-loop workflow that puts humans in control of every automation cycle.
 
+The architecture will be: Human tells Hermes what to do → Hermes initiates LangGraph swarm → Swarm controls Telegram bot which communicates with Human for approval points.
+
 ## Current Status
-✅ Basic swarm nodes implemented (Architect → Code Writer → Reviewer → Pre-Commit)
-✅ Anti-drift rules enforced programmatically
-✅ Integration with mini-swe-agent as code execution layer
+✅ Internal swarm flow implemented: architect → code_writer → reviewer → pre_commit
+✅ If pre-commit fails → loops back to code_writer (testing-and-back-to-coding loop functionality)
+✅ If reviewer rejects → loops back to architect (anti-drift compliance)
+✅ 3-iteration limits on both loops with abortion after max attempts
+✅ Anti-drift rules enforced in reviewer node
+✅ Integration with mini-swe-agent as code execution layer in code_writer
 ❌ Human approval points missing at critical interfaces
-❌ No human review of AI-generated prompts
-❌ No verification step before commits/pushes
+❌ No human review of AI-generated prompts (Step 2→3 in 9-step)
+❌ No verification step before commits/pushes (Step 8→9 in 9-step)
+❌ No integration between Hermes, Swarm, and Telegram for approval workflow
 ❌ Automated workflow bypasses human oversight
 
-## Next Steps - Human Integration
+## Next Steps - Hermes-Swarm-Telegram Integration
 
-### 1. Implement Human Approval Points (CRITICAL)
-**Problem**: System proceeds without human review at crucial decision points
-**Goal**: Add explicit approval requirements following 9-step workflow design
+### 1. Enable Hermes to Initiate Swarm Processes (CRITICAL)
+**Problem**: No connection between Hermes agent (me) and the LangGraph swarm for processing user requests
+**Goal**: When you tell me "implement this feature", I (Hermes agent) start the appropriate LangGraph swarm process
 
-- [ ] Before proceeding from Architect to Code Writer: Human must approve task breakdown
-- [ ] Before applying changes from Code Writer: Human must review generated diff
-- [ ] Before running pre-commit checks: Human must approve test execution
-- [ ] In node outputs: Add `human_approval_needed: True` field when critical changes occur
+- [ ] Implement mechanism for Hermes to properly invoke the swarm process when you give requests
+- [ ] Pass your original request and any constraints from Hermes to the swarm
+- [ ] Ensure swarm receives appropriate context that Hermes knows about your intent
+- [ ] Set up proper error handling if swarm fails to start
 
-**Priority**: CRITICAL - No automation without human involvement
+**Priority**: CRITICAL - This bridges your interaction with swarm execution
 
-**Implementation Requirements:**
-```python
-# In state.py, add approval status tracking:
-human_approval_needed: bool
-pending_action: str  # Description of what needs approval
-approved_by_human: bool
-```
+### 2. Implement Hermes-Guided Swarm with Telegram Communication Layer (CRITICAL)
+**Problem**: No communication layer that connects the swarm back to human after Hermes initiates it
+**Goal**: Swarm communicates with humans via Telegram bot for approval points while maintaining connection back to the orchestrated process
 
-### 2. Create Human Interface Layer (CRITICAL) 
-**Problem**: No proper Hermes Agent mediation between humans and automation
-**Goal**: Implement Hermes Agent as human/swarm interface following workflow design
+- [ ] Set up swarm to communicate with human via Telegram bot when human approval needed
+- [ ] Link specific swarm instances to the original Hermes initiating command that started them
+- [ ] Ensure you can trace from your original request through Hermes to the swarm to its status
+- [ ] Set up proper user authentication for the Telegram bot to ensure security
+- [ ] Make sure the "you approve via telegram" happens for the correct requests from step 1
 
-- [ ] Step 2: Hermes Agent writes AI prompt for swarm and shows to human
-- [ ] Step 3: Human reviews and approves prompts before swarm activation
-- [ ] Step 8: Hermes Agent evaluates swarm results and prepares for final approval
-- [ ] Step 9: Human performs final review and decides to push
+**Priority**: CRITICAL - This enables human approvals in the flow while maintaining connections
 
-**Priority**: CRITICAL - This is the missing interface design
+### 3. Implement Telegram Bot for Approval Points (CRITICAL)
+**Problem**: No human approval interface using Telegram as the communication medium for Steps 2→3 and 8→9
+**Goal**: Telegram bot serves as the communication channel controlled by the swarm to ask for human approval at critical stages
 
-### 3. Modify Graph Workflow Flow
-**Current**: Automated flow from Architect → Code Writer → Reviewer → Pre-Commit
-**Goal**: Add approval gates that stop workflow until human approval received
+- [ ] Step 2: Telegram bot, controlled by swarm, generates and presents AI prompts to human based on Hermes-initiated request
+- [ ] Step 2: Telegram bot displays generated AI prompt to human without timeout constraints
+- [ ] Step 3: Telegram bot waits for human approval WITHOUT timeout (using Telegram message interface)
+- [ ] Step 3: Human can approve, reject, or request modifications via Telegram bot commands
+- [ ] Step 3: When rejected, return to prompt generation or allow cancellation
+- [ ] Step 3: Only proceed with swarm internal execution if human approves via Telegram
+- [ ] Step 8: After swarm completes internal steps, Telegram bot presents results to human for review
+- [ ] Step 9: Telegram bot enables human to authorize final commitment and push to repository
+- [ ] Create appropriate Telegram bot commands (e.g., /approve, /reject, /cancel) tied to specific pending processes
 
-```python
-# In graph.py, add conditional logic after each node:
-def routing_logic(state):
-    # After architect completion
-    if state.get('pending_approval_for', '') == 'code_writer':
-        return 'awaiting_human_approval' 
-    
-    # After code writer completion  
-    if state.get('pending_approval_for', '') == 'review':
-        return 'awaiting_human_approval'
-    
-    # After reviewer completion
-    if state.get('pending_approval_for', '') == 'pre_commit':
-        return 'awaiting_human_approval'
-    
-    return state.get('next_node')
-```
+**Priority**: CRITICAL - These are the essential human control points connecting Hermes-initiated processes to human decision making
 
-**Priority**: HIGH - Required for human-in-the-loop workflow
+### 4. Maintain State Linkage Across Systems
+**Current**: No connection between Hermes session that initiated, LangGraph run instance, and Telegram approvals
+**Goal**: Enable end-to-end traceability linking your original request through all systems
 
-### 4. Add Node Wrapping for Approval Integration
-**Problem**: Current nodes don't support approval requirements
-**Goal**: Wrap each node to check for human approval before advancing
+- [ ] Establish identifiers linking Hermes commands to specific swarm runs
+- [ ] Ensure each Telegram approval request identifies which original request it relates to
+- [ ] Maintain ability to cancel or modify a pending request across all three systems
+- [ ] Log chain of actions from initial request through completion for audit trail
 
-For architect_node:
-```python
-def architect_node(state: dict[str, Any]) -> dict[str, Any]:
-    # Existing architect logic
-    llm_result = plan_task_with_constraints(state['original_request']) 
-    subtasks = parse_to_subtasks(llm_result)
-    
-    # NEW: Set state to wait for human approval before code writer
-    return {
-        "subtasks": subtasks,
-        "human_approval_needed": True,
-        "pending_action": f"Approve task breakdown before code writer: {str(subtasks)[:100]}...",
-        "action_details": {
-            "node": "architect", 
-            "next_step": "code_writer",
-            "content": subtasks
-        },
-        "next_node": "awaiting_human_approval"  # Stop workflow until approval
-    }
-```
-
-**Priority**: HIGH - Implements approval points in core logic
-
-### 5. Create Human Approval Mechanism
-**Goal**: Allow humans to review, approve, reject, or modify requests at each interface point
-
-- [ ] Interface to show pending actions requiring approval
-- [ ] Ability to approve, reject, or request modifications
-- [ ] Option to cancel automation cycle entirely
-- [ ] Resume workflow from appropriate state when approved
-
-**Implementation considerations:**
-- May need persistent state storage for waiting workflow instances
-- Notification mechanism for humans when approval required
-- Mechanism to resume workflow after approval
-
-#### 5a. Human Approval Interface
-- [ ] Present clear information about what's happening and what's requesting approval
-- [ ] Allow for contextual decision making with full information
-- [ ] Implement feedback pathway to adjust workflow if rejected
-
-**Priority**: CRITICAL - No human-in-the-loop without this mechanism
-
-## Next Steps - Testing with Human Oversight
-
-### 6. Update Testing Approach for Human Integration
-**Problem**: Tests run without human involvement defeating purpose of safe automation
-**Goal**: Test human-in-the-loop workflow, not just autonomous automation
-
-- [ ] Develop tests that include human decision points (simulated or mocked)
-- [ ] Verify approval mechanisms work correctly
-- [ ] Test cancellation and modification flows  
-- [ ] Confirm all anti-drift rules enforced through human oversight
-
-**Priority**: HIGH - Tests must validate complete workflow
-
-### 7. Test Edge Cases with Human Interface
-- [ ] What happens with human not available for extended period?
-- [ ] How to handle rejected approval requests?
-- [ ] How to handle cancelled automation cycles?
-- [ ] Multiple concurrent automation requests?
-- [ ] Emergency cancellation during complex workflow?
-
-**Priority**: MEDIUM - Important for production reliability
+**Priority**: HIGH - Needed for proper operation and debugging
 
 ## Next Steps - Safety & Validation
 
-### 8. Implement Pre-Commit Safety Checks with Human Authorization
-**Current**: Pre-commit testing runs in closed loop with automated retries
-**Goal**: Add human awareness of test results and failures
+### 5. Implement Secure Handoffs Between Systems
+**Problem**: Multiple systems (Hermes, Swarm, Telegram) must coordinate safely
+**Goal**: Ensure appropriate security and validation between all system interactions
 
-- [ ] When tests fail, escalate to human for decision on how to proceed
-- [ ] Don't hide failed tests - humans should see what changes break tests
-- [ ] Allow humans to request fixes as new tasks when failures occur
+- [ ] Validate swarm operations originate from authorized Hermes commands
+- [ ] Verify Telegram approval commands come from authorized user
+- [ ] Ensure only approved changes are committed to the repository
+- [ ] Implement proper authentication at each handoff point
+- [ ] Audit log all cross-system operations
 
-**Priority**: HIGH - Critical safety mechanism
+**Priority**: HIGH - Critical for security with multiple system interactions
 
-```python
-# In pre-commit node:
-def pre_commit_node(state):
-    test_results = run_tests(state['proposed_changes'])
-    
-    if not all([r.success for r in test_results]):
-        return {
-            "test_failures": test_results,
-            "human_approval_needed": True,
-            "pending_action": f"Review failing tests before fixes: {[f.name for f in test_results if not f.success]}",
-            "next_node": "awaiting_human_approval"
-        }
-    
-    return {"tests_passed": True}
-```
+### 6. Test Full Integration Flow
+**Problem**: Need to test the complete flow from top to bottom: Human→Hermes→Swarm→Telegram→Human→Swarm→Hermes→Completion
+**Goal**: Validate the end-to-end workflow functions correctly
 
-### 9. Add Human Verification of Final Commits
-**Problem**: Automated commit without final human review allows mistakes to propagate
-**Goal**: Create mandatory human review point before changes reach repository
+- [ ] Test complete 9-step flow from original request to final git push
+- [ ] Test rejection scenarios at both approval points
+- [ ] Test interruption/cancellation scenarios
+- [ ] Test multiple simultaneous request scenarios
 
-From our 9-step workflow in SWARM.md this is Steps 8-9:
-```
-8. HERMES AGENT evaluates result from Swarm
-   └─ Informs human that job is finished
-   └─ Awaits human commit decision
-      ↓
-9. FINAL APPROVAL
-   └─ Human review and verification
-   └─ Human decision to commit and push
-```
+**Priority**: HIGH - Required to validate the complete architecture
 
-**Priority**: CRITICAL - Prevents bad changes reaching repository without review
+## Next Steps - Testing with Integrated Systems
+
+### 7. Update Testing Approach
+**Problem**: Need to simulate the coordinated multi-system workflow
+**Goal**: Test the integrated systems as they will operate in production
+
+- [ ] Create tests that validate Hermes can properly initiate swarm processes
+- [ ] Test state linkage between all three systems
+- [ ] Test failure resilience (what happens if Telegram unavailable?)
+- [ ] Test the complete approval flow through all systems
+
+**Priority**: MEDIUM - Required for stability
+
+### 8. Test Edge Cases in Multi-System Environment
+- [ ] What if the same user has multiple pending requests? (avoid mix-ups between requests)
+- [ ] What if you approve the wrong pending request? (verification before applying)
+- [ ] How to handle interruptions where Hermes is doing other work while swarm waits for approval?
+- [ ] What about authorization verification for git operations?
+- [ ] What happens if Hermes restarts while swarm is waiting for approval?
+
+**Priority**: MEDIUM - Important for reliability
 
 ## Next Steps - Documentation
-### 10. Update Integration Documentation
-- [ ] Add human-in-the-loop workflow explanation to AGENTS.md
-- [ ] Document approval mechanism to SWARM.md
-- [ ] Create troubleshooting guide for human interface (how to approve, reject, etc.)
+### 9. Update Integration Documentation
+- [ ] Document the 3-part workflow (Hermes→Swarm→Telegram→Swarm→etc.)
+- [ ] Explain how each system connects to the others
+- [ ] Create troubleshooting guide for multi-system interactions
+- [ ] Document security considerations and user authorization flows
 
-**Priority**: MEDIUM - Critical for user adoption
+**Priority**: MEDIUM - Critical for operation and maintenance
 
 ## Quick Wins (Top Priority)
 
-### Immediate Actions for Human Control
-- [ ] Add human approval flag to state management
-- [ ] Modify one node (architect) with approval requirement as proof of concept
-- [ ] Implement basic approval mechanism for proof of concept
-- [ ] Test simple approval workflow
+### Immediate Actions for Integration
+- [ ] Enable Hermes to securely initiate swarm processes when told to do so
+- [ ] Set up identity verification for linking systems properly
+- [ ] Connect Telegram bot to receive requests from and respond to swarm operations
+- [ ] Implement secure approval flow from Telegram to complete the loop
 
-## Testing Checklist for Human Integration
+## Testing Checklist for Integrated Systems
 
 ### Before Each Test Run
-- [ ] Human interface capability available for approval points
-- [ ] State tracking for approval status functional  
-- [ ] Approval mechanism prevents workflow progression without consent
-- [ ] Ability to cancel workflows during approval steps
+- [ ] Hermes can be instructed to initiate swarm processes
+- [ ] Unique identification system linking requests across all components
+- [ ] Telegram bot ready to receive and respond to user approval requests
+- [ ] Permission and security verification working between systems
 
-### After Each Test Run  
-- [ ] Human control points working correctly
-- [ ] Workflow properly stops at approval gates
-- [ ] Approval/Rejection decisions processed correctly
-- [ ] Cancellation terminates workflow as expected
+### After Each Test Run
+- [ ] Complete 9-step path works: Human→Hermes→Swarm→Telegram→Human→Swarm→Hermes→Final Action
+- [ ] Human maintains control throughout via the integrated approval points
+- [ ] Multiple requests properly isolated and traced
+- [ ] Changes only pushed after human approves through the full chain
 
 ## Resources
 - SWARM.md: Complete 9-step human-in-the-loop workflow design
-- archive/HUMAN_INTEGRATION_GUIDE.md: Technical recommendations for implementation
-- AGENTS.md: Integration patterns with Hermes Agent
+- LangGraph swarm: Architect → Code Writer → Reviewer → Pre-Commit implementation
 
 ---
 
-**Document Status**: Active Development  
-**Last Updated**: 2026-03-28  
-**Focus**: Human-First Architecture Implementation
+**Document Status**: Active Development
+**Last Updated**: 2026-03-28
+**Focus**: Integrated Hermes→Swarm→Telegram Human Control Architecture
