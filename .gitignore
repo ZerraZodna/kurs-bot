@@ -157,4 +157,4 @@ yarn.lock
 .grok/settings.json
 .aider*
 .gitnexus
-src/data/ai_judge_cache.json
+scripts/ngrok.pid
