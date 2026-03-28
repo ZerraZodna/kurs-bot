@@ -1,384 +1,224 @@
-# TODO: Swarm/ Mini-SWE-Agent Integration - Next Steps
+# TODO: Human-In-The-Loop Swarm Integration
 
 ## Overview
-Mini-swe-agent is now integrated into swarm/ with extended workflow functions. This file tracks remaining work for testing, integration, and production deployment.
+Current swarm implementation operates as a closed automation cycle without explicit human intervention points. This document tracks necessary work to implement a complete 9-step human-in-the-loop workflow that puts humans in control of every automation cycle.
 
 ## Current Status
-✅ Mini-swe-agent copied into `swarm/mini_swe_agent/`
-✅ Extended workflow functions implemented:
-  - `plan_task_with_tests()`
-  - `create_code_with_tests()`
-  - `run_pre_commit()`
-  - `execute_extended_workflow()`
-✅ Unit tests created: `swarm/mini_swe_agent/test_extended_workflow.py`
-✅ Dependencies resolved in `.venv`
+✅ Basic swarm nodes implemented (Architect → Code Writer → Reviewer → Pre-Commit)
+✅ Anti-drift rules enforced programmatically
+✅ Integration with mini-swe-agent as code execution layer
+❌ Human approval points missing at critical interfaces
+❌ No human review of AI-generated prompts
+❌ No verification step before commits/pushes
+❌ Automated workflow bypasses human oversight
 
-## Next Steps - Testing
+## Next Steps - Human Integration
 
-### 1. Fix Test Execution Issues
-**Problem**: Tests fail because no LLM server is running
-**Action**: Set up a test LLM or mock responses
+### 1. Implement Human Approval Points (CRITICAL)
+**Problem**: System proceeds without human review at crucial decision points
+**Goal**: Add explicit approval requirements following 9-step workflow design
 
-```bash
-# Option A: Start local Qwen LLM
-# Option B: Use Ollama with a model
-# Option C: Mock the LLM for unit testing
+- [ ] Before proceeding from Architect to Code Writer: Human must approve task breakdown
+- [ ] Before applying changes from Code Writer: Human must review generated diff
+- [ ] Before running pre-commit checks: Human must approve test execution
+- [ ] In node outputs: Add `human_approval_needed: True` field when critical changes occur
 
-# Add to test file:
-@mock.patch('swarm.mini_swe_agent.LitellmModel.query')
-def test_with_mocked_llm(mock_query):
-    mock_query.return_value = {"content": "test diff"}
-    # ... test logic
+**Priority**: CRITICAL - No automation without human involvement
+
+**Implementation Requirements:**
+```python
+# In state.py, add approval status tracking:
+human_approval_needed: bool
+pending_action: str  # Description of what needs approval
+approved_by_human: bool
 ```
 
-**Priority**: HIGH - Tests must pass before production deployment
+### 2. Create Human Interface Layer (CRITICAL) 
+**Problem**: No proper Hermes Agent mediation between humans and automation
+**Goal**: Implement Hermes Agent as human/swarm interface following workflow design
 
-### 2. Test Individual Functions
-- [ ] `plan_task_with_tests()` - Verify task planning output
-- [ ] `create_code_with_tests()` - Verify code + test generation
-- [ ] `run_pre_commit()` - Verify test execution and failure loop
-- [ ] `execute_extended_workflow()` - Verify full workflow coordination
+- [ ] Step 2: Hermes Agent writes AI prompt for swarm and shows to human
+- [ ] Step 3: Human reviews and approves prompts before swarm activation
+- [ ] Step 8: Hermes Agent evaluates swarm results and prepares for final approval
+- [ ] Step 9: Human performs final review and decides to push
 
-### 3. Test Edge Cases
-- [ ] Empty task string
-- [ ] Very long task string
-- [ ] Invalid task description
-- [ ] File already exists
-- [ ] File permissions issues
-- [ ] Network errors during LLM calls
-- [ ] LLM timeout
-- [ ] Pre-commit with 0 retries
+**Priority**: CRITICAL - This is the missing interface design
 
-### 4. Test Integration
-- [ ] Multi-task workflow (break down large tasks)
-- [ ] Test creation for new functions
-- [ ] Test modification for existing functions
-- [ ] Pre-commit failure loop (3 retries)
-- [ ] Anti-drift rule violations
-
-## Next Steps - Integration
-
-### 5. Integrate with Existing Swarm Workflow
-**Current**: swarm/nodes.py uses LangGraph with LLM
-**Goal**: Use mini-swe-agent as CODE WRITER node
+### 3. Modify Graph Workflow Flow
+**Current**: Automated flow from Architect → Code Writer → Reviewer → Pre-Commit
+**Goal**: Add approval gates that stop workflow until human approval received
 
 ```python
-# Add to swarm/nodes.py
-from swarm.mini_swe_agent import create_agent
-
-def code_writer_node_with_mini_swe(state):
-    """Use mini-swe-agent as CODE WRITER"""
-    agent = create_agent()
-    # ... implement
+# In graph.py, add conditional logic after each node:
+def routing_logic(state):
+    # After architect completion
+    if state.get('pending_approval_for', '') == 'code_writer':
+        return 'awaiting_human_approval' 
+    
+    # After code writer completion  
+    if state.get('pending_approval_for', '') == 'review':
+        return 'awaiting_human_approval'
+    
+    # After reviewer completion
+    if state.get('pending_approval_for', '') == 'pre_commit':
+        return 'awaiting_human_approval'
+    
+    return state.get('next_node')
 ```
 
-**Status**: NOT STARTED
-**Priority**: HIGH
+**Priority**: HIGH - Required for human-in-the-loop workflow
 
-### 6. Add Pre-Commit to Swarm Workflow
-**Current**: Pre-commit is manual step
-**Goal**: Auto-run pre-commit after Code Writer
+### 4. Add Node Wrapping for Approval Integration
+**Problem**: Current nodes don't support approval requirements
+**Goal**: Wrap each node to check for human approval before advancing
+
+For architect_node:
+```python
+def architect_node(state: dict[str, Any]) -> dict[str, Any]:
+    # Existing architect logic
+    llm_result = plan_task_with_constraints(state['original_request']) 
+    subtasks = parse_to_subtasks(llm_result)
+    
+    # NEW: Set state to wait for human approval before code writer
+    return {
+        "subtasks": subtasks,
+        "human_approval_needed": True,
+        "pending_action": f"Approve task breakdown before code writer: {str(subtasks)[:100]}...",
+        "action_details": {
+            "node": "architect", 
+            "next_step": "code_writer",
+            "content": subtasks
+        },
+        "next_node": "awaiting_human_approval"  # Stop workflow until approval
+    }
+```
+
+**Priority**: HIGH - Implements approval points in core logic
+
+### 5. Create Human Approval Mechanism
+**Goal**: Allow humans to review, approve, reject, or modify requests at each interface point
+
+- [ ] Interface to show pending actions requiring approval
+- [ ] Ability to approve, reject, or request modifications
+- [ ] Option to cancel automation cycle entirely
+- [ ] Resume workflow from appropriate state when approved
+
+**Implementation considerations:**
+- May need persistent state storage for waiting workflow instances
+- Notification mechanism for humans when approval required
+- Mechanism to resume workflow after approval
+
+#### 5a. Human Approval Interface
+- [ ] Present clear information about what's happening and what's requesting approval
+- [ ] Allow for contextual decision making with full information
+- [ ] Implement feedback pathway to adjust workflow if rejected
+
+**Priority**: CRITICAL - No human-in-the-loop without this mechanism
+
+## Next Steps - Testing with Human Oversight
+
+### 6. Update Testing Approach for Human Integration
+**Problem**: Tests run without human involvement defeating purpose of safe automation
+**Goal**: Test human-in-the-loop workflow, not just autonomous automation
+
+- [ ] Develop tests that include human decision points (simulated or mocked)
+- [ ] Verify approval mechanisms work correctly
+- [ ] Test cancellation and modification flows  
+- [ ] Confirm all anti-drift rules enforced through human oversight
+
+**Priority**: HIGH - Tests must validate complete workflow
+
+### 7. Test Edge Cases with Human Interface
+- [ ] What happens with human not available for extended period?
+- [ ] How to handle rejected approval requests?
+- [ ] How to handle cancelled automation cycles?
+- [ ] Multiple concurrent automation requests?
+- [ ] Emergency cancellation during complex workflow?
+
+**Priority**: MEDIUM - Important for production reliability
+
+## Next Steps - Safety & Validation
+
+### 8. Implement Pre-Commit Safety Checks with Human Authorization
+**Current**: Pre-commit testing runs in closed loop with automated retries
+**Goal**: Add human awareness of test results and failures
+
+- [ ] When tests fail, escalate to human for decision on how to proceed
+- [ ] Don't hide failed tests - humans should see what changes break tests
+- [ ] Allow humans to request fixes as new tasks when failures occur
+
+**Priority**: HIGH - Critical safety mechanism
 
 ```python
-# Add Pre-Commit node after Reviewer
+# In pre-commit node:
 def pre_commit_node(state):
-    """Run pre-commit checks"""
-    from swarm.mini_swe_agent import run_pre_commit
-    result = run_pre_commit(state['current_task'])
-    # Handle failure loop
+    test_results = run_tests(state['proposed_changes'])
+    
+    if not all([r.success for r in test_results]):
+        return {
+            "test_failures": test_results,
+            "human_approval_needed": True,
+            "pending_action": f"Review failing tests before fixes: {[f.name for f in test_results if not f.success]}",
+            "next_node": "awaiting_human_approval"
+        }
+    
+    return {"tests_passed": True}
 ```
 
-**Status**: NOT STARTED
-**Priority**: MEDIUM
+### 9. Add Human Verification of Final Commits
+**Problem**: Automated commit without final human review allows mistakes to propagate
+**Goal**: Create mandatory human review point before changes reach repository
 
-### 7. Add Multi-Task Support
-**Current**: Single task at a time
-**Goal**: Break large tasks into subtasks
-
-```python
-# Update architect_node()
-def architect_node_with_subtasks(state):
-    """Break large tasks into subtasks"""
-    # Use mini-swe-agent to plan subtasks
-    # Execute each subtask
-    # Return combined result
+From our 9-step workflow in SWARM.md this is Steps 8-9:
+```
+8. HERMES AGENT evaluates result from Swarm
+   └─ Informs human that job is finished
+   └─ Awaits human commit decision
+      ↓
+9. FINAL APPROVAL
+   └─ Human review and verification
+   └─ Human decision to commit and push
 ```
 
-**Status**: NOT STARTED
-**Priority**: MEDIUM
-
-### 8. Add Test Creation Automation
-**Current**: Tests must be explicitly requested
-**Goal**: Auto-generate tests for new code
-
-```python
-# In create_code_with_tests()
-def create_code_with_tests_auto(state):
-    """Auto-generate tests for new functions"""
-    # Analyze code changes
-    # Generate test file
-    # Add to changes
-```
-
-**Status**: NOT STARTED
-**Priority**: HIGH
-
-## Next Steps - Production Deployment
-
-### 9. Add Configuration Options
-```python
-# Add to create_agent()
-def create_agent(
-    cwd="/home/steen/kurs-bot/swarm/",
-    model_name="qwen2.5:7b-instruct-q4_K_M",
-    base_url="http://localhost:8080/v1",
-    max_retries=3,
-    timeout=60
-):
-    """Create agent with configurable options"""
-```
-
-**Status**: PARTIAL - Some options exist, need more
-**Priority**: LOW
-
-### 10. Add Logging
-```python
-# Add logging to all functions
-import logging
-logger = logging.getLogger(__name__)
-
-logger.info(f"Planning task: {task}")
-logger.info(f"Code creation result: {result}")
-logger.warning(f"Pre-commit failed, retry {retry}/3")
-```
-
-**Status**: NOT STARTED
-**Priority**: LOW
-
-### 11. Add Error Handling
-```python
-# Add try/except blocks
-def plan_task_with_tests_safe(task):
-    try:
-        return plan_task_with_tests(task)
-    except Exception as e:
-        logger.error(f"Planning failed: {e}")
-        raise
-```
-
-**Status**: NOT STARTED
-**Priority**: MEDIUM
-
-### 12. Add Performance Monitoring
-- [ ] Track execution time per phase
-- [ ] Track LLM call costs
-- [ ] Track retry counts
-- [ ] Track success/failure rates
-
-**Status**: NOT STARTED
-**Priority**: LOW
+**Priority**: CRITICAL - Prevents bad changes reaching repository without review
 
 ## Next Steps - Documentation
+### 10. Update Integration Documentation
+- [ ] Add human-in-the-loop workflow explanation to AGENTS.md
+- [ ] Document approval mechanism to SWARM.md
+- [ ] Create troubleshooting guide for human interface (how to approve, reject, etc.)
 
-### 13. Update AGENTS.md
-**Current**: Has basic description
-**Goal**: Add detailed examples and troubleshooting
+**Priority**: MEDIUM - Critical for user adoption
 
-```markdown
-## Swarm/ Mini-SWE-Agent Integration
+## Quick Wins (Top Priority)
 
-### Usage Examples
-```python
-# Simple usage
-from swarm.mini_swe_agent import run_task_with_anti_drift
-diff = run_task_with_anti_drift("Task description")
+### Immediate Actions for Human Control
+- [ ] Add human approval flag to state management
+- [ ] Modify one node (architect) with approval requirement as proof of concept
+- [ ] Implement basic approval mechanism for proof of concept
+- [ ] Test simple approval workflow
 
-# Extended workflow
-from swarm.mini_swe_agent import execute_extended_workflow
-result = execute_extended_workflow("Complex task")
-```
-
-### Troubleshooting
-- **No LLM server**: Start Qwen or Ollama
-- **Timeout**: Increase timeout parameter
-- **Anti-drift violations**: Review anti-drift rules
-- **Test failures**: Check pre-commit configuration
-```
-
-**Status**: PARTIAL
-**Priority**: MEDIUM
-
-### 14. Create Troubleshooting Guide
-```markdown
-# Swarm/ Mini-SWE-Agent Troubleshooting
-
-## Common Issues
-
-### LLM Connection Errors
-**Symptom**: `Connection refused`
-**Solution**: Start local LLM server
-
-### Timeout Errors
-**Symptom**: `Timeout after 60s`
-**Solution**: Increase timeout parameter
-
-### Anti-Drift Violations
-**Symptom**: `REJECT from Reviewer`
-**Solution**: Review anti-drift rules
-```
-
-**Status**: NOT STARTED
-**Priority**: LOW
-
-### 15. Add Release Notes
-```markdown
-# Swarm/ Mini-SWE-Agent Release Notes
-
-## Version 0.2.0
-- Extended workflow functions added
-- Test creation automation
-- Pre-commit failure loop
-- Anti-drift rules enforcement
-```
-
-**Status**: NOT STARTED
-**Priority**: LOW
-
-## Next Steps - Future Enhancements
-
-### 16. Add Custom Anti-Drift Rules
-```python
-# Allow custom rules per task
-def create_agent(
-    custom_rules=["rule1", "rule2"],
-):
-    pass
-```
-
-**Status**: NOT STARTED
-**Priority**: LOW
-
-### 17. Add Tool Integration
-```python
-# Integrate with other tools
-- git operations (commit, push)
-- file operations (read, write)
-- terminal commands
-```
-
-**Status**: NOT STARTED
-**Priority**: LOW
-
-### 18. Add Docker/Sandbox Support
-```python
-# Allow running in sandbox
-def create_agent(
-    sandbox=True,
-    sandbox_type="docker",
-):
-    pass
-```
-
-**Status**: NOT STARTED
-**Priority**: LOW
-
-### 19. Add Multi-Model Support
-```python
-# Support multiple models
-def create_agent(
-    models=[
-        {"name": "qwen", "weight": 0.7},
-        {"name": "claude", "weight": 0.3},
-    ]
-):
-    pass
-```
-
-**Status**: NOT STARTED
-**Priority**: LOW
-
-### 20. Add Analytics Dashboard
-```python
-# Track usage statistics
-- Tasks completed
-- Test failures
-- Pre-commit issues
-- Anti-drift violations
-```
-
-**Status**: NOT STARTED
-**Priority**: LOW
-
-## Quick Wins (Do First)
-
-### 30-Minute Tasks
-- [ ] Fix test execution (setup mock LLM)
-- [ ] Add basic error logging
-- [ ] Add simple error handling
-- [ ] Test with mock responses
-
-### 1-Hour Tasks
-- [ ] Add configuration options
-- [ ] Update AGENTS.md with examples
-- [ ] Add troubleshooting section
-- [ ] Test multi-task workflow
-
-### 2-Hour Tasks
-- [ ] Integrate with swarm/nodes.py
-- [ ] Add pre-commit automation
-- [ ] Add test creation automation
-- [ ] Add performance monitoring
-
-## Testing Checklist
+## Testing Checklist for Human Integration
 
 ### Before Each Test Run
-- [ ] LLM server is running
-- [ ] `.venv` is activated
-- [ ] `mini-swe-agent` is installed
-- [ ] `qwen2.5:7b-instruct-q4_K_M` model is available
+- [ ] Human interface capability available for approval points
+- [ ] State tracking for approval status functional  
+- [ ] Approval mechanism prevents workflow progression without consent
+- [ ] Ability to cancel workflows during approval steps
 
-### After Each Test Run
-- [ ] Check for errors
-- [ ] Verify output format
-- [ ] Check anti-drift compliance
-- [ ] Review test coverage
+### After Each Test Run  
+- [ ] Human control points working correctly
+- [ ] Workflow properly stops at approval gates
+- [ ] Approval/Rejection decisions processed correctly
+- [ ] Cancellation terminates workflow as expected
 
 ## Resources
-
-### Documentation
-- mini-swe-agent docs: https://mini-swe-agent.com/
-- swarm/ docs: `docs/` directory
-- AGENTS.md: Main workflow guide
-
-### Tools
-- mini-swe-agent: `pip install mini-swe-agent`
-- swarm/: `swarm/mini_swe_agent/`
-- tests: `swarm/mini_swe_agent/test_extended_workflow.py`
-
-### Commands
-```bash
-# Run tests
-node ./scripts/venv.js test -- swarm/mini_swe_agent/test_extended_workflow.py
-
-# Start LLM server (Qwen example)
-# See .env for configuration
-
-# Use mini-swe-agent
-python -c "from swarm.mini_swe_agent import execute_extended_workflow; print(execute_extended_workflow('task'))"
-```
-
-## Notes
-
-- **Version**: 0.2.0
-- **Last Updated**: 2024-03-27
-- **Status**: Active Development
-- **Next Review**: After all tests pass
-
-## Contributors
-
-- [Your Name] - Initial integration
-- [Next Person] - Testing and production deployment
+- SWARM.md: Complete 9-step human-in-the-loop workflow design
+- archive/HUMAN_INTEGRATION_GUIDE.md: Technical recommendations for implementation
+- AGENTS.md: Integration patterns with Hermes Agent
 
 ---
 
-**End of TODO_SWARM.md**
+**Document Status**: Active Development  
+**Last Updated**: 2026-03-28  
+**Focus**: Human-First Architecture Implementation

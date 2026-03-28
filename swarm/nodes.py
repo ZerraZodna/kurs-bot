@@ -4,6 +4,9 @@ import os
 import logging
 from typing import Any
 
+# Get working directory from environment or use default
+SWARM_CWD = os.getenv("SWARM_CWD", "/home/steen/kurs-bot/swarm/")
+
 from swarm.mini_swe_agent import run_task_with_anti_drift
 
 # Configure logger
@@ -65,7 +68,7 @@ def code_writer_node(state: dict[str, Any]) -> dict[str, Any]:
 
     try:
         # Use mini-swe-agent to generate code changes
-        diff = run_task_with_anti_drift(task, cwd="/home/steen/kurs-bot/swarm/")
+        diff = run_task_with_anti_drift(task, cwd=SWARM_CWD)
 
         return {
             "proposed_changes": diff,
@@ -93,16 +96,14 @@ def pre_commit_node(state: dict[str, Any]) -> dict[str, Any]:
     Run pre-commit checks after Code Writer.
     Auto-runs tests to verify changes don't break anything.
     """
-    state.get("current_task", "Run pre-commit checks")
-    # task = state.get("current_task", "Run pre-commit checks")
+    current_task = state.get("current_task", "Run pre-commit checks")
+    _ = current_task  # Keep variable for reference
 
     try:
         # Run pre-commit checks
         import subprocess
 
-        result = subprocess.run(
-            ["npm", "test"], cwd="/home/steen/kurs-bot/swarm/", capture_output=True, text=True, timeout=60
-        )
+        result = subprocess.run(["npm", "test"], cwd=SWARM_CWD, capture_output=True, text=True, timeout=60)
 
         success = result.returncode == 0
 

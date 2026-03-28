@@ -6,6 +6,10 @@ anti-drift CODE WRITER functionality for the swarm/ supervisor system.
 """
 
 from typing import Dict, Any
+import os
+
+# Get working directory from environment or use default
+SWARM_CWD = os.getenv("SWARM_CWD", "/home/steen/kurs-bot/swarm/")
 from swarm.mini_swe_agent.agents import DefaultAgent
 from swarm.mini_swe_agent.models import LitellmModel
 from swarm.mini_swe_agent.environments import LocalEnvironment
@@ -48,7 +52,7 @@ class DefaultAgentWrapper(DefaultAgent):
                 model_name="qwen2.5:7b-instruct-q4_K_M",
                 base_url="http://localhost:8080/v1",
             ),
-            env=env or LocalEnvironment(cwd="/home/steen/kurs-bot/swarm/"),
+            env=env or LocalEnvironment(cwd=SWARM_CWD),
             config_class=self._get_config(),
         )
 
@@ -101,13 +105,13 @@ def create_agent(
     return DefaultAgentWrapper(model=model, env=env)
 
 
-def run_task_with_anti_drift(task: str, cwd: str = "/home/steen/kurs-bot/swarm/") -> str:
+def run_task_with_anti_drift(task: str, cwd: str = SWARM_CWD) -> str:
     """Run a coding task with anti-drift rules enforced."""
     agent = create_agent(cwd=cwd)
     return agent.run(task)
 
 
-def plan_task_with_tests(task: str, cwd: str = "/home/steen/kurs-bot/swarm/") -> Dict[str, Any]:
+def plan_task_with_tests(task: str, cwd: str = SWARM_CWD) -> Dict[str, Any]:
     """Plan a coding task with test requirements included."""
     agent = create_agent(cwd=cwd)
     plan_task = f"""
@@ -124,7 +128,7 @@ Extended Workflow Requirements:
     return agent.run(plan_task)
 
 
-def create_code_with_tests(task: str, cwd: str = "/home/steen/kurs-bot/swarm/") -> Dict[str, Any]:
+def create_code_with_tests(task: str, cwd: str = SWARM_CWD) -> Dict[str, Any]:
     """Create or modify code with auto-generated unit tests."""
     agent = create_agent(cwd=cwd)
     create_task = f"""
@@ -141,7 +145,7 @@ Extended Workflow:
     return {"success": True, "diff": result, "tests_generated": True}
 
 
-def run_pre_commit(task: str, cwd: str = "/home/steen/kurs-bot/swarm/", max_retries: int = 3) -> Dict[str, Any]:
+def run_pre_commit(task: str, cwd: str = SWARM_CWD, max_retries: int = 3) -> Dict[str, Any]:
     """Run Pre-Commit checks with failure loop."""
     agent = create_agent(cwd=cwd)
     pre_commit_task = f"""
@@ -165,9 +169,7 @@ Extended Workflow:
     }
 
 
-def execute_extended_workflow(
-    task: str, cwd: str = "/home/steen/kurs-bot/swarm/", max_retries: int = 3
-) -> Dict[str, Any]:
+def execute_extended_workflow(task: str, cwd: str = SWARM_CWD, max_retries: int = 3) -> Dict[str, Any]:
     """Execute the full extended workflow."""
     planning = plan_task_with_tests(task, cwd)
     code_creation = create_code_with_tests(task, cwd)
