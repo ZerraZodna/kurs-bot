@@ -237,7 +237,23 @@ class SwarmTelegramPoller:
     def __init__(self):
         self.running = False
         self.poll_interval = 3  # Seconds between polls
+        self._client: httpx.AsyncClient | None = None  # Shared HTTP client
         logger.info("[swarm-telegram-polling] Swarm Telegram Poller initialized")
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        """Return (or create) the shared httpx.AsyncClient with connection pooling."""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+                timeout=httpx.Timeout(10.0),
+            )
+        return self._client
+
+    async def close(self) -> None:
+        """Close the shared HTTP client. Call when shutting down."""
+        if self._client is not None and not self._client.is_closed:
+            await self._client.aclose()
+            self._client = None
 
     async def process_update(self, update) -> None:
         """
@@ -246,19 +262,104 @@ class SwarmTelegramPoller:
         Args:
             update: Telegram update dictionary containing message and chat info
         """
-        # Get message and chat info
-        message = update.get("message", {})
-        chat_id = message.get("chat", {}).get("id")
-        user_id = message.get("from", {}).get("id")
-        text = message.get("text", "").lower()
+        try:
+            # Get message and chat info
+            message = update.get("message", {})
+            chat_id = message.get("chat", {}).get("id")
+            user_id = message.get("from", {}).get("id")
+            text = message.get("text", "").lower()
 
-        if not chat_id or not user_id:
-            return
+            if not chat_id or not user_id:
+                return
 
-        # Check authorization
-        if not state_manager.is_authorized(chat_id, user_id):
-            # Check if this is a help message from an unauthorized user
-            if text == "/help":
+            # Check authorization
+            if not state_manager.is_authorized(chat_id, user_id):
+                # Check if this is a help message from an unauthorized user
+                if text == "/help":
+                    help_text = """
+🤖 Swarm Approval Bot
+
+Available commands:
+- /approve - Approve pending swarm request
+- /retry "instructions" - Request adjustments with feedback
+- /decline - Decline pending request completely
+- /help - Show this help message
+
+Reply with /approve to continue or /decline to cancel.
+"""
+                    await send_message(chat_id, help_text)
+                return
+
+            # Handle commands
+            if text == "/approve":
+                # Check for pending requests for this chat
+                pending_requests = state_manager.get_pending_approvals_for_chat(chat_id)
+                if pending_requests:
+                    request_id = pending_requests[0].request_id
+                    logger.info(f"[swarm-telegram-polling] Processing approve command for {request_id}")
+
+                    # Process the approval
+                    state_manager.approve_request(request_id, user_id)
+
+                    # Send confirmation
+                    confirmation = f"""
+✅ APPROVAL RECEIVED
+
+Your approval for request {request_id} has been processed.
+The swarm workflow will continue.
+"""
+                    await send_message(chat_id, confirmation)
+                else:
+                    await send_message(chat_id, "No pending approval requests. Use /help for available commands.")
+
+            elif text == "/decline":
+                # Check for pending requests for this chat
+                pending_requests = state_manager.get_pending_approvals_for_chat(chat_id)
+                if pending_requests:
+                    request_id = pending_requests[0].request_id
+                    logger.info(f"[swarm-telegram-polling] Processing decline command for {request_id}")
+
+                    # Process the decline
+                    state_manager.decline_request(request_id, user_id)
+
+                    # Send confirmation
+                    confirmation = f"""
+❌ DECLINE RECEIVED
+
+Your decline for request {request_id} has been processed.
+The swarm operation has been cancelled.
+"""
+                    await send_message(chat_id, confirmation)
+                else:
+                    await send_message(chat_id, "No pending approval requests. Use /help for available commands.")
+
+            elif text.startswith("/retry "):
+                # Extract feedback from the command
+                feedback = text[6:].strip()  # Remove "/retry " prefix
+
+                # Check for pending requests for this chat
+                pending_requests = state_manager.get_pending_approvals_for_chat(chat_id)
+                if pending_requests:
+                    request_id = pending_requests[0].request_id
+                    logger.info(f"[swarm-telegram-polling] Processing retry feedback for {request_id}")
+
+                    # Add retry feedback
+                    state_manager.add_retry_feedback(request_id, user_id, feedback)
+
+                    # Send confirmation
+                    confirmation = f"""
+🔧 FEEDBACK RECEIVED
+
+Your feedback for request {request_id} has been recorded:
+"{feedback[:200]}"
+
+The swarm will apply these adjustments.
+"""
+                    await send_message(chat_id, confirmation)
+                else:
+                    await send_message(chat_id, "No pending approval requests. Use /help for available commands.")
+
+            elif text == "/help":
                 help_text = """
 🤖 Swarm Approval Bot
 
@@ -271,90 +372,8 @@ Available commands:
 Reply with /approve to continue or /decline to cancel.
 """
                 await send_message(chat_id, help_text)
-            return
-
-        # Handle commands
-        if text == "/approve":
-            # Check for pending requests for this chat
-            pending_requests = state_manager.get_pending_approvals_for_chat(chat_id)
-            if pending_requests:
-                request_id = pending_requests[0].request_id
-                logger.info(f"[swarm-telegram-polling] Processing approve command for {request_id}")
-
-                # Process the approval
-                state_manager.approve_request(request_id, user_id)
-
-                # Send confirmation
-                confirmation = f"""
-✅ APPROVAL RECEIVED
-
-Your approval for request {request_id} has been processed.
-The swarm workflow will continue.
-"""
-                await send_message(chat_id, confirmation)
-            else:
-                await send_message(chat_id, "No pending approval requests. Use /help for available commands.")
-
-        elif text == "/decline":
-            # Check for pending requests for this chat
-            pending_requests = state_manager.get_pending_approvals_for_chat(chat_id)
-            if pending_requests:
-                request_id = pending_requests[0].request_id
-                logger.info(f"[swarm-telegram-polling] Processing decline command for {request_id}")
-
-                # Process the decline
-                state_manager.decline_request(request_id, user_id)
-
-                # Send confirmation
-                confirmation = f"""
-❌ DECLINE RECEIVED
-
-Your decline for request {request_id} has been processed.
-The swarm operation has been cancelled.
-"""
-                await send_message(chat_id, confirmation)
-            else:
-                await send_message(chat_id, "No pending approval requests. Use /help for available commands.")
-
-        elif text.startswith("/retry "):
-            # Extract feedback from the command
-            feedback = text[6:].strip()  # Remove "/retry " prefix
-
-            # Check for pending requests for this chat
-            pending_requests = state_manager.get_pending_approvals_for_chat(chat_id)
-            if pending_requests:
-                request_id = pending_requests[0].request_id
-                logger.info(f"[swarm-telegram-polling] Processing retry feedback for {request_id}")
-
-                # Add retry feedback
-                state_manager.add_retry_feedback(request_id, user_id, feedback)
-
-                # Send confirmation
-                confirmation = f"""
-🔧 FEEDBACK RECEIVED
-
-Your feedback for request {request_id} has been recorded:
-"{feedback[:200]}"
-
-The swarm will apply these adjustments.
-"""
-                await send_message(chat_id, confirmation)
-            else:
-                await send_message(chat_id, "No pending approval requests. Use /help for available commands.")
-
-        elif text == "/help":
-            help_text = """
-🤖 Swarm Approval Bot
-
-Available commands:
-- /approve - Approve pending swarm request
-- /retry "instructions" - Request adjustments with feedback
-- /decline - Decline pending request completely
-- /help - Show this help message
-
-Reply with /approve to continue or /decline to cancel.
-"""
-            await send_message(chat_id, help_text)
+        except Exception as e:
+            logger.error(f"[swarm-telegram-polling] Error processing update: {e}")
 
     async def run(self):
         """
@@ -364,21 +383,24 @@ Reply with /approve to continue or /decline to cancel.
         self.running = True
         logger.info("[swarm-telegram-polling] Starting polling service...")
 
-        while self.running:
-            try:
-                # Get new updates
-                result = await self._get_new_updates()
+        try:
+            while self.running:
+                try:
+                    # Get new updates
+                    result = await self._get_new_updates()
 
-                if result:
-                    for update in result:
-                        await self.process_update(update)
+                    if result:
+                        for update in result:
+                            await self.process_update(update)
 
-                # Wait before next poll
-                await asyncio.sleep(self.poll_interval)
+                    # Wait before next poll
+                    await asyncio.sleep(self.poll_interval)
 
-            except Exception as e:
-                logger.error(f"[swarm-telegram-polling] Error in polling loop: {e}")
-                await asyncio.sleep(self.poll_interval)
+                except Exception as e:
+                    logger.error(f"[swarm-telegram-polling] Error in polling loop: {e}")
+                    await asyncio.sleep(self.poll_interval)
+        finally:
+            await self.close()
 
     async def _get_new_updates(self) -> list:
         """
@@ -425,10 +447,17 @@ Reply with /approve to continue or /decline to cancel.
             API response
         """
         url = f"{API_BASE}/{method}"
-        async with httpx.AsyncClient() as client:
+        try:
+            client = await self._get_client()
             response = await client.post(url, json=params)
             response.raise_for_status()
             return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"[swarm-telegram-polling] API call {method} failed: {e.response.status_code}")
+            raise
+        except Exception as e:
+            logger.error(f"[swarm-telegram-polling] API call {method} error: {e}")
+            raise
 
     def stop(self):
         """Stop the polling service."""
@@ -448,13 +477,16 @@ async def send_message(chat_id: int, text: str) -> None:
         chat_id: Telegram chat ID
         text: Message text to send
     """
+    if not API_BASE:
+        logger.warning("[swarm-telegram-polling] Cannot send message: no API_BASE configured")
+        return
     try:
         url = f"{API_BASE}/sendMessage"
         params = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, json=params)
-            response.raise_for_status()
+        client = await poller._get_client()
+        response = await client.post(url, json=params)
+        response.raise_for_status()
 
         logger.info(f"[swarm-telegram-polling] Sent message to chat {chat_id}")
     except Exception as e:
@@ -500,24 +532,24 @@ async def send_swarm_approval_request(
     user_id: int,
     request_id: str,
     prompt_or_change_summary: str,
-    approval_stage: str = "start",  # "start" for Step 2-3 approval, "end" for Step 8-9 approval
+    approval_stage: str = "start",
 ) -> None:
     """Function to send approval request from swarm to user via Telegram."""
+    try:
+        # Verify authorization before sending
+        if not state_manager.is_authorized(chat_id, user_id):
+            logger.warning(
+                f"[swarm-telegram-polling] Unauthorized attempt to send approval request: chat {chat_id}, user {user_id}"
+            )
+            return
 
-    # Verify authorization before sending
-    if not state_manager.is_authorized(chat_id, user_id):
-        logger.warning(
-            f"[swarm-telegram-polling] Unauthorized attempt to send approval request: chat {chat_id}, user {user_id}"
-        )
-        return
+        # Register authorization if not already registered
+        if str(chat_id) not in state_manager.authorization_map:
+            state_manager.register_authorization(chat_id, user_id)
 
-    # Register authorization if not already registered
-    if str(chat_id) not in state_manager.authorization_map:
-        state_manager.register_authorization(chat_id, user_id)
+        stage_description = "swarm prompt" if approval_stage == "start" else "completed changes"
 
-    stage_description = "swarm prompt" if approval_stage == "start" else "completed changes"
-
-    message = f"""
+        message = f"""
 🔄 {stage_description.upper()} PENDING APPROVAL
 
 Current status: Waiting for your approval
@@ -534,22 +566,25 @@ Options:
 Reply with /approve to continue or /decline to cancel.
     """.strip()
 
-    # Add this to pending approvals state
-    state_manager.add_pending_approval(
-        request_id=request_id,
-        chat_id=str(chat_id),
-        user_id=str(user_id),
-        stage=approval_stage,
-        summary=prompt_or_change_summary[:2000],
-    )
+        # Add this to pending approvals state
+        state_manager.add_pending_approval(
+            request_id=request_id,
+            chat_id=str(chat_id),
+            user_id=str(user_id),
+            stage=approval_stage,
+            summary=prompt_or_change_summary[:2000],
+        )
 
-    await send_message(chat_id, message)
-    logger.info(f"[swarm-telegram-polling] Sent approval request {request_id} to chat {chat_id}")
+        await send_message(chat_id, message)
+        logger.info(f"[swarm-telegram-polling] Sent approval request {request_id} to chat {chat_id}")
+    except Exception as e:
+        logger.error(f"[swarm-telegram-polling] Error sending approval request {request_id}: {e}")
 
 
 async def send_swarm_complete_notification(chat_id: int, completion_details: str) -> None:
     """Send completion notification after successful swarm operation."""
-    message = f"""
+    try:
+        message = f"""
 ✅ SWARM OPERATION COMPLETE
 
 Process finished successfully!
@@ -560,8 +595,10 @@ Details:
 You may receive further notifications depending on the swarm settings.
     """.strip()
 
-    await send_message(chat_id, message)
-    logger.info(f"[swarm-telegram-polling] Sent completion notification to chat {chat_id}")
+        await send_message(chat_id, message)
+        logger.info(f"[swarm-telegram-polling] Sent completion notification to chat {chat_id}")
+    except Exception as e:
+        logger.error(f"[swarm-telegram-polling] Error sending completion notification: {e}")
 
 
 if __name__ == "__main__":

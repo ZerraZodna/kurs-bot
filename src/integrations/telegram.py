@@ -17,6 +17,30 @@ logger = logging.getLogger(__name__)
 TELEGRAM_BOT_TOKEN = settings.TELEGRAM_BOT_TOKEN
 API_BASE = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
+# Shared httpx client with connection pooling to avoid creating a new
+# client for every Telegram API call (especially during streaming where
+# edit_message is called 20+ times per response).
+_telegram_client: httpx.AsyncClient | None = None
+
+
+async def _get_telegram_client() -> httpx.AsyncClient:
+    """Return a shared httpx.AsyncClient with connection pooling."""
+    global _telegram_client
+    if _telegram_client is None or _telegram_client.is_closed:
+        _telegram_client = httpx.AsyncClient(
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+            timeout=httpx.Timeout(10.0),
+        )
+    return _telegram_client
+
+
+async def close_telegram_client() -> None:
+    """Close the shared Telegram httpx client. Call on shutdown."""
+    global _telegram_client
+    if _telegram_client is not None and not _telegram_client.is_closed:
+        await _telegram_client.aclose()
+        _telegram_client = None
+
 
 def sanitize_html_for_telegram(text: str) -> str:
     """Sanitize HTML to Telegram-supported format.
@@ -137,13 +161,13 @@ async def send_typing_action(chat_id: int) -> bool:
 
     url = f"{API_BASE}/sendChatAction"
     payload = {"chat_id": chat_id, "action": "typing"}
-    async with httpx.AsyncClient() as client:
-        try:
-            r = await client.post(url, json=payload, timeout=10.0)
-            r.raise_for_status()
-            return r.json().get("ok", False)
-        except Exception:
-            return False
+    client = await _get_telegram_client()
+    try:
+        r = await client.post(url, json=payload, timeout=10.0)
+        r.raise_for_status()
+        return r.json().get("ok", False)
+    except Exception:
+        return False
 
 
 async def edit_message(chat_id: int, message_id: int, text: str) -> dict | None:
@@ -161,74 +185,74 @@ async def edit_message(chat_id: int, message_id: int, text: str) -> dict | None:
         "text": text,
         "parse_mode": "HTML",
     }
-    async with httpx.AsyncClient() as client:
-        max_retries = settings.TELEGRAM_EDIT_MAX_RETRIES
-        base_backoff = settings.TELEGRAM_BACKOFF_BASE_S
+    client = await _get_telegram_client()
+    max_retries = settings.TELEGRAM_EDIT_MAX_RETRIES
+    base_backoff = settings.TELEGRAM_BACKOFF_BASE_S
 
-        for attempt in range(max_retries + 1):
-            try:
-                r = await client.post(url, json=payload, timeout=10.0)
-                r.raise_for_status()
-                return r.json()
-            except httpx.HTTPStatusError as e:
-                resp = e.response
-                if resp is None:
-                    if attempt < max_retries:
-                        await asyncio.sleep(base_backoff * (2**attempt))
-                        continue
-                    logger.warning("[telegram] editMessageText final fail after %d retries: no resp", max_retries + 1)
-                    return None
-
-                status = resp.status_code
-                body = ""
-                try:
-                    body = resp.text
-                except Exception:
-                    pass
-
-                # Ignore "message not modified"
-                if status == 400 and "message is not modified" in body.lower():
-                    return None
-
-                # Rate limit or bad request - backoff and retry
-                if status in (400, 429) and attempt < max_retries:
-                    backoff = base_backoff * (2**attempt)
-                    logger.warning(
-                        "[telegram] editMessageText retry %d/%d after %.1fs (status=%d): %s",
-                        attempt + 1,
-                        max_retries,
-                        backoff,
-                        status,
-                        body[:100],
-                    )
-                    await asyncio.sleep(backoff)
-                    continue
-
-                # HTML error fallback (no parse_mode)
-                if status == 400:
-                    fallback = {
-                        "chat_id": chat_id,
-                        "message_id": message_id,
-                        "text": text,
-                    }
-                    try:
-                        r = await client.post(url, json=fallback, timeout=10.0)
-                        r.raise_for_status()
-                        return r.json()
-                    except Exception:
-                        pass
-
-                # Final fail
-                logger.warning(
-                    "[telegram] editMessageText final fail after %d retries: %d %s", max_retries + 1, status, body[:100]
-                )
-                return None
-            except Exception as e:
+    for attempt in range(max_retries + 1):
+        try:
+            r = await client.post(url, json=payload, timeout=10.0)
+            r.raise_for_status()
+            return r.json()
+        except httpx.HTTPStatusError as e:
+            resp = e.response
+            if resp is None:
                 if attempt < max_retries:
                     await asyncio.sleep(base_backoff * (2**attempt))
                     continue
-                logger.warning("[telegram] editMessageText final exception after %d retries: %s", max_retries + 1, e)
+                logger.warning("[telegram] editMessageText final fail after %d retries: no resp", max_retries + 1)
                 return None
+
+            status = resp.status_code
+            body = ""
+            try:
+                body = resp.text
+            except Exception:
+                pass
+
+            # Ignore "message not modified"
+            if status == 400 and "message is not modified" in body.lower():
+                return None
+
+            # Rate limit or bad request - backoff and retry
+            if status in (400, 429) and attempt < max_retries:
+                backoff = base_backoff * (2**attempt)
+                logger.warning(
+                    "[telegram] editMessageText retry %d/%d after %.1fs (status=%d): %s",
+                    attempt + 1,
+                    max_retries,
+                    backoff,
+                    status,
+                    body[:100],
+                )
+                await asyncio.sleep(backoff)
+                continue
+
+            # HTML error fallback (no parse_mode)
+            if status == 400:
+                fallback = {
+                    "chat_id": chat_id,
+                    "message_id": message_id,
+                    "text": text,
+                }
+                try:
+                    r = await client.post(url, json=fallback, timeout=10.0)
+                    r.raise_for_status()
+                    return r.json()
+                except Exception:
+                    pass
+
+            # Final fail
+            logger.warning(
+                "[telegram] editMessageText final fail after %d retries: %d %s", max_retries + 1, status, body[:100]
+            )
+            return None
+        except Exception as e:
+            if attempt < max_retries:
+                await asyncio.sleep(base_backoff * (2**attempt))
+                continue
+            logger.warning("[telegram] editMessageText final exception after %d retries: %s", max_retries + 1, e)
+            return None
 
 
 async def send_message_streaming(
@@ -309,40 +333,40 @@ async def send_message(chat_id: int, text: str) -> dict | None:
     text = sanitize_html_for_telegram(text)
 
     url = f"{API_BASE}/sendMessage"
-    async with httpx.AsyncClient() as client:
-        # Telegram hard limit is 4096 chars; stay below to be safe
-        max_len = 3500
-        chunks = _split_text(text, max_len) or [""]
-        last_response = None
-        for chunk in chunks:
-            payload = {
-                "chat_id": chat_id,
-                "text": chunk,
-                "parse_mode": "HTML",  # Use HTML instead of MarkdownV2
-            }
+    client = await _get_telegram_client()
+    # Telegram hard limit is 4096 chars; stay below to be safe
+    max_len = 3500
+    chunks = _split_text(text, max_len) or [""]
+    last_response = None
+    for chunk in chunks:
+        payload = {
+            "chat_id": chat_id,
+            "text": chunk,
+            "parse_mode": "HTML",  # Use HTML instead of MarkdownV2
+        }
+        try:
+            r = await client.post(url, json=payload, timeout=10.0)
+            r.raise_for_status()
+            last_response = r.json()
+        except httpx.HTTPStatusError as e:
+            # Log details for easier debugging
+            resp = e.response
+            body = None
             try:
-                r = await client.post(url, json=payload, timeout=10.0)
+                body = resp.text if resp is not None else None
+            except Exception:
+                body = None
+            print(f"[telegram] HTTPStatusError {getattr(resp, 'status_code', None)}; body={body}")
+            # Fallback: send plain text without parse_mode to avoid HTML errors
+            if resp is not None and resp.status_code == 400:
+                fallback_payload = {"chat_id": chat_id, "text": chunk}
+                r = await client.post(url, json=fallback_payload, timeout=10.0)
                 r.raise_for_status()
                 last_response = r.json()
-            except httpx.HTTPStatusError as e:
-                # Log details for easier debugging
-                resp = e.response
-                body = None
-                try:
-                    body = resp.text if resp is not None else None
-                except Exception:
-                    body = None
-                print(f"[telegram] HTTPStatusError {getattr(resp, 'status_code', None)}; body={body}")
-                # Fallback: send plain text without parse_mode to avoid HTML errors
-                if resp is not None and resp.status_code == 400:
-                    fallback_payload = {"chat_id": chat_id, "text": chunk}
-                    r = await client.post(url, json=fallback_payload, timeout=10.0)
-                    r.raise_for_status()
-                    last_response = r.json()
-                else:
-                    # Let the caller see the exception so they can mark the send as failed
-                    raise
-        return last_response
+            else:
+                # Let the caller see the exception so they can mark the send as failed
+                raise
+    return last_response
 
 
 def _split_text(text: str, max_len: int) -> list[str]:

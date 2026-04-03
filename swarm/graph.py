@@ -8,6 +8,7 @@ from .nodes import (
     pre_commit_node,
 )
 import logging
+import asyncio
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -48,7 +49,7 @@ def build_supervisor_graph(checkpointer=None):
 
     # === Step 2-3: Prompt Approval Hook ===
     # After architect generates prompt, request approval before proceeding
-    def request_prompt_approval(state: SupervisorState):
+    async def request_prompt_approval(state: SupervisorState):
         """
         Request prompt approval from user via Telegram.
         Called after architect generates prompt (Step 2-3).
@@ -66,7 +67,7 @@ def build_supervisor_graph(checkpointer=None):
 
         request_id = None
         try:
-            request_id = hook_request_prompt_approval(
+            request_id = await hook_request_prompt_approval(
                 chat_id=state["telegram_chat_id"],
                 user_id=state["telegram_user_id"],
                 prompt=f"Architect prompt: {state.get('subtasks', [''])[0][:500]}",
@@ -108,7 +109,7 @@ def build_supervisor_graph(checkpointer=None):
 
     # === Step 8-9: Final Approval Hook ===
     # After pre_commit passes, request final approval before completion
-    def request_final_approval(state: SupervisorState):
+    async def request_final_approval(state: SupervisorState):
         """
         Request final approval from user via Telegram.
         Called after pre_commit passes (Step 8-9).
@@ -126,7 +127,7 @@ def build_supervisor_graph(checkpointer=None):
 
         request_id = None
         try:
-            request_id = hook_request_final_approval(
+            request_id = await hook_request_final_approval(
                 chat_id=state["telegram_chat_id"],
                 user_id=state["telegram_user_id"],
                 summary=f"Final changes ready for commit: {state.get('proposed_changes', '')[:500]}",

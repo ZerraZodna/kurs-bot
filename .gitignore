@@ -158,3 +158,5 @@ yarn.lock
 .aider*
 .gitnexus
 scripts/ngrok.pid
+.last_lesson_sent
+

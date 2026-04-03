@@ -8,10 +8,11 @@ anti-drift CODE WRITER functionality for the swarm/ supervisor system.
 from typing import Dict, Any
 import os
 
-# Get working directory from environment or use default
+# Get working directory from environment or default
 SWARM_CWD = os.getenv("SWARM_CWD", "/home/steen/kurs-bot/swarm/")
 from swarm.mini_swe_agent.agents import DefaultAgent
-from swarm.mini_swe_agent.models import LitellmModel
+from swarm.mini_swe_agent.agents.default import AgentConfig
+from swarm.mini_swe_agent.models.local_model import LocalModel
 from swarm.mini_swe_agent.environments import LocalEnvironment
 
 __version__ = "0.2.0"
@@ -45,23 +46,30 @@ class DefaultAgentWrapper(DefaultAgent):
     8. DO NOT use markdown in output, just plain diff
     """
 
-    def __init__(self, model: LitellmModel | None = None, env: LocalEnvironment | None = None):
+    def __init__(self, model: LocalModel | None = None, env: LocalEnvironment | None = None):
+        config = self._get_config()
         super().__init__(
             model=model
-            or LitellmModel(
-                model_name="qwen2.5:7b-instruct-q4_K_M",
-                base_url="http://localhost:8080/v1",
+            or LocalModel(
+                model_name="Qwen3.5-9B-UD-Q4_K_XL",
+                base_url="http://192.168.64.1:8080/v1",
             ),
             env=env or LocalEnvironment(cwd=SWARM_CWD),
-            config_class=self._get_config(),
+            config_class=AgentConfig,
+            system_template=config.system_template,
+            instance_template=config.instance_template,
+            timeout_template=config.timeout_template,
+            format_error_template=config.format_error_template,
+            action_observation_template=config.action_observation_template,
+            action_regex=config.action_regex,
+            step_limit=config.step_limit,
+            cost_limit=config.cost_limit,
         )
 
     def _get_config(self):
         """Return config with anti-drift rules in system prompt."""
-        from minisweagent.agents.default import AgentConfig
-        from jinja2 import Template
-
-        anti_drift_template = Template("""
+        from swarm.mini_swe_agent.agents.default import AgentConfig
+        anti_drift_template_string = """
         You are a strict technical coding supervisor for the kurs-bot project.
 
         IDENTITY: You are a coding supervisor. You do NOT generate spiritual content,
@@ -79,12 +87,12 @@ class DefaultAgentWrapper(DefaultAgent):
         - Enforce all rules strictly.
 
         {{ task }}
-        """)
+        """
         return AgentConfig(
-            system_template=anti_drift_template,
+            system_template=anti_drift_template_string,
             instance_template="{{ task }}",
             timeout_template="Timeout after {{ timeout }}s",
-            format_error_template="Error: {{ error }}",
+            format_error_template="Error: {{ actions }}",
             action_observation_template="{{ output }}",
             action_regex=r"```bash\s*\n(.*?)\n```",
             step_limit=0,
@@ -93,15 +101,22 @@ class DefaultAgentWrapper(DefaultAgent):
 
     def run(self, task: str, **kwargs) -> str:
         """Run task with anti-drift rules."""
+        print(f"Task: {task}")
         return super().run(task, **kwargs)
 
 
 def create_agent(
-    cwd: str = "/home/steen/kurs-bot/swarm/", model_name: str = "qwen2.5:7b-instruct-q4_K_M"
+    cwd: str = "/home/steen/kurs-bot/swarm/"
 ) -> DefaultAgentWrapper:
     """Create a configured agent with anti-drift rules."""
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
     env = LocalEnvironment(cwd=cwd)
-    model = LitellmModel(model_name=model_name, base_url="http://localhost:8080/v1")
+    model_name = os.getenv("OPENAI_MODEL", "Qwen3.5-9B-UD-Q4_K_XL")
+    base_url = os.getenv("OPENAI_BASE_URL", "http://192.168.64.1:8080/v1")
+    model = LocalModel(model_name=model_name, base_url=base_url)
+    print("Created agent")
     return DefaultAgentWrapper(model=model, env=env)
 
 
@@ -195,17 +210,17 @@ if __name__ == "__main__":
     print(f"Running task: {task}")
     print("=" * 80)
 
-    try:
-        result = execute_extended_workflow(task)
-        print("\n--- PLANNING ---")
-        print(result["planning"])
-        print("\n--- CODE CREATION ---")
-        print(result["code_creation"])
-        print("\n--- PRE-COMMIT ---")
-        print(result["pre_commit"])
-    except Exception as e:
-        print(f"ERROR: {e}")
-        import traceback
-
-        traceback.print_exc()
-        sys.exit(1)
+    #try:
+    result = execute_extended_workflow(task)
+    print("\n--- PLANNING ---")
+    print(result["planning"])
+    print("\n--- CODE CREATION ---")
+    print(result["code_creation"])
+    print("\n--- PRE-COMMIT ---")
+    print(result["pre_commit"])
+    #except Exception as e:
+    #    print(f"ERROR: {e}")
+    #    import traceback
+    #
+    #    traceback.print_exc()
+    #    sys.exit(1)

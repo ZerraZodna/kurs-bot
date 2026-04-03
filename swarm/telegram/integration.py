@@ -97,7 +97,7 @@ class SwarmTelegramIntegration:
             )
 
             # Send the approval request through existing hooks
-            send_swarm_approval_request(
+            result = await send_swarm_approval_request(
                 chat_id=chat_id,
                 user_id=user_id,
                 request_id=request_id,
@@ -161,7 +161,7 @@ class SwarmTelegramIntegration:
             )
 
             # Send the approval request through existing hooks
-            send_swarm_approval_request(
+            result = await send_swarm_approval_request(
                 chat_id=chat_id,
                 user_id=user_id,
                 request_id=request_id,

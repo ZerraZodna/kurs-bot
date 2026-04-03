@@ -24,6 +24,20 @@ logger = logging.getLogger(__name__)
 # In-memory store for processed update IDs (single instance only)
 _processed_updates: Set[int] = set()
 
+# Shared httpx client for the polling loop
+_polling_client: httpx.AsyncClient | None = None
+
+
+async def _get_polling_client() -> httpx.AsyncClient:
+    """Return (or create) the shared httpx.AsyncClient for polling."""
+    global _polling_client
+    if _polling_client is None or _polling_client.is_closed:
+        _polling_client = httpx.AsyncClient(
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+            timeout=httpx.Timeout(10.0),
+        )
+    return _polling_client
+
 
 async def poll_updates(offset: int = 0) -> list[dict]:
     """Fetch updates from Telegram using long-polling."""
@@ -39,22 +53,22 @@ async def poll_updates(offset: int = 0) -> list[dict]:
         "allowed_updates": settings.TELEGRAM_POLL_ALLOWED_UPDATES,
     }
 
-    async with httpx.AsyncClient() as client:
-        try:
-            r = await client.post(url, json=payload, timeout=settings.TELEGRAM_POLL_TIMEOUT + 5)
-            r.raise_for_status()
-            data = r.json()
+    client = await _get_polling_client()
+    try:
+        r = await client.post(url, json=payload, timeout=settings.TELEGRAM_POLL_TIMEOUT + 5)
+        r.raise_for_status()
+        data = r.json()
 
-            if data.get("ok"):
-                return data.get("result", [])
-            else:
-                logger.error(f"[polling] API error: {data}")
-                return []
-        except httpx.TimeoutException:
+        if data.get("ok"):
+            return data.get("result", [])
+        else:
+            logger.error(f"[polling] API error: {data}")
             return []
-        except Exception as e:
-            logger.error(f"[polling] Error fetching updates: {e}")
-            return []
+    except httpx.TimeoutException:
+        return []
+    except Exception as e:
+        logger.error(f"[polling] Error fetching updates: {e}")
+        return []
 
 
 async def _ensure_user(user_id: str, first_name: str | None, last_name: str | None) -> int | None:
@@ -132,9 +146,12 @@ async def _trigger_batch(user_id: int, external_id: str) -> None:
 
 async def _import_and_process(user_id: int, external_id: str) -> None:
     """Import and run batch processing (avoid circular import)."""
-    from src.integrations.telegram import process_telegram_batch
+    try:
+        from src.integrations.telegram import process_telegram_batch
 
-    await process_telegram_batch(user_id, external_id)
+        await process_telegram_batch(user_id, external_id)
+    except Exception as e:
+        logger.error(f"[polling] Batch processing error for user {user_id}: {e}")
 
 
 async def _is_user_allowed(user_id: int) -> bool:
@@ -154,48 +171,51 @@ async def _is_user_allowed(user_id: int) -> bool:
 
 async def process_update(update: dict) -> None:
     """Process a single Telegram update."""
-    update_id = update.get("update_id")
-    if update_id in _processed_updates:
-        return
+    try:
+        update_id = update.get("update_id")
+        if update_id in _processed_updates:
+            return
 
-    message = update.get("message") or update.get("edited_message")
-    if not message:
-        return
+        message = update.get("message") or update.get("edited_message")
+        if not message:
+            return
 
-    parsed = TelegramHandler.parse_webhook(update)
-    if not parsed:
-        return
+        parsed = TelegramHandler.parse_webhook(update)
+        if not parsed:
+            return
 
-    user_id_str = parsed["user_id"]
-    text = parsed["text"]
-    chat_id = int(parsed["chat_id"])
+        user_id_str = parsed["user_id"]
+        text = parsed["text"]
+        chat_id = int(parsed["chat_id"])
 
-    logger.info(f"[polling] Message from {user_id_str}: {text[:30]}...")
+        logger.info(f"[polling] Message from {user_id_str}: {text[:30]}...")
 
-    # Send typing indicator immediately
-    await send_typing_action(chat_id)
+        # Send typing indicator immediately
+        await send_typing_action(chat_id)
 
-    # Ensure user exists
-    first_name = message.get("from", {}).get("first_name")
-    last_name = message.get("from", {}).get("last_name")
-    db_user_id = await _ensure_user(user_id_str, first_name, last_name)
+        # Ensure user exists
+        first_name = message.get("from", {}).get("first_name")
+        last_name = message.get("from", {}).get("last_name")
+        db_user_id = await _ensure_user(user_id_str, first_name, last_name)
 
-    if db_user_id is None:
-        return
+        if db_user_id is None:
+            return
 
-    # Check restrictions
-    if not await _is_user_allowed(db_user_id):
+        # Check restrictions
+        if not await _is_user_allowed(db_user_id):
+            _processed_updates.add(update_id)
+            return
+
+        # Log message
+        await _log_message(db_user_id, parsed)
+
+        # Mark processed
         _processed_updates.add(update_id)
-        return
 
-    # Log message
-    await _log_message(db_user_id, parsed)
-
-    # Mark processed
-    _processed_updates.add(update_id)
-
-    # Trigger batch processing
-    await _trigger_batch(db_user_id, user_id_str)
+        # Trigger batch processing
+        await _trigger_batch(db_user_id, user_id_str)
+    except Exception as e:
+        logger.error(f"[polling] Error processing update {update.get('update_id')}: {e}")
 
 
 async def start_polling() -> None:
