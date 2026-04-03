@@ -27,6 +27,10 @@ _processed_updates: Set[int] = set()
 # Shared httpx client for the polling loop
 _polling_client: httpx.AsyncClient | None = None
 
+# Graceful shutdown control
+_shutdown_event: asyncio.Event | None = None
+_polling_task: asyncio.Task | None = None
+
 
 async def _get_polling_client() -> httpx.AsyncClient:
     """Return (or create) the shared httpx.AsyncClient for polling."""
@@ -37,6 +41,22 @@ async def _get_polling_client() -> httpx.AsyncClient:
             timeout=httpx.Timeout(10.0),
         )
     return _polling_client
+
+
+async def close_polling_client() -> None:
+    """Close the shared polling httpx client. Call on shutdown."""
+    global _polling_client
+    if _polling_client is not None and not _polling_client.is_closed:
+        await _polling_client.aclose()
+        _polling_client = None
+
+
+def request_shutdown() -> None:
+    """Signal the polling loop to stop gracefully."""
+    global _shutdown_event
+    if _shutdown_event is not None:
+        _shutdown_event.set()
+        logger.info("[polling] Shutdown requested")
 
 
 async def poll_updates(offset: int = 0) -> list[dict]:
@@ -219,33 +239,60 @@ async def process_update(update: dict) -> None:
 
 
 async def start_polling() -> None:
-    """Main polling loop."""
+    """Main polling loop with graceful shutdown support."""
+    global _shutdown_event, _polling_task
+    _shutdown_event = asyncio.Event()
+    _polling_task = asyncio.current_task()
     logger.info("[polling] Starting Telegram long-polling...")
     offset = 0
 
-    while True:
-        try:
-            updates = await poll_updates(offset)
+    try:
+        while not _shutdown_event.is_set():
+            try:
+                # Use a timeout so the loop can check shutdown periodically
+                updates = await poll_updates(offset)
 
-            for update in updates:
-                await process_update(update)
-                update_id = update.get("update_id")
-                if update_id is not None:
-                    offset = update_id + 1
+                for update in updates:
+                    if _shutdown_event.is_set():
+                        logger.info("[polling] Shutting down, skipping remaining updates")
+                        break
+                    await process_update(update)
+                    update_id = update.get("update_id")
+                    if update_id is not None:
+                        offset = update_id + 1
 
-            # Cleanup old processed updates
-            if len(_processed_updates) > 1000:
-                sorted_updates = sorted(_processed_updates)
-                _processed_updates.clear()
-                _processed_updates.update(sorted_updates[:1000])
+                # Cleanup old processed updates
+                if len(_processed_updates) > 1000:
+                    sorted_updates = sorted(_processed_updates)
+                    _processed_updates.clear()
+                    _processed_updates.update(sorted_updates[-1000:])
 
-        except Exception as e:
-            logger.error(f"[polling] Error: {e}")
-            await asyncio.sleep(5)
+            except Exception as e:
+                logger.error(f"[polling] Error: {e}")
+                if _shutdown_event.is_set():
+                    break
+                await asyncio.sleep(5)
+    finally:
+        await close_polling_client()
+        _polling_task = None
+        logger.info("[polling] Polling loop stopped and resources released")
 
 
 def start_polling_task() -> asyncio.Task | None:
     """Start polling as background task."""
     if not settings.USE_TELEGRAM_LONG_POLLING:
         return None
-    return asyncio.create_task(start_polling())
+    task = asyncio.create_task(start_polling())
+    return task
+
+
+async def stop_polling_task() -> None:
+    """Gracefully stop the polling task if it's running."""
+    global _polling_task
+    if _polling_task is not None and not _polling_task.done():
+        request_shutdown()
+        try:
+            await asyncio.wait_for(_polling_task, timeout=10.0)
+        except asyncio.TimeoutError:
+            logger.warning("[polling] Task didn't stop within 10s, cancelling")
+            _polling_task.cancel()
