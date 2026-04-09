@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from src.config import settings
 from src.core.timezone import format_dt_in_timezone, get_user_timezone_from_db
 from src.language.prompt_builder import PromptBuilder
-from src.language.prompt_registry import get_prompt_registry
+
 from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.models.database import User
@@ -27,7 +27,7 @@ class DialogueEngine:
 
         self.db = db
         self.memory_manager = memory_manager or MemoryManager(db)
-        self.prompt_registry = get_prompt_registry()
+
         self.prompt_builder = PromptBuilder(db, self.memory_manager)
         self.onboarding = OnboardingService(db)
         self.onboarding_flow = OnboardingFlow(self.memory_manager, self.onboarding, self.call_ollama)
@@ -75,24 +75,21 @@ class DialogueEngine:
         # Stage 2: Language detection
         user_lang = await self._detect_and_store_language(user_id, text)
 
-        # Stage 3: RAG setup
-        text, use_rag, rag_response = self._setup_rag_configuration(user_id, text)
-        if rag_response:
-            return {"type": "text", "text": rag_response}
+        # No dual-mode; unified spiritual
 
         # Stage 4: Commands
-        command_response = await self._handle_commands(user_id, text, session, use_rag)
+        command_response = await self._handle_commands(user_id, text, session)
         if command_response:
             return {"type": "text", "text": command_response}
 
         # Stage 5: Onboarding
-        onboarding_response = await self._handle_onboarding_stage(user_id, text, session, use_rag)
+        onboarding_response = await self._handle_onboarding_stage(user_id, text, session)
         if onboarding_response:
             return {"type": "text", "text": onboarding_response}
 
         # Stage 6: Lessons & Schedule
         lesson_response = await self._handle_lesson_and_schedule_stage(
-            user_id, text, session, user_lang, include_lesson, use_rag
+            user_id, text, session, user_lang, include_lesson
         )
         if lesson_response:
             return {"type": "text", "text": lesson_response}
@@ -103,7 +100,6 @@ class DialogueEngine:
             text,
             session,
             user_lang,
-            use_rag,
             include_history,
             history_turns,
             include_lesson,
@@ -134,39 +130,30 @@ class DialogueEngine:
             return "Your data processing is restricted. If you want to resume, please update your consent settings."
         return None
 
-    def _setup_rag_configuration(self, user_id: int, text: str) -> tuple[str, bool, str | None]:
-        """Detect and configure RAG mode for the current message."""
-        from src.services.dialogue import parse_rag_prefix
-
-        text, use_rag = parse_rag_prefix(text)
-
-        return text, use_rag, None
-
-    async def _handle_commands(self, user_id: int, text: str, session: Session, use_rag: bool) -> str | None:
+    async def _handle_commands(self, user_id: int, text: str, session: Session) -> str | None:
         """Handle various specialized commands."""
-        from src.services.dialogue import handle_list_memories, handle_rag_prompt_command
+        from src.services.dialogue import handle_list_memories, handle_custom_system_prompt_command
 
-        if use_rag:
-            list_memories = handle_list_memories(text, self.memory_manager, session, user_id)
-            if list_memories:
-                return list_memories
+        list_memories = handle_list_memories(text, self.memory_manager, session, user_id)
+        if list_memories:
+            return list_memories
 
-            prompt_cmd_response = handle_rag_prompt_command(text, self.memory_manager, user_id)
-            if prompt_cmd_response:
-                return prompt_cmd_response
+        prompt_cmd_response = handle_custom_system_prompt_command(text, self.memory_manager, user_id)
+        if prompt_cmd_response:
+            return prompt_cmd_response
 
         return None
 
-    async def _handle_onboarding_stage(self, user_id: int, text: str, session: Session, use_rag: bool) -> str | None:
+    async def _handle_onboarding_stage(self, user_id: int, text: str, session: Session) -> str | None:
         """Handle onboarding flow."""
-        if self.onboarding_flow and self.onboarding.should_show_onboarding(user_id) and not use_rag:
+        if self.onboarding_flow and self.onboarding.should_show_onboarding(user_id):
             onboarding_response = await self.onboarding_flow.handle_onboarding(user_id, text, session)
             return onboarding_response
 
         return None
 
     async def _handle_lesson_and_schedule_stage(
-        self, user_id: int, text: str, session: Session, user_lang: str, include_lesson: bool, use_rag: bool
+        self, user_id: int, text: str, session: Session, user_lang: str, include_lesson: bool
     ) -> str | None:
         from src.services.dialogue import handle_schedule_messages, maybe_send_next_lesson
 
@@ -182,7 +169,7 @@ class DialogueEngine:
         if schedule_response:
             return schedule_response
 
-        if include_lesson and not use_rag:
+        if include_lesson:
             auto_message = await maybe_send_next_lesson(
                 user_id=user_id,
                 text=text,
@@ -202,7 +189,6 @@ class DialogueEngine:
         text: str,
         session: Session,
         user_lang: str,
-        use_rag: bool,
         include_history: bool,
         history_turns: int,
         include_lesson: bool,
@@ -210,36 +196,39 @@ class DialogueEngine:
     ) -> Dict[str, Any]:
         """Unified streaming response generator (English/non-English)."""
         relevant_memories = await self._get_relevant_memories(user_id, text, session)
-        context_type = self._detect_context_type(user_id, text, use_rag)
+        context_type = self._detect_context_type(user_id, text)
 
-        # Build prompt
-        if use_rag:
-            try:
-                system_prompt = self.prompt_registry.get_prompt_for_user(self.memory_manager, user_id)
-            except Exception:
-                system_prompt = settings.SYSTEM_PROMPT_RAG
-            prompt = self.prompt_builder.build_rag_prompt(
-                user_id=user_id,
-                user_input=text,
-                system_prompt=system_prompt,
-                relevant_memories=relevant_memories,
-                include_conversation_history=include_history,
-                history_turns=history_turns,
-                context_type=context_type,
+        # Build spiritual prompt (ALWAYS) - check for custom override via memories
+        custom_prompt_mem = self.memory_manager.get_memory(user_id, MemoryKey.CUSTOM_SYSTEM_PROMPT)
+        selected_key_mem = self.memory_manager.get_memory(user_id, MemoryKey.SELECTED_SYSTEM_PROMPT_KEY)
+        system_prompt = settings.SYSTEM_PROMPT  # default spiritual
+
+        if custom_prompt_mem and custom_prompt_mem[0].get("value"):
+            system_prompt = str(custom_prompt_mem[0].get("value"))
+        elif selected_key_mem and selected_key_mem[0].get("value"):
+            # Load from PromptTemplate DB (simple version since registry removed)
+            from src.models.templates import PromptTemplate
+
+            pt = (
+                session
+                .query(PromptTemplate)
+                .filter(PromptTemplate.key == str(selected_key_mem[0].get("value")))
+                .first()
             )
-        else:
-            system_prompt = settings.SYSTEM_PROMPT
-            prompt = self.prompt_builder.build_prompt(
-                user_id=user_id,
-                user_input=text,
-                system_prompt=system_prompt,
-                include_lesson=include_lesson,
-                include_conversation_history=include_history,
-                history_turns=history_turns,
-                max_age_hours=24.0,
-                relevant_memories=relevant_memories,
-                context_type=context_type,
-            )
+            if pt:
+                system_prompt = pt.text
+
+        prompt = self.prompt_builder.build_prompt(
+            user_id=user_id,
+            user_input=text,
+            system_prompt=system_prompt,
+            include_lesson=include_lesson,
+            include_conversation_history=include_history,
+            history_turns=history_turns,
+            max_age_hours=24.0,
+            relevant_memories=relevant_memories,
+            context_type=context_type,
+        )
 
         # Common streaming logic
         is_english = not user_lang or user_lang.lower() == "en"
@@ -310,10 +299,8 @@ class DialogueEngine:
         ]
         return relevant_memories
 
-    def _detect_context_type(self, user_id: int, text: str, use_rag: bool) -> str:
+    def _detect_context_type(self, user_id: int, text: str) -> str:
         """Detect conversation context type for function availability."""
-        if use_rag:
-            return "rag"
 
         from src.functions.definitions import FunctionDefinitions
         from src.memories.constants import MemoryKey

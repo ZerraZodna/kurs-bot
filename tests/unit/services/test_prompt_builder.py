@@ -137,7 +137,7 @@ class TestPromptBuilder:
         """Given: A RAG prompt request for telegram
         When: Building a RAG prompt
         Then: Should include anti-table formatting guidance."""
-        prompt = prompt_builder.build_rag_prompt(
+        prompt = prompt_builder.build_prompt(
             user_id=test_user.user_id,
             user_input="Summarize my reminders",
             system_prompt="You are a helpful assistant.",

@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.memories.memory_handler import MemoryHandler
 from src.memories.semantic_search import get_semantic_search_service
-from src.models.database import PromptTemplate, SessionLocal
+from src.models.database import SessionLocal
+from src.models.templates import PromptTemplate
 from src.models.user import User
 from src.services.gdpr_service import (
     erase_user_data,
@@ -25,10 +26,10 @@ from src.services.gdpr_verification import create_verification, verify_code
 logger = logging.getLogger(__name__)
 
 
-def parse_rag_prefix(text: str) -> Tuple[str, bool]:
+def parse_custom_prefix(text: str) -> Tuple[str, bool]:
     text_lower = text.strip().lower()
-    if text_lower.startswith("rag:") or text_lower.startswith("rag "):
-        stripped = text[4:].lstrip(": ").strip()
+    if text_lower.startswith("custom:") or text_lower.startswith("custom "):
+        stripped = text[7:].lstrip(": ").strip()
         return stripped, True
     return text, False
 
@@ -282,21 +283,21 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
         return "Failed to list memories."
 
 
-def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> str | None:
-    """Handle `rag_prompt` CLI-style commands from users.
+def handle_custom_system_prompt_command(text: str, memory_manager, user_id: int) -> str | None:
+    """Handle `custom_prompt` commands for system prompt overrides.
 
-    Supported commands:
-      - `rag_prompt list` — list available public prompt templates
-      - `rag_prompt select <key>` — select a template for your account
-      - `rag_prompt custom <text>` — set a custom free-text prompt for RAG
-      - `rag_prompt show` — show current selection / custom prompt
+    Supported:
+      - `custom_prompt list` — list available system prompts
+      - `custom_prompt select <key>` — select a system prompt template
+      - `custom_prompt custom <text>` — set custom system prompt
+      - `custom_prompt show` — show active system prompt
     """
     if not text or not text.strip():
         return None
 
     parts = text.strip().split()
     cmd = parts[0].lower()
-    if cmd not in ("rag_prompt", "ragprompt", "rag-prompt"):
+    if cmd not in ("custom_prompt", "customprompt"):
         return None
 
     # no subcommand -> help
@@ -319,7 +320,7 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> str | 
             active_type = None
             active_key = None
             try:
-                custom_mem = memory_manager.get_memory(user_id, MemoryKey.CUSTOM_RAG_PROMPT)
+                custom_mem = memory_manager.get_memory(user_id, MemoryKey.CUSTOM_SYSTEM_PROMPT)
                 custom_val = custom_mem[0].get("value") if custom_mem else None
                 if custom_val and custom_val.strip():
                     active_type = "custom"
@@ -327,7 +328,7 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> str | 
                 custom_val = None
 
             try:
-                sel_mem = memory_manager.get_memory(user_id, MemoryKey.SELECTED_RAG_PROMPT_KEY)
+                sel_mem = memory_manager.get_memory(user_id, MemoryKey.SELECTED_SYSTEM_PROMPT_KEY)
                 sel_key = sel_mem[0].get("value") if sel_mem else None
                 if active_type is None and sel_key:
                     active_type = "selected"
@@ -366,7 +367,7 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> str | 
                     parts_out.append(f"{t.key}{suffix}: {t.title}")
 
             if not parts_out:
-                return "No RAG prompts available."
+                return "No system prompts available."
             return "Available prompts:\n" + "\n".join(parts_out)
 
         if sub == "select":
@@ -378,7 +379,7 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> str | 
                 return f"Prompt template '{key}' not found. Use 'rag_prompt list' to view available keys."
             memory_manager.store_memory(
                 user_id=user_id,
-                key=MemoryKey.SELECTED_RAG_PROMPT_KEY,
+                key=MemoryKey.SELECTED_SYSTEM_PROMPT_KEY,
                 value=key,
                 source="user_command",
                 category=MemoryCategory.CONVERSATION.value,
@@ -393,7 +394,7 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> str | 
             # Store in user memory (keeps existing behavior)
             memory_manager.store_memory(
                 user_id=user_id,
-                key=MemoryKey.CUSTOM_RAG_PROMPT,
+                key=MemoryKey.CUSTOM_SYSTEM_PROMPT,
                 value=rest,
                 source="user_command",
                 category=MemoryCategory.CONVERSATION.value,
@@ -401,7 +402,7 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> str | 
 
             # Also persist as a private PromptTemplate row so it appears in listings
             try:
-                key = f"private_rag_user_{user_id}"
+                key = f"private_system_user_{user_id}"
                 existing = db.query(PromptTemplate).filter(PromptTemplate.key == key).first()
                 if existing:
                     existing.text = rest
@@ -424,11 +425,9 @@ def handle_rag_prompt_command(text: str, memory_manager, user_id: int) -> str | 
                 except Exception:
                     pass
 
-            return "Custom RAG prompt saved for your account."
-
-        if sub == "show":
-            sel = memory_manager.get_memory(user_id, MemoryKey.SELECTED_RAG_PROMPT_KEY)
-            custom = memory_manager.get_memory(user_id, MemoryKey.CUSTOM_RAG_PROMPT)
+            if sub == "show":
+                sel = memory_manager.get_memory(user_id, MemoryKey.SELECTED_SYSTEM_PROMPT_KEY)
+                custom = memory_manager.get_memory(user_id, MemoryKey.CUSTOM_SYSTEM_PROMPT)
             parts_out = []
             if custom and custom[0].get("value"):
                 parts_out.append(

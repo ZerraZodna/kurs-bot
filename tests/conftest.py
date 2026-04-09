@@ -204,7 +204,6 @@ def ensure_test_db(db_engine, monkeypatch):
     monkeypatch.setattr("src.services.dialogue.command_handlers.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("src.services.maintenance.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("src.middleware.consent.SessionLocal", TestSessionLocal)
-    monkeypatch.setattr("src.language.prompt_registry.SessionLocal", TestSessionLocal)
 
     # Skip app startup lessons import in tests
     monkeypatch.setattr("src.api.app.ensure_lessons_imported", lambda: None, raising=False)

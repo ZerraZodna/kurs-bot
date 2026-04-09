@@ -18,7 +18,7 @@ def test_rag_list_memories_personal_assistant(monkeypatch):
     Then: It returns the relevant memories
     """
     # Import inside test to ensure patched symbols resolve correctly
-    from src.services.dialogue.command_handlers import handle_list_memories, parse_rag_prefix
+    from src.services.dialogue.command_handlers import handle_list_memories
 
     # Given: Create an in-memory engine/session
     engine = create_engine("sqlite:///:memory:")
@@ -61,14 +61,8 @@ def test_rag_list_memories_personal_assistant(monkeypatch):
         lambda: FakeSearchService(),
     )
 
-    # When: Simulate RAG input with query to trigger semantic search (fixes test)
-    stripped, is_rag = parse_rag_prefix("rag list memories acim")
-
-    # Then: It should be recognized as RAG
-    assert is_rag is True
-
-    # When: Call the handler
-    out = handle_list_memories(stripped, None, session, user_id=1)
+    # When: Call the handler with query tail to trigger semantic search
+    out = handle_list_memories("list memories acim", None, session, user_id=1)
 
     # Then: It should return the memory
     assert out is not None
