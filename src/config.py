@@ -1,4 +1,4 @@
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
 from pydantic_settings import BaseSettings
 
 
@@ -64,7 +64,7 @@ Only use functions relevant to the current context.
     USE_TELEGRAM_LONG_POLLING: bool = False
     TELEGRAM_POLL_TIMEOUT: int = 25
     TELEGRAM_POLL_LIMIT: int = 100
-    TELEGRAM_POLL_ALLOWED_UPDATES: list = ["message", "edited_message"]
+    TELEGRAM_POLL_ALLOWED_UPDATES: list[str] = Field(default_factory=list)
     # Enable the developer web UI when True (set in .env during local dev)
     DEV_WEB_CLIENT: bool = False
     # Add more config as needed

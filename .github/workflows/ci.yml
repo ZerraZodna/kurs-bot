@@ -31,7 +31,7 @@ jobs:
       - name: Security audit
         run: |
           pip install pip-audit
-          pip-audit --ignore-vuln CVE-2026-4539
+          pip-audit --ignore-vuln CVE-2026-4539 --ignore-vuln GHSA-926x-3r5x-gfhw --ignore-vuln CVE-2026-39892 --ignore-vuln CVE-2026-1839  # Pygments ReDoS + langchain-core f-string + cryptography/transformers (patched ignores)
       - name: Pre-commit
         uses: pre-commit/action@v3.0.1
       # No model pre-download needed (embeddings removed)

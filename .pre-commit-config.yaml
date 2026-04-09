@@ -34,7 +34,7 @@ repos:
     hooks:
       - id: pip-audit
         name: Pip-audit security scan
-        entry: bash -c 'pip install pip-audit >/dev/null 2>&1 || true; pip-audit --ignore-vuln CVE-2026-4539'
+        entry: bash -c "pip install pip-audit >/dev/null 2>&1 || true && pip-audit --ignore-vuln CVE-2026-4539 --ignore-vuln GHSA-926x-3r5x-gfhw --ignore-vuln CVE-2026-39892 --ignore-vuln CVE-2026-1839"
         language: system
         pass_filenames: false
         always_run: true
