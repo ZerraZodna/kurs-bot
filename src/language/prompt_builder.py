@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Tuple
 
 from sqlalchemy.orm import Session
 
+from datetime import timedelta
 from src.core.timezone import format_dt_in_timezone, get_user_timezone_from_db, to_utc, utc_now
 from src.functions.definitions import get_function_definitions
 from src.memories import MemoryManager
@@ -77,6 +78,7 @@ class PromptBuilder:
         include_lesson: bool = True,
         include_conversation_history: bool = True,
         history_turns: int = 4,
+        max_age_hours: float | None = 24.0,
         relevant_memories: List[Dict[str, Any]] | None = None,
         context_type: str = "general_chat",
         include_functions: bool = True,
@@ -199,8 +201,8 @@ class PromptBuilder:
         system_prompt: str,
         relevant_memories: List[Dict[str, Any]] | None = None,
         include_conversation_history: bool = True,
-        history_turns: int = 2,
-        max_memories: int = 5,
+        history_turns: int = 7,
+        max_memories: int = 99,
         context_type: str = "general_chat",
         include_functions: bool = True,
     ) -> str:
@@ -448,20 +450,20 @@ class PromptBuilder:
 
         return "\n".join(parts) if parts else ""
 
-    def _build_conversation_history(self, user_id: int, num_turns: int = 4) -> str:
-        """Retrieve recent conversation history for multi-turn context."""
-        # Query recent messages for this user, ordered by creation date
-        messages = (
-            self.db
-            .query(MessageLog)
-            .filter(
-                MessageLog.user_id == user_id,
-                MessageLog.status.in_(["delivered", "sent"]),  # Only successful messages
-            )
-            .order_by(MessageLog.created_at.desc())
-            .limit(num_turns * 2)
-            .all()
+    def _build_conversation_history(self, user_id: int, num_turns: int = 8, max_age_hours: float | None = 24.0) -> str:
+        """Retrieve recent conversation history for multi-turn context, NOW-focused.\\n\\n        Filters to messages within max_age_hours (default 24h) for pure present-moment context."""
+
+        # Query recent messages for this user, ordered by creation date (NOW-focused)
+        base_query = self.db.query(MessageLog).filter(
+            MessageLog.user_id == user_id,
+            MessageLog.status.in_(["delivered", "sent"]),  # Only successful messages
         )
+
+        if max_age_hours is not None:
+            age_limit = utc_now() - timedelta(hours=max_age_hours)
+            base_query = base_query.filter(MessageLog.created_at >= age_limit)
+
+        messages = base_query.order_by(MessageLog.created_at.desc()).limit(num_turns * 2).all()
 
         if not messages:
             return ""

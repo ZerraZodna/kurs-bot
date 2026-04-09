@@ -99,7 +99,15 @@ class DialogueEngine:
 
         # FALLBACK TO LLM STREAMING (ALWAYS)
         return await self._generate_streaming_response(
-            user_id, text, session, user_lang, use_rag, include_history, history_turns, include_lesson
+            user_id,
+            text,
+            session,
+            user_lang,
+            use_rag,
+            include_history,
+            history_turns,
+            include_lesson,
+            context_aware_turns=True,
         )
 
     async def _detect_and_store_language(self, user_id: int, text: str) -> str:
@@ -198,6 +206,7 @@ class DialogueEngine:
         include_history: bool,
         history_turns: int,
         include_lesson: bool,
+        context_aware_turns: bool = True,
     ) -> Dict[str, Any]:
         """Unified streaming response generator (English/non-English)."""
         relevant_memories = await self._get_relevant_memories(user_id, text, session)
@@ -227,6 +236,7 @@ class DialogueEngine:
                 include_lesson=include_lesson,
                 include_conversation_history=include_history,
                 history_turns=history_turns,
+                max_age_hours=24.0,
                 relevant_memories=relevant_memories,
                 context_type=context_type,
             )
