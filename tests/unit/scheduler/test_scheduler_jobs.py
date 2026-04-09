@@ -5,6 +5,7 @@ Migrated from tests/test_scheduler_jobs.py to use new test fixtures.
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
 from src.scheduler import jobs
 
 
@@ -60,6 +61,7 @@ class TestSchedulerJobs:
         # Cleanup
         jobs.shutdown_scheduler()
 
+    @pytest.mark.serial
     def test_sync_and_remove_cron_job(self):
         """Should sync and remove cron-based daily jobs."""
         # Given: An initialized scheduler

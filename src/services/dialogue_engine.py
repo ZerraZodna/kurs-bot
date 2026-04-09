@@ -1,5 +1,5 @@
 import logging
-from typing import Dict
+from typing import Dict, Any
 
 from sqlalchemy.orm import Session
 
@@ -9,7 +9,6 @@ from src.language.prompt_builder import PromptBuilder
 from src.language.prompt_registry import get_prompt_registry
 from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
-from src.memories.semantic_search import get_semantic_search_service
 from src.models.database import User
 from src.onboarding.flow import OnboardingFlow
 from src.onboarding.service import OnboardingService
@@ -53,7 +52,7 @@ class DialogueEngine:
         include_history: bool = True,
         history_turns: int = 4,
         include_lesson: bool = True,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Unified message processing - ALWAYS returns streaming-ready response.
 
@@ -153,8 +152,6 @@ class DialogueEngine:
     async def _handle_onboarding_stage(self, user_id: int, text: str, session: Session, use_rag: bool) -> str | None:
         """Handle onboarding flow."""
         if self.onboarding_flow and self.onboarding.should_show_onboarding(user_id) and not use_rag:
-            # from src.memories.constants import MemoryKey
-            # pending_step = self.memory_manager.get_memory(user_id, MemoryKey.ONBOARDING_STEP_PENDING)
             onboarding_response = await self.onboarding_flow.handle_onboarding(user_id, text, session)
             return onboarding_response
 
@@ -177,7 +174,6 @@ class DialogueEngine:
         if schedule_response:
             return schedule_response
 
-        # Auto-send next lesson on a new day when user makes contact
         if include_lesson and not use_rag:
             auto_message = await maybe_send_next_lesson(
                 user_id=user_id,
@@ -202,7 +198,7 @@ class DialogueEngine:
         include_history: bool,
         history_turns: int,
         include_lesson: bool,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """Unified streaming response generator (English/non-English)."""
         relevant_memories = await self._get_relevant_memories(user_id, text, session)
         context_type = self._detect_context_type(user_id, text, use_rag)
@@ -235,6 +231,7 @@ class DialogueEngine:
                 context_type=context_type,
             )
 
+        # Common streaming logic
         is_english = not user_lang or user_lang.lower() == "en"
 
         async def post_hook(full_response_text: str):
@@ -288,6 +285,21 @@ class DialogueEngine:
 
             return {"type": "stream", "generator": gen, "post_hook": post_hook_translated}
 
+    async def _get_relevant_memories(self, user_id: int, text: str, session: Session) -> list:
+        """Retrieve ALL active non-expired memories (full context)."""
+        from src.memories.memory_handler import MemoryHandler
+        from src.core.timezone import utc_now
+
+        handler = MemoryHandler(session)
+        now = utc_now()
+        all_memories = handler.list_active_memories(user_id=user_id)
+        valid_memories = [m for m in all_memories if not handler._is_expired(m.ttl_expires_at, now)]
+        relevant_memories = [
+            {"memory_id": m.memory_id, "key": m.key, "value": m.value, "category": m.category, "similarity": 1.0}
+            for m in sorted(valid_memories, key=lambda m: m.updated_at or m.created_at, reverse=True)
+        ]
+        return relevant_memories
+
     def _detect_context_type(self, user_id: int, text: str, use_rag: bool) -> str:
         """Detect conversation context type for function availability."""
         if use_rag:
@@ -310,17 +322,6 @@ class DialogueEngine:
             return "schedule_setup"
 
         return "general_chat"
-
-    async def _get_relevant_memories(self, user_id: int, text: str, session: Session) -> list:
-        """Retrieve relevant memories."""
-        relevant_memories = []
-        search_service = get_semantic_search_service()
-        results = await search_service.search_memories(user_id=user_id, query_text=text, session=session)
-        relevant_memories = [
-            {"memory_id": m.memory_id, "key": m.key, "value": m.value, "category": m.category, "similarity": s}
-            for m, s in results
-        ]
-        return relevant_memories
 
     async def _handle_schedule_request(self, user_id: int, text: str, session: Session) -> str | None:
         """Handle explicit schedule requests (unchanged helper)."""

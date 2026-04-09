@@ -5,7 +5,7 @@
 - `README.md` remains the source of truth for setup, runtime, and deployment.
 - `CLAUDE.md` and `GEMINI.md` are adapter files and should only contain tool-specific deltas.
 
-## Task Management System (NEW)
+## Task Management System
 
 ### Master Task Tracker
 - **Location**: `tasks/TODO_MASTER.md` — Central queue for ALL work items
@@ -37,12 +37,12 @@
 
 ## Build, Test, and Development Commands
 - `npm install`: create `.venv` and install Python dependencies.
-- `npm run init_db -- --db prod` or `npm run init_db -- --db dev`: initialize database.
+`npm run init_db`: initialize production database (`node ./scripts/venv.js run scripts/utils/init_db.py --yes --db prod`).
 - `npm start`: start local stack via helper scripts.
-- `npm run start:foreground`: run API only (`uvicorn src.api.app:app --host 127.0.0.1 --port 8000`).
-- `npm test`: run test suite through the project wrapper.
-- `npm test -- tests/test_telegram_handler.py -q`: run targeted tests through the same wrapper.
-- On this machine, prefer `npm test` / `node ./scripts/venv.js test` (see `tasks/lessons.md`).
+`npm run start:foreground`: run API only (`node ./scripts/venv.js exec -m uvicorn src.api.app:app --host 127.0.0.1 --port 8000`).
+`npm test`: run parallel test suite (`node ./scripts/venv.js test -- -n auto -q`).
+- Targeted: `npm test -- tests/test_telegram_handler.py -q`.
+- Prefer `npm test` / `node ./scripts/venv.js test`.
 
 ## Engineering Workflow (All Contributors)
 
@@ -114,7 +114,7 @@
 
 ## Testing and Pull Requests
 - Standard command: `npm test`
-- Targeted command: `npm test -- tests/test_telegram_handler.py tests/test_prompt_builder.py -q`
+- Targeted: `npm test -- tests/test_telegram_handler.py -q` (add more as needed).
 - Equivalent direct wrapper: `node ./scripts/venv.js test [pytest args]`
 - Test framework: `pytest` (`pytest.ini` uses `tests/`). They can run in paralell too, but might fail with sql races.
 - Naming: `test_*.py` files and `test_*` functions.
@@ -123,10 +123,9 @@
 - Keep commits focused and imperative (for example: `refactor: split dialogue scheduler checks`).
 
 ## Key Architecture Docs (Read These First for Context)
-- `docs/LESSON_DELIVERY_FLOW.md` — **Lesson state machine**: how `current_lesson` vs `last_sent_lesson_id` work, the day-by-day flow after onboarding, confirmation prompts, and `_semantic_yes_no` trigger dependency. Essential reading for any lesson/scheduler/onboarding work.
-- `docs/EMBEDDINGS_TRIGGERS.md` — **Trigger embeddings pipeline**: STARTER list, `ci_trigger_data.py` generation, CI seeding, staleness detection, and the critical `confirm_yes`/`confirm_no` requirement.
-- `docs/ONBOARDING.md` — Onboarding conversation flow.
-- `swarm/TODO.md` — **3-Tier Supervisor Architecture**: Anti-drift coding system with Architect → Code Writer → Reviewer → Pre-Commit workflow. REQUIRED for all coding tasks.
+- `docs/dev/ARCHITECTURE.md` — Overall system architecture.
+- `docs/dev/DB_GUIDE.md` — Database schema and models.
+- `swarm/mini_swe_agent/` — Current mini SWE agent for coding tasks (anti-drift pattern).
 
 ## Anti-Drift Coding System (swarm/ & subagent pattern)
 
@@ -138,86 +137,9 @@ The anti-drift coding system prevents scope creep and maintains task boundaries 
 3. **Reviewer**: Validates anti-drift compliance
 4. **Pre-Commit Runner**: Runs tests before final approval
 
-### Usage: swarm CLI
-**Prerequisites**: Local LLM server running at `localhost:8080/v1`
 
-**Command format:**
-```bash
-node ./scripts/venv.js exec -m swarm.cli "Your task description here"
-```
-
-**Example:**
-```bash
-node ./scripts/venv.js exec -m swarm.cli "Add max_retries=3 to swarm/config.py"
-```
-
-**Expected output:**
-```
-Step 1/3: Architect planning...
-Step 2/3: Code writer generating...
-Step 3/3: Review complete!
-📝 Reviewer feedback: ✅ Approved
-✅ Task completed successfully!
---- PROPOSED DIFF ---
-[unified git diff for files in swarm/ only]
-```
-
-**⚠️ Timeout Warning**: LLM calls may take 60s+. Set appropriate timeout if needed.
 
 ### Usage: Subagent Pattern (Recommended)
 **No LLM required** - Works everywhere, faster than swarm CLI
-
-**Command format:**
-```python
-delegate_task(
-    goal="Clear task description with STRICT constraints",
-    context="[Anti-drift rules: output ONLY unified git diff, stay in designated folder only...]",
-    toolsets=["terminal", "file"]
-)
-```
-
-**Example:**
-```python
-delegate_task(
-    goal="Create swarm/TODO.md documenting the 3-tier architecture",
-    context="Anti-drift rules: output ONLY unified git diff, DO NOT write full files, DO NOT touch files outside swarm/, DO NOT add extra functions or tests, DO NOT modify imports in existing files, DO NOT change existing swarm/ code, DO NOT use markdown, just plain diff. If you violate any rule, the REVIEWER will reject you.",
-    toolsets=["terminal", "file"]
-)
-```
-
-**Benefits:**
-- ✅ **Faster**: ~24s vs ~60s+
-- ✅ **No timeout**: No LLM dependency
-- ✅ **More reliable**: Human-in-the-loop
-- ✅ **Works everywhere**: No infrastructure needed
-
-### Anti-Drift Rules (MUST follow)
-**For ALL coding tasks:**
-- Output ONLY a unified git diff
-- DO NOT write full files
-- DO NOT touch files outside designated scope
-- DO NOT add extra functions or tests
-- DO NOT modify imports in existing files
-- DO NOT change existing code
-- DO NOT use markdown in output
-- Keep changes minimal and focused
-
-### Workflow (4-Tier)
-```
-1. Architect → Define task with STRICT constraints
-   ↓
-2. Code Writer → Execute (output ONLY unified git diff)
-   ↓
-3. Reviewer → Validate compliance
-   ↓
-4. Pre-Commit → Run tests (npm test / pytest)
-   ↓
-5. You → Final approval to commit/push
-```
-
-### Documentation
-- `swarm/TODO.md` — Architecture documentation
-- `SWARM_SUBAGENT_PATTERN.md` — Subagent pattern guide
-- `swarm/cli.py` — CLI implementation (requires LLM)
 
 **IMPORTANT**: Always test changes in a local branch before pushing. Never commit without running tests first.

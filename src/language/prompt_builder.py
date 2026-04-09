@@ -138,7 +138,7 @@ class PromptBuilder:
             context_parts.append(f"\n-- Preferences\n{prefs_context}")
 
         # 5. Semantic Relevant Memories (optional)
-        semantic_context = self._build_semantic_memory_context(relevant_memories or [])
+        semantic_context = self._build_semantic_memory_context(relevant_memories or [], max_items=50)
         if semantic_context:
             context_parts.append(f"\n-- Relevant Memories\n{semantic_context}")
 
