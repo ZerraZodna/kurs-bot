@@ -18,14 +18,9 @@ import pytest
 # Load dotenv early so its variables are available to pytest and any imported
 # project modules during collection
 def _load_dotenv_if_present():
-    repo_root = Path(__file__).resolve().parent.parent  # to root
-    env_path = repo_root / ".env"
-    test_env_path = repo_root / ".env.test"
-    if env_path.exists():
-        env_path = env_path
-    elif test_env_path.exists():
-        env_path = test_env_path
-    else:
+    repo_root = Path(__file__).resolve().parent
+    env_path = repo_root / ".env.test"
+    if not env_path.exists():
         return
     try:
         with env_path.open("r", encoding="utf8") as f:
