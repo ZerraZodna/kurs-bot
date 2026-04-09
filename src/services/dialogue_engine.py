@@ -15,6 +15,8 @@ from src.onboarding.service import OnboardingService
 from src.scheduler import api as scheduler_api
 from src.services.dialogue import (
     stream_ollama,
+    get_user_language,
+    translate_text,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,7 +80,7 @@ class DialogueEngine:
         # No dual-mode; unified spiritual
 
         # Stage 4: Commands
-        command_response = await self._handle_commands(user_id, text, session)
+        command_response = await self._handle_commands(user_id, text, session, user_lang)
         if command_response:
             return {"type": "text", "text": command_response}
 
@@ -130,7 +132,9 @@ class DialogueEngine:
             return "Your data processing is restricted. If you want to resume, please update your consent settings."
         return None
 
-    async def _handle_commands(self, user_id: int, text: str, session: Session) -> str | None:
+    async def _handle_commands(
+        self, user_id: int, text: str, session: Session, user_lang: str | None = None
+    ) -> str | None:
         """Handle various specialized commands."""
         from src.services.dialogue import handle_list_memories, handle_custom_system_prompt_command
 
@@ -141,6 +145,42 @@ class DialogueEngine:
         prompt_cmd_response = handle_custom_system_prompt_command(text, self.memory_manager, user_id)
         if prompt_cmd_response:
             return prompt_cmd_response
+
+        # /help command
+        if text.strip().lower() in ["/help", "/start"]:
+            help_text = """<b>🌟 Kurs Bot - ACIM Spiritual Companion</b>
+
+<b>📖 Lessons & Reminders</b>
+• Daily ACIM lessons sent automatically
+• <b>Set your time:</b> "Set daily lesson reminder for 9AM" or "morning"
+• <b>Manual:</b> "Send lesson 29", "Next lesson", "Repeat lesson"
+• "What's my current lesson?"
+
+<b>🧠 Personal Memory</b>
+• I remember our conversations & preferences
+• "Forget [topic]" to remove specific memory
+• "Remember [important fact]" for persistence
+• "List my memories" (existing command)
+
+<b>⚙️ Personalization</b>
+• Language auto-detected (EN/DE/others)
+• Custom system prompt: [use existing command]
+• Timezone auto-detected from messages
+
+<b>🔒 Privacy/GDPR</b>
+• /delete - full data deletion
+• /consent - manage data permissions
+• Data retention: 90 days conversations, profiles forever until deleted
+
+<b>Talk naturally! 🙏</b>
+Type /help anytime.
+
+/start also shows this help."""
+            if user_lang is None:
+                user_lang = get_user_language(self.memory_manager, user_id)
+            if user_lang and user_lang.lower() not in ("en",):
+                help_text = await translate_text(help_text, user_lang, self.call_ollama)
+            return help_text
 
         return None
 

@@ -135,8 +135,6 @@ class TelegramHandler:
             return None
         # Ignore bot commands (optional)
         text = msg.get("text")
-        if text.startswith("/"):
-            return None
         return {
             "user_id": str(user.get("id")),
             "channel": "telegram",
