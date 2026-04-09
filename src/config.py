@@ -64,7 +64,7 @@ Only use functions relevant to the current context.
     USE_TELEGRAM_LONG_POLLING: bool = False
     TELEGRAM_POLL_TIMEOUT: int = 25
     TELEGRAM_POLL_LIMIT: int = 100
-    TELEGRAM_POLL_ALLOWED_UPDATES: list[str] = Field(default_factory=list)
+    TELEGRAM_POLL_ALLOWED_UPDATES: str = Field(default="message,callback_query")
     # Enable the developer web UI when True (set in .env during local dev)
     DEV_WEB_CLIENT: bool = False
     # Add more config as needed

@@ -70,7 +70,9 @@ async def poll_updates(offset: int = 0) -> list[dict]:
         "timeout": settings.TELEGRAM_POLL_TIMEOUT,
         "offset": offset,
         "limit": settings.TELEGRAM_POLL_LIMIT,
-        "allowed_updates": settings.TELEGRAM_POLL_ALLOWED_UPDATES,
+        "allowed_updates": [u.strip() for u in settings.TELEGRAM_POLL_ALLOWED_UPDATES.split(",") if u.strip()]
+        if settings.TELEGRAM_POLL_ALLOWED_UPDATES
+        else [],
     }
 
     client = await _get_polling_client()
