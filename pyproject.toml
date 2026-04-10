@@ -39,6 +39,7 @@ dev = [
     "httpx",
     "mypy",
     "pip-audit",
+    "pip-tools",
 ]
 
 [tool.ruff]
