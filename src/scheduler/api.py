@@ -298,7 +298,6 @@ def parse_time_string(time_str: str) -> tuple[int, int]:
 
 def execute_scheduled_task(
     schedule_id: int,
-    simulate: bool = False,
     session: Session | None = None,
 ) -> Any:
     """
@@ -306,7 +305,6 @@ def execute_scheduled_task(
 
     Args:
         schedule_id: The schedule ID to execute
-        simulate: If True, simulate execution without sending messages
         session: Optional database session
 
     Returns:
@@ -316,6 +314,5 @@ def execute_scheduled_task(
 
     return scheduler_execution.execute_scheduled_task(
         schedule_id=schedule_id,
-        simulate=simulate,
         session=session,
     )

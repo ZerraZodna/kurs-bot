@@ -132,9 +132,7 @@ class DialogueEngine:
             return "Your data processing is restricted. If you want to resume, please update your consent settings."
         return None
 
-    async def _handle_commands(
-        self, user_id: int, text: str, session: Session, user_lang: str | None = None
-    ) -> str | None:
+    async def _handle_commands(self, user_id: int, text: str, session: Session, user_lang: str) -> str | None:
         """Handle various specialized commands."""
         from src.services.dialogue import handle_list_memories, handle_custom_system_prompt_command
 
@@ -153,7 +151,7 @@ class DialogueEngine:
 <b>📖 Lessons & Reminders</b>
 • Daily ACIM lessons sent automatically
 • <b>Set your time:</b> "Set daily lesson reminder for 9AM" or "morning"
-• <b>Manual:</b> "Send lesson 29", "Next lesson", "Repeat lesson"
+• <b>Manual:</b> <code>/lesson 29</code>, "Next lesson", "Repeat lesson"
 • "What's my current lesson?"
 
 <b>🧠 Personal Memory</b>
@@ -176,11 +174,22 @@ class DialogueEngine:
 Type /help anytime.
 
 /start also shows this help."""
-            if user_lang is None:
-                user_lang = get_user_language(self.memory_manager, user_id)
             if user_lang and user_lang.lower() not in ("en",):
                 help_text = await translate_text(help_text, user_lang, self.call_ollama)
             return help_text
+
+        # /lesson command
+        if text.strip().startswith("/lesson"):
+            from src.lessons.delivery import _parse_lesson_int, deliver_lesson
+
+            parts = text.strip().split(maxsplit=1)
+            target_lesson_id = _parse_lesson_int(parts[1] if len(parts) > 1 else None)
+            message = deliver_lesson(session, user_id, target_lesson_id, self.memory_manager, user_lang)
+            if message:
+                logger.info(f"[command /lesson user={user_id}] lesson_id={target_lesson_id or 'current'}")
+                return message
+            else:
+                return "Sorry, could not deliver lesson. Please check lesson number or try /help."
 
         return None
 
@@ -363,7 +372,7 @@ Type /help anytime.
     async def _handle_schedule_request(self, user_id: int, text: str, session: Session) -> str | None:
         """Handle explicit schedule requests (unchanged helper)."""
         from src.scheduler.schedule_query_handler import build_schedule_status_response
-        from src.services.dialogue import get_user_language, translate_text
+        from src.services.dialogue import translate_text
 
         schedules = scheduler_api.get_user_schedules(user_id, session=session)
         if schedules:

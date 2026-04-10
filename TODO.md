@@ -1,9 +1,7 @@
-# TODO: Fix GitHub Actions SettingsError for TELEGRAM_POLL_ALLOWED_UPDATES
+# Task Progress: Implement /lesson Telegram Command
 
-## Steps
-- [x] Step 1: Edit src/config.py - Change TELEGRAM_POLL_ALLOWED_UPDATES field to str type with default "message,callback_query"
-- [x] Step 2: Edit src/integrations/telegram_polling.py - Parse the str config value to list in poll_updates payload
-- [x] Step 3: Test locally with pytest to verify fix
-- [ ] Step 4: Update TODO.md with completion status
-
-Progress: 3/4 steps complete
+task_progress Items:
+- [x] Step 1: Update src/lessons/delivery.py - Make deliver_lesson async, rename/export as handle_lesson_request with chat_id param, integrate telegram.send_message (reuse _parse_lesson_int, get_lesson_or_import, format_lesson_message, set_current_lesson)
+- [x] Step 2: Update src/integrations/telegram.py - Add /lesson handling in process_telegram_batch early (parse n, call handle_lesson_request, skip LLM)
+- [x] Step 3: Run npm run lint && npm run test
+- [ ] Step 4: Manual test verification (send /lesson 29, /lesson in Telegram, check DB with scripts/inspect/inspect_users.py)

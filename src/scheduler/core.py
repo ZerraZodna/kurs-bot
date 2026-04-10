@@ -121,45 +121,23 @@ class SchedulerService:
     @staticmethod
     def execute_scheduled_task(
         schedule_id: int,
-        simulate: bool = False,
         session: Session | None = None,
     ):
         return scheduler_execution.execute_scheduled_task(
             schedule_id=schedule_id,
-            simulate=simulate,
             session=session,
         )
 
     @staticmethod
-    def _execute_one_time_schedule(
-        db: Session,
-        schedule: Schedule,
-        user: User,
-        memory_manager: MemoryManager,
-        simulate: bool,
-    ) -> list:
+    def _execute_one_time_schedule(db: Session, schedule: Schedule, user: User, memory_manager: MemoryManager) -> None:
         return scheduler_execution._execute_one_time_schedule(
-            db=db,
-            schedule=schedule,
-            user=user,
-            memory_manager=memory_manager,
-            simulate=simulate,
+            db=db, schedule=schedule, user=user, memory_manager=memory_manager
         )
 
     @staticmethod
-    def _execute_lesson_schedule(
-        db: Session,
-        schedule: Schedule,
-        user: User,
-        memory_manager: MemoryManager,
-        simulate: bool,
-    ) -> list:
+    def _execute_lesson_schedule(db: Session, schedule: Schedule, user: User, memory_manager: MemoryManager) -> None:
         return scheduler_execution._execute_lesson_schedule(
-            db=db,
-            schedule=schedule,
-            user=user,
-            memory_manager=memory_manager,
-            simulate=simulate,
+            db=db, schedule=schedule, user=user, memory_manager=memory_manager
         )
 
     @staticmethod

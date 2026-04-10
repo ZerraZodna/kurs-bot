@@ -164,19 +164,11 @@ def run_recovery_check(
         return recovered
 
 
-def execute_scheduled_task(schedule_id: int, simulate: bool = False, session: Session | None = None):
+def execute_scheduled_task(schedule_id: int, session: Session | None = None):
     """Execute a scheduled task (send lesson or reminder).
-
     This is called by APScheduler when a job triggers.
-
-    `simulate=True` is used by debug "next_day" flows to simulate that a
-    day boundary has happened. It is not a dry-run flag: outbound sends and
-    memory updates may still occur. It primarily avoids schedule timestamp
-    progression/commits in this method.
     """
     with get_session(session) as db:
-        messages: list = []
-
         # Lookup schedule and user; if missing, close session and return
         schedule = db.query(Schedule).filter_by(schedule_id=schedule_id).first()
         if not schedule or not schedule.is_active:
@@ -194,49 +186,30 @@ def execute_scheduled_task(schedule_id: int, simulate: bool = False, session: Se
 
     # One-time reminders are handled separately
     if is_one_time_schedule_type(schedule.schedule_type):
-        messages = _execute_one_time_schedule(db, schedule, user, memory_manager, simulate)
-        if simulate:
-            return messages
+        _execute_one_time_schedule(db, schedule, user, memory_manager)
         return
 
     # Otherwise handle lesson schedule
-    messages = _execute_lesson_schedule(db, schedule, user, memory_manager, simulate)
+    _execute_lesson_schedule(db, schedule, user, memory_manager)
 
     # For recurring lesson schedules, update next_send_time and last_sent
-    if not simulate:
-        now = utc_now()
-        schedule.last_sent_at = now
-        schedule.next_send_time = now + timedelta(days=1)
-        user.last_active_at = now
-        db.commit()
-        logger.info("✓ Executed schedule %s, next send at %s", schedule_id, schedule.next_send_time)
-    else:
-        logger.info("Simulated execution of schedule %s (no DB changes)", schedule_id)
-
-    if simulate:
-        return messages
+    now = utc_now()
+    schedule.last_sent_at = now
+    schedule.next_send_time = now + timedelta(days=1)
+    user.last_active_at = now
+    db.commit()
+    logger.info("✓ Executed schedule %s, next send at %s", schedule_id, schedule.next_send_time)
 
 
-def _execute_one_time_schedule(
-    db: Session,
-    schedule: Schedule,
-    user: User,
-    memory_manager: MemoryManager,
-    simulate: bool,
-) -> list:
+def _execute_one_time_schedule(db: Session, schedule: Schedule, user: User, memory_manager: MemoryManager) -> None:
     """Handle a one-time reminder schedule execution.
 
     Returns list of messages produced during simulation.
     """
-    messages: list = []
     message = get_schedule_message(memory_manager, schedule.user_id, schedule.schedule_id)
     if not message:
         message = "Reminder"
     send_outbound_message(db, user, message)
-    if simulate:
-        messages.append(message)
-        logger.info("Simulated one-time reminder %s (no DB changes)", schedule.schedule_id)
-        return messages
 
     # Persist state for executed one-time reminder
     schedule.last_sent_at = utc_now()
@@ -245,26 +218,15 @@ def _execute_one_time_schedule(
     db.commit()
 
     # Remove job from scheduler (use jobs helper)
-    try:
-        from . import jobs as schedule_jobs
+    from . import jobs as schedule_jobs
 
-        schedule_jobs.remove_job_for_schedule(schedule.schedule_id)
-    except Exception as e:
-        logger.warning("Could not remove job %s: %s", job_id_for_schedule(schedule.schedule_id), e)
+    schedule_jobs.remove_job_for_schedule(schedule.schedule_id)
 
     logger.info("✓ Executed one-time reminder %s", schedule.schedule_id)
-    return messages
 
 
-def _execute_lesson_schedule(
-    db: Session,
-    schedule: Schedule,
-    user: User,
-    memory_manager: MemoryManager,
-    simulate: bool,
-) -> list:
+def _execute_lesson_schedule(db: Session, schedule: Schedule, user: User, memory_manager: MemoryManager) -> None:
     """Handle recurring lesson schedule execution. Returns messages for simulation."""
-    messages: list = []
     language = get_user_language(memory_manager, schedule.user_id)
 
     from src.lessons.state import compute_current_lesson_state
@@ -278,5 +240,4 @@ def _execute_lesson_schedule(
         state.get("previous_lesson_id"),
     )
 
-    messages = deliver_lesson(db, schedule.user_id, None, memory_manager, simulate, language)
-    return messages
+    deliver_lesson(db, schedule.user_id, None, memory_manager, language)

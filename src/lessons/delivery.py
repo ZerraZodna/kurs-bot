@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import List
 
 from sqlalchemy.orm import Session
 
@@ -72,11 +71,9 @@ def deliver_lesson(
     user_id: int,
     target_lesson_id: int | None,
     memory_manager: MemoryManager,
-    simulate: bool = False,
     language: str | None = None,
-) -> List[str]:
+) -> None:
     """Deliver lesson: load, format, send, advance state (formerly scheduler._execute_lesson_schedule)."""
-    messages = []
     if language is None:
         from src.scheduler.memory_helpers import get_user_language
 
@@ -87,23 +84,21 @@ def deliver_lesson(
         state = compute_current_lesson_state(memory_manager, user_id)
         target_lesson_id = state["lesson_id"]
 
+    if target_lesson_id is None:
+        return None
     lesson = get_lesson_or_import(db, target_lesson_id)
     if not lesson:
         logger.warning(f"No lesson {target_lesson_id} for user {user_id}")
-        return messages
+        return None
 
     message = asyncio.run(handler_format_lesson_message(lesson, language))
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
-        return messages
+        return None
 
-    if not simulate:
-        send_outbound_message(db, user, message)
-        set_current_lesson(memory_manager, user_id, target_lesson_id)
-        user.last_active_at = utc_now()
-        db.commit()
-        logger.info(f"Delivered lesson {target_lesson_id} to user {user_id}")
-    else:
-        messages.append(message)
-
-    return messages
+    send_outbound_message(db, user, message)
+    set_current_lesson(memory_manager, user_id, target_lesson_id)
+    user.last_active_at = utc_now()
+    db.commit()
+    logger.info(f"Delivered lesson {target_lesson_id} to user {user_id}")
+    return None
