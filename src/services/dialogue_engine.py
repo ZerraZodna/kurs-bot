@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from src.config import settings
 from src.core.timezone import format_dt_in_timezone, get_user_timezone_from_db
 from src.language.prompt_builder import PromptBuilder
+from src.language import translate_text
 from src.lessons.delivery import _parse_lesson_int, deliver_lesson
 
 from src.memories import MemoryManager
@@ -18,7 +19,6 @@ from src.scheduler import api as scheduler_api
 from src.services.dialogue import (
     stream_ollama,
     get_user_language,
-    translate_text,
 )
 
 logger = logging.getLogger(__name__)
@@ -179,12 +179,13 @@ Type /help anytime.
         if text.strip().startswith("/lesson"):
             parts = text.strip().split(maxsplit=1)
             target_lesson_id = _parse_lesson_int(parts[1] if len(parts) > 1 else None)
-            message = deliver_lesson(session, user_id, target_lesson_id, self.memory_manager, user_lang)
-            if message:
+            english_text = deliver_lesson(session, user_id, target_lesson_id, self.memory_manager)
+            if english_text is not None:
+                if user_lang and user_lang.lower() not in ("en",):
+                    english_text = await translate_text(english_text, user_lang, self.call_ollama)
                 logger.info(f"[command /lesson user={user_id}] lesson_id={target_lesson_id or 'current'}")
-                return message
-            else:
-                return "Sorry, could not deliver lesson. Please check lesson number or try /help."
+                return english_text
+            return "Sorry, could not deliver lesson. Please check lesson number or try /help."
 
         return None
 
@@ -355,7 +356,7 @@ Type /help anytime.
     def _handle_schedule_request(self, user_id: int, text: str, session: Session) -> str | None:
         """Handle explicit schedule requests (unchanged helper)."""
         from src.scheduler.schedule_query_handler import build_schedule_status_response
-        from src.services.dialogue import translate_text
+        from src.language import translate_text
 
         schedules = scheduler_api.get_user_schedules(user_id, session=session)
         if schedules:
@@ -372,7 +373,8 @@ Type /help anytime.
 
             user_lang = get_user_language(self.memory_manager, user_id)
             if user_lang and user_lang.lower() not in ("en",):
-                resp_text = asyncio.run(translate_text(resp_text, user_lang, self.call_ollama))
+                loop = asyncio.get_event_loop()
+                resp_text = loop.run_until_complete(translate_text(resp_text, user_lang, self.call_ollama))
 
             return resp_text or ""
 

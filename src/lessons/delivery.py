@@ -6,18 +6,18 @@ Used by scheduler, functions, onboarding, etc. No scheduling deps.
 
 from __future__ import annotations
 
-import asyncio
+
 import logging
 
 from sqlalchemy.orm import Session
 
 from src.core.timezone import utc_now
-from src.lessons.handler import format_lesson_message as handler_format_lesson_message
+from src.lessons.handler import get_english_lesson_text as handler_get_english_lesson_text
 from src.lessons.importer import ensure_lessons_available
 from src.lessons.state import compute_current_lesson_state, get_current_lesson, set_current_lesson
 from src.memories import MemoryManager
 from src.models.database import Lesson, User
-from src.scheduler.message_utils import send_outbound_message
+
 
 logger = logging.getLogger(__name__)
 
@@ -45,24 +45,23 @@ def get_lesson_or_import(db: Session, lesson_id: int) -> Lesson | None:
     return None
 
 
-def build_lesson_preview(
+def get_english_lesson_preview(
     db: Session,
     memory_manager: MemoryManager,
     user_id: int,
-    language: str,
 ) -> str | None:
-    """Build preview message for no-last-sent (formerly scheduler._preview_build_for_no_last_sent)."""
+    """Build English preview text for no-last-sent (formerly scheduler._preview_build_for_no_last_sent)."""
     cur = get_current_lesson(memory_manager, user_id)
     lesson_id = _parse_lesson_int(cur)
     if lesson_id is not None:
         next_id = (lesson_id % 365) + 1
         lesson = get_lesson_or_import(db, next_id)
         if lesson:
-            return asyncio.run(handler_format_lesson_message(lesson, language))
+            return handler_get_english_lesson_text(lesson)
     # Fallback Lesson 1
     lesson = get_lesson_or_import(db, 1)
     if lesson:
-        return asyncio.run(handler_format_lesson_message(lesson, language))
+        return handler_get_english_lesson_text(lesson)
     return None
 
 
@@ -71,10 +70,8 @@ def deliver_lesson(
     user_id: int,
     target_lesson_id: int | None,
     memory_manager: MemoryManager,
-    language: str,
-) -> None:
-    """Deliver lesson: load, format, send, advance state (formerly scheduler._execute_lesson_schedule)."""
-
+) -> str | None:
+    """Load lesson, advance state, return English text (callers translate &amp; send)."""
     # Compute/use target lesson
     if target_lesson_id is None:
         state = compute_current_lesson_state(memory_manager, user_id)
@@ -87,14 +84,14 @@ def deliver_lesson(
         logger.warning(f"No lesson {target_lesson_id} for user {user_id}")
         return None
 
-    message = asyncio.run(handler_format_lesson_message(lesson, language))
+    english_text = handler_get_english_lesson_text(lesson)
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
         return None
 
-    send_outbound_message(db, user, message)
+    # Advance state
     set_current_lesson(memory_manager, user_id, target_lesson_id)
     user.last_active_at = utc_now()
     db.commit()
-    logger.info(f"Delivered lesson {target_lesson_id} to user {user_id}")
-    return None
+    logger.info(f"Prepared lesson {target_lesson_id} for user {user_id}")
+    return english_text

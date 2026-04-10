@@ -4,8 +4,6 @@ import re
 from typing import Callable
 
 from sqlalchemy.orm import Session
-
-from src.lessons.handler import translate_text
 from src.memories.constants import MemoryCategory, MemoryKey
 from src.memories.dialogue_helpers import get_user_language
 from src.scheduler import api as scheduler_api
@@ -50,6 +48,8 @@ async def handle_schedule_messages(
         else:
             response = "You don’t have any active lesson schedules to pause."
         language = get_user_language(memory_manager, user_id)
+        from src.language import translate_text
+
         if language.lower() not in ["en"]:
             response = await translate_text(response, language, call_ollama)
         return response
@@ -111,6 +111,8 @@ async def handle_schedule_messages(
                 lang = get_user_language(memory_manager, user_id)
         except Exception:
             lang = None
+        from src.language import translate_text
+
         if lang and lang.lower() not in ("en",):
             resp = await translate_text(resp, lang, call_ollama)
         return resp

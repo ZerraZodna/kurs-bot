@@ -5,32 +5,12 @@ import logging
 
 from sqlalchemy.orm import Session
 
-from src.config import settings
 
 # Use dynamic lookup for send_message so tests can monkeypatch the package symbol
 from src.models.database import MessageLog, User
 from src.services.traffic_tracker import record_traffic_event
 
 logger = logging.getLogger(__name__)
-
-
-def translate_text_sync(text: str, language: str) -> str:
-    print("Translate to lng=%s", str)
-    try:
-        prompt = (
-            f"Translate the following text to {language}. "
-            "Preserve paragraph breaks and meaning. Return only the translation.\n\n"
-            f"{text}"
-        )
-        model = settings.OLLAMA_MODEL
-        # Lazy import to avoid circular imports at module import time
-        from src.services.dialogue.ollama_client import call_ollama
-
-        resp = asyncio.run(call_ollama(prompt, model=model))
-        return resp or text
-    except Exception as e:
-        logger.warning(f"Translation failed, sending original text: {e}")
-        return text
 
 
 def send_outbound_message(db: Session, user: User, text: str) -> None:

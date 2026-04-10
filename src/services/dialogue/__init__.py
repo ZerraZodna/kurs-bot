@@ -1,9 +1,7 @@
 """Dialogue service subpackages and utilities."""
 
 from src.language.language_service import detect_and_store_language
-from src.lessons.handler import (
-    translate_text,
-)
+
 from src.memories.dialogue_helpers import (
     get_user_language,
 )
@@ -22,7 +20,6 @@ from .pause_handler import detect_pause_request
 __all__ = [
     "call_ollama",
     "stream_ollama",
-    "translate_text",
     "get_user_language",
     "detect_and_store_language",
     "detect_pause_request",

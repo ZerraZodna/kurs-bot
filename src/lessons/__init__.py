@@ -19,7 +19,7 @@ Usage:
 # PDF import functions
 # Lesson delivery/progression functions (restored from original exports)
 from .db_importer import import_to_db, verify_db_count
-from .handler import format_lesson_message, translate_text
+from .handler import get_english_lesson_text
 from .importer import ensure_lessons_available
 from .lesson_parser import parse_lessons_from_text
 from .pdf_extractor import extract_formatted_text
@@ -39,12 +39,11 @@ __all__ = [
     "verify_db_count",
     # CLI entry points
     # Lesson delivery/progression functions
-    "format_lesson_message",
-    "translate_text",
     "ensure_lessons_available",
     "compute_current_lesson_state",
     "get_current_lesson",
     "get_lesson_state",
     "has_lesson_status",
     "set_current_lesson",
+    "get_english_lesson_text",
 ]

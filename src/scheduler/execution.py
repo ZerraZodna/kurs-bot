@@ -13,14 +13,15 @@ from typing import Callable
 from sqlalchemy.orm import Session
 
 from src.core.timezone import utc_now
-from src.lessons import format_lesson_message
-from src.lessons.delivery import build_lesson_preview, deliver_lesson, get_lesson_or_import
+from src.lessons import get_english_lesson_text
+from src.lessons.delivery import get_english_lesson_preview, deliver_lesson, get_lesson_or_import
 from src.memories import MemoryManager
 from src.models.database import Lesson, Schedule, User, get_session
 from src.scheduler.message_utils import send_outbound_message
 
 from .domain import is_one_time_schedule_type, job_id_for_schedule
 from .memory_helpers import get_schedule_message, get_user_language
+from src.language import translate_text
 
 logger = logging.getLogger(__name__)
 
@@ -53,22 +54,17 @@ def _build_schedule_message(
         message = get_schedule_message(memory_manager, schedule.user_id, schedule.schedule_id)
         return message or "Reminder"
 
-    language = get_user_language(memory_manager, schedule.user_id)
-
     from src.lessons.state import get_current_lesson
 
     last_sent = get_current_lesson(memory_manager, schedule.user_id)
     if not last_sent:
-        return build_lesson_preview(db, memory_manager, schedule.user_id, language)
+        return get_english_lesson_preview(db, memory_manager, schedule.user_id)
 
     next_id = (last_sent % 365) + 1
-    # Always auto-advance without asking for confirmation
     lesson = get_lesson_or_import(db, next_id)
     if lesson:
-        return asyncio.run(format_lesson_message(lesson, language))
+        return get_english_lesson_text(lesson)
 
-    # No lesson to send
-    # Send a failure message?
     return None
 
 
@@ -227,9 +223,7 @@ def _execute_one_time_schedule(db: Session, schedule: Schedule, user: User, memo
 
 
 def _execute_lesson_schedule(db: Session, schedule: Schedule, user: User, memory_manager: MemoryManager) -> None:
-    """Handle recurring lesson schedule execution. Returns messages for simulation."""
-    language = get_user_language(memory_manager, schedule.user_id)
-
+    """Handle recurring lesson schedule execution."""
     from src.lessons.state import compute_current_lesson_state
 
     state = compute_current_lesson_state(memory_manager, schedule.user_id)
@@ -241,4 +235,9 @@ def _execute_lesson_schedule(db: Session, schedule: Schedule, user: User, memory
         state.get("previous_lesson_id"),
     )
 
-    deliver_lesson(db, schedule.user_id, None, memory_manager, language)
+    english_text = deliver_lesson(db, schedule.user_id, None, memory_manager)
+    if english_text:
+        lang = get_user_language(memory_manager, schedule.user_id)
+        if lang and lang.lower() not in ("en",):
+            english_text = asyncio.run(translate_text(english_text, lang))
+        send_outbound_message(db, user, english_text)
