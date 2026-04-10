@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from typing import Dict, Any
 
@@ -7,7 +6,7 @@ from sqlalchemy.orm import Session
 from src.config import settings
 from src.core.timezone import format_dt_in_timezone, get_user_timezone_from_db
 from src.language.prompt_builder import PromptBuilder
-from src.language import translate_text
+from src.language.onboarding_prompts import get_onboarding_message
 from src.lessons.delivery import _parse_lesson_int, deliver_lesson
 
 from src.memories import MemoryManager
@@ -18,7 +17,6 @@ from src.onboarding.service import OnboardingService
 from src.scheduler import api as scheduler_api
 from src.services.dialogue import (
     stream_ollama,
-    get_user_language,
 )
 
 logger = logging.getLogger(__name__)
@@ -143,36 +141,7 @@ class DialogueEngine:
 
         # /help command
         if text.strip().lower() in ["/help", "/start"]:
-            help_text = """<b>🌟 Kurs Bot - ACIM Spiritual Companion</b>
-
-<b>📖 Lessons & Reminders</b>
-• Daily ACIM lessons sent automatically
-• <b>Set your time:</b> "Set daily lesson reminder for 9AM" or "morning"
-• <b>Manual:</b> <code>/lesson 29</code>, "Next lesson", "Repeat lesson"
-• "What's my current lesson?"
-
-<b>🧠 Personal Memory</b>
-• I remember our conversations & preferences
-• "Forget [topic]" to remove specific memory
-• "Remember [important fact]" for persistence
-• "List my memories" (existing command)
-
-<b>⚙️ Personalization</b>
-• Language auto-detected (EN/DE/others)
-• Custom system prompt: [use existing command]
-• Timezone auto-detected from messages
-
-<b>🔒 Privacy/GDPR</b>
-• /delete - full data deletion
-• /consent - manage data permissions
-• Data retention: 90 days conversations, profiles forever until deleted
-
-<b>Talk naturally! 🙏</b>
-Type /help anytime.
-
-/start also shows this help."""
-            if user_lang and user_lang.lower() not in ("en",):
-                help_text = await translate_text(help_text, user_lang, self.call_ollama)
+            help_text = get_onboarding_message("commands.help", user_lang)
             return help_text
 
         # /lesson command
@@ -181,11 +150,9 @@ Type /help anytime.
             target_lesson_id = _parse_lesson_int(parts[1] if len(parts) > 1 else None)
             english_text = deliver_lesson(session, user_id, target_lesson_id, self.memory_manager)
             if english_text is not None:
-                if user_lang and user_lang.lower() not in ("en",):
-                    english_text = await translate_text(english_text, user_lang, self.call_ollama)
                 logger.info(f"[command /lesson user={user_id}] lesson_id={target_lesson_id or 'current'}")
-                return english_text
-            return "Sorry, could not deliver lesson. Please check lesson number or try /help."
+                return english_text  # Already translated in deliver_lesson if needed
+            return get_onboarding_message("commands.lesson_error", user_lang)
 
         return None
 
@@ -356,7 +323,6 @@ Type /help anytime.
     def _handle_schedule_request(self, user_id: int, text: str, session: Session) -> str | None:
         """Handle explicit schedule requests (unchanged helper)."""
         from src.scheduler.schedule_query_handler import build_schedule_status_response
-        from src.language import translate_text
 
         schedules = scheduler_api.get_user_schedules(user_id, session=session)
         if schedules:
@@ -370,12 +336,7 @@ Type /help anytime.
                 ttl_hours=1,
                 category=MemoryCategory.CONVERSATION.value,
             )
-
-            user_lang = get_user_language(self.memory_manager, user_id)
-            if user_lang and user_lang.lower() not in ("en",):
-                loop = asyncio.get_event_loop()
-                resp_text = loop.run_until_complete(translate_text(resp_text, user_lang, self.call_ollama))
-
+            # Schedule responses handled by LLM lang instruction
             return resp_text or ""
 
         time_memories = self.memory_manager.get_memory(user_id, MemoryKey.PREFERRED_LESSON_TIME)

@@ -63,8 +63,70 @@ You can also:
     return messages.get(language, messages["en"])
 
 
-# Onboarding messages - simplified to name + consent only
+# Onboarding & command messages - bilingual EN/NO
 ONBOARD_MESSAGES = {
+    "commands.help": {
+        "en": """<b>🌟 Kurs Bot - ACIM Spiritual Companion</b>
+
+<b>📖 Lessons & Reminders</b>
+• Daily ACIM lessons sent automatically
+• <b>Set your time:</b> "Set daily lesson reminder for 9AM" or "morning"
+• <b>Manual:</b> <code>/lesson 29</code>, "Next lesson", "Repeat lesson"
+• "What's my current lesson?"
+
+<b>🧠 Personal Memory</b>
+• I remember our conversations & preferences
+• "Forget [topic]" to remove specific memory
+• "Remember [important fact]" for persistence
+• "List my memories" (existing command)
+
+<b>⚙️ Personalization</b>
+• Language auto-detected (EN/DE/others)
+• Custom system prompt: [use existing command]
+• Timezone auto-detected from messages
+
+<b>🔒 Privacy/GDPR</b>
+• /delete - full data deletion
+• /consent - manage data permissions
+• Data retention: 90 days conversations, profiles forever until deleted
+
+<b>Talk naturally! 🙏</b>
+Type /help anytime.
+
+/start also shows this help.""",
+        "no": """<b>🌟 Kurs Bot - ACIM Åndelig Følgesvenn</b>
+
+<b>📖 Leksjoner & Påminnelser</b>
+• Daglige ACIM-leksjoner sendes automatisk
+• <b>Sett din tid:</b> "Sett daglig leksjonspåminnelse kl. 9" eller "morgen"
+• <b>Manuell:</b> <code>/leksjon 29</code>, "Neste leksjon", "Gjenta leksjon"
+• "Hva er min nåværende leksjon?"
+
+<b>🧠 Personlig Minne</b>
+• Jeg husker våre samtaler & preferanser
+• "Glem [emne]" fjerner spesifikt minne
+• "Husk [viktig faktum]" for persistens
+• "List mine minner" (eksisterende kommando)
+
+<b>⚙️ Personalisering</b>
+• Språk auto-deteksjon (EN/NO/andre)
+• Egendefinert system prompt: [bruk eksisterende kommando]
+• Tidssone auto-deteksjon fra meldinger
+
+<b>🔒 Personvern/GDPR</b>
+• /delete - full datasletting
+• /consent - administrer datatillatelser
+• Dataretensjon: 90 dager samtaler, profiler evig til slettet
+
+<b>Snakk naturlig! 🙏</b>
+Skriv /help når som helst.
+
+/start viser også denne hjelpen.""",
+    },
+    "commands.lesson_error": {
+        "en": "Sorry, could not deliver lesson. Please check lesson number or try /help.",
+        "no": "Beklager, kunne ikke levere leksjonen. Sjekk leksjonsnummer eller prøv /help.",
+    },
     "consent_declined": {
         "en": "Understood. I won't store your information. If you change your mind, just message me again. 🙏",
         "no": "Forstått. Jeg lagrer ikke informasjonen din. Hvis du ombestemmer deg, bare send meg en melding igjen. 🙏",
