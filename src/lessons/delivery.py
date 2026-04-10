@@ -71,13 +71,9 @@ def deliver_lesson(
     user_id: int,
     target_lesson_id: int | None,
     memory_manager: MemoryManager,
-    language: str | None = None,
+    language: str,
 ) -> None:
     """Deliver lesson: load, format, send, advance state (formerly scheduler._execute_lesson_schedule)."""
-    if language is None:
-        from src.scheduler.memory_helpers import get_user_language
-
-        language = get_user_language(memory_manager, user_id)
 
     # Compute/use target lesson
     if target_lesson_id is None:

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from src.config import settings
 from src.core.timezone import format_dt_in_timezone, get_user_timezone_from_db
 from src.language.prompt_builder import PromptBuilder
+from src.lessons.delivery import _parse_lesson_int, deliver_lesson
 
 from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
@@ -180,8 +181,6 @@ Type /help anytime.
 
         # /lesson command
         if text.strip().startswith("/lesson"):
-            from src.lessons.delivery import _parse_lesson_int, deliver_lesson
-
             parts = text.strip().split(maxsplit=1)
             target_lesson_id = _parse_lesson_int(parts[1] if len(parts) > 1 else None)
             message = deliver_lesson(session, user_id, target_lesson_id, self.memory_manager, user_lang)
@@ -204,7 +203,7 @@ Type /help anytime.
     async def _handle_lesson_and_schedule_stage(
         self, user_id: int, text: str, session: Session, user_lang: str, include_lesson: bool
     ) -> str | None:
-        from src.services.dialogue import handle_schedule_messages, maybe_send_next_lesson
+        from src.services.dialogue import handle_schedule_messages
 
         schedule_response = await handle_schedule_messages(
             user_id=user_id,
@@ -217,18 +216,6 @@ Type /help anytime.
         )
         if schedule_response:
             return schedule_response
-
-        if include_lesson:
-            auto_message = await maybe_send_next_lesson(
-                user_id=user_id,
-                text=text,
-                session=session,
-                prompt_builder=self.prompt_builder,
-                memory_manager=self.memory_manager,
-                call_ollama=self.call_ollama,
-            )
-            if auto_message:
-                return auto_message
 
         return None
 

@@ -11,7 +11,6 @@ from typing import Any, Dict
 
 from sqlalchemy.orm import Session
 
-from src.lessons.advance import maybe_send_next_lesson as _maybe_send_next_lesson
 from src.lessons.handler import (
     _find_lesson_by_id as _find_lesson,
 )
@@ -54,25 +53,6 @@ def format_lesson_message(lesson: Lesson, language: str | None = None) -> str:
         return f"Lesson {lesson.lesson_id}: {lesson.title}\n\n{lesson.content}"
 
 
-async def maybe_send_next_lesson(
-    user_id: int,
-    text: str,
-    session: Session,
-    prompt_builder: Any,
-    memory_manager: MemoryManager,
-    call_ollama: Any,
-) -> str | None:
-    """Check if we should auto-send the next lesson on a new day."""
-    return await _maybe_send_next_lesson(
-        user_id=user_id,
-        text=text,
-        session=session,
-        prompt_builder=prompt_builder,
-        memory_manager=memory_manager,
-        call_ollama=call_ollama,
-    )
-
-
 # Re-export state functions
 def get_current_lesson(memory_manager: MemoryManager, user_id: int) -> Any | None:
     """Get the user's current lesson."""
@@ -104,5 +84,4 @@ __all__ = [
     "set_current_lesson",
     "has_lesson_status",
     "compute_current_lesson_state",
-    "maybe_send_next_lesson",
 ]

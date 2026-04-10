@@ -14,14 +14,10 @@ Usage:
 
     # Or use individual components
     from src.lessons import extract_formatted_text, parse_lessons_from_text, import_to_db
-
-    # Lesson delivery functions
-    from src.lessons import maybe_send_next_lesson, get_current_lesson, set_current_lesson
 """
 
 # PDF import functions
 # Lesson delivery/progression functions (restored from original exports)
-from .advance import is_simple_greeting, maybe_send_next_lesson
 from .db_importer import import_to_db, verify_db_count
 from .handler import format_lesson_message, translate_text
 from .importer import ensure_lessons_available
@@ -43,8 +39,6 @@ __all__ = [
     "verify_db_count",
     # CLI entry points
     # Lesson delivery/progression functions
-    "is_simple_greeting",
-    "maybe_send_next_lesson",
     "format_lesson_message",
     "translate_text",
     "ensure_lessons_available",
