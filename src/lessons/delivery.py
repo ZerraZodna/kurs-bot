@@ -89,9 +89,12 @@ def deliver_lesson(
     if not user:
         return None
 
-    # Advance state
-    set_current_lesson(memory_manager, user_id, target_lesson_id)
-    user.last_active_at = utc_now()
-    db.commit()
-    logger.info(f"Prepared lesson {target_lesson_id} for user {user_id}")
+    # Advance state only for numbered lessons (not intro/0)
+    if target_lesson_id != 0:
+        set_current_lesson(memory_manager, user_id, target_lesson_id)
+        user.last_active_at = utc_now()
+        db.commit()
+        logger.info(f"Prepared lesson {target_lesson_id} for user {user_id}")
+    else:
+        logger.info(f"Sent introduction (lesson 0) for user {user_id} without updating lesson state")
     return english_text
