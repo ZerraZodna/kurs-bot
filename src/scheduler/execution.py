@@ -21,7 +21,6 @@ from src.scheduler.message_utils import send_outbound_message
 
 from .domain import is_one_time_schedule_type, job_id_for_schedule
 from .memory_helpers import get_schedule_message, get_user_language
-from src.language import translate_text
 
 logger = logging.getLogger(__name__)
 
@@ -239,5 +238,7 @@ def _execute_lesson_schedule(db: Session, schedule: Schedule, user: User, memory
     if english_text:
         lang = get_user_language(memory_manager, schedule.user_id)
         if lang and lang.lower() not in ("en",):
+            from src.language import translate_text
+
             english_text = asyncio.run(translate_text(english_text, lang))
         send_outbound_message(db, user, english_text)
