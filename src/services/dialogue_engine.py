@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Dict, Any
 
@@ -34,11 +35,6 @@ class DialogueEngine:
         self.prompt_builder = PromptBuilder(db, self.memory_manager)
         self.onboarding = OnboardingService(db)
         self.onboarding_flow = OnboardingFlow(self.memory_manager, self.onboarding, self.call_ollama)
-
-    @property
-    def memory_judge(self):
-        """Expose MemoryJudge from memory_manager for memory extraction."""
-        return self.memory_manager.ai_judge
 
     async def call_ollama(self, prompt: str, model: str | None = None, language: str | None = None) -> str:
         """Delegate to dialogue.ollama_client with optional language hint."""
@@ -356,7 +352,7 @@ Type /help anytime.
 
         return "general_chat"
 
-    async def _handle_schedule_request(self, user_id: int, text: str, session: Session) -> str | None:
+    def _handle_schedule_request(self, user_id: int, text: str, session: Session) -> str | None:
         """Handle explicit schedule requests (unchanged helper)."""
         from src.scheduler.schedule_query_handler import build_schedule_status_response
         from src.services.dialogue import translate_text
@@ -376,9 +372,9 @@ Type /help anytime.
 
             user_lang = get_user_language(self.memory_manager, user_id)
             if user_lang and user_lang.lower() not in ("en",):
-                resp_text = await translate_text(resp_text, user_lang, self.call_ollama)
+                resp_text = asyncio.run(translate_text(resp_text, user_lang, self.call_ollama))
 
-            return resp_text
+            return resp_text or ""
 
         time_memories = self.memory_manager.get_memory(user_id, MemoryKey.PREFERRED_LESSON_TIME)
         if not time_memories:

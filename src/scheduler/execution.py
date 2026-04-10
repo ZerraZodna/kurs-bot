@@ -5,6 +5,7 @@ Contains schedule execution paths and missed-job recovery behavior.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import timedelta
 from typing import Callable
@@ -64,7 +65,7 @@ def _build_schedule_message(
     # Always auto-advance without asking for confirmation
     lesson = get_lesson_or_import(db, next_id)
     if lesson:
-        return format_lesson_message(lesson, language)
+        return asyncio.run(format_lesson_message(lesson, language))
 
     # No lesson to send
     # Send a failure message?
