@@ -144,17 +144,38 @@ class DialogueEngine:
             help_text = get_onboarding_message("commands.help", user_lang)
             return help_text
 
-        # /lesson command
-        if text.strip().startswith("/lesson"):
-            parts = text.strip().split(maxsplit=1)
-            target_lesson_id = _parse_lesson_int(parts[1] if len(parts) > 1 else None)
-            english_text = deliver_lesson(session, user_id, target_lesson_id, self.memory_manager)
-            if english_text is not None:
-                logger.info(f"[command /lesson user={user_id}] lesson_id={target_lesson_id or 'current'}")
-                return english_text  # Already translated in deliver_lesson if needed
-            return get_onboarding_message("commands.lesson_error", user_lang)
+        # Lesson commands
+        lesson_response = await self._handle_lesson_command(session, user_id, text, user_lang)
+        if lesson_response:
+            return lesson_response
 
         return None
+
+    async def _handle_lesson_command(self, session: Session, user_id: int, text: str, user_lang: str) -> str | None:
+        """Handle /todays_lesson, /introduction, /lesson commands."""
+        cmd_text = text.strip()
+
+        if cmd_text == "/todays_lesson":
+            target_lesson_id = None
+            cmd_name = "todays_lesson"
+            log_id = "current"
+        elif cmd_text == "/introduction":
+            target_lesson_id = 0
+            cmd_name = "introduction"
+            log_id = 0
+        elif cmd_text.startswith("/lesson"):
+            parts = cmd_text.split(maxsplit=1)
+            target_lesson_id = _parse_lesson_int(parts[1] if len(parts) > 1 else None)
+            cmd_name = "lesson"
+            log_id = target_lesson_id or "current"
+        else:
+            return None
+
+        english_text = deliver_lesson(session, user_id, target_lesson_id, self.memory_manager)
+        if english_text is not None:
+            logger.info(f"[command /{cmd_name} user={user_id}] lesson_id={log_id}")
+            return english_text  # Already translated in deliver_lesson if needed
+        return get_onboarding_message("commands.lesson_error", user_lang)
 
     async def _handle_onboarding_stage(self, user_id: int, text: str, session: Session) -> str | None:
         """Handle onboarding flow."""
