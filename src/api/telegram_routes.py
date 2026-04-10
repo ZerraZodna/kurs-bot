@@ -8,6 +8,7 @@ from sqlalchemy.exc import OperationalError
 from src.config import settings
 from src.core.timezone import utc_now, utc_now_plus
 from src.integrations.telegram import TelegramHandler, process_telegram_batch
+from src.integrations.telegram_routing import resolve_reply_chat_id
 from src.models.database import BatchLock, MessageLog, SessionLocal, User, get_session
 from src.services.admin_notifier import send_admin_notification, set_admin_chat_id
 from src.services.traffic_tracker import record_traffic_event
@@ -54,6 +55,9 @@ async def telegram_webhook(request: Request, secret_token: str):
     # --- Add or update user in DB ---
     uid = parsed["user_id"]
     text = parsed["text"]
+    reply_chat_id = resolve_reply_chat_id(parsed)
+    if reply_chat_id is None:
+        return {"ok": False, "reason": "Missing or invalid chat id"}
     first_name = payload.get("message", {}).get("from", {}).get("first_name")
     last_name = payload.get("message", {}).get("from", {}).get("last_name")
 
@@ -127,7 +131,7 @@ async def telegram_webhook(request: Request, secret_token: str):
                 lock = BatchLock(user_id=user_id, channel="telegram", expires_at=utc_now_plus(minutes=3))
                 db.add(lock)
                 db.commit()
-                asyncio.create_task(process_telegram_batch(user_id, uid))
+                asyncio.create_task(process_telegram_batch(user_id, str(reply_chat_id)))
 
     _retry_db_op("batch lock", _create_batch_lock, attempts=3, delay_seconds=0.1)
 

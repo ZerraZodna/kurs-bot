@@ -16,6 +16,7 @@ from src.integrations.telegram import (
     TelegramHandler,
     send_typing_action,
 )
+from src.integrations.telegram_routing import resolve_reply_chat_id
 from src.models.database import BatchLock, MessageLog, SessionLocal, User
 from src.services.admin_notifier import send_admin_notification
 
@@ -195,7 +196,7 @@ async def process_update(update: dict) -> None:
     """Process a single Telegram update."""
     try:
         update_id = update.get("update_id")
-        if update_id in _processed_updates:
+        if update_id is not None and update_id in _processed_updates:
             return
 
         message = update.get("message") or update.get("edited_message")
@@ -208,7 +209,9 @@ async def process_update(update: dict) -> None:
 
         user_id_str = parsed["user_id"]
         text = parsed["text"]
-        chat_id = int(parsed["chat_id"])
+        chat_id = resolve_reply_chat_id(parsed)
+        if chat_id is None:
+            return
 
         logger.info(f"[polling] Message from {user_id_str}: {text[:30]}...")
 
@@ -225,17 +228,19 @@ async def process_update(update: dict) -> None:
 
         # Check restrictions
         if not await _is_user_allowed(db_user_id):
-            _processed_updates.add(update_id)
+            if update_id is not None:
+                _processed_updates.add(update_id)
             return
 
         # Log message
         await _log_message(db_user_id, parsed)
 
         # Mark processed
-        _processed_updates.add(update_id)
+        if update_id is not None:
+            _processed_updates.add(update_id)
 
         # Trigger batch processing
-        await _trigger_batch(db_user_id, user_id_str)
+        await _trigger_batch(db_user_id, str(chat_id))
     except Exception as e:
         logger.error(f"[polling] Error processing update {update.get('update_id')}: {e}")
 

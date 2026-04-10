@@ -135,12 +135,14 @@ class TelegramHandler:
             return None
         # Ignore bot commands (optional)
         text = msg.get("text")
+        chat = msg.get("chat", {}) or {}
         return {
             "user_id": str(user.get("id")),
             "channel": "telegram",
             "text": text,
             "external_message_id": str(msg.get("message_id")),
-            "chat_id": str(msg.get("chat", {}).get("id")),
+            "chat_id": str(chat.get("id")),
+            "chat_type": chat.get("type"),
             "timestamp": datetime.fromtimestamp(msg.get("date", 0), timezone.utc),
         }
 
