@@ -1,6 +1,8 @@
 # Vendor & Subprocessor List
 
-**Last updated:** 2024-10-01
+> **⚠️ TEMPLATE — Needs completion.** See [README.md](README.md) for status.
+>
+> **Last updated:** 2024-10-01
 
 | Vendor | Purpose | Data Categories | Region | DPA/SCC Status | Notes |
 |---|---|---|---|---|---|
@@ -9,4 +11,4 @@
 | Hosting provider | App hosting | All | TBD | TBD | Fill in provider |
 
 ## Change Notification
-Document how users are informed about subprocessor changes.
+> TODO: Document how users are informed about subprocessor changes.

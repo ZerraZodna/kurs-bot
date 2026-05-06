@@ -1,6 +1,8 @@
 # Data Protection Impact Assessment (DPIA)
 
-**Last updated:** 2024-10-01
+> **⚠️ TEMPLATE — Needs completion.** See [README.md](README.md) for status.
+>
+> **Last updated:** 2024-10-01
 
 ## 1) Description of Processing
 - System: Kurs Bot
@@ -9,8 +11,7 @@
 - Data subjects: end users
 
 ## 2) Necessity & Proportionality
-- Describe why each data category is necessary.
-- Explain minimization measures and defaults.
+> TODO: Describe why each data category is necessary. Explain minimization measures and defaults.
 
 ## 3) Risks to Data Subjects
 - Unauthorized access to message content
@@ -24,7 +25,7 @@
 - Encryption in transit and at rest
 
 ## 5) Residual Risk
-- Evaluate residual risk and acceptance decision.
+> TODO: Evaluate residual risk and acceptance decision.
 
 ## 6) Approval
-- DPO/Owner sign-off and date
+> TODO: DPO/Owner sign-off and date

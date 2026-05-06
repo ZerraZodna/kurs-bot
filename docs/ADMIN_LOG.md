@@ -38,5 +38,4 @@ Robustness
 - Log failures for operator visibility and retry where appropriate in background jobs.
 
 Next actions
-- Keep this doc in `docs/` for discoverability; remove the root-level note once satisfied.
 - Optionally expand with examples for multi-admin support and admin onboarding UX (e.g. one-time "please /start" prompt).

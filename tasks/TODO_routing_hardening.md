@@ -1,4 +1,4 @@
-# Telegram group/private routing hardening TODO
+# Telegram group/private routing hardening
 
 1. [ ] Add explicit same-chat routing policy helper (group stays group, private stays private)
 2. [ ] Integrate routing helper in webhook path (`src/api/telegram_routes.py`)

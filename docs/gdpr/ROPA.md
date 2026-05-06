@@ -1,8 +1,11 @@
 # Records of Processing Activities (RoPA)
 
-**Last updated:** 2024-10-01
+> **⚠️ TEMPLATE — Needs completion.** See [README.md](README.md) for status.
+>
+> **Last updated:** 2024-10-01
 
 ## Controller
+> TODO: Fill in controller details
 - Name:
 - Contact:
 - DPO (if applicable):

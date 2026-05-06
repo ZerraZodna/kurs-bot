@@ -19,11 +19,7 @@
 ## 🐛 Bug Fixes
 
 ### Unrelated Bugs (Fix Independently)
-- [ ] Research and test Telegram streaming interval issue → `tasks/RESEARCH_TELEGRAM_STREAMING.md`
-  - Issue: User wants to test if 0.2s causes 402 errors
-  - Goal: Determine if manual setting is enough or code fix needed
-  - Approach: Test different intervals, document evidence, choose fix
-  - Options: Manual setting, warning, or change default to 1.0s
+- None currently tracked
 
 ### Discovered During Other Fixes
 - [ ] None currently tracked
@@ -33,7 +29,7 @@
 ## ✨ Features
 
 ### New Functionality
-- [ ] None currently tracked
+- [ ] Telegram routing hardening → `tasks/TODO_routing_hardening.md`
 
 ### Enhancements
 - [ ] None currently tracked
@@ -66,13 +62,14 @@
 - [ ] Research OpenAI as alternative to Ollama → `tasks/RESEARCH_OPENAI.md`
 
 ### Prompt Format Differences (COMPLETE)
-- [x] Research prompt formatting differences between Ollama and OpenAI → `tasks/RESEARCH_PROMPT_FORMAT.md`
+- [x] Research prompt formatting differences between Ollama and OpenAI
   - ✅ Backward compatibility strategy defined
   - ✅ Function calling preservation plan
   - ✅ Memory injection preservation plan
   - ✅ Test strategy (keep old tests, add new ones)
   - ✅ Ollama Cloud format update needed
   - ✅ Implementation checklist ready
+  - Note: Original research file removed; findings incorporated into codebase.
 
 ---
 

@@ -1,11 +1,14 @@
 # Incident & Breach Response Plan
 
-**Last updated:** 2024-10-01
+> **⚠️ TEMPLATE — Needs completion.** See [README.md](README.md) for status.
+>
+> **Last updated:** 2024-10-01
 
 ## Scope
 Applies to all personal data processing systems and integrations.
 
 ## Roles & Contacts
+> TODO: Fill in names and contact info
 - Incident Manager:
 - Security Lead:
 - DPO (if applicable):

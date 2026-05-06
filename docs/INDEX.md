@@ -2,15 +2,15 @@
 
 ## 📁 Current Structure (Cleaned)
 
-docs/ (2 top-level)
+docs/ (3 top-level)
 ├── ADMIN_LOG.md (admin notifications spec)
 ├── INDEX.md (this file)
+├── MILESTONE_PLAN.md (8-milestone implementation plan)
 ├── dev/ (developer guides)
 │   ├── ARCHITECTURE.md
-│   ├── DB_GUIDE.md (merged DATABASE_GUIDE + DB_MANAGEMENT)
-│   ├── NPM_USAGE.md
-│   └── SCRIPTS_ORGANIZATION.md
+│   └── DB_GUIDE.md (merged DATABASE_GUIDE + DB_MANAGEMENT)
 └── gdpr/ (compliance)
+    ├── README.md (compliance status overview)
     ├── DPIA.md
     ├── DSR_ID_VERIFICATION.md
     ├── GDPR_PLAN_IMPLEMENTATION.md
@@ -20,15 +20,13 @@ docs/ (2 top-level)
     ├── ROPA.md
     └── VENDOR_SUBPROCESSORS.md
 
-**Before cleanup:** 19 flat .md files → **After:** Organized (dev/ + gdpr/), easy to navigate.
+**Note:** NPM_USAGE.md, SCRIPTS_ORGANIZATION.md, LESSON_DELIVERY_FLOW.md, and EMBEDDINGS_TRIGGERS.md were removed (files no longer exist).
 
 ## 🔗 Key Documents
 
 ### Developer
 - [Architecture & Design](dev/ARCHITECTURE.md)
 - [Database Guide](dev/DB_GUIDE.md)
-- [NPM Usage](dev/NPM_USAGE.md)
-- [Scripts Org](dev/SCRIPTS_ORGANIZATION.md)
 
 ### GDPR/Compliance
 - [Implementation Plan](gdpr/GDPR_PLAN_IMPLEMENTATION.md) - Central checklist
@@ -42,4 +40,7 @@ docs/ (2 top-level)
 ### Admin
 - [Notifications](ADMIN_LOG.md)
 
-Updated: Current structure.
+### Planning
+- [8-Milestone Plan](MILESTONE_PLAN.md) — Full implementation roadmap
+
+Updated: Added README.md (gdpr), MILESTONE_PLAN.md; removed broken references.
