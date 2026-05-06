@@ -108,9 +108,10 @@
 - When adding new functions that accept `session: Optional[Session] = None`, always use the context manager pattern.
 - The same principle applies to any resource that needs cleanup (file handles, HTTP clients, etc.).
 
-### Timezone Centralization (MANDATORY)
-- ALL timezone operations MUST use ONLY `src.core.timezone` module
-- BANNED everywhere else: `import datetime`, `from datetime import timezone`, `from zoneinfo`
+### Timezone Centralization
+- Primary: use `src.core.timezone` module for project-specific timezone helpers (`utc_now()`, `from_utc()`, etc.)
+- Python 3.12+ allows `datetime.UTC` (the constant) — use it for simple `datetime.now(datetime.UTC)` calls
+- Still avoid `from datetime import timezone` in application code; prefer `datetime.UTC` or `src.core.timezone`
 
 ## Testing and Pull Requests
 - Standard command: `npm test`
