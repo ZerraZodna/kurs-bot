@@ -150,7 +150,7 @@ switch (cmd) {
       '',
       '  npm install          # installs JS deps and runs `postinstall` to set up Python venv and deps',
       '  # or explicitly (if you prefer):',
-      '  npm run install:py   # install Python deps into .venv (requirements.txt or editable install)',
+      '  npm run install:py   # install Python deps into .venv from pyproject.toml',
       '  npm test             # runs pytest via the consolidated runner',
       '  npm start            # starts the backend (uvicorn) and ngrok if available (detached)',
       '  npm stop             # stop ngrok and uvicorn processes started by `npm start`',
@@ -174,7 +174,7 @@ switch (cmd) {
     console.log('Usage: node scripts/venv.js <command> [args]\n');
     console.log('Commands:');
     console.log('  ensure-venv       Create .venv if missing');
-    console.log('  install           Install Python deps (requirements.txt or editable)');
+    console.log('  install           Install Python deps from pyproject.toml');
     console.log('  test [pytest-args]  Run pytest');
     console.log('  run <script> [args] Run a Python script');
     console.log('  exec <python-args>  Run arbitrary python with args');
