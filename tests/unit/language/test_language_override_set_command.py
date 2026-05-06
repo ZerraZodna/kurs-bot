@@ -3,7 +3,7 @@
 Migrated from tests/test_language_override_set_command.py to use new test fixtures.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 import pytest
 
@@ -27,7 +27,7 @@ class TestLanguageOverrideSetCommand:
             channel="test",
             first_name="John",
             opted_in=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db_session.add(user)
         db_session.commit()

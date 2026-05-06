@@ -4,7 +4,7 @@ This test verifies that when a user says "in 10 minutes", the reminder
 is scheduled correctly in their local timezone, not UTC.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -22,7 +22,7 @@ class TestRelativeTimeParsing:
         # Bug behavior: Calculates from UTC -> 14:14 UTC = 15:14 Oslo (WRONG!)
 
         # Mock current time
-        mock_utc_now = datetime(2026, 3, 2, 14, 4, 0, tzinfo=timezone.utc)  # 14:04 UTC
+        mock_utc_now = datetime(2026, 3, 2, 14, 4, 0, tzinfo=UTC)  # 14:04 UTC
         oslo_tz = ZoneInfo("Europe/Oslo")
         mock_oslo_now = mock_utc_now.astimezone(oslo_tz)  # Should be 15:04 Oslo
 
@@ -36,7 +36,7 @@ class TestRelativeTimeParsing:
 
         # The FIX: Should calculate from local time
         fixed_run_at_local = mock_oslo_now + timedelta(minutes=10)  # 15:14 Oslo
-        fixed_run_at_utc = fixed_run_at_local.astimezone(timezone.utc)  # 14:14 UTC
+        fixed_run_at_utc = fixed_run_at_local.astimezone(UTC)  # 14:14 UTC
 
         # Verify the bug
         assert buggy_run_at.hour == 14  # 14:14 UTC
@@ -75,7 +75,7 @@ class TestRelativeTimeParsing:
         # User in Oslo says "in 10 minutes" at 15:55 Oslo time
         # Expected: 16:05 Oslo time = 15:05 UTC
 
-        mock_utc_now = datetime(2026, 3, 2, 14, 55, 0, tzinfo=timezone.utc)  # 14:55 UTC = 15:55 Oslo
+        mock_utc_now = datetime(2026, 3, 2, 14, 55, 0, tzinfo=UTC)  # 14:55 UTC = 15:55 Oslo
         oslo_tz = ZoneInfo("Europe/Oslo")
         mock_oslo_now = mock_utc_now.astimezone(oslo_tz)
 
@@ -87,7 +87,7 @@ class TestRelativeTimeParsing:
 
         # Fix: Add 10 min to local, convert to UTC
         fixed_local = mock_oslo_now + timedelta(minutes=10)  # 16:05 Oslo
-        fixed_utc = fixed_local.astimezone(timezone.utc)  # 15:05 UTC
+        fixed_utc = fixed_local.astimezone(UTC)  # 15:05 UTC
 
         # Bug result in Oslo time
         buggy_oslo = buggy.astimezone(oslo_tz)
@@ -110,7 +110,7 @@ class TestRelativeTimeParsing:
         tokyo_tz = ZoneInfo("Asia/Tokyo")
 
         # Tokyo: 23:00, UTC: 14:00
-        mock_utc = datetime(2026, 3, 2, 14, 0, 0, tzinfo=timezone.utc)
+        mock_utc = datetime(2026, 3, 2, 14, 0, 0, tzinfo=UTC)
         mock_tokyo = mock_utc.astimezone(tokyo_tz)
 
         assert mock_tokyo.hour == 23
@@ -143,12 +143,12 @@ class TestRelativeTimeParsing:
         oslo_tz = ZoneInfo("Europe/Oslo")
 
         # If the code thought 15:04 was UTC (bug):
-        buggy_base = datetime(2026, 3, 2, 15, 4, 0, tzinfo=timezone.utc)
+        buggy_base = datetime(2026, 3, 2, 15, 4, 0, tzinfo=UTC)
         buggy_result = buggy_base + timedelta(minutes=10)  # 15:14 UTC
 
         # What the user actually wanted:
         # 15:04 Oslo = 14:04 UTC
-        correct_base = datetime(2026, 3, 2, 14, 4, 0, tzinfo=timezone.utc)
+        correct_base = datetime(2026, 3, 2, 14, 4, 0, tzinfo=UTC)
         correct_result = correct_base + timedelta(minutes=10)  # 14:14 UTC
 
         # Convert to Oslo time for comparison

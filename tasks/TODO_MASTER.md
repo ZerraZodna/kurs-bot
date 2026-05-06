@@ -29,7 +29,7 @@
 ## ✨ Features
 
 ### New Functionality
-- [ ] Telegram routing hardening → `tasks/TODO_routing_hardening.md`
+- None currently tracked
 
 ### Enhancements
 - [ ] None currently tracked

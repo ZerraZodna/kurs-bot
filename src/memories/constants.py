@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class MemoryCategory(str, Enum):
+class MemoryCategory(StrEnum):
     FACT = "fact"
     PROFILE = "profile"
     PREFERENCES = "preferences"

@@ -3,7 +3,7 @@
 Migrated from tests/test_scheduler_characterization.py to use new test fixtures.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 
 import pytest
 from tests.fixtures.users import make_ready_user
@@ -26,7 +26,7 @@ class TestSchedulerCharacterization:
         """
         # Given: A one-time schedule in the future
         user_id = test_user_with_memories.user_id
-        run_at = datetime.now(timezone.utc) + timedelta(minutes=2)
+        run_at = datetime.now(UTC) + timedelta(minutes=2)
         schedule = SchedulerService.create_one_time_schedule(
             user_id=user_id,
             run_at=run_at,

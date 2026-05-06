@@ -8,7 +8,7 @@ This test file covers the query_schedule function handler which:
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from unittest.mock import Mock, patch
 
 import pytest
@@ -70,18 +70,18 @@ class TestHandleQuerySchedule:
             lesson_id=1,
             schedule_type="daily",
             cron_expression="0 9 * * *",
-            next_send_time=datetime(2024, 1, 15, 9, 0, tzinfo=timezone.utc),
+            next_send_time=datetime(2024, 1, 15, 9, 0, tzinfo=UTC),
             is_active=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         schedule2 = Schedule(
             user_id=test_user.user_id,
             lesson_id=2,
             schedule_type="daily",
             cron_expression="0 18 * * *",
-            next_send_time=datetime(2024, 1, 15, 18, 0, tzinfo=timezone.utc),
+            next_send_time=datetime(2024, 1, 15, 18, 0, tzinfo=UTC),
             is_active=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db_session.add(schedule1)
         db_session.add(schedule2)
@@ -90,7 +90,7 @@ class TestHandleQuerySchedule:
         with patch("src.core.timezone.get_user_timezone_from_db", return_value="Europe/Oslo"):
             with patch("src.core.timezone.format_dt_in_timezone") as mock_format:
                 # Mock timezone conversion to return a fixed time
-                mock_format.return_value = (datetime(2024, 1, 15, 10, 0, tzinfo=timezone.utc), "Europe/Oslo")
+                mock_format.return_value = (datetime(2024, 1, 15, 10, 0, tzinfo=UTC), "Europe/Oslo")
 
                 with patch("src.scheduler.api.get_user_schedules", return_value=[schedule1, schedule2]):
                     context = {
@@ -128,9 +128,9 @@ class TestHandleQuerySchedule:
             lesson_id=1,
             schedule_type="daily",
             cron_expression="0 9 * * *",
-            next_send_time=datetime(2024, 1, 15, 9, 0, tzinfo=timezone.utc),  # 9 AM UTC
+            next_send_time=datetime(2024, 1, 15, 9, 0, tzinfo=UTC),  # 9 AM UTC
             is_active=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db_session.add(schedule)
         db_session.commit()
@@ -139,7 +139,7 @@ class TestHandleQuerySchedule:
         with patch("src.core.timezone.get_user_timezone_from_db", return_value="Europe/Oslo"):
             with patch("src.core.timezone.format_dt_in_timezone") as mock_format:
                 # Mock: 9 AM UTC should become 10 AM in Europe/Oslo
-                local_dt = datetime(2024, 1, 15, 10, 0, tzinfo=timezone.utc)
+                local_dt = datetime(2024, 1, 15, 10, 0, tzinfo=UTC)
                 mock_format.return_value = (local_dt, "Europe/Oslo")
 
                 with patch("src.scheduler.api.get_user_schedules", return_value=[schedule]):
@@ -172,9 +172,9 @@ class TestHandleQuerySchedule:
             lesson_id=None,
             schedule_type="one_time_reminder",
             cron_expression="",  # Required field but not used for one_time
-            next_send_time=datetime(2024, 1, 20, 14, 0, tzinfo=timezone.utc),
+            next_send_time=datetime(2024, 1, 20, 14, 0, tzinfo=UTC),
             is_active=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db_session.add(schedule)
         db_session.commit()
@@ -222,9 +222,9 @@ class TestHandleQuerySchedule:
             lesson_id=1,
             schedule_type="daily",
             cron_expression="0 9 * * *",
-            next_send_time=datetime(2024, 1, 15, 9, 0, tzinfo=timezone.utc),
+            next_send_time=datetime(2024, 1, 15, 9, 0, tzinfo=UTC),
             is_active=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
         # Create inactive schedule
@@ -233,9 +233,9 @@ class TestHandleQuerySchedule:
             lesson_id=2,
             schedule_type="daily",
             cron_expression="0 18 * * *",
-            next_send_time=datetime(2024, 1, 15, 18, 0, tzinfo=timezone.utc),
+            next_send_time=datetime(2024, 1, 15, 18, 0, tzinfo=UTC),
             is_active=False,  # Inactive
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
         db_session.add(active_schedule)
@@ -244,7 +244,7 @@ class TestHandleQuerySchedule:
 
         with patch("src.core.timezone.get_user_timezone_from_db", return_value="UTC"):
             with patch("src.core.timezone.format_dt_in_timezone") as mock_format:
-                mock_format.return_value = (datetime(2024, 1, 15, 9, 0, tzinfo=timezone.utc), "UTC")
+                mock_format.return_value = (datetime(2024, 1, 15, 9, 0, tzinfo=UTC), "UTC")
 
                 # Only return active schedules from the API
                 with patch("src.scheduler.api.get_user_schedules", return_value=[active_schedule]):
@@ -297,9 +297,9 @@ class TestHandleQuerySchedule:
             lesson_id=None,
             schedule_type="one_time_reminder",
             cron_expression="",  # Required field but not used for one_time
-            next_send_time=datetime(2024, 1, 20, 14, 0, tzinfo=timezone.utc),
+            next_send_time=datetime(2024, 1, 20, 14, 0, tzinfo=UTC),
             is_active=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db_session.add(schedule)
         db_session.commit()
@@ -368,9 +368,9 @@ class TestHandleQueryScheduleIntegration:
             lesson_id=None,
             schedule_type="one_time_reminder",
             cron_expression="",  # Required field but not used for one_time
-            next_send_time=datetime(2024, 1, 20, 14, 0, tzinfo=timezone.utc),
+            next_send_time=datetime(2024, 1, 20, 14, 0, tzinfo=UTC),
             is_active=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db_session.add(schedule)
         db_session.commit()

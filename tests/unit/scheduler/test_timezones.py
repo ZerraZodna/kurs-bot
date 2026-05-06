@@ -3,7 +3,7 @@
 Refactored to use new test fixtures from tests/fixtures/
 """
 
-from datetime import timezone
+from datetime import UTC
 
 from sqlalchemy.orm import Session
 
@@ -24,7 +24,7 @@ class TestParseLocalTimeToUtc:
         # Then: Result should be a timezone-aware UTC datetime
         assert utc_dt.tzinfo is not None
         # Hour may vary depending on DST; ensure conversion yields an aware UTC datetime
-        assert utc_dt.tzinfo.utcoffset(utc_dt) == timezone.utc.utcoffset(utc_dt)
+        assert utc_dt.tzinfo.utcoffset(utc_dt) == UTC.utcoffset(utc_dt)
 
 
 class TestScheduleTimezoneStorage:
@@ -46,7 +46,7 @@ class TestScheduleTimezoneStorage:
             ns = sched.next_send_time
             # Some DB backends (sqlite) may return naive datetimes; treat naive as UTC
             if ns.tzinfo is None:
-                ns = ns.replace(tzinfo=timezone.utc)
+                ns = ns.replace(tzinfo=UTC)
             # Display should show 09:00 in user's timezone
             local_dt, _ = format_dt_in_timezone(ns, "Europe/Oslo")
             assert f"{local_dt:%H:%M}" == "09:00"
@@ -70,7 +70,7 @@ class TestScheduleTimezoneStorage:
         if updated.next_send_time:
             ns = updated.next_send_time
             if ns.tzinfo is None:
-                ns = ns.replace(tzinfo=timezone.utc)
+                ns = ns.replace(tzinfo=UTC)
             # Display should show 10:15 in Europe/Oslo
             local_dt, _ = format_dt_in_timezone(ns, "Europe/Oslo")
             assert f"{local_dt:%H:%M}" == "10:15"

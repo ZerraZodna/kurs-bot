@@ -1,5 +1,5 @@
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -16,7 +16,7 @@ if __name__ == "__main__":
     print(f"Total messages in DB: {total_messages}")
 
     # Today's messages
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     today_rows = (
         db.query(MessageLog).filter(MessageLog.created_at >= today_start).order_by(MessageLog.created_at.desc()).all()
     )

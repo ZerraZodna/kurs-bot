@@ -160,7 +160,7 @@ def test_gdpr_retention_purges_ttl_memories(db_session):
         source="test",
         created_at=datetime.datetime.now(datetime.UTC),
         updated_at=datetime.datetime.now(datetime.UTC),
-        ttl_expires_at=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1),
+        ttl_expires_at=datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=1),
     )
     db_session.add(expired)
     db_session.commit()

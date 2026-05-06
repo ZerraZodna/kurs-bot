@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 
 from src.core.timezone import format_dt_in_timezone, to_utc
 from src.models.database import Schedule, SessionLocal, User
@@ -71,14 +71,14 @@ def _parse_run_at(run_at_val) -> datetime:
             dt = _dp.parse(run_at_val)
         return to_utc(dt)
     if isinstance(run_at_val, int | float):
-        return to_utc(datetime.fromtimestamp(run_at_val, timezone.utc))
+        return to_utc(datetime.fromtimestamp(run_at_val, UTC))
     return None
 
 
 def test_parse_run_at_iso_and_epoch():
     db = SessionLocal()
     try:
-        now = datetime.now(timezone.utc).replace(microsecond=0)
+        now = datetime.now(UTC).replace(microsecond=0)
         iso = now.isoformat()
         parsed_iso = _parse_run_at(iso)
         assert parsed_iso is not None
@@ -90,7 +90,7 @@ def test_parse_run_at_iso_and_epoch():
         parsed_epoch = _parse_run_at(epoch)
         assert parsed_epoch is not None
         assert parsed_epoch.tzinfo is not None
-        assert to_utc(parsed_epoch) == to_utc(datetime.fromtimestamp(epoch, timezone.utc))
+        assert to_utc(parsed_epoch) == to_utc(datetime.fromtimestamp(epoch, UTC))
 
     finally:
         db.close()

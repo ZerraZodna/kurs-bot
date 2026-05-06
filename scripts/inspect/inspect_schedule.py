@@ -51,7 +51,7 @@ def _print_ns(ns, user_id, db):
     # If naive, assume UTC for inspection (code's current behavior)
     if getattr(ns, "tzinfo", None) is None:
         print("Interpreting stored value as UTC (naive) for inspection")
-        ns_assumed = ns.replace(tzinfo=datetime.timezone.utc)
+        ns_assumed = ns.replace(tzinfo=datetime.UTC)
     else:
         ns_assumed = ns
 

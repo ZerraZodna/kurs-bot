@@ -3,7 +3,7 @@
 Migrated from tests/test_language_detection_short_messages.py to use new test fixtures.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 import pytest
 
@@ -26,7 +26,7 @@ class TestLanguageDetectionShortMessages:
             channel="test",
             first_name="Test",
             opted_in=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db_session.add(user)
         db_session.commit()

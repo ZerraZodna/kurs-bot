@@ -3,7 +3,7 @@
 Migrated from tests/test_scheduler_jobs.py to use new test fixtures.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 
 import pytest
 from src.scheduler import jobs
@@ -44,7 +44,7 @@ class TestSchedulerJobs:
         assert sched is not None
 
         # When: Creating a one-time schedule and syncing
-        run_at = datetime.now(timezone.utc) + timedelta(seconds=5)
+        run_at = datetime.now(UTC) + timedelta(seconds=5)
         fake_schedule = FakeSchedule(9999, "one_time_reminder", next_send_time=run_at)
         jobs.sync_job_for_schedule(fake_schedule)
 

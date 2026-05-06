@@ -51,7 +51,7 @@ class MemoryBuilder:
 
     def archived(self, archived_at: datetime.datetime | None = None) -> "MemoryBuilder":
         self._is_active = False
-        self._archived_at = archived_at or datetime.datetime.now(datetime.timezone.utc)
+        self._archived_at = archived_at or datetime.datetime.now(datetime.UTC)
         return self
 
     def with_source(self, source: str) -> "MemoryBuilder":
@@ -71,8 +71,8 @@ class MemoryBuilder:
             category=self._category,
             is_active=self._is_active,
             archived_at=self._archived_at,
-            created_at=self._created_at or datetime.datetime.now(datetime.timezone.utc),
-            updated_at=datetime.datetime.now(datetime.timezone.utc),
+            created_at=self._created_at or datetime.datetime.now(datetime.UTC),
+            updated_at=datetime.datetime.now(datetime.UTC),
             source=self._source,
         )
         self.db.add(memory)
@@ -148,7 +148,7 @@ class ScheduleBuilder:
 
     def send_now(self) -> "ScheduleBuilder":
         """Set next_send_time to now (for immediate execution)."""
-        self._next_send_time = datetime.datetime.now(datetime.timezone.utc)
+        self._next_send_time = datetime.datetime.now(datetime.UTC)
         return self
 
     def send_at(self, send_time: datetime.datetime) -> "ScheduleBuilder":
@@ -162,9 +162,9 @@ class ScheduleBuilder:
             lesson_id=self._lesson_id,
             schedule_type=self._schedule_type,
             cron_expression=self._cron_expression,
-            next_send_time=self._next_send_time or datetime.datetime.now(datetime.timezone.utc),
+            next_send_time=self._next_send_time or datetime.datetime.now(datetime.UTC),
             is_active=self._is_active,
-            created_at=datetime.datetime.now(datetime.timezone.utc),
+            created_at=datetime.datetime.now(datetime.UTC),
         )
         self.db.add(schedule)
         self.db.commit()
@@ -222,7 +222,7 @@ class MessageBuilder:
             channel=self._channel,
             external_message_id=self._external_message_id,
             status=self._status,
-            created_at=datetime.datetime.now(datetime.timezone.utc),
+            created_at=datetime.datetime.now(datetime.UTC),
         )
         self.db.add(message)
         self.db.commit()
@@ -319,7 +319,7 @@ class LessonBuilder:
             lesson_id=self._lesson_id,
             title=self._title,
             content=self._content,
-            created_at=self._created_at or datetime.datetime.now(datetime.timezone.utc),
+            created_at=self._created_at or datetime.datetime.now(datetime.UTC),
         )
         self.db.add(lesson)
         self.db.commit()

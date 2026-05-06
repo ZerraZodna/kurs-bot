@@ -300,6 +300,6 @@ async def stop_polling_task() -> None:
         request_shutdown()
         try:
             await asyncio.wait_for(_polling_task, timeout=10.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("[polling] Task didn't stop within 10s, cancelling")
             _polling_task.cancel()

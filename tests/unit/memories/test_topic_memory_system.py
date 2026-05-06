@@ -1,7 +1,7 @@
 """Comprehensive test suite for topic-based memory system."""
 
 import random
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 import pytest
 
@@ -85,9 +85,9 @@ def test_temporal_resolution(memory_manager, clean_test_data, test_user_id):
 
     # Store multiple names at different times
     times = [
-        ("OldName", datetime(2026, 1, 1, tzinfo=timezone.utc)),
-        ("MiddleName", datetime(2026, 2, 1, tzinfo=timezone.utc)),
-        ("NewestName", datetime(2026, 3, 1, tzinfo=timezone.utc)),
+        ("OldName", datetime(2026, 1, 1, tzinfo=UTC)),
+        ("MiddleName", datetime(2026, 2, 1, tzinfo=UTC)),
+        ("NewestName", datetime(2026, 3, 1, tzinfo=UTC)),
     ]
 
     for value, created_at in times:

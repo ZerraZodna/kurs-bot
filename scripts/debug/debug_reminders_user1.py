@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import asyncio
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 # Ensure repo root is on path for src imports
@@ -15,7 +15,7 @@ from src.services.dialogue_engine import DialogueEngine
 
 def dump_user_state(db, user_id: int):
     print(f"\n{'=' * 80}")
-    print(f"=== User {user_id} state inspection ({datetime.now(tz=timezone.utc).isoformat()}) ===")
+    print(f"=== User {user_id} state inspection ({datetime.now(tz=UTC).isoformat()}) ===")
     print(f"{'=' * 80}")
 
     user = db.query(User).filter_by(user_id=user_id).first()
@@ -78,11 +78,11 @@ async def debug_reminders_query(user_id: int = 1, query: str = "What are my remi
         print("   (Live Ollama streaming ~20-40s)...\n")
 
         dialogue = DialogueEngine(db)
-        start_time = datetime.now(tz=timezone.utc)
+        start_time = datetime.now(tz=UTC)
 
         response = await dialogue.process_message(user_id, query, db)
 
-        elapsed = datetime.now(tz=timezone.utc) - start_time
+        elapsed = datetime.now(tz=UTC) - start_time
         print(f"⏱️  Initial process_message in {elapsed.total_seconds():.1f}s\n")
 
         full_response = ""
@@ -103,9 +103,9 @@ async def debug_reminders_query(user_id: int = 1, query: str = "What are my remi
 
             # Call post_hook with full_response (executes functions!)
             print("🔧 Calling post_hook for function execution...\n")
-            post_start = datetime.now(tz=timezone.utc)
+            post_start = datetime.now(tz=UTC)
             diagnostics = await response["post_hook"](full_response)
-            post_elapsed = datetime.now(tz=timezone.utc) - post_start
+            post_elapsed = datetime.now(tz=UTC) - post_start
             print(f"⏱️  post_hook completed in {post_elapsed.total_seconds():.1f}s\n")
         else:
             print("📄 Non-stream response:")

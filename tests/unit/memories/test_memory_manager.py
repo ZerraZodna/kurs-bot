@@ -66,7 +66,7 @@ class TestMemoryManager:
     def test_purge_expired(self, db_session: Session, test_user):
         """Old archived memories should be purged."""
         # Given: An old archived memory
-        old_date = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=800)
+        old_date = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=800)
         mem = Memory(
             user_id=test_user.user_id,
             category="fact",

@@ -25,7 +25,7 @@ This invokes real Ollama (~30s).
 import asyncio
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 from src.integrations.telegram_stream import StreamingFilter
 from src.models.database import Memory, Schedule, SessionLocal, User, init_db
@@ -34,7 +34,7 @@ from src.services.dialogue_engine import DialogueEngine
 
 def dump_user_state(db, user_id: int):
     """Dump user state: user, schedules, recent memories."""
-    print(f"\\n=== User {user_id} state (at {datetime.now(tz=timezone.utc).isoformat()}) ===")
+    print(f"\\n=== User {user_id} state (at {datetime.now(tz=UTC).isoformat()}) ===")
     user = db.query(User).filter_by(user_id=user_id).first()
     if not user:
         print("❌ User not found")

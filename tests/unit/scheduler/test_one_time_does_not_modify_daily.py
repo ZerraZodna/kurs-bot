@@ -3,7 +3,7 @@ Migrated tests for one-time schedule creation.
  migrated from tests/test_one_time_does_not_modify_daily.py
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 
 from src.models.database import Schedule, SessionLocal
 from src.scheduler import SchedulerService
@@ -25,7 +25,7 @@ def test_one_time_creation_does_not_modify_daily():
         daily = SchedulerService.create_daily_schedule(user_id=user_id, lesson_id=None, time_str="08:00", session=db)
 
         # When: Create a one-time reminder for the same user
-        run_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        run_at = datetime.now(UTC) + timedelta(hours=1)
         one = SchedulerService.create_one_time_schedule(
             user_id=user_id, run_at=run_at, message="One-time reminder", session=db
         )

@@ -123,7 +123,7 @@ def generate_html_lesson(lesson_id):
 def send_lesson_to_telegram(lesson_id, html_content):
     """Send HTML lesson to Telegram"""
     # Save HTML file
-    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
     filename = f"lesson_{lesson_id}_{timestamp}.html"
     filepath = os.path.expanduser(f"~/kurs-bot/lessons/{filename}")
 

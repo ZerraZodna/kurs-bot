@@ -2,7 +2,7 @@
 Tests for duplicate reminder prevention in the scheduler.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -21,7 +21,7 @@ class TestDuplicateReminderPrevention:
         mock_schedule = MagicMock()
         mock_schedule.schedule_id = 1
         mock_schedule.schedule_type = SCHEDULE_TYPE_ONE_TIME_REMINDER
-        mock_schedule.next_send_time = datetime(2024, 1, 15, 14, 30, 0, tzinfo=timezone.utc)
+        mock_schedule.next_send_time = datetime(2024, 1, 15, 14, 30, 0, tzinfo=UTC)
         mock_schedule.is_active = True
 
         # Mock the session query
@@ -29,7 +29,7 @@ class TestDuplicateReminderPrevention:
         mock_session.query.return_value.filter_by.return_value.all.return_value = [mock_schedule]
 
         # Search for the same time
-        run_at = datetime(2024, 1, 15, 14, 30, 0, tzinfo=timezone.utc)
+        run_at = datetime(2024, 1, 15, 14, 30, 0, tzinfo=UTC)
         result = find_existing_one_time_reminder(
             user_id=123,
             run_at=run_at,
@@ -46,7 +46,7 @@ class TestDuplicateReminderPrevention:
         mock_schedule = MagicMock()
         mock_schedule.schedule_id = 1
         mock_schedule.schedule_type = SCHEDULE_TYPE_ONE_TIME_REMINDER
-        mock_schedule.next_send_time = datetime(2024, 1, 15, 14, 30, 0, tzinfo=timezone.utc)
+        mock_schedule.next_send_time = datetime(2024, 1, 15, 14, 30, 0, tzinfo=UTC)
         mock_schedule.is_active = True
 
         # Mock the session query
@@ -54,7 +54,7 @@ class TestDuplicateReminderPrevention:
         mock_session.query.return_value.filter_by.return_value.all.return_value = [mock_schedule]
 
         # Search for a time 30 seconds later (within 60s tolerance)
-        run_at = datetime(2024, 1, 15, 14, 30, 30, tzinfo=timezone.utc)
+        run_at = datetime(2024, 1, 15, 14, 30, 30, tzinfo=UTC)
         result = find_existing_one_time_reminder(
             user_id=123,
             run_at=run_at,
@@ -71,7 +71,7 @@ class TestDuplicateReminderPrevention:
         mock_schedule = MagicMock()
         mock_schedule.schedule_id = 1
         mock_schedule.schedule_type = SCHEDULE_TYPE_ONE_TIME_REMINDER
-        mock_schedule.next_send_time = datetime(2024, 1, 15, 14, 30, 0, tzinfo=timezone.utc)
+        mock_schedule.next_send_time = datetime(2024, 1, 15, 14, 30, 0, tzinfo=UTC)
         mock_schedule.is_active = True
 
         # Mock the session query
@@ -79,7 +79,7 @@ class TestDuplicateReminderPrevention:
         mock_session.query.return_value.filter_by.return_value.all.return_value = [mock_schedule]
 
         # Search for a time 2 minutes later (outside 60s tolerance)
-        run_at = datetime(2024, 1, 15, 14, 32, 0, tzinfo=timezone.utc)
+        run_at = datetime(2024, 1, 15, 14, 32, 0, tzinfo=UTC)
         result = find_existing_one_time_reminder(
             user_id=123,
             run_at=run_at,
@@ -95,7 +95,7 @@ class TestDuplicateReminderPrevention:
         mock_schedule = MagicMock()
         mock_schedule.schedule_id = 1
         mock_schedule.schedule_type = "daily"  # Not a one-time reminder
-        mock_schedule.next_send_time = datetime(2024, 1, 15, 14, 30, 0, tzinfo=timezone.utc)
+        mock_schedule.next_send_time = datetime(2024, 1, 15, 14, 30, 0, tzinfo=UTC)
         mock_schedule.is_active = True
 
         # Mock the session query
@@ -103,7 +103,7 @@ class TestDuplicateReminderPrevention:
         mock_session.query.return_value.filter_by.return_value.all.return_value = [mock_schedule]
 
         # Search for the same time
-        run_at = datetime(2024, 1, 15, 14, 30, 0, tzinfo=timezone.utc)
+        run_at = datetime(2024, 1, 15, 14, 30, 0, tzinfo=UTC)
         result = find_existing_one_time_reminder(
             user_id=123,
             run_at=run_at,
@@ -120,7 +120,7 @@ class TestDuplicateReminderPrevention:
         mock_schedule = MagicMock()
         mock_schedule.schedule_id = 1
         mock_schedule.schedule_type = SCHEDULE_TYPE_ONE_TIME_REMINDER
-        mock_schedule.next_send_time = datetime(2024, 1, 15, 14, 30, 0, tzinfo=timezone.utc)
+        mock_schedule.next_send_time = datetime(2024, 1, 15, 14, 30, 0, tzinfo=UTC)
         mock_schedule.is_active = False  # Inactive
 
         # Mock the session query - should not return inactive schedules
@@ -128,7 +128,7 @@ class TestDuplicateReminderPrevention:
         mock_session.query.return_value.filter_by.return_value.all.return_value = []
 
         # Search for the same time
-        run_at = datetime(2024, 1, 15, 14, 30, 0, tzinfo=timezone.utc)
+        run_at = datetime(2024, 1, 15, 14, 30, 0, tzinfo=UTC)
         result = find_existing_one_time_reminder(
             user_id=123,
             run_at=run_at,
@@ -160,7 +160,7 @@ class TestCreateOneTimeScheduleDeduplication:
 
                 # Mock sync_job_for_schedule
                 with patch("src.scheduler.operations.schedule_jobs.sync_job_for_schedule"):
-                    run_at = datetime(2024, 1, 15, 14, 30, 0, tzinfo=timezone.utc)
+                    run_at = datetime(2024, 1, 15, 14, 30, 0, tzinfo=UTC)
                     result = create_one_time_schedule(
                         user_id=123,
                         run_at=run_at,
@@ -194,7 +194,7 @@ class TestCreateOneTimeScheduleDeduplication:
 
                     # Mock sync_job_for_schedule
                     with patch("src.scheduler.operations.schedule_jobs.sync_job_for_schedule"):
-                        run_at = datetime(2024, 1, 15, 14, 30, 0, tzinfo=timezone.utc)
+                        run_at = datetime(2024, 1, 15, 14, 30, 0, tzinfo=UTC)
                         result = create_one_time_schedule(
                             user_id=123,
                             run_at=run_at,

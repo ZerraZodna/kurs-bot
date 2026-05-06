@@ -30,7 +30,7 @@ def test_user(db_session: Session) -> Generator[User, None, None]:
         first_name=DEFAULT_FIRST_NAME,
         last_name="User",
         opted_in=True,
-        created_at=datetime.datetime.now(datetime.timezone.utc),
+        created_at=datetime.datetime.now(datetime.UTC),
     )
     db_session.add(user)
     db_session.commit()
@@ -69,7 +69,7 @@ def test_user_norwegian(db_session: Session) -> Generator[User, None, None]:
         first_name="Ola",
         last_name="Nordmann",
         opted_in=True,
-        created_at=datetime.datetime.now(datetime.timezone.utc),
+        created_at=datetime.datetime.now(datetime.UTC),
     )
     db_session.add(user)
     db_session.commit()
@@ -116,7 +116,7 @@ class UserFactory:
             first_name=first_name,
             last_name=last_name,
             opted_in=opted_in,
-            created_at=datetime.datetime.now(datetime.timezone.utc),
+            created_at=datetime.datetime.now(datetime.UTC),
         )
         self.db_session.add(user)
         self.db_session.commit()

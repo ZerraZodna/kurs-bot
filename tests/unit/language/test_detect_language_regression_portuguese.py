@@ -3,7 +3,7 @@
 Migrated from tests/test_detect_language_regression_portuguese.py to use new test fixtures.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 import pytest
 
@@ -27,7 +27,7 @@ class TestDetectLanguageRegressionPortuguese:
             channel="test",
             first_name="Test",
             opted_in=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db_session.add(user)
         db_session.commit()

@@ -5,7 +5,7 @@ operations.py, then converted again in jobs.py. This test verifies the bug
 and will pass once the fix is applied.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from unittest.mock import Mock, patch
 from zoneinfo import ZoneInfo
 
@@ -30,7 +30,7 @@ class TestOneTimeReminderUTCConversion:
 
         # First conversion: local to UTC (as done in operations.py)
         local_aware = local_time.replace(tzinfo=ZoneInfo(local_tz))
-        utc_time = local_aware.astimezone(timezone.utc)
+        utc_time = local_aware.astimezone(UTC)
 
         # This is what operations.py does - converts to UTC
         # utc_time should be 14:14 UTC (Oslo is UTC+1 in March)
@@ -59,7 +59,7 @@ class TestOneTimeReminderUTCConversion:
         from src.scheduler.jobs import sync_job_for_schedule
 
         # Create a mock schedule with a specific UTC time
-        run_at = datetime(2026, 3, 2, 14, 14, 0, tzinfo=timezone.utc)  # 14:14 UTC
+        run_at = datetime(2026, 3, 2, 14, 14, 0, tzinfo=UTC)  # 14:14 UTC
 
         mock_schedule = Mock()
         mock_schedule.schedule_id = 123
@@ -129,7 +129,7 @@ class TestOneTimeReminderUTCConversion:
             local_run_at = datetime(2026, 3, 2, 15, 14, 0, tzinfo=ZoneInfo(local_tz))
 
             # Expected UTC time: 14:14 UTC (Oslo is UTC+1 in March)
-            expected_utc = local_run_at.astimezone(timezone.utc)
+            expected_utc = local_run_at.astimezone(UTC)
             assert expected_utc.hour == 14
 
             # Call the function with a mock session
@@ -171,10 +171,10 @@ class TestDateTriggerBehavior:
         from apscheduler.triggers.date import DateTrigger
 
         # Create a UTC time 2 seconds in the future
-        future_utc = datetime.now(timezone.utc) + timedelta(seconds=2)
+        future_utc = datetime.now(UTC) + timedelta(seconds=2)
 
         # Create trigger
-        trigger = DateTrigger(run_date=future_utc, timezone=timezone.utc)
+        trigger = DateTrigger(run_date=future_utc, timezone=UTC)
 
         # Verify the trigger's next fire time is what we expect
         next_fire = trigger.get_next_fire_time(None, future_utc - timedelta(seconds=1))
@@ -206,12 +206,12 @@ class TestDateTriggerBehavior:
         assert utc_2 == utc_1  # Should be identical
 
         # Create trigger with the double-converted time
-        trigger = DateTrigger(run_date=utc_2, timezone=timezone.utc)
+        trigger = DateTrigger(run_date=utc_2, timezone=UTC)
 
         # The trigger should still fire at the correct moment
         # 14:14 UTC = 15:14 Oslo
-        expected_fire_time = local_time.astimezone(timezone.utc)
-        actual_fire_time = trigger.get_next_fire_time(None, datetime(2026, 3, 2, 14, 0, 0, tzinfo=timezone.utc))
+        expected_fire_time = local_time.astimezone(UTC)
+        actual_fire_time = trigger.get_next_fire_time(None, datetime(2026, 3, 2, 14, 0, 0, tzinfo=UTC))
 
         assert actual_fire_time == expected_fire_time, (
             f"Trigger fire time incorrect after double UTC conversion! "
@@ -232,10 +232,10 @@ class TestSchedulerJobTimezoneHandling:
         from apscheduler.triggers.date import DateTrigger
 
         # Create a UTC datetime
-        utc_time = datetime(2026, 3, 2, 14, 14, 0, tzinfo=timezone.utc)
+        utc_time = datetime(2026, 3, 2, 14, 14, 0, tzinfo=UTC)
 
         # Create trigger with UTC timezone
-        trigger_utc = DateTrigger(run_date=utc_time, timezone=timezone.utc)
+        trigger_utc = DateTrigger(run_date=utc_time, timezone=UTC)
 
         # The trigger's run_date should be the same
         assert trigger_utc.run_date == utc_time
@@ -245,7 +245,7 @@ class TestSchedulerJobTimezoneHandling:
         trigger_oslo = DateTrigger(run_date=oslo_time, timezone=ZoneInfo("Europe/Oslo"))
 
         # Both triggers should represent the same moment in time
-        assert trigger_utc.run_date.astimezone(timezone.utc) == trigger_oslo.run_date.astimezone(timezone.utc)
+        assert trigger_utc.run_date.astimezone(UTC) == trigger_oslo.run_date.astimezone(UTC)
 
     def test_to_utc_idempotent(self):
         """

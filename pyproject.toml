@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Kurs-bot: ACIM lesson delivery bot"
 readme = "README.md"
 requires-python = ">=3.12"
-license = {file = "LICENSE"}
+
 authors = [{name = "Johannes Steen"}]
 dependencies = [
     "langchain-openai>=1.1.14",
@@ -50,7 +50,7 @@ dev = [
 ]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py312"
 line-length = 120
 src = ["src", "tests"]
 
@@ -101,6 +101,8 @@ ignore = [
 # strptime for date-only parsing (no timezone needed for .date() extraction)
 "src/functions/parameters.py" = ["DTZ007"]
 "src/services/traffic_tracker.py" = ["DTZ007"]
+# Central timezone module — uses timezone.utc intentionally
+"src/core/timezone.py" = ["DTZ"]
 # Intentional re-exports for backward compatibility
 "src/models/database.py" = ["F401"]
 "src/scheduler/maintenance.py" = ["F401"]
@@ -127,7 +129,7 @@ filterwarnings = [
 norecursedirs = ["scripts/debug"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

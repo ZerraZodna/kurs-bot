@@ -3,7 +3,7 @@ Migrated tests for SchedulerService.
  migrated from tests/test_scheduler_service.py
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 
 import pytest
 from sqlalchemy import create_engine
@@ -29,7 +29,7 @@ def db_session():
         first_name="Sched",
         last_name="Test",
         opted_in=True,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
     # Create test lessons
@@ -37,13 +37,13 @@ def db_session():
         lesson_id=1,
         title="Nothing I see means anything",
         content="Lesson one content.",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     lesson_two = Lesson(
         lesson_id=2,
         title="I have given everything I see all the meaning that it has for me",
         content="Lesson two content.",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     session.add(user)
     session.add(lesson)
@@ -86,7 +86,7 @@ class TestSchedulerService:
 
         # Given: User with active daily schedule
         user = db_session.query(User).first()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         user.last_active_at = now - timedelta(days=days_ago)
         db_session.commit()
 
@@ -161,9 +161,9 @@ class TestSchedulerService:
             lesson_id=None,
             schedule_type="daily",
             cron_expression="0 9 * * *",
-            next_send_time=datetime.now(timezone.utc),
+            next_send_time=datetime.now(UTC),
             is_active=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db_session.add(schedule)
         db_session.commit()

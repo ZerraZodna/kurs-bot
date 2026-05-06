@@ -19,7 +19,7 @@ def lesson(db_session: Session) -> Lesson:
     lesson = Lesson(
         title="Test Lesson",
         content="This is test content for lesson 1.",
-        created_at=datetime.datetime.now(datetime.timezone.utc),
+        created_at=datetime.datetime.now(datetime.UTC),
     )
     db_session.add(lesson)
     db_session.commit()
@@ -309,4 +309,4 @@ def frozen_time() -> datetime.datetime:
     Returns a fixed UTC datetime that can be used for consistent
     time-based assertions.
     """
-    return datetime.datetime(2024, 1, 15, 12, 0, 0, tzinfo=datetime.timezone.utc)
+    return datetime.datetime(2024, 1, 15, 12, 0, 0, tzinfo=datetime.UTC)

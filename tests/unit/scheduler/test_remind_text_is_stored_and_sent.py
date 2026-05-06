@@ -4,7 +4,7 @@ Migrated tests for remind text storage and sending.
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 
 import pytest
 
@@ -27,7 +27,7 @@ async def test_remind_me_creates_one_time_with_correct_message():
         user_id = make_ready_user(db, external_id="remind_test_user", first_name="Remind")
 
         # When: Build a schedule_spec like an assistant intent would provide
-        run_at = (datetime.now(timezone.utc) + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+        run_at = (datetime.now(UTC) + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
 
         # When: Use FunctionExecutor to create one-time reminder
         executor = get_function_executor()

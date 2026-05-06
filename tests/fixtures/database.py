@@ -107,7 +107,7 @@ def db_session_with_user(db_session) -> Generator[Session, None, None]:
         first_name=DEFAULT_TEST_USER_FIRST_NAME,
         last_name="User",
         opted_in=True,
-        created_at=datetime.datetime.now(datetime.timezone.utc),
+        created_at=datetime.datetime.now(datetime.UTC),
     )
     db_session.add(user)
     db_session.commit()

@@ -5,7 +5,7 @@ This module centralizes timezone helpers for reuse across packages.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, UTC
 from typing import Tuple
 from zoneinfo import ZoneInfo
 
@@ -15,9 +15,9 @@ def utc_now() -> datetime:
 
     This is the ONE canonical way to get "now" in this project.
     Never use datetime.now(), datetime.utcnow(), or
-    datetime.now(timezone.utc) directly.
+    datetime.now(UTC) directly.
     """
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _normalize_tz_name(tz_name: str | None) -> str | None:
@@ -90,7 +90,7 @@ def format_dt_in_timezone(dt: datetime, tz_name: str | None) -> Tuple[datetime, 
         resolved_name = "UTC"
 
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
 
     return dt.astimezone(tzinfo), resolved_name
 
@@ -107,19 +107,19 @@ def to_utc(dt: datetime, tz_name: str | None = None) -> datetime:
         raise ValueError("dt must be a datetime")
 
     if dt.tzinfo is not None:
-        return dt.astimezone(timezone.utc)
+        return dt.astimezone(UTC)
 
     # naive
     if tz_name:
         try:
             tz = ZoneInfo(tz_name)
         except Exception:
-            tz = timezone.utc
+            tz = UTC
         local = dt.replace(tzinfo=tz)
-        return local.astimezone(timezone.utc)
+        return local.astimezone(UTC)
 
     # assume UTC
-    return dt.replace(tzinfo=timezone.utc)
+    return dt.replace(tzinfo=UTC)
 
 
 def from_utc(dt: datetime, tz_name: str | None) -> datetime:
@@ -131,13 +131,13 @@ def from_utc(dt: datetime, tz_name: str | None) -> datetime:
         raise ValueError("dt must be a datetime")
 
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
 
     resolved_name = tz_name or "UTC"
     try:
         tz = ZoneInfo(resolved_name)
     except Exception:
-        tz = timezone.utc
+        tz = UTC
 
     return dt.astimezone(tz)
 
@@ -166,19 +166,19 @@ def parse_local_time_to_utc(time_str: str, tz_name: str, now_utc: datetime | Non
     if now_utc is None:
         from datetime import datetime as _dt
 
-        now_utc = _dt.now(timezone.utc)
+        now_utc = _dt.now(UTC)
 
     try:
         tz = ZoneInfo(tz_name or "UTC")
     except Exception:
-        tz = timezone.utc
+        tz = UTC
 
     local_now = now_utc.astimezone(tz)
     local_next = local_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
     if local_next <= local_now:
         local_next = local_next + timedelta(days=1)
 
-    return local_next.astimezone(timezone.utc)
+    return local_next.astimezone(UTC)
 
 
 def validate_timezone_name(tz_name: str | None) -> bool:
@@ -303,7 +303,7 @@ def format_cron_local(hour: int, minute: int, tz_name: str) -> Tuple[str, str]:
     if not resolved_name:
         raise ValueError(f"Invalid timezone: {tz_name}")
     tzinfo = ZoneInfo(resolved_name)
-    utc_dt = datetime(2000, 1, 1, hour, minute, 0, tzinfo=timezone.utc)
+    utc_dt = datetime(2000, 1, 1, hour, minute, 0, tzinfo=UTC)
     local_dt = utc_dt.astimezone(tzinfo)
     return f"{local_dt.hour:02d}:{local_dt.minute:02d}", resolved_name
 
@@ -319,3 +319,7 @@ def now_local(tz_name: str) -> Tuple[datetime, str]:
         raise ValueError(f"Invalid timezone: {tz_name}")
     tz = ZoneInfo(resolved_name)
     return utc_now().astimezone(tz), resolved_name
+
+
+# Re-export for backward compatibility (some files import `timezone` from this module)
+timezone = UTC

@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from src.core.timezone import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Dict, List
 
 
-class MemoryTopic(str, Enum):
+class MemoryTopic(StrEnum):
     """Top-level memory topics."""
 
     IDENTITY = "identity"

@@ -164,7 +164,7 @@ In `src/integrations/telegram.py`:
 **2.2 - Create FastAPI Webhook Endpoint**
 
 In `src/api/routes.py`:
-- POST `/webhook/telegram`: 
+- POST `/webhook/telegram`:
   - Accept Telegram Bot API JSON payload
   - Call `TelegramHandler.parse_webhook()`
   - Dispatch to `MessageRouter.route_message()`
@@ -707,7 +707,7 @@ Alembic migration:
   - `interval_hours`: INT nullable - e.g., 2 (remind after 2 hours)
   - `reminder_count`: INT default 0 - how many reminders to send per day
   - `last_reminder_sent_at`: DATETIME2 nullable - track reminder timing
-  
+
 Run migration: `alembic revision --autogenerate -m "add_interval_reminder_fields" && alembic upgrade head`
 
 **7.2 - Update LessonEngine for Completion Tracking**

@@ -4,7 +4,7 @@ This test verifies that when a user provides a new name (e.g., "Johannes"),
 it overrides the old Telegram name (e.g., "Dev").
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 import pytest
 
@@ -60,7 +60,7 @@ def test_name_temporal_resolution(clean_test_data, test_user_id):
         .first()
     )
     if mem:
-        mem.created_at = datetime(2026, 2, 26, 16, 19, 0, tzinfo=timezone.utc)
+        mem.created_at = datetime(2026, 2, 26, 16, 19, 0, tzinfo=UTC)
         db.commit()
 
     # Store new user-provided name (like from "my name is Johannes")
@@ -80,7 +80,7 @@ def test_name_temporal_resolution(clean_test_data, test_user_id):
         .first()
     )
     if mem:
-        mem.created_at = datetime(2026, 3, 2, 15, 44, 0, tzinfo=timezone.utc)
+        mem.created_at = datetime(2026, 3, 2, 15, 44, 0, tzinfo=UTC)
         db.commit()
 
     # Test 1: TopicManager.get_name() should return "Johannes"
