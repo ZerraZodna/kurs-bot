@@ -152,7 +152,7 @@ src/data/Sparkly_ACIM_extracted.txt
 
 # Node / JavaScript
 node_modules/
-package-lock.json
+# package-lock.json tracked for security (npm audit)
 yarn.lock
 .grok/settings.json
 .aider*
