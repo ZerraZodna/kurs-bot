@@ -185,9 +185,18 @@ def parse_lessons_from_text(full_text: str) -> List[Tuple[int, str, str]]:
                 out[idx] = (1, title, content)
                 break
 
-    # Post-processing: move INTRODUCTION blocks from end of one lesson
-    # to beginning of the next lesson. This fixes Part introduction bleed.
+    # Post-processing: move INTRODUCTION and review blocks from end of one
+    # lesson to beginning of the next lesson. This fixes Part introduction
+    # bleed and spaced-letter review marker bleed.
     out = _move_introductions_to_next(out)
+    out = _move_reviews_to_next(out)
+
+    # After moving intros and reviews, the intro/review text may sit before
+    # the canonical "Lesson {id}" header. Fix the order: header first, then
+    # intro/review text.
+    # Also collapse review markers spaced with letters: "r e v i e w i"
+    # -> "review I" (readable format in Telegram), keeping the spaced form
+    # as-is since that's the PDF artifact.
 
     # After moving intros, the intro text may sit before the canonical header.
     # Fix the order: "Lesson {id}" header should come first, then intro text.
@@ -204,7 +213,37 @@ def parse_lessons_from_text(full_text: str) -> List[Tuple[int, str, str]]:
             content = from_header + "\n\n" + before_header.strip()
         out[i] = (lid, title, _normalize_sentence_spacing(content))
 
+    # Normalize review markers: "r e v i e w i i i" → "<b>Review 3</b>"
+    for i, (lid, title, content) in enumerate(out):
+        if lid is None:
+            continue
+        out[i] = (lid, title, _normalize_review_marker(content))
+
     return out
+
+
+# Roman numeral → Arabic number mapping for review markers
+_REVIEW_ROMAN_TO_ARABIC = {
+    "i": 1, "ii": 2, "iii": 3, "iv": 4,
+    "v": 5, "vi": 6,
+}
+
+
+def _normalize_review_marker(content: str) -> str:
+    """Replace spaced-letter review marker with readable <b>Review N</b>."""
+
+    def _replace_review(m):
+        # Extract the roman numeral part (group 1)
+        roman = m.group(1).replace(" ", "").lower()
+        num = _REVIEW_ROMAN_TO_ARABIC.get(roman, roman)
+        return f"<b>Review {num}</b>"
+
+    return re.sub(
+        r"\br\s+e\s+v\s+i\s+e\s+w\s+(i\s*v\s*i|i\s*v|i\s*i\s*i|i\s*i|v\s*i|v|i)\b",
+        _replace_review,
+        content,
+        flags=re.IGNORECASE,
+    )
 
 
 def _strip_leading_intro(
@@ -229,29 +268,83 @@ def _strip_leading_intro(
     return result
 
 
-def _move_introductions_to_next(
+def _move_reviews_to_next(
     lessons: list[tuple[int | None, str, str]],
 ) -> list[tuple[int | None, str, str]]:
-    """Move trailing INTRODUCTION blocks to the next lesson.
+    """Move trailing spaced-letter review blocks to the next lesson.
 
-    When a Part introduction bleeds into the last lesson of the previous
-    Part, the content looks like: "...lesson text... I N T R O D U C T I O N ...intro text..."
-    We detect the spaced-letter marker and move everything from the marker onward
-    to the next lesson. The spaced letters are normalized after moving.
+    The PDF has spaced-letter review markers like "r e v i e w i" that bleed
+    into the previous lesson's content. We detect the spaced-letter review
+    marker and move everything from the marker onward to the next lesson.
     """
     if len(lessons) < 2:
         return lessons
 
-    # Pattern for spaced letters spelling "INTRODUCTION"
-    intro_marker_pattern = re.compile(
-        r"(?:\b|^)(i\s+n\s+t\s+r\s+o\s+d\s+u\s+c\s+t\s+i\s+o\s+n)(?:\b|$)",
+    # Pattern: spaced letters r e v i e w + roman numeral (i through vi)
+    # Requires \s+ between letters to distinguish from normal "review" word.
+    # Roman numeral alternation ordered longest-first to avoid partial matches.
+    review_marker_pattern = re.compile(
+        r"\br\s+e\s+v\s+i\s+e\s+w\s+"
+        r"(i\s*v\s*i"    # vi (i v i)
+        r"|i\s*v"         # iv
+        r"|i\s*i\s*i"     # iii
+        r"|i\s*i"         # ii
+        r"|v\s*i"         # vi (v i)
+        r"|v"             # v
+        r"|i"             # i
+        r")\b",
         re.IGNORECASE,
     )
 
     result = list(lessons)
     for i in range(len(result) - 1):
         _lid, title, content = result[i]
-        # Find the spaced-letter INTRODUCTION marker
+        match = review_marker_pattern.search(content)
+
+        if match is not None:
+            review_idx = match.start()
+            before_review = content[:review_idx].rstrip()
+
+            # Only move if there's actual content before the marker
+            if not before_review.strip():
+                continue
+
+            review_block = content[review_idx:].strip()
+
+            # Update current lesson (remove review block)
+            result[i] = (_lid, title, before_review if before_review else "")
+
+            # Prepend review block to next lesson
+            next_lid, next_title, next_content = result[i + 1]
+            result[i + 1] = (
+                next_lid,
+                next_title,
+                review_block + "\n\n" + next_content,
+            )
+
+    return result
+
+
+def _move_introductions_to_next(
+    lessons: list[tuple[int | None, str, str]],
+) -> list[tuple[int | None, str, str]]:
+    """Move trailing INTRODUCTION blocks to the next lesson.
+
+    When a Part introduction bleeds into the last lesson of the previous
+    Part, the content looks like: "...lesson text... <b>INTRODUCTION</b> ...intro text..."
+    We detect the HTML INTRODUCTION marker and move everything from the marker onward
+    to the next lesson.
+    """
+    if len(lessons) < 2:
+        return lessons
+
+    # Pattern for HTML-formatted INTRODUCTION header
+    intro_marker_pattern = re.compile(r"<b>\s*INTRODUCTION\s*</b>", re.IGNORECASE)
+
+    result = list(lessons)
+    for i in range(len(result) - 1):
+        _lid, title, content = result[i]
+        # Find the HTML INTRODUCTION marker
         match = intro_marker_pattern.search(content)
 
         if match is not None:
@@ -261,11 +354,6 @@ def _move_introductions_to_next(
             if not before_intro.strip():
                 continue
             intro_block = content[intro_idx:].strip()
-
-            # Normalize spaced letters in the moved intro block
-            from src.lessons.pdf_extractor import _normalize_spaced_letters
-
-            intro_block = _normalize_spaced_letters(intro_block)
 
             # Update current lesson (remove intro block)
             result[i] = (_lid, title, before_intro if before_intro else "")
