@@ -94,7 +94,7 @@ async def test_telegram_streaming(user_id: int, text: str):
         print(f"⏱️  process_message_for_telegram: {elapsed:.1f}s\\n")
 
         if result["type"] != "stream":
-            print(f"❌ Expected streaming but got: {result.get('text', '??')[:200]}...")
+            print(f"❌ Expected streaming but got: {result.get("text", "??")[:200]}...")
             return
 
         print("✅ Streaming path OK\\n")
@@ -117,7 +117,7 @@ async def test_telegram_streaming(user_id: int, text: str):
         # Step 3: Extract for functions + post_hook (key Telegram step)
         remaining = stream_filter.get_remaining_for_functions()
         print(
-            f"🔧 Remaining for functions (len={len(remaining) if remaining else 0}): {repr(remaining[:200]) if remaining else 'None'}\\n"
+            f"🔧 Remaining for functions (len={len(remaining) if remaining else 0}): {repr(remaining[:200]) if remaining else "None"}\\n"
         )
 
         function_text = remaining if remaining else full_response
@@ -127,15 +127,15 @@ async def test_telegram_streaming(user_id: int, text: str):
         diagnostics = await result["post_hook"](function_text)
 
         print("📊 Post-hook diagnostics:")
-        print(f"  structured_intent_used: {diagnostics.get('structured_intent_used')}")
-        print(f"  dispatched_actions: {diagnostics.get('dispatched_actions')}")
+        print(f"  structured_intent_used: {diagnostics.get("structured_intent_used")}")
+        print(f"  dispatched_actions: {diagnostics.get("dispatched_actions")}")
 
         execution_result = diagnostics.get("execution_result")
         if execution_result:
             print("✅ Functions executed!")
             for r in execution_result.results:
                 status = "✅" if r.success else "❌"
-                print(f"  {status} {r.function_name}: {r.result if r.result else r.error or 'no result'}")
+                print(f"  {status} {r.function_name}: {r.result if r.result else r.error or "no result"}")
                 if r.function_name == "send_todays_lesson":
                     print("     🎉 TARGET FUNCTION HIT!")
         else:

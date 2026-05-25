@@ -179,7 +179,7 @@ async def get_user_context(user_id: int, db: Session = Depends(get_db)):
     preferences = memory_manager.get_memory(user_id, MemoryKey.PREFERRED_TONE)
     progress = get_current_lesson(memory_manager, user_id)
 
-    name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "User"
+    name = f"{user.first_name or ""} {user.last_name or ""}".strip() or "User"
 
     return UserContextResponse(
         user_id=user_id,

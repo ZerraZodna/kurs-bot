@@ -83,7 +83,7 @@ def main() -> int:
 
         # Import to database
         clear_flag = args.clear or (not args.no_clear and not len(lessons))
-        logger.info(f"Importing lessons to database... {'Clearing existing' if clear_flag else 'Preserving existing'}")
+        logger.info(f"Importing lessons to database... {"Clearing existing" if clear_flag else "Preserving existing"}")
 
         added = import_to_db(lessons, clear=clear_flag)
 

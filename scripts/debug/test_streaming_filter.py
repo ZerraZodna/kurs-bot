@@ -67,10 +67,10 @@ async def test_streaming_with_filter(user_id: int, text: str):
             diagnostics = await result["post_hook"](function_parse_text)
 
             print("\n--- Diagnostics ---")
-            print(f"Keys: {diagnostics.keys() if diagnostics else 'None'}")
-            print(f"structured_intent_used: {diagnostics.get('structured_intent_used')}")
-            print(f"dispatched_actions: {diagnostics.get('dispatched_actions')}")
-            print(f"execution_result: {diagnostics.get('execution_result')}")
+            print(f"Keys: {diagnostics.keys() if diagnostics else "None"}")
+            print(f"structured_intent_used: {diagnostics.get("structured_intent_used")}")
+            print(f"dispatched_actions: {diagnostics.get("dispatched_actions")}")
+            print(f"execution_result: {diagnostics.get("execution_result")}")
 
             if diagnostics.get("execution_result"):
                 print("\n✅ Function executed successfully!")
@@ -83,7 +83,7 @@ async def test_streaming_with_filter(user_id: int, text: str):
                 print("\n❌ No function executed!")
 
         else:
-            print(f"❌ Non-streaming response: {result['text'][:200]}...")
+            print(f"❌ Non-streaming response: {result["text"][:200]}...")
 
     finally:
         db.close()

@@ -61,7 +61,7 @@ def create_daily_schedule(
         created_at = getattr(schedule, "created_at", None)
         created_str = created_at.isoformat() if created_at is not None else utc_now().isoformat()
         logger.debug(
-            f"persisted schedule id=<{getattr(schedule, 'schedule_id', None)}> "
+            f"persisted schedule id=<{getattr(schedule, "schedule_id", None)}> "
             f"user={user_id} next_send_local_input={next_send.isoformat()} "
             f"cron='{cron_expression}' created_at={created_str}"
         )

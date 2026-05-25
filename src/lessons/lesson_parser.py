@@ -134,6 +134,7 @@ def parse_lessons_from_text(full_text: str) -> List[Tuple[int, str, str]]:
         lessons_raw.append((lid, title, block))
 
     out = []
+    intro_block = None
     if lessons_raw:
         first_header_line = headers[0][0]
         for _idx, (hl, lid) in enumerate(headers):
@@ -141,11 +142,11 @@ def parse_lessons_from_text(full_text: str) -> List[Tuple[int, str, str]]:
             if val == 1:
                 first_header_line = hl
                 break
+
+        # Extract intro block from lines before first Lesson 1 header
         if first_header_line > 0:
             intro_lines = lines[:first_header_line]
             intro_block = "\n".join(line.strip() for line in intro_lines if line.strip()).strip()
-            if len(intro_block) > 80:
-                out.append((0, "Introduction", intro_block))
 
     seen = set()
     seq = 1
@@ -169,12 +170,39 @@ def parse_lessons_from_text(full_text: str) -> List[Tuple[int, str, str]]:
         content = _normalize_lesson_content_header(content, lid)
         out.append((lid, title, content))
 
+    # Append intro block to Lesson 1's content (insert after canonical header)
+    if intro_block and len(intro_block) > 80:
+        for idx, (lid, title, content) in enumerate(out):
+            if lid == 1:
+                # Find the "Lesson 1" header and insert intro after it
+                match = re.search(r"(?i)(Lesson\s+1\s*\n\s*\n?)(.*)", content, re.DOTALL)
+                if match:
+                    header = match.group(1)
+                    body = match.group(2)
+                    content = header + "\n\n" + intro_block.strip() + "\n\n" + body
+                else:
+                    content = intro_block + "\n\n" + content
+                out[idx] = (1, title, content)
+                break
+
     # Post-processing: move INTRODUCTION blocks from end of one lesson
     # to beginning of the next lesson. This fixes Part introduction bleed.
-    # Also strip leading INTRODUCTION from any lesson so the canonical
-    # "Lesson {id}" header can be prepended cleanly.
     out = _move_introductions_to_next(out)
-    out = _strip_leading_intro(out)
+
+    # After moving intros, the intro text may sit before the canonical header.
+    # Fix the order: "Lesson {id}" header should come first, then intro text.
+    for i, (lid, title, content) in enumerate(out):
+        if lid is None:
+            continue
+        # Find the "Lesson {id}" header in the content
+        header_pattern = re.compile(rf"(?i)^Lesson\s+{lid}\b")
+        match = header_pattern.search(content)
+        if match and match.start() > 0:
+            # Header is not at the start — move intro before it
+            before_header = content[: match.start()]
+            from_header = content[match.start() :]
+            content = from_header + "\n\n" + before_header.strip()
+        out[i] = (lid, title, _normalize_sentence_spacing(content))
 
     return out
 
@@ -196,7 +224,7 @@ def _strip_leading_intro(
             # until we hit the "Lesson {id}" canonical header or non-intro text
             intro_match = re.match(r"(?i)(INTRODUCTION.*?)(\n\nLesson \d+|\n{3,})", stripped, re.DOTALL)
             if intro_match:
-                content = stripped[len(intro_match.group(1)):].strip()
+                content = stripped[len(intro_match.group(1)) :].strip()
         result.append((lid, title, content))
     return result
 
@@ -207,33 +235,42 @@ def _move_introductions_to_next(
     """Move trailing INTRODUCTION blocks to the next lesson.
 
     When a Part introduction bleeds into the last lesson of the previous
-    Part, the content looks like: "...lesson text... INTRODUCTION ...intro text..."
-    We detect this and move everything from 'INTRODUCTION' onward to the
-    next lesson.
+    Part, the content looks like: "...lesson text... I N T R O D U C T I O N ...intro text..."
+    We detect the spaced-letter marker and move everything from the marker onward
+    to the next lesson. The spaced letters are normalized after moving.
     """
     if len(lessons) < 2:
         return lessons
 
+    # Pattern for spaced letters spelling "INTRODUCTION"
+    intro_marker_pattern = re.compile(
+        r"(?:\b|^)(i\s+n\s+t\s+r\s+o\s+d\s+u\s+c\s+t\s+i\s+o\s+n)(?:\b|$)",
+        re.IGNORECASE,
+    )
+
     result = list(lessons)
     for i in range(len(result) - 1):
         _lid, title, content = result[i]
-        # Find INTRODUCTION in content (case-insensitive)
-        intro_idx = None
-        for match in re.finditer(r"(?i)\bINTRODUCTION\b", content):
-            intro_idx = match.start()
+        # Find the spaced-letter INTRODUCTION marker
+        match = intro_marker_pattern.search(content)
 
-        if intro_idx is not None:
+        if match is not None:
+            intro_idx = match.start()
             before_intro = content[:intro_idx].rstrip()
-            # Only move if there's actual content before INTRODUCTION
-            # (intro at the very start belongs with this lesson)
+            # Only move if there's actual content before the marker
             if not before_intro.strip():
                 continue
             intro_block = content[intro_idx:].strip()
 
+            # Normalize spaced letters in the moved intro block
+            from src.lessons.pdf_extractor import _normalize_spaced_letters
+
+            intro_block = _normalize_spaced_letters(intro_block)
+
             # Update current lesson (remove intro block)
             result[i] = (_lid, title, before_intro if before_intro else "")
 
-            # Prepend intro block to next lesson
+            # Prepend normalized intro block to next lesson
             next_lid, next_title, next_content = result[i + 1]
             result[i + 1] = (
                 next_lid,

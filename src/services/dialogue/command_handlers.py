@@ -217,13 +217,13 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
                 created_at = user.created_at.strftime("%Y-%m-%d %H:%M") if user.created_at else "-"
                 last_active_at = user.last_active_at.strftime("%Y-%m-%d %H:%M") if user.last_active_at else "-"
                 lines.append(f"user_id={user.user_id}")
-                lines.append(f"external_id={user.external_id or ''}")
-                lines.append(f"channel={user.channel or ''}")
-                lines.append(f"timezone={user.timezone or ''}")
-                lines.append(f"lesson={user.lesson if user.lesson is not None else ''}")
-                lines.append(f"first_name={user.first_name or ''}")
-                lines.append(f"last_name={user.last_name or ''}")
-                lines.append(f"email={user.email or ''}")
+                lines.append(f"external_id={user.external_id or ""}")
+                lines.append(f"channel={user.channel or ""}")
+                lines.append(f"timezone={user.timezone or ""}")
+                lines.append(f"lesson={user.lesson if user.lesson is not None else ""}")
+                lines.append(f"first_name={user.first_name or ""}")
+                lines.append(f"last_name={user.last_name or ""}")
+                lines.append(f"email={user.email or ""}")
                 lines.append(f"created_at={created_at}")
                 lines.append(f"last_active_at={last_active_at}")
             else:
@@ -345,8 +345,7 @@ def handle_custom_system_prompt_command(text: str, memory_manager, user_id: int)
             # Include private templates owned by this user (owner stored as str(user_id))
             try:
                 private_templates = (
-                    db
-                    .query(PromptTemplate)
+                    db.query(PromptTemplate)
                     .filter(
                         PromptTemplate.visibility == "private",
                         PromptTemplate.owner == str(user_id),

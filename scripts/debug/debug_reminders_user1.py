@@ -14,9 +14,9 @@ from src.services.dialogue_engine import DialogueEngine
 
 
 def dump_user_state(db, user_id: int):
-    print(f"\n{'=' * 80}")
+    print(f"\n{"=" * 80}")
     print(f"=== User {user_id} state inspection ({datetime.now(tz=UTC).isoformat()}) ===")
-    print(f"{'=' * 80}")
+    print(f"{"=" * 80}")
 
     user = db.query(User).filter_by(user_id=user_id).first()
     if not user:
@@ -43,8 +43,7 @@ def dump_user_state(db, user_id: int):
     print("\n🧠 Relevant Memories (schedule-related, recent 50):")
     relevant_keys = ["schedule_message", "schedule_request_pending", "preferred_daily_time"]
     mems = (
-        db
-        .query(Memory)
+        db.query(Memory)
         .filter(Memory.user_id == user_id, Memory.key.in_(relevant_keys))
         .order_by(Memory.created_at.desc())
         .limit(50)
@@ -64,7 +63,7 @@ def dump_user_state(db, user_id: int):
     else:
         print("  (no memories)")
 
-    print(f"{'=' * 80}\n")
+    print(f"{"=" * 80}\n")
 
 
 async def debug_reminders_query(user_id: int = 1, query: str = "What are my reminders"):
@@ -118,15 +117,15 @@ async def debug_reminders_query(user_id: int = 1, query: str = "What are my remi
         if diagnostics:
             print(diagnostics)
             # Detailed breakdown
-            print(f"\nstructured_intent_used: {diagnostics.get('structured_intent_used', 'N/A')}")
-            print(f"dispatched_actions: {diagnostics.get('dispatched_actions', [])}")
+            print(f"\nstructured_intent_used: {diagnostics.get("structured_intent_used", "N/A")}")
+            print(f"dispatched_actions: {diagnostics.get("dispatched_actions", [])}")
             exec_result = diagnostics.get("execution_result")
             if exec_result and hasattr(exec_result, "results"):
                 print("Functions executed:")
                 for r in exec_result.results:
                     status = "✅" if r.success else "❌"
                     print(
-                        f"  {status} {r.function_name}: {getattr(r, 'result', 'N/A') or getattr(r, 'error', 'no output')}"
+                        f"  {status} {r.function_name}: {getattr(r, "result", "N/A") or getattr(r, "error", "no output")}"
                     )
                     if "get_user_schedules" in r.function_name or "schedule" in r.function_name.lower():
                         print("     🎯 REMINDER FUNCTION!")

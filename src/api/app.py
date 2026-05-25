@@ -207,7 +207,7 @@ DEV_WEB = getattr(settings, "DEV_WEB_CLIENT", False)
 
 # Compute project-relative static path for visibility in logs/debugging
 static_path = Path(__file__).resolve().parents[2] / "static" / "dev_web_client"
-logging.debug(f"settings.DEV_WEB_CLIENT={getattr(settings, 'DEV_WEB_CLIENT', None)}")
+logging.debug(f"settings.DEV_WEB_CLIENT={getattr(settings, "DEV_WEB_CLIENT", None)}")
 logging.debug(f"computed static_path={static_path} exists={static_path.exists()}")
 
 if DEV_WEB:

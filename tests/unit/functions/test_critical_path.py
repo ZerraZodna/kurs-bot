@@ -438,7 +438,7 @@ class TestIntegration:
         # Validate each function against registry
         for func in parse_result.functions:
             is_valid, errors = registry.validate_call(func["name"], func["parameters"])
-            assert is_valid, f"Function {func['name']} validation failed: {errors}"
+            assert is_valid, f"Function {func["name"]} validation failed: {errors}"
 
 
 if __name__ == "__main__":

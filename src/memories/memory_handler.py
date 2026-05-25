@@ -66,8 +66,7 @@ class MemoryHandler(MemoryStore):
     ) -> List[MemoryEntity]:
         like_pattern = f"%{query_text.strip()}%"
         rows = (
-            self
-            .build_active_query(session=self.db, user_id=user_id, categories=categories)
+            self.build_active_query(session=self.db, user_id=user_id, categories=categories)
             .filter(Memory.value.ilike(like_pattern))
             .all()
         )
@@ -145,8 +144,7 @@ class MemoryHandler(MemoryStore):
         init_db()
 
         existing = (
-            self.db
-            .query(Memory)
+            self.db.query(Memory)
             .filter(
                 Memory.user_id == user_id,
                 Memory.key == key,
@@ -225,8 +223,7 @@ class MemoryHandler(MemoryStore):
             return 0
         now = utc_now()
         updated = (
-            self.db
-            .query(Memory)
+            self.db.query(Memory)
             .filter(
                 Memory.user_id == user_id,
                 Memory.memory_id.in_(memory_ids),

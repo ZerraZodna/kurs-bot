@@ -91,14 +91,14 @@ class TestResponseParsingBug:
         assert parsed.response_text == "Your goal is spiritual growth."
 
         # This demonstrates the bug visually
-        print(f"\n{'=' * 60}")
+        print(f"\n{"=" * 60}")
         print("BUG DEMONSTRATION:")
-        print(f"{'=' * 60}")
+        print(f"{"=" * 60}")
         print("Raw LLM response (CURRENTLY sent to Telegram):")
         print(f"  {raw_llm_response[:80]}...")
         print("\nParsed response_text (SHOULD be sent to Telegram):")
         print(f"  {parsed.response_text}")
-        print(f"{'=' * 60}")
+        print(f"{"=" * 60}")
 
 
 class TestDesiredBehavior:

@@ -10,12 +10,15 @@ import fitz
 
 
 def _normalize_spaced_letters(text: str) -> str:
-    """Collapse spaced letters that spell 'lesson' or 'introduction' into normal text.
+    """Collapse spaced letters that spell 'lesson' into normal text.
 
     Handles spaced-letter variants from PDF fonts:
       "L E S S O N" -> "LESSON"
       "L E S S O N  1 0" -> "LESSON 10"
-      "I N T R O D U C T I O N" -> "INTRODUCTION"
+
+    NOTE: "I N T R O D U C T I O N" is NOT normalized here because the word
+    "introduction" appears naturally in lesson text. Normalization happens
+    after the spaced-letter marker is used as a Part boundary.
     """
     if not text or " " not in text:
         return text
@@ -31,12 +34,7 @@ def _normalize_spaced_letters(text: str) -> str:
 
     # Collapse "L E S S O N" (optionally followed by spaced digits)
     pattern = r"(?:\b|^)((?:l\s+e\s+s\s+s\s+o\s+n))((?:\s+\d){1,3})?(?:\b|$)"
-    text = re.sub(pattern, _collapse_lesson, text, flags=re.I)
-
-    # Collapse "I N T R O D U C T I O N"
-    text = re.sub(r"(?:\b|^)(i\s+n\s+t\s+r\s+o\s+d\s+u\s+c\s+t\s+i\s+o\s+n)(?:\b|$)", r"INTRODUCTION", text, flags=re.I)
-
-    return text
+    return re.sub(pattern, _collapse_lesson, text, flags=re.I)
 
 
 def _span_styles_from_font(font_name: str) -> Tuple[bool, bool, bool]:

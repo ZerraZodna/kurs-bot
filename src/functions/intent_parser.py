@@ -165,14 +165,14 @@ class IntentParser:
             if not isinstance(data["functions"], list):
                 errors.append("'functions' must be an array")
             else:
-                logger.debug(f"Found {len(data['functions'])} functions in response")
+                logger.debug(f"Found {len(data["functions"])} functions in response")
                 for i, func in enumerate(data["functions"]):
                     func_errors = self._validate_function_call(func, i)
                     if func_errors:
                         errors.extend(func_errors)
                     else:
                         functions.append(func)
-                        logger.debug(f"Function extracted: {func.get('name')} with params: {func.get('parameters')}")
+                        logger.debug(f"Function extracted: {func.get("name")} with params: {func.get("parameters")}")
         # Also support legacy "intent" field for backward compatibility
         elif "intent" in data:
             intent = data["intent"]

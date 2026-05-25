@@ -53,8 +53,7 @@ def verify_code(
     code: str,
 ) -> GdprVerification:
     verification = (
-        session
-        .query(GdprVerification)
+        session.query(GdprVerification)
         .filter(
             GdprVerification.user_id == user_id,
             GdprVerification.verified_at == None,

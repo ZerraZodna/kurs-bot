@@ -231,8 +231,7 @@ class DialogueEngine:
             from src.models.templates import PromptTemplate
 
             pt = (
-                session
-                .query(PromptTemplate)
+                session.query(PromptTemplate)
                 .filter(PromptTemplate.key == str(selected_key_mem[0].get("value")))
                 .first()
             )
