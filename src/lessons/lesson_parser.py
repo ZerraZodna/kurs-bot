@@ -168,4 +168,77 @@ def parse_lessons_from_text(full_text: str) -> List[Tuple[int, str, str]]:
         content = _normalize_sentence_spacing(content)
         content = _normalize_lesson_content_header(content, lid)
         out.append((lid, title, content))
+
+    # Post-processing: move INTRODUCTION blocks from end of one lesson
+    # to beginning of the next lesson. This fixes Part introduction bleed.
+    # Also strip leading INTRODUCTION from any lesson so the canonical
+    # "Lesson {id}" header can be prepended cleanly.
+    out = _move_introductions_to_next(out)
+    out = _strip_leading_intro(out)
+
     return out
+
+
+def _strip_leading_intro(
+    lessons: list[tuple[int | None, str, str]],
+) -> list[tuple[int | None, str, str]]:
+    """Strip leading INTRODUCTION block from lesson content.
+
+    If a lesson's content starts with INTRODUCTION text (from PDF bleed),
+    remove it so the canonical "Lesson {id}" header can be prepended cleanly.
+    The intro text was already captured as a separate lesson entry.
+    """
+    result = []
+    for lid, title, content in lessons:
+        stripped = content.lstrip()
+        if re.match(r"(?i)^\bINTRODUCTION\b", stripped):
+            # Strip everything up to (and including) the INTRODUCTION block
+            # until we hit the "Lesson {id}" canonical header or non-intro text
+            intro_match = re.match(r"(?i)(INTRODUCTION.*?)(\n\nLesson \d+|\n{3,})", stripped, re.DOTALL)
+            if intro_match:
+                content = stripped[len(intro_match.group(1)):].strip()
+        result.append((lid, title, content))
+    return result
+
+
+def _move_introductions_to_next(
+    lessons: list[tuple[int | None, str, str]],
+) -> list[tuple[int | None, str, str]]:
+    """Move trailing INTRODUCTION blocks to the next lesson.
+
+    When a Part introduction bleeds into the last lesson of the previous
+    Part, the content looks like: "...lesson text... INTRODUCTION ...intro text..."
+    We detect this and move everything from 'INTRODUCTION' onward to the
+    next lesson.
+    """
+    if len(lessons) < 2:
+        return lessons
+
+    result = list(lessons)
+    for i in range(len(result) - 1):
+        _lid, title, content = result[i]
+        # Find INTRODUCTION in content (case-insensitive)
+        intro_idx = None
+        for match in re.finditer(r"(?i)\bINTRODUCTION\b", content):
+            intro_idx = match.start()
+
+        if intro_idx is not None:
+            before_intro = content[:intro_idx].rstrip()
+            # Only move if there's actual content before INTRODUCTION
+            # (intro at the very start belongs with this lesson)
+            if not before_intro.strip():
+                continue
+            intro_block = content[intro_idx:].strip()
+
+            # Update current lesson (remove intro block)
+            result[i] = (_lid, title, before_intro if before_intro else "")
+
+            # Prepend intro block to next lesson
+            next_lid, next_title, next_content = result[i + 1]
+            result[i + 1] = (
+                next_lid,
+                next_title,
+                intro_block + "\n\n" + next_content,
+            )
+
+    return result
