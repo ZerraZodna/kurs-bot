@@ -110,7 +110,8 @@ def extract_formatted_text(pdf_path: Path) -> str:
                         continue
 
             # remove inline page-header tokens (e.g. PART I, PART 1, WORKBOOK)
-            pattern_str = r"(?:\b(?:p\s*a\s*r\s*t(?:\s+(?:\d{1,3}|[ivxlcdm]+))?)\b|\bworkbook\b)"
+            # Requires a number or Roman numeral after PART — never strips standalone "part"
+            pattern_str = r"\b(?:p\s+a\s+r\s+t|part)\s+(?:\d{1,3}|[ivxlcdm]+)\b|\bworkbook\b"
             header_tok = re.compile(pattern_str, flags=re.IGNORECASE)
             styled_header_re = re.compile(r"[*_\"']*" + pattern_str + r"[*_\"']*", flags=re.IGNORECASE)
             cleaned_runs = []
