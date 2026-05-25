@@ -41,4 +41,4 @@ def get_english_lesson_text(lesson: Lesson) -> str:
     Returns:
         Raw English lesson text
     """
-    return f"Lesson {lesson.lesson_id}: {lesson.title}\n\n{lesson.content}"
+    return f"{lesson.title}\n\n{lesson.content}"
