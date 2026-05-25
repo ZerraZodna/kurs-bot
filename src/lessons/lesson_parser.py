@@ -224,8 +224,12 @@ def parse_lessons_from_text(full_text: str) -> List[Tuple[int, str, str]]:
 
 # Roman numeral → Arabic number mapping for review markers
 _REVIEW_ROMAN_TO_ARABIC = {
-    "i": 1, "ii": 2, "iii": 3, "iv": 4,
-    "v": 5, "vi": 6,
+    "i": 1,
+    "ii": 2,
+    "iii": 3,
+    "iv": 4,
+    "v": 5,
+    "vi": 6,
 }
 
 
@@ -285,13 +289,13 @@ def _move_reviews_to_next(
     # Roman numeral alternation ordered longest-first to avoid partial matches.
     review_marker_pattern = re.compile(
         r"\br\s+e\s+v\s+i\s+e\s+w\s+"
-        r"(i\s*v\s*i"    # vi (i v i)
-        r"|i\s*v"         # iv
-        r"|i\s*i\s*i"     # iii
-        r"|i\s*i"         # ii
-        r"|v\s*i"         # vi (v i)
-        r"|v"             # v
-        r"|i"             # i
+        r"(i\s*v\s*i"  # vi (i v i)
+        r"|i\s*v"  # iv
+        r"|i\s*i\s*i"  # iii
+        r"|i\s*i"  # ii
+        r"|v\s*i"  # vi (v i)
+        r"|v"  # v
+        r"|i"  # i
         r")\b",
         re.IGNORECASE,
     )

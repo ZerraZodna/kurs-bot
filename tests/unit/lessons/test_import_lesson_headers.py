@@ -37,9 +37,9 @@ These practice ideas should also be applied in a broad and consistent way.
 
     assert lesson_rows, "Expected parsed lesson rows"
     for lesson_id, _title, content in lesson_rows:
-        assert content.startswith(
-            f"Lesson {lesson_id}"
-        ), f"Lesson {lesson_id} content must start with canonical header; got: {content[:50]!r}"
+        assert content.startswith(f"Lesson {lesson_id}"), (
+            f"Lesson {lesson_id} content must start with canonical header; got: {content[:50]!r}"
+        )
 
 
 def test_does_not_treat_phrase_lesson_a_day_as_header():
@@ -102,9 +102,9 @@ def test_full_pdf_lesson_1_title_not_intro_bleed(acim_pdf_text):
     assert 1 in by_id, "Lesson 1 missing from parsed output"
     title, content = by_id[1]
     assert "Nothing I see" in title, f"Unexpected lesson 1 title: {title!r}"
-    assert not content.lower().startswith(
-        "lesson 1\\n\\nlesson a day"
-    ), "Lesson 1 should not start with 'lesson a day' intro bleed"
+    assert not content.lower().startswith("lesson 1\\n\\nlesson a day"), (
+        "Lesson 1 should not start with 'lesson a day' intro bleed"
+    )
 
 
 def test_full_pdf_review_markers_moved_to_next_lesson(acim_pdf_text):
@@ -127,14 +127,11 @@ def test_full_pdf_review_markers_moved_to_next_lesson(acim_pdf_text):
         prev_content = by_id[prev_id][1]
         next_content = by_id[next_id][1]
         # The original spaced-letter marker should NOT be in either lesson
-        spaced = f"r e v i e w " + marker.replace("<b>Review ", "").replace("</b>", "")
-        assert spaced not in prev_content, (
-            f"Original review marker should not remain in lesson {prev_id}"
-        )
+        spaced = "r e v i e w " + marker.replace("<b>Review ", "").replace("</b>", "")
+        assert spaced not in prev_content, f"Original review marker should not remain in lesson {prev_id}"
         # The normalized marker should be in the next lesson
         assert marker in next_content, (
-            f"Normalized review marker '{marker}' should be in lesson {next_id}; "
-            f"not found in: {next_content[:200]!r}"
+            f"Normalized review marker '{marker}' should be in lesson {next_id}; not found in: {next_content[:200]!r}"
         )
 
 
