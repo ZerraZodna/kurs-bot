@@ -36,13 +36,13 @@ def db_session():
     lesson = Lesson(
         lesson_id=1,
         title="Nothing I see means anything",
-        content="Lesson one content.",
+        content="Lesson 1\n\nLesson one content.",
         created_at=datetime.now(UTC),
     )
     lesson_two = Lesson(
         lesson_id=2,
         title="I have given everything I see all the meaning that it has for me",
-        content="Lesson two content.",
+        content="Lesson 2\n\nLesson two content.",
         created_at=datetime.now(UTC),
     )
     session.add(user)
