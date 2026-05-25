@@ -296,14 +296,15 @@ class PromptBuilder:
 
             now_utc = utc_now()
             local_dt, resolved_name = format_dt_in_timezone(now_utc, tz_name)
-            return f"Local time: {local_dt.strftime("%Y-%m-%d %H:%M")} ({resolved_name})"
+            return f"Local time: {local_dt.strftime('%Y-%m-%d %H:%M')} ({resolved_name})"
         except Exception:
             return None
 
     def _get_last_lesson_from_logs(self, user_id: int) -> Dict[str, Any] | None:
         """Fallback: infer last sent lesson from message logs."""
         messages = (
-            self.db.query(MessageLog)
+            self.db
+            .query(MessageLog)
             .filter(MessageLog.user_id == user_id, MessageLog.direction == "outbound")
             .order_by(MessageLog.created_at.desc())
             .limit(20)
@@ -340,7 +341,7 @@ class PromptBuilder:
         # Format as prompt lines
         parts = []
         for field_name, value in profile.items():
-            parts.append(f"{field_name.replace("_", " ").title()}: {value}")
+            parts.append(f"{field_name.replace('_', ' ').title()}: {value}")
 
         # Add channel info
         if user.phone_number:
@@ -367,7 +368,7 @@ class PromptBuilder:
 
         parts = []
         if tone:
-            parts.append(f"Preferred Tone: {tone[0]["value"]}")
+            parts.append(f"Preferred Tone: {tone[0]['value']}")
 
         return "\n".join(parts) if parts else ""
 

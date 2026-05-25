@@ -356,7 +356,7 @@ async def send_message(chat_id: int, text: str) -> dict | None:
                 body = resp.text if resp is not None else None
             except Exception:
                 body = None
-            print(f"[telegram] HTTPStatusError {getattr(resp, "status_code", None)}; body={body}")
+            print(f"[telegram] HTTPStatusError {getattr(resp, 'status_code', None)}; body={body}")
             # Fallback: send plain text without parse_mode to avoid HTML errors
             if resp is not None and resp.status_code == 400:
                 fallback_payload = {"chat_id": chat_id, "text": chunk}
@@ -415,7 +415,8 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
 
             try:
                 unprocessed = (
-                    db.query(MessageLog)
+                    db
+                    .query(MessageLog)
                     .filter(
                         MessageLog.user_id == user_id,
                         MessageLog.direction == "inbound",
@@ -498,7 +499,7 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                     # RAW functions logging before any processing
                     fn_names = [f.get("name", "NO_NAME") for f in parse_result.functions]
                     fn_details = [
-                        f"{f.get("name", "NO_NAME")} (len={len(f.get("name", ""))})" for f in parse_result.functions
+                        f"{f.get('name', 'NO_NAME')} (len={len(f.get('name', ''))})" for f in parse_result.functions
                     ]
                     logger.info(
                         f"[telegram RAW_FUNCTIONS user={user_id}] functions_count={len(parse_result.functions)}, names={fn_names}, details={fn_details}"
@@ -525,7 +526,7 @@ async def process_telegram_batch(user_id: int, external_id: str) -> None:
                             r.function_name for r in execution_result.results if r.success
                         ]
                     logger.info(
-                        f"[telegram EXEC_RESULT user={user_id}] exec_result={diagnostics.get("execution_result") is not None},actions_len={len(diagnostics.get("dispatched_actions", []))},keys={list(diagnostics.keys())}"
+                        f"[telegram EXEC_RESULT user={user_id}] exec_result={diagnostics.get('execution_result') is not None},actions_len={len(diagnostics.get('dispatched_actions', []))},keys={list(diagnostics.keys())}"
                     )
 
                     # Handle all cases: success, empty [], parse errors, exec fails

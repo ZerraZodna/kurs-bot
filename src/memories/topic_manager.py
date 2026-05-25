@@ -147,7 +147,7 @@ class TopicManager:
         if name and name != "friend":
             context["name"] = name
         elif user and user.first_name:
-            context["name"] = f"{user.first_name} {user.last_name or ""}".strip()
+            context["name"] = f"{user.first_name} {user.last_name or ''}".strip()
 
         # Get all identity fields from topic
         identity = self.get_topic(user_id, MemoryTopic.IDENTITY)

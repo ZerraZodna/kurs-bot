@@ -56,7 +56,7 @@ def create_mock_call_ollama() -> AsyncMock:
 
     async def _mock_call_ollama(prompt: str, model: str | None = None, language: str | None = None) -> str:
         short = (prompt[:160] + "...") if prompt and len(prompt) > 160 else (prompt or "")
-        return f"[MOCK_OLLAMA_REPLY] model={model or "default"} lang={language or "en"} text={short}"
+        return f"[MOCK_OLLAMA_REPLY] model={model or 'default'} lang={language or 'en'} text={short}"
 
     return AsyncMock(side_effect=_mock_call_ollama)
 

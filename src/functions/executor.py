@@ -223,7 +223,7 @@ class FunctionExecutor:
                 result = ExecutionResult(
                     function_name=function_name,
                     success=False,
-                    error=f"Parameter validation failed: {", ".join(errors)}",
+                    error=f"Parameter validation failed: {', '.join(errors)}",
                 )
                 batch_result.results.append(result)
                 if not continue_on_error:
@@ -297,7 +297,7 @@ class FunctionExecutor:
         is_valid, errors = self.registry.validate_call(function_name, parameters)
         if not is_valid:
             return ExecutionResult(
-                function_name=function_name, success=False, error=f"Validation failed: {", ".join(errors)}"
+                function_name=function_name, success=False, error=f"Validation failed: {', '.join(errors)}"
             )
 
         handler = self._handlers.get(function_name)

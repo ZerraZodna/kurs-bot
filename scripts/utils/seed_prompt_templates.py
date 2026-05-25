@@ -67,7 +67,7 @@ def seed(delete_existing_system: bool = False) -> None:
         for t in templates:
             existing = db.query(PromptTemplate).filter(PromptTemplate.key == t["key"]).first()
             if existing:
-                print(f"ℹ️ Prompt template already exists: {t["key"]}")
+                print(f"ℹ️ Prompt template already exists: {t['key']}")
                 continue
             tmpl = PromptTemplate(
                 key=t["key"],

@@ -300,7 +300,7 @@ class ParameterValidator:
 
         unknown = provided_params - known_params
         if unknown:
-            errors.append(f"Unknown parameters: {", ".join(unknown)}")
+            errors.append(f"Unknown parameters: {', '.join(unknown)}")
 
         # Validate each parameter
         for param_name, param_info in schema.items():

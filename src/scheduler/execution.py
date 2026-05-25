@@ -79,7 +79,8 @@ def run_recovery_check(
         try:
             now = utc_now()
             due = (
-                db.query(Schedule)
+                db
+                .query(Schedule)
                 .filter(
                     Schedule.is_active,
                     Schedule.next_send_time is not None,

@@ -42,5 +42,5 @@ class TestDetectLanguageRegression:
         assert lang_memories, "No user_language memory was stored"
         assert any(m["value"].lower().startswith("en") for m in lang_memories), (
             "Expected English language memory to have been stored (regression),"
-            f" but got: {[m["value"] for m in lang_memories]}"
+            f" but got: {[m['value'] for m in lang_memories]}"
         )

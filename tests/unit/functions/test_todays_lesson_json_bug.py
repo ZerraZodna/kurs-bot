@@ -64,14 +64,14 @@ class TestTodaysLessonJsonBug:
         # User sees: {"response": "Today's lesson...", "functions": [...]}
         # Instead of: "Today's lesson is a time for reflection and inner peace."
 
-        print(f"\n{"=" * 60}")
+        print(f"\n{'=' * 60}")
         print("BUG DEMONSTRATION - Today's Lesson:")
-        print(f"{"=" * 60}")
+        print(f"{'=' * 60}")
         print("Raw LLM response (CURRENTLY sent to user):")
         print(f"  {raw_llm_response}")
         print("\nParsed response_text (SHOULD be sent to user):")
         print(f"  {result.response_text}")
-        print(f"{"=" * 60}")
+        print(f"{'=' * 60}")
 
     def test_todays_lesson_variations(self):
         """

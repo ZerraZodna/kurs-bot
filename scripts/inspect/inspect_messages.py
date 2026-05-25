@@ -24,9 +24,9 @@ if __name__ == "__main__":
 
     for r in today_rows:
         print(
-            f"{r.message_id} {r.user_id} {r.direction} {r.status} {getattr(r, "error_message", "None")} {r.created_at}"
+            f"{r.message_id} {r.user_id} {r.direction} {r.status} {getattr(r, 'error_message', 'None')} {r.created_at}"
         )
-        print(f"CONTENT ({len(r.content or "")} chars): {r.content}")
+        print(f"CONTENT ({len(r.content or '')} chars): {r.content}")
         print("---")
 
     db.close()

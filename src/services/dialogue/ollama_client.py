@@ -300,7 +300,7 @@ async def call_ollama(
         short = (prompt[:160] + "...") if prompt and len(prompt) > 160 else (prompt or "")
         raise RuntimeError(
             "Real Ollama calls are disabled in this test process (TEST_USE_REAL_OLLAMA is falsy). "
-            f"Attempted model={chosen_model or "none"} lang={language or "en"} prompt_snippet={short[:200]}"
+            f"Attempted model={chosen_model or 'none'} lang={language or 'en'} prompt_snippet={short[:200]}"
         )
 
     # Determine cloud vs local endpoint. Use cloud ONLY when the model

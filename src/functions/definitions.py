@@ -189,12 +189,12 @@ Remember: Always return valid JSON with "response" and "functions" fields."""
 
                 # Validate function exists
                 if not self.registry.is_valid_function(func["name"]):
-                    return False, f"Unknown function: {func["name"]}"
+                    return False, f"Unknown function: {func['name']}"
 
                 # Validate parameters
                 is_valid, errors = self.registry.validate_call(func["name"], func["parameters"])
                 if not is_valid:
-                    return False, f"Function {func["name"]}: {", ".join(errors)}"
+                    return False, f"Function {func['name']}: {', '.join(errors)}"
 
             return True, None
 

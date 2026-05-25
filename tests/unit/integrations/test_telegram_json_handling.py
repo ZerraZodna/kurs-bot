@@ -36,14 +36,14 @@ def test_json_response_extraction():
     # Test extraction
     extracted = extract_response_text(ai_json_response)
 
-    print(f"\n{"=" * 60}")
+    print(f"\n{'=' * 60}")
     print("JSON RESPONSE TEST:")
-    print(f"{"=" * 60}")
+    print(f"{'=' * 60}")
     print("Raw AI response (full_response):")
     print(f"  {ai_json_response[:80]}...")
     print("\nExtracted response_text:")
     print(f"  '{extracted}'")
-    print(f"{"=" * 60}")
+    print(f"{'=' * 60}")
 
     # The extracted text should be the natural language response, not the JSON
     assert extracted == "Today's lesson is a time for reflection and inner peace."
@@ -71,15 +71,15 @@ def test_empty_response_with_function():
 
     extracted = extract_response_text(ai_json_response)
 
-    print(f"\n{"=" * 60}")
+    print(f"\n{'=' * 60}")
     print("EMPTY RESPONSE WITH FUNCTION TEST:")
-    print(f"{"=" * 60}")
+    print(f"{'=' * 60}")
     print("Raw AI response (full_response):")
     print(f"  {ai_json_response[:60]}...")
     print("\nExtracted response_text:")
     print(f"  '{extracted}'")
     print(f"Length: {len(extracted)}")
-    print(f"{"=" * 60}")
+    print(f"{'=' * 60}")
 
     # Should return empty string (not the full JSON)
     assert extracted == ""
@@ -103,14 +103,14 @@ async def test_telegram_batch_with_json_response():
 
     ai_response = extract_response_text(full_response)
 
-    print(f"\n{"=" * 60}")
+    print(f"\n{'=' * 60}")
     print("TELEGRAM BATCH SIMULATION:")
-    print(f"{"=" * 60}")
+    print(f"{'=' * 60}")
     print("Accumulated full_response:")
     print(f"  {full_response[:80]}...")
     print("\nExtracted ai_response:")
     print(f"  '{ai_response}'")
-    print(f"{"=" * 60}")
+    print(f"{'=' * 60}")
 
     # Verify the extracted response is clean text
     assert ai_response == "Today's lesson is a time for reflection"
@@ -156,15 +156,15 @@ async def test_telegram_batch_with_empty_response():
     # Check if we should send
     should_send = ai_response and ai_response.strip()
 
-    print(f"\n{"=" * 60}")
+    print(f"\n{'=' * 60}")
     print("EMPTY RESPONSE TEST:")
-    print(f"{"=" * 60}")
+    print(f"{'=' * 60}")
     print("Accumulated full_response:")
     print(f"  {full_response[:60]}...")
     print("\nExtracted ai_response:")
     print(f"  '{ai_response}'")
     print(f"Should send message: {should_send}")
-    print(f"{"=" * 60}")
+    print(f"{'=' * 60}")
 
     # When response is empty, we should NOT send a message
     assert ai_response == ""

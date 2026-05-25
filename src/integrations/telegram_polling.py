@@ -146,7 +146,8 @@ async def _trigger_batch(user_id: int, external_id: str) -> None:
     db = SessionLocal()
     try:
         existing = (
-            db.query(BatchLock)
+            db
+            .query(BatchLock)
             .filter(
                 BatchLock.user_id == user_id,
                 BatchLock.expires_at > utc_now(),
@@ -241,7 +242,7 @@ async def process_update(update: dict) -> None:
         # Trigger batch processing
         await _trigger_batch(db_user_id, str(chat_id))
     except Exception as e:
-        logger.error(f"[polling] Error processing update {update.get("update_id")}: {e}")
+        logger.error(f"[polling] Error processing update {update.get('update_id')}: {e}")
 
 
 async def start_polling() -> None:

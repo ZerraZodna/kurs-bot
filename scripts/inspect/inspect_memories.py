@@ -41,7 +41,8 @@ def main():
     mm = MemoryManager()
 
     q = (
-        mm.db.query(Memory)
+        mm.db
+        .query(Memory)
         .filter(
             Memory.user_id == user_id,
             Memory.is_active,

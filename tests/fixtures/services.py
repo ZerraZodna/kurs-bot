@@ -278,7 +278,7 @@ def mock_ollama_client(monkeypatch) -> MagicMock:
 
         # Default response for other cases
         return json.dumps({
-            "response": f"[MOCK_OLLAMA_REPLY] model={model or "default"} lang={language or "en"}",
+            "response": f"[MOCK_OLLAMA_REPLY] model={model or 'default'} lang={language or 'en'}",
             "functions": [],
         })
 
