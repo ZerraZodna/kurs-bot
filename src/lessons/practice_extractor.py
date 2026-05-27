@@ -44,13 +44,15 @@ EXTRACTION_PROMPT = (
 )
 
 
-def _extract_via_ollama(lesson: Lesson) -> dict[str, Any] | None:
-    """Call Ollama to extract practice instructions from lesson content."""
+def _extract_via_llm(lesson: Lesson) -> dict[str, Any] | None:
+    """Call configured LLM (Ollama or OpenAI) to extract practice instructions."""
     try:
-        from src.services.dialogue import call_ollama
+        import asyncio
+
+        from src.services.dialogue import call_llm
 
         prompt = EXTRACTION_PROMPT.format(content=lesson.content)
-        result = call_ollama(prompt)
+        result = asyncio.run(call_llm(prompt))
         if not result:
             return None
 
@@ -114,7 +116,7 @@ def check_and_extract_practice_instructions(lesson_id: int, session: Session | N
                     )
 
             # Extract via AI
-            result = _extract_via_ollama(lesson)
+            result = _extract_via_llm(lesson)
             if result is None:
                 result = _default_extraction()
 
