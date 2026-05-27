@@ -76,6 +76,11 @@ class MemoryKey:
     # Lesson repeat tracking
     LESSON_REPEAT_OFFERED = "lesson_repeat_offered"
 
+    # Practice reminders
+    PRACTICE_REMINDER_PENDING = "practice_reminder_pending"
+    PRACTICE_REMINDER_DECLINED_TODAY = "practice_reminder_declined_today"
+    PRACTICE_REMINDER_EVENING_CUTOFF = "practice_reminder_evening_cutoff"
+
     # Centralized key sets for memory category inference (DRY)
     # These are frozensets for efficient membership testing
     PROFILE_KEYS = frozenset({

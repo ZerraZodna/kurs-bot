@@ -1,3 +1,23 @@
+# Python 3.10+ compatibility shim — several types were removed
+# from `collections` and moved to `collections.abc`. Patch them early
+# so any lazy-importing dependency gets the aliases.
+import collections
+import collections.abc
+
+for _attr in (
+    "MutableSet",
+    "MutableMapping",
+    "MutableSequence",
+    "Mapping",
+    "Sequence",
+    "Iterable",
+    "Iterator",
+    "Callable",
+    "Generator",
+):
+    if not hasattr(collections, _attr):
+        setattr(collections, _attr, getattr(collections.abc, _attr))
+
 import asyncio
 import logging
 import threading

@@ -10,7 +10,7 @@
 | Category | Total | In Progress | Pending |
 |----------|-------|-------------|---------|
 | 🐛 Bug Fixes | 0 | 0 | 0 |
-| ✨ Features | 0 | 0 | 0 |
+| ✨ Features | 1 | 0 | 1 |
 | 🔧 Technical Debt | 0 | 0 | 0 |
 | 🧪 Testing | 0 | 0 | 0 |
 
@@ -29,7 +29,7 @@
 ## ✨ Features
 
 ### New Functionality
-- None currently tracked
+- [x] **Interactive Practice Reminders** — AI-extracted lesson practice instructions, interactive follow-up after lesson delivery, hourly reminders with tailored messages → `tasks/TODO_REMINDER.md` ✅ All 9 steps done. 15 new tests. 267 total tests pass.
 
 ### Enhancements
 - [ ] None currently tracked

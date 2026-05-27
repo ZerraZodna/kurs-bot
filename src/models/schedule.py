@@ -13,6 +13,7 @@ class Lesson(Base):
     content = Column(Text, nullable=False)
     difficulty_level = Column(String(32))
     duration_minutes = Column(Integer)
+    practice_instructions = Column(Text, nullable=True)  # JSON string from AI extraction
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     # Relationships

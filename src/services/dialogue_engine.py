@@ -149,7 +149,30 @@ class DialogueEngine:
         if lesson_response:
             return lesson_response
 
+        # Stop daily reminders command
+        stop_response = await self._handle_stop_daily_reminders(user_id, text, session)
+        if stop_response:
+            return stop_response
+
         return None
+
+    async def _handle_stop_daily_reminders(self, user_id: int, text: str, session: Session) -> str | None:
+        """Handle /stop_daily_reminders command or natural language 'stop reminders'."""
+        text_lower = text.strip().lower()
+        is_command = text_lower in ("/stop_daily_reminders", "/stop_reminders")
+        is_natural = any(
+            phrase in text_lower
+            for phrase in ["stop daily reminders", "stop reminders", "no more reminders", "stop practice reminders"]
+        )
+        if not is_command and not is_natural:
+            return None
+
+        from src.scheduler.reminder_manager import stop_daily_reminders
+
+        count = stop_daily_reminders(user_id, session=session)
+        if count:
+            return f"Stopped {count} practice reminder(s) for today."
+        return "No active practice reminders to stop."
 
     async def _handle_lesson_command(self, session: Session, user_id: int, text: str, user_lang: str) -> str | None:
         """Handle /todays_lesson, /introduction, /lesson commands."""
@@ -190,6 +213,11 @@ class DialogueEngine:
     ) -> str | None:
         from src.services.dialogue import handle_schedule_messages
 
+        # Check for practice reminder response first (before general schedule handling)
+        practice_response = await self._handle_practice_reminder_response(user_id, text, session)
+        if practice_response:
+            return practice_response
+
         schedule_response = await handle_schedule_messages(
             user_id=user_id,
             text=text,
@@ -203,6 +231,109 @@ class DialogueEngine:
             return schedule_response
 
         return None
+
+    async def _handle_practice_reminder_response(self, user_id: int, text: str, session: Session) -> str | None:
+        """Handle user response to practice reminder prompt (yes/no) or 'start reminders' after declining."""
+        text_lower = text.strip().lower()
+
+        # Check if user declined today and wants to start reminders
+        declined_today = self.memory_manager.get_memory(user_id, MemoryKey.PRACTICE_REMINDER_DECLINED_TODAY)
+        if declined_today and any(
+            phrase in text_lower
+            for phrase in ["start reminders", "yes reminders", "send reminders", "practice reminders"]
+        ):
+            # Get today's lesson and create reminders
+            from src.lessons.state import get_current_lesson
+            from src.scheduler.reminder_manager import create_reminders
+
+            from src.lessons.practice_extractor import check_and_extract_practice_instructions
+
+            last_sent = get_current_lesson(self.memory_manager, user_id)
+            if last_sent:
+                lesson_id = _parse_lesson_int(last_sent)
+                if lesson_id:
+                    instructions = check_and_extract_practice_instructions(lesson_id, session=session)
+                    if instructions and instructions.get("frequency", "single") != "single":
+                        create_reminders(lesson_id, user_id, instructions, session=session)
+                        self.memory_manager.store_memory(
+                            user_id=user_id,
+                            key=MemoryKey.PRACTICE_REMINDER_DECLINED_TODAY,
+                            value="false",
+                            ttl_hours=1,
+                            category=MemoryCategory.CONVERSATION.value,
+                            source="dialogue_engine",
+                        )
+                        return "Great! I've sent you practice reminders for today."
+
+        # Normal yes/no flow
+        pending = self.memory_manager.get_memory(user_id, MemoryKey.PRACTICE_REMINDER_PENDING)
+        if not pending:
+            return None
+
+        lesson_id = int(str(pending[0].get("value", "0")))
+
+        # Detect yes/no
+        is_yes = text_lower in ("yes", "y", "ja", "jo", "yeah", "sure", "ok", "okay", "absolutely", "do it")
+        is_no = text_lower in (
+            "no",
+            "n",
+            "nei",
+            "nein",
+            "nope",
+            "not now",
+            "skip",
+            "no thanks",
+            "no thank you",
+            "stop daily reminders",
+        )
+
+        if not is_yes and not is_no:
+            return None
+
+        if is_yes:
+            # Create reminders
+            from src.scheduler.reminder_manager import create_reminders
+
+            from src.lessons.practice_extractor import check_and_extract_practice_instructions
+
+            instructions = check_and_extract_practice_instructions(lesson_id, session=session)
+            if instructions:
+                create_reminders(lesson_id, user_id, instructions, session=session)
+                freq = instructions.get("frequency", "hourly")
+                freq_labels = {
+                    "hourly": "at the top of each hour",
+                    "twice_daily": "twice today (morning and evening)",
+                    "three_times_daily": "three times today",
+                    "morning_evening": "twice today (morning and evening)",
+                }
+                label = freq_labels.get(freq, "throughout the day")
+                response = f"Great! I'll send you reminders {label}. Each will include today's key phrase and a brief instruction."
+            else:
+                response = "I couldn't determine the practice pattern. No reminders will be sent."
+
+        else:
+            # User declined
+            self.memory_manager.store_memory(
+                user_id=user_id,
+                key=MemoryKey.PRACTICE_REMINDER_DECLINED_TODAY,
+                value="true",
+                ttl_hours=24,
+                category=MemoryCategory.CONVERSATION.value,
+                source="dialogue_engine",
+            )
+            response = "No problem. You can always ask me to send reminders later with 'start reminders'."
+
+        # Clear pending state
+        self.memory_manager.store_memory(
+            user_id=user_id,
+            key=MemoryKey.PRACTICE_REMINDER_PENDING,
+            value="",
+            ttl_hours=1,
+            category=MemoryCategory.CONVERSATION.value,
+            source="dialogue_engine",
+        )
+
+        return response
 
     async def _generate_streaming_response(
         self,

@@ -23,6 +23,7 @@ from .handler import get_english_lesson_text
 from .importer import ensure_lessons_available
 from .lesson_parser import parse_lessons_from_text
 from .pdf_extractor import extract_formatted_text
+from .practice_extractor import check_and_extract_practice_instructions
 from .state import (
     compute_current_lesson_state,
     get_current_lesson,
@@ -46,4 +47,6 @@ __all__ = [
     "has_lesson_status",
     "set_current_lesson",
     "get_english_lesson_text",
+    # Practice instruction extraction
+    "check_and_extract_practice_instructions",
 ]

@@ -16,6 +16,7 @@ from src.core.timezone import utc_now
 from src.lessons import get_english_lesson_text
 from src.lessons.delivery import get_english_lesson_preview, deliver_lesson, get_lesson_or_import
 from src.memories import MemoryManager
+from src.memories.constants import MemoryCategory, MemoryKey
 from src.models.database import Lesson, Schedule, User, get_session
 from src.scheduler.message_utils import send_outbound_message
 
@@ -242,3 +243,64 @@ def _execute_lesson_schedule(db: Session, schedule: Schedule, user: User, memory
 
             english_text = asyncio.run(translate_text(english_text, lang))
         send_outbound_message(db, user, english_text)
+
+        # After delivering the lesson, check if extra practice is suggested
+        _maybe_ask_practice_reminders(db, schedule.user_id, memory_manager, user)
+
+
+def _maybe_ask_practice_reminders(db: Session, user_id: int, memory_manager: MemoryManager, user: User) -> None:
+    """After lesson delivery, ask user if they want practice reminders.
+
+    Only triggers for lessons with non-single practice frequency.
+    """
+    from src.lessons.state import get_current_lesson
+
+    last_sent = get_current_lesson(memory_manager, user_id)
+    if not last_sent:
+        return
+
+    lesson_id = _parse_lesson_int(last_sent)
+    if lesson_id is None or lesson_id == 0:
+        return
+
+    # Check if user already declined today (skip asking again)
+    declined_today = memory_manager.get_memory(user_id, MemoryKey.PRACTICE_REMINDER_DECLINED_TODAY)
+    if declined_today:
+        return
+
+    # Check practice instructions
+    from src.lessons.practice_extractor import check_and_extract_practice_instructions
+
+    instructions = check_and_extract_practice_instructions(lesson_id, session=db)
+    if not instructions:
+        return
+
+    frequency = instructions.get("frequency", "single")
+    if frequency == "single":
+        return
+
+    # Build frequency label
+    freq_labels = {
+        "hourly": "hourly today",
+        "twice_daily": "twice today (morning and evening)",
+        "three_times_daily": "three times today",
+        "morning_evening": "twice today (morning and evening)",
+    }
+    freq_label = freq_labels.get(frequency, f"{frequency}")
+
+    # Ask user
+    message = (
+        f"This lesson suggests practicing {freq_label}. "
+        f"Would you like me to send you reminders throughout the day? (yes/no)"
+    )
+    send_outbound_message(db, user, message)
+
+    # Store pending state so the dialogue engine can handle the response
+    memory_manager.store_memory(
+        user_id=user_id,
+        key=MemoryKey.PRACTICE_REMINDER_PENDING,
+        value=str(lesson_id),
+        ttl_hours=1,
+        category=MemoryCategory.CONVERSATION.value,
+        source="scheduler",
+    )
