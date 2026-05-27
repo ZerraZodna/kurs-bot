@@ -208,6 +208,21 @@ def ensure_test_db(db_engine, monkeypatch):
     # Skip app startup lessons import in tests
     monkeypatch.setattr("src.api.app.ensure_lessons_imported", lambda: None, raising=False)
 
+    # Patch unified LLM entry point to prevent real OpenAI/Ollama calls.
+    # The call_llm function in openai_client.py has a test guard, but it
+    # reads settings.IS_TEST_ENV which is baked in at module import time
+    # (before .env.test is loaded). Patch the exported symbol globally.
+    async def _mock_call_llm(prompt: str, model: str | None = None, language: str | None = None, temperature: float | None = None) -> str:
+        short = (prompt[:160] + "...") if prompt and len(prompt) > 160 else (prompt or "")
+        return f"[MOCK_LLM_REPLY] model={model or 'default'} lang={language or 'en'} text={short}"
+
+    monkeypatch.setattr("src.services.dialogue.call_llm", _mock_call_llm)
+    monkeypatch.setattr("src.services.dialogue.openai_client.call_llm", _mock_call_llm)
+    # Also patch in practice_extractor where call_llm is imported via 'from ... import'
+    import src.lessons.practice_extractor as pe_module
+
+    pe_module.call_llm = _mock_call_llm
+
     repo_root = Path(__file__).resolve().parents[1]
 
     # Always drop_all + create_all for reliable test isolation (fixes SQLite truncation issues in CI)

@@ -18,13 +18,6 @@ def mock_settings():
         mock.NON_ENGLISH_OLLAMA_MODEL = "gpt-oss:20b"
         mock.IS_TEST_ENV = False
         mock.TEST_USE_REAL_OLLAMA = False
-        # Also patch module-level constants so they reflect the fixture
-        import src.services.dialogue.openai_client as mod
-
-        mod.OPENAI_MODEL = "gpt-4o"
-        mod.OPENAI_TEMPERATURE = 0.2
-        mod._IS_TEST_ENV = False
-        mod._TEST_USE_REAL_OLLAMA = False
         yield mock
 
 
