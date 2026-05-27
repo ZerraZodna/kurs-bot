@@ -47,7 +47,7 @@ EXTRACTION_PROMPT = (
 def _extract_via_ollama(lesson: Lesson) -> dict[str, Any] | None:
     """Call Ollama to extract practice instructions from lesson content."""
     try:
-        from src.services.dialogue.ollama_client import call_ollama
+        from src.services.dialogue import call_ollama
 
         prompt = EXTRACTION_PROMPT.format(content=lesson.content)
         result = call_ollama(prompt)

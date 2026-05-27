@@ -230,7 +230,7 @@ async def detect_language(text: str):
         )
         try:
             # Import lazily to avoid circular package import at module import time
-            from src.services.dialogue.ollama_client import call_ollama
+            from src.services.dialogue import call_ollama
 
             resp = await call_ollama(prompt, model=settings.OLLAMA_MODEL, language="en")
         except Exception:

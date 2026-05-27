@@ -81,6 +81,56 @@ def ensure_lessons_imported():
         logging.exception(f"Failed to auto-import lessons: {e}")
 
 
+def _check_openai_provider(settings) -> bool:
+    """Lightweight sync health check for the OpenAI-compatible provider.
+
+    Sends a minimal chat.completions request via httpx to verify the
+    endpoint is reachable and returns a valid model identifier.
+    """
+    base_url = getattr(settings, "OPENAI_BASE_URL", None)
+    api_key = getattr(settings, "OPENAI_API_KEY", None)
+    model = getattr(settings, "OPENAI_MODEL", "gpt-4o")
+
+    if not base_url and not api_key:
+        logging.warning("OpenAI provider configured but OPENAI_BASE_URL and OPENAI_API_KEY are both empty")
+        return False
+
+    try:
+        # base_url may or may not already include /v1
+        if base_url:
+            base = base_url.rstrip("/")
+            if base.endswith("/v1"):
+                url = f"{base}/chat/completions"
+            else:
+                url = f"{base}/v1/chat/completions"
+        else:
+            url = "https://api.openai.com/v1/chat/completions"
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": "ping"}],
+            "max_tokens": 3,
+        }
+
+        resp = httpx.post(url, json=payload, headers=headers, timeout=5.0)
+
+        if resp.status_code == 200:
+            data = resp.json()
+            model_used = data.get("model", "unknown")
+            logging.info("OpenAI provider confirmed — model: %s (endpoint: %s)", model_used, base_url or "default OpenAI")
+            return True
+        else:
+            logging.warning("OpenAI provider health check returned HTTP %d: %s", resp.status_code, resp.text[:200])
+            return False
+
+    except Exception as e:
+        logging.warning("OpenAI provider health check failed: %s", e)
+        return False
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Auto-import lessons if database is empty
@@ -175,18 +225,17 @@ async def lifespan(app: FastAPI):
             logging.exception("/api/generate ping failed at %s", base)
             return False
 
-    # Consolidated Ollama availability and model checks (refactored).
-    try:
-        any_ok, diagnostics = run_ollama_checks(settings)
-        if not any_ok:
-            logging.error("Ollama AI server is NOT reachable at configured endpoints (checked preferred endpoints)")
-            for e in diagnostics:
-                logging.error("Diag: %s", str(e))
-        else:
-            logging.info("Ollama checks passed")
-            logging.debug("Ollama diagnostics: %s", diagnostics)
-    except Exception:
-        logging.exception("Error while running Ollama checks")
+    # Provider-specific health checks
+    if getattr(settings, "LLM_PROVIDER", "ollama") == "openai":
+        # OpenAI path — no Ollama checks needed
+        try:
+            openai_ok = _check_openai_provider(settings)
+            if not openai_ok:
+                logging.warning("OpenAI-compatible server health check failed (non-fatal; requests will fall back gracefully)")
+            else:
+                logging.info("OpenAI-compatible provider checks passed")
+        except Exception:
+            logging.exception("Error while running OpenAI provider checks")
 
     yield
 

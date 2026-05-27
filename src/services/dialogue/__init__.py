@@ -15,11 +15,14 @@ from .command_handlers import (
     parse_custom_prefix,
 )
 from .ollama_client import call_ollama, stream_ollama
+from .openai_client import call_llm, stream_llm
 from .pause_handler import detect_pause_request
 
 __all__ = [
     "call_ollama",
     "stream_ollama",
+    "call_llm",
+    "stream_llm",
     "get_user_language",
     "detect_and_store_language",
     "detect_pause_request",

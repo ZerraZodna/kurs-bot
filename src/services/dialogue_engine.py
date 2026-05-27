@@ -17,6 +17,7 @@ from src.onboarding.service import OnboardingService
 from src.scheduler import api as scheduler_api
 from src.services.dialogue import (
     stream_ollama,
+    stream_llm,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,9 +36,11 @@ class DialogueEngine:
         self.onboarding_flow = OnboardingFlow(self.memory_manager, self.onboarding, self.call_ollama)
 
     async def call_ollama(self, prompt: str, model: str | None = None, language: str | None = None) -> str:
-        """Delegate to dialogue.ollama_client with optional language hint."""
+        """Delegate to the configured LLM provider with optional language hint."""
+        if settings.LLM_PROVIDER == "openai":
+            from src.services.dialogue import call_llm
+            return await call_llm(prompt, model, language)
         from src.services.dialogue import call_ollama
-
         return await call_ollama(prompt, model, language)
 
     async def process_message(
@@ -416,11 +419,10 @@ class DialogueEngine:
             return parse_result.response_text if parse_result.response_text is not None else full_response_text
 
         if is_english:
-            gen = stream_ollama(
-                prompt,
-                model=None,
-                language=user_lang,
-            )
+            if settings.LLM_PROVIDER == "openai":
+                gen = stream_llm(prompt, model=None, language=user_lang)
+            else:
+                gen = stream_ollama(prompt, model=None, language=user_lang)
             return {"type": "stream", "generator": gen, "post_hook": post_hook}
         else:
             response = await self.call_ollama(prompt, None, user_lang)
@@ -429,7 +431,10 @@ class DialogueEngine:
             response_text = extract_response_text(response)
 
             translation_prompt = f"Translate to {user_lang}. Return ONLY translation:\n\n{response_text}"
-            gen = stream_ollama(translation_prompt, None, user_lang)
+            if settings.LLM_PROVIDER == "openai":
+                gen = stream_llm(translation_prompt, None, user_lang)
+            else:
+                gen = stream_ollama(translation_prompt, None, user_lang)
 
             async def post_hook_translated(full_translated: str):
                 await post_hook(response)

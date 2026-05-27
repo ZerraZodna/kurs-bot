@@ -1,16 +1,16 @@
 # Kurs-Bot Tasks Master Queue
 
 > 📋 **Central tracker for all bugs, features, and improvements**
-> 🔄 Use this to see the full scope of work — never lose context!
+> 🔄 Use this to see the full scope of work - never lose context!
 
 ---
 
 ## 📊 Quick Status
 
 | Category | Total | In Progress | Pending |
-|----------|-------|-------------|---------|
+|----------|-------|-------------|---------|  
 | 🐛 Bug Fixes | 0 | 0 | 0 |
-| ✨ Features | 1 | 0 | 1 |
+| ✨ Features | 2 | 0 | 2 |
 | 🔧 Technical Debt | 0 | 0 | 0 |
 | 🧪 Testing | 0 | 0 | 0 |
 
@@ -29,10 +29,10 @@
 ## ✨ Features
 
 ### New Functionality
-- [x] **Interactive Practice Reminders** — AI-extracted lesson practice instructions, interactive follow-up after lesson delivery, hourly reminders with tailored messages → `tasks/TODO_REMINDER.md` ✅ All 9 steps done. 15 new tests. 267 total tests pass.
+- [x] **Interactive Practice Reminders** - AI-extracted lesson practice instructions, interactive follow-up after lesson delivery, hourly reminders with tailored messages → `tasks/TODO_REMINDER.md` ✅ All 9 steps done. 15 new tests. 267 total tests pass.
 
 ### Enhancements
-- [ ] None currently tracked
+- [ ] **OpenAI-Compatible LLM Provider** — Add support for any OpenAI-compatible server alongside Ollama, zero changes to existing code → `tasks/TODO_OPEN_AI.md`
 
 ---
 
@@ -59,17 +59,8 @@
 ## 🔍 Research
 
 ### OpenAI Integration
-- [ ] Research OpenAI as alternative to Ollama → `tasks/RESEARCH_OPENAI.md`
-
-### Prompt Format Differences (COMPLETE)
-- [x] Research prompt formatting differences between Ollama and OpenAI
-  - ✅ Backward compatibility strategy defined
-  - ✅ Function calling preservation plan
-  - ✅ Memory injection preservation plan
-  - ✅ Test strategy (keep old tests, add new ones)
-  - ✅ Ollama Cloud format update needed
-  - ✅ Implementation checklist ready
-  - Note: Original research file removed; findings incorporated into codebase.
+- [x] Research OpenAI as alternative to Ollama → `tasks/RESEARCH_OPENAI.md`
+- [ ] Implementation → `tasks/TODO_OPEN_AI.md`
 
 ---
 

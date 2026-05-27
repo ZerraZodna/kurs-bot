@@ -67,7 +67,14 @@ Only use functions relevant to the current context.
     TELEGRAM_POLL_ALLOWED_UPDATES: str = Field(default="message,callback_query")
     # Enable the developer web UI when True (set in .env during local dev)
     DEV_WEB_CLIENT: bool = False
-    # Add more config as needed
+    # OpenAI / OpenAI-compatible LLM provider
+    LLM_PROVIDER: str = "ollama"  # "ollama" | "openai"
+    OPENAI_MODEL: str = "gpt-4o"
+    OPENAI_BASE_URL: str = ""  # empty = default OpenAI; set for compatible servers
+    OPENAI_API_KEY: str = ""
+    OPENAI_TIMEOUT: float = 120.0
+    OPENAI_LONG_TIMEOUT: float = 380.0
+    OPENAI_TEMPERATURE: float = 0.2
 
     model_config: ConfigDict = ConfigDict(
         env_file=".env",
