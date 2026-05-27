@@ -83,6 +83,7 @@ def patch_ollama_client(monkeypatch) -> MagicMock:
 # Unified LLM mock (supports both providers)
 # ---------------------------------------------------------------------------
 
+
 class LLMClientMock:
     """Configurable LLM mock for both Ollama and OpenAI clients.
 

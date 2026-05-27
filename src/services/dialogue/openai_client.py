@@ -55,6 +55,7 @@ def _build_client_kwargs() -> dict[str, Any]:
 # Non-streaming entry point
 # ---------------------------------------------------------------------------
 
+
 async def call_llm(
     prompt: str,
     model: str | None = None,
@@ -94,7 +95,9 @@ async def call_llm(
     temp = OPENAI_TEMPERATURE if temperature is None else temperature
     timeout = OPENAI_LONG_TIMEOUT if _is_long_model(chosen_model) else OPENAI_TIMEOUT
 
-    logger.info("AI PROMPT openai (model=%s): %s", chosen_model, (prompt[:100] + "...") if len(prompt) > 100 else prompt)
+    logger.info(
+        "AI PROMPT openai (model=%s): %s", chosen_model, (prompt[:100] + "...") if len(prompt) > 100 else prompt
+    )
 
     try:
         client = AsyncOpenAI(**_build_client_kwargs())
@@ -123,6 +126,7 @@ async def call_llm(
 # ---------------------------------------------------------------------------
 # Streaming entry point
 # ---------------------------------------------------------------------------
+
 
 async def stream_llm(
     prompt: str,

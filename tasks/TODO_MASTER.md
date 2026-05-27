@@ -8,7 +8,7 @@
 ## 📊 Quick Status
 
 | Category | Total | In Progress | Pending |
-|----------|-------|-------------|---------|  
+|----------|-------|-------------|---------|
 | 🐛 Bug Fixes | 0 | 0 | 0 |
 | ✨ Features | 2 | 0 | 2 |
 | 🔧 Technical Debt | 0 | 0 | 0 |

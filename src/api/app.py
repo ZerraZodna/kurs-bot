@@ -40,7 +40,6 @@ from src.middleware.logging_redaction import apply_logging_redaction
 from src.models.database import Base, Lesson, SessionLocal, engine
 from src.scheduler import SchedulerService
 from src.services.maintenance import nightly_memory_purge
-from src.services.ollama_online_test import run_ollama_checks
 from src.services.security_checks import verify_secrets_config
 
 
@@ -120,7 +119,9 @@ def _check_openai_provider(settings) -> bool:
         if resp.status_code == 200:
             data = resp.json()
             model_used = data.get("model", "unknown")
-            logging.info("OpenAI provider confirmed — model: %s (endpoint: %s)", model_used, base_url or "default OpenAI")
+            logging.info(
+                "OpenAI provider confirmed — model: %s (endpoint: %s)", model_used, base_url or "default OpenAI"
+            )
             return True
         else:
             logging.warning("OpenAI provider health check returned HTTP %d: %s", resp.status_code, resp.text[:200])
@@ -231,7 +232,9 @@ async def lifespan(app: FastAPI):
         try:
             openai_ok = _check_openai_provider(settings)
             if not openai_ok:
-                logging.warning("OpenAI-compatible server health check failed (non-fatal; requests will fall back gracefully)")
+                logging.warning(
+                    "OpenAI-compatible server health check failed (non-fatal; requests will fall back gracefully)"
+                )
             else:
                 logging.info("OpenAI-compatible provider checks passed")
         except Exception:

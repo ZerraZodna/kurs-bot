@@ -39,8 +39,10 @@ class DialogueEngine:
         """Delegate to the configured LLM provider with optional language hint."""
         if settings.LLM_PROVIDER == "openai":
             from src.services.dialogue import call_llm
+
             return await call_llm(prompt, model, language)
         from src.services.dialogue import call_ollama
+
         return await call_ollama(prompt, model, language)
 
     async def process_message(

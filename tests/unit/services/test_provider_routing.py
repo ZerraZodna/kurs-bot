@@ -22,13 +22,14 @@ def mock_session():
 @pytest.mark.asyncio
 async def test_ollama_provider_routes_to_ollama(mock_session):
     """When LLM_PROVIDER=ollama, call_ollama routes to ollama_client."""
-    with patch("src.services.dialogue_engine.settings") as mock_settings, \
-         patch("src.services.dialogue_engine.get_user_timezone_from_db", return_value="Europe/Oslo"), \
-         patch("src.services.dialogue_engine.MemoryManager") as mock_mm_cls, \
-         patch("src.services.dialogue_engine.PromptBuilder") as mock_pb_cls, \
-         patch("src.services.dialogue_engine.OnboardingService") as mock_os_cls, \
-         patch("src.services.dialogue_engine.OnboardingFlow") as mock_of_cls:
-
+    with (
+        patch("src.services.dialogue_engine.settings") as mock_settings,
+        patch("src.services.dialogue_engine.get_user_timezone_from_db", return_value="Europe/Oslo"),
+        patch("src.services.dialogue_engine.MemoryManager") as mock_mm_cls,
+        patch("src.services.dialogue_engine.PromptBuilder") as mock_pb_cls,
+        patch("src.services.dialogue_engine.OnboardingService") as mock_os_cls,
+        patch("src.services.dialogue_engine.OnboardingFlow") as mock_of_cls,
+    ):
         mock_settings.LLM_PROVIDER = "ollama"
         mock_settings.SYSTEM_PROMPT = "test prompt"
 
@@ -60,13 +61,14 @@ async def test_ollama_provider_routes_to_ollama(mock_session):
 @pytest.mark.asyncio
 async def test_openai_provider_routes_to_openai(mock_session):
     """When LLM_PROVIDER=openai, call_ollama routes to openai_client."""
-    with patch("src.services.dialogue_engine.settings") as mock_settings, \
-         patch("src.services.dialogue_engine.get_user_timezone_from_db", return_value="Europe/Oslo"), \
-         patch("src.services.dialogue_engine.MemoryManager") as mock_mm_cls, \
-         patch("src.services.dialogue_engine.PromptBuilder") as mock_pb_cls, \
-         patch("src.services.dialogue_engine.OnboardingService") as mock_os_cls, \
-         patch("src.services.dialogue_engine.OnboardingFlow") as mock_of_cls:
-
+    with (
+        patch("src.services.dialogue_engine.settings") as mock_settings,
+        patch("src.services.dialogue_engine.get_user_timezone_from_db", return_value="Europe/Oslo"),
+        patch("src.services.dialogue_engine.MemoryManager") as mock_mm_cls,
+        patch("src.services.dialogue_engine.PromptBuilder") as mock_pb_cls,
+        patch("src.services.dialogue_engine.OnboardingService") as mock_os_cls,
+        patch("src.services.dialogue_engine.OnboardingFlow") as mock_of_cls,
+    ):
         mock_settings.LLM_PROVIDER = "openai"
         mock_settings.SYSTEM_PROMPT = "test prompt"
 

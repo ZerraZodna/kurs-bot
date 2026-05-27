@@ -276,16 +276,16 @@ Create a new mock that can patch both Ollama and OpenAI clients:
 ```python
 class LLMClientMock:
     """Mock for both Ollama and OpenAI LLM clients."""
-    
+
     async def mock_call(self, prompt, model=None, language=None):
         # Same logic as existing OllamaMock._mock_call
-    
+
     async def mock_stream(self, prompt, model=None, language=None):
         # Same logic as existing OllamaMock._mock_stream
-    
+
     def patch_ollama(self, monkeypatch):
         # Patch ollama_client.call_ollama and stream_ollama
-    
+
     def patch_openai(self, monkeypatch):
         # Patch openai_client.call_llm and stream_llm
 ```

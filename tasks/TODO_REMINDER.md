@@ -74,7 +74,7 @@ Create a function `check_and_extract_practice_instructions(lesson_id: int, sessi
 
 **Integration point:** This runs **1 hour before lesson delivery** (or whenever the lesson is about to be delivered). The scheduler checks this before sending the lesson.
 
-**Why this matters:** 
+**Why this matters:**
 - First run: AI extracts, stores in DB
 - Subsequent runs: instant DB lookup
 - Next year, for new users: already cached, no re-processing

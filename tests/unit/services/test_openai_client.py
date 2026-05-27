@@ -20,6 +20,7 @@ def mock_settings():
         mock.TEST_USE_REAL_OLLAMA = False
         # Also patch module-level constants so they reflect the fixture
         import src.services.dialogue.openai_client as mod
+
         mod.OPENAI_MODEL = "gpt-4o"
         mod.OPENAI_TEMPERATURE = 0.2
         mod._IS_TEST_ENV = False
@@ -31,9 +32,7 @@ def mock_settings():
 def mock_openai_response():
     """Create a mock OpenAI chat completion response."""
     response = MagicMock()
-    response.choices = [
-        MagicMock(message=MagicMock(content="Hello, how can I help you?"))
-    ]
+    response.choices = [MagicMock(message=MagicMock(content="Hello, how can I help you?"))]
     return response
 
 
@@ -195,8 +194,10 @@ class TestStreamLlm:
     @pytest.mark.asyncio
     async def test_fallback_on_error(self, mock_settings, mock_openai_response):
         """stream_llm falls back to call_llm on exception."""
-        with patch("src.services.dialogue.openai_client.AsyncOpenAI") as mock_async_openai, \
-             patch("src.services.dialogue.openai_client.call_llm", new_callable=AsyncMock) as mock_call:
+        with (
+            patch("src.services.dialogue.openai_client.AsyncOpenAI") as mock_async_openai,
+            patch("src.services.dialogue.openai_client.call_llm", new_callable=AsyncMock) as mock_call,
+        ):
             mock_async_openai.side_effect = Exception("Network error")
             mock_call.return_value = "fallback response"
 
