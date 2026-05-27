@@ -1,5 +1,6 @@
 """Unit tests for the OpenAI-compatible LLM client."""
 
+import importlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -7,8 +8,8 @@ import pytest
 
 @pytest.fixture
 def mock_settings():
-    """Patch settings and module-level constants to prevent real API calls in tests."""
-    with patch("src.services.dialogue.openai_client.settings") as mock:
+    """Patch settings at the source (src.config) so reload picks up patched values."""
+    with patch("src.config.settings") as mock:
         mock.OPENAI_MODEL = "gpt-4o"
         mock.OPENAI_BASE_URL = "http://test.local/v1"
         mock.OPENAI_API_KEY = "sk-test"
@@ -30,19 +31,32 @@ def mock_openai_response():
 
 
 class TestCallLlm:
-    """Tests for the non-streaming call_llm function."""
+    """Tests for the non-streaming call_llm function.
+
+    Note: conftest globally monkeypatches call_llm with a mock. These tests
+    need the real implementation so that the AsyncOpenAI mock actually runs.
+    We reload the module to bypass the monkeypatch.  The mock_settings fixture
+    patches src.config.settings (the source), so the reload picks up the
+    patched config values.
+    """
+
+    def _real_module(self):
+        """Reload openai_client to get the real call_llm, bypassing conftest monkeypatch."""
+        import src.services.dialogue.openai_client as oc
+
+        importlib.reload(oc)
+        return oc
 
     @pytest.mark.asyncio
     async def test_returns_content_from_response(self, mock_settings, mock_openai_response):
         """call_llm returns the content from the first choice."""
-        with patch("src.services.dialogue.openai_client.AsyncOpenAI") as mock_async_openai:
+        oc = self._real_module()
+        with patch.object(oc, "AsyncOpenAI") as mock_async_openai:
             mock_client = AsyncMock()
             mock_client.chat.completions.create = AsyncMock(return_value=mock_openai_response)
             mock_async_openai.return_value = mock_client
 
-            from src.services.dialogue.openai_client import call_llm
-
-            result = await call_llm("Hello")
+            result = await oc.call_llm("Hello")
 
             assert result == "Hello, how can I help you?"
             mock_client.chat.completions.create.assert_called_once()
@@ -53,14 +67,13 @@ class TestCallLlm:
     @pytest.mark.asyncio
     async def test_uses_custom_model(self, mock_settings, mock_openai_response):
         """call_llm uses the provided model parameter."""
-        with patch("src.services.dialogue.openai_client.AsyncOpenAI") as mock_async_openai:
+        oc = self._real_module()
+        with patch.object(oc, "AsyncOpenAI") as mock_async_openai:
             mock_client = AsyncMock()
             mock_client.chat.completions.create = AsyncMock(return_value=mock_openai_response)
             mock_async_openai.return_value = mock_client
 
-            from src.services.dialogue.openai_client import call_llm
-
-            await call_llm("Hello", model="gpt-3.5-turbo")
+            await oc.call_llm("Hello", model="gpt-3.5-turbo")
 
             call_args = mock_client.chat.completions.create.call_args
             assert call_args[1]["model"] == "gpt-3.5-turbo"
@@ -68,14 +81,13 @@ class TestCallLlm:
     @pytest.mark.asyncio
     async def test_uses_custom_temperature(self, mock_settings, mock_openai_response):
         """call_llm passes the temperature parameter."""
-        with patch("src.services.dialogue.openai_client.AsyncOpenAI") as mock_async_openai:
+        oc = self._real_module()
+        with patch.object(oc, "AsyncOpenAI") as mock_async_openai:
             mock_client = AsyncMock()
             mock_client.chat.completions.create = AsyncMock(return_value=mock_openai_response)
             mock_async_openai.return_value = mock_client
 
-            from src.services.dialogue.openai_client import call_llm
-
-            await call_llm("Hello", temperature=0.7)
+            await oc.call_llm("Hello", temperature=0.7)
 
             call_args = mock_client.chat.completions.create.call_args
             assert call_args[1]["temperature"] == 0.7
@@ -83,42 +95,39 @@ class TestCallLlm:
     @pytest.mark.asyncio
     async def test_handles_empty_response(self, mock_settings):
         """call_llm returns error message when response has no choices."""
-        with patch("src.services.dialogue.openai_client.AsyncOpenAI") as mock_async_openai:
+        oc = self._real_module()
+        with patch.object(oc, "AsyncOpenAI") as mock_async_openai:
             mock_client = AsyncMock()
             mock_response = MagicMock()
             mock_response.choices = []
             mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
             mock_async_openai.return_value = mock_client
 
-            from src.services.dialogue.openai_client import call_llm
-
-            result = await call_llm("Hello")
+            result = await oc.call_llm("Hello")
 
             assert result == "[No response from LLM]"
 
     @pytest.mark.asyncio
     async def test_handles_api_error(self, mock_settings):
         """call_llm returns error message on exception."""
-        with patch("src.services.dialogue.openai_client.AsyncOpenAI") as mock_async_openai:
+        oc = self._real_module()
+        with patch.object(oc, "AsyncOpenAI") as mock_async_openai:
             mock_async_openai.side_effect = Exception("Connection refused")
 
-            from src.services.dialogue.openai_client import call_llm
-
-            result = await call_llm("Hello")
+            result = await oc.call_llm("Hello")
 
             assert result == "[Sorry, I couldn't process your request right now.]"
 
     @pytest.mark.asyncio
     async def test_uses_base_url_and_api_key(self, mock_settings, mock_openai_response):
         """call_llm passes base_url and api_key to AsyncOpenAI."""
-        with patch("src.services.dialogue.openai_client.AsyncOpenAI") as mock_async_openai:
+        oc = self._real_module()
+        with patch.object(oc, "AsyncOpenAI") as mock_async_openai:
             mock_client = AsyncMock()
             mock_client.chat.completions.create = AsyncMock(return_value=mock_openai_response)
             mock_async_openai.return_value = mock_client
 
-            from src.services.dialogue.openai_client import call_llm
-
-            await call_llm("Hello")
+            await oc.call_llm("Hello")
 
             mock_async_openai.assert_called_once()
             call_kwargs = mock_async_openai.call_args[1]

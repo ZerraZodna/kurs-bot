@@ -212,7 +212,9 @@ def ensure_test_db(db_engine, monkeypatch):
     # The call_llm function in openai_client.py has a test guard, but it
     # reads settings.IS_TEST_ENV which is baked in at module import time
     # (before .env.test is loaded). Patch the exported symbol globally.
-    async def _mock_call_llm(prompt: str, model: str | None = None, language: str | None = None, temperature: float | None = None) -> str:
+    async def _mock_call_llm(
+        prompt: str, model: str | None = None, language: str | None = None, temperature: float | None = None
+    ) -> str:
         short = (prompt[:160] + "...") if prompt and len(prompt) > 160 else (prompt or "")
         return f"[MOCK_LLM_REPLY] model={model or 'default'} lang={language or 'en'} text={short}"
 

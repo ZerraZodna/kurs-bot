@@ -55,7 +55,8 @@ def dump_state(db, user_id: int):
         MemoryKey.PRACTICE_REMINDER_EVENING_CUTOFF,
     ]
     mems = (
-        db.query(Memory)
+        db
+        .query(Memory)
         .filter(Memory.user_id == user_id, Memory.key.in_(practice_keys))
         .order_by(Memory.created_at.desc())
         .all()
@@ -68,12 +69,7 @@ def dump_state(db, user_id: int):
 
     # Schedules
     print("\n📅 Active schedules:")
-    schedules = (
-        db.query(Schedule)
-        .filter_by(user_id=user_id, is_active=True)
-        .order_by(Schedule.created_at.desc())
-        .all()
-    )
+    schedules = db.query(Schedule).filter_by(user_id=user_id, is_active=True).order_by(Schedule.created_at.desc()).all()
     if not schedules:
         print("  (none)")
     else:
