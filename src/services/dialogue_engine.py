@@ -38,13 +38,9 @@ class DialogueEngine:
 
     async def call_ollama(self, prompt: str, model: str | None = None, language: str | None = None) -> str:
         """Delegate to the configured LLM provider with optional language hint."""
-        if settings.LLM_PROVIDER == "openai":
-            from src.services.dialogue import call_llm
+        from src.services.dialogue import call_llm_router
 
-            return await call_llm(prompt, model, language)
-        from src.services.dialogue import call_ollama
-
-        return await call_ollama(prompt, model, language)
+        return await call_llm_router(prompt, model=model, language=language)
 
     async def process_message(
         self,

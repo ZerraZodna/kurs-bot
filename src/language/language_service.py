@@ -13,7 +13,6 @@ import re
 
 from langdetect import detect_langs
 
-from src.config import settings
 from src.language.keyword_detector import detect_language as keyword_detect
 from src.memories.constants import MemoryCategory, MemoryKey
 
@@ -230,12 +229,9 @@ async def detect_language(text: str):
         )
         try:
             # Import lazily to avoid circular package import at module import time
-            from src.services.dialogue import call_llm, call_ollama
+            from src.services.dialogue import call_llm_router
 
-            if settings.LLM_PROVIDER == "openai":
-                resp = await call_llm(prompt, model=settings.OPENAI_MODEL, language="en")
-            else:
-                resp = await call_ollama(prompt, model=settings.OLLAMA_MODEL, language="en")
+            resp = await call_llm_router(prompt, model=None, language="en")
         except Exception:
             resp = ""
         if resp:
