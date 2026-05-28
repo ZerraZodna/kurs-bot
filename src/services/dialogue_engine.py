@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Dict, Any
 
@@ -123,6 +124,70 @@ class DialogueEngine:
         else:
             logger.warning("[commands] Bot commands registration via /start returned false")
 
+    async def _ask_practice_reminders(self, session: Session, user_id: int, memory_manager: MemoryManager) -> None:
+        """Background task: check if current lesson has practice reminders and ask user."""
+        try:
+            from src.lessons.state import get_current_lesson
+            from src.lessons.practice_extractor import check_and_extract_practice_instructions
+            from src.integrations.telegram import send_message
+            from src.models.database import User as UserModel
+            from src.memories.constants import MemoryKey
+
+            user_obj = session.query(UserModel).filter_by(user_id=user_id).first()
+            if not user_obj:
+                return
+
+            last_sent = get_current_lesson(memory_manager, user_id)
+            if not last_sent:
+                return
+
+            lesson_id = _parse_lesson_int(last_sent)
+            if lesson_id is None or lesson_id == 0:
+                return
+
+            # Skip if already declined today
+            declined = memory_manager.get_memory(user_id, MemoryKey.PRACTICE_REMINDER_DECLINED_TODAY)
+            if declined:
+                return
+
+            # Skip if already pending
+            pending = memory_manager.get_memory(user_id, MemoryKey.PRACTICE_REMINDER_PENDING)
+            if pending:
+                return
+
+            instructions = check_and_extract_practice_instructions(lesson_id, session=session)
+            if not instructions:
+                return
+
+            frequency = instructions.get("frequency", "single")
+            if frequency == "single":
+                return
+
+            freq_labels = {
+                "hourly": "hourly today",
+                "twice_daily": "twice today (morning and evening)",
+                "three_times_daily": "three times today",
+                "morning_evening": "twice today (morning and evening)",
+            }
+            freq_label = freq_labels.get(frequency, f"{frequency}")
+
+            message = (
+                f"This lesson suggests practicing {freq_label}. "
+                f"Would you like me to send you reminders throughout the day? (yes/no)"
+            )
+            await send_message(int(user_obj.external_id), message)
+
+            memory_manager.store_memory(
+                user_id=user_id,
+                key=MemoryKey.PRACTICE_REMINDER_PENDING,
+                value=str(lesson_id),
+                ttl_hours=1,
+                category=MemoryCategory.CONVERSATION.value,
+                source="dialogue_engine",
+            )
+        except Exception as e:
+            logger.warning("Failed to ask practice reminders for user %d: %s", user_id, e)
+
     async def _check_user_restrictions(self, user_id: int, text: str, user: User, session: Session) -> str | None:
         """Handle GDPR commands and check if user is deleted or restricted."""
         from src.services.dialogue import handle_gdpr_commands
@@ -222,6 +287,12 @@ class DialogueEngine:
         english_text = deliver_lesson(session, user_id, target_lesson_id, self.memory_manager)
         if english_text is not None:
             logger.info(f"[command /{cmd_name} user={user_id}] lesson_id={log_id}")
+            # Schedule practice reminder check in background (don't block lesson delivery)
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self._ask_practice_reminders(session, user_id, self.memory_manager))
+            except RuntimeError:
+                pass
             return english_text  # Already translated in deliver_lesson if needed
         return get_onboarding_message("commands.lesson_error", user_lang)
 
