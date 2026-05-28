@@ -76,7 +76,10 @@ def _extract_via_llm(lesson: Lesson) -> dict[str, Any] | None:
                 result = future.result()
         except RuntimeError:
             # No running loop — safe to use asyncio.run directly
-            result = asyncio.run(call_llm(prompt))
+            if settings.LLM_PROVIDER == "openai":
+                result = asyncio.run(call_llm(prompt))
+            else:
+                result = asyncio.run(call_ollama(prompt))
         if not result:
             return None
 

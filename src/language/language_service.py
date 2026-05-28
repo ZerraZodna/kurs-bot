@@ -230,9 +230,12 @@ async def detect_language(text: str):
         )
         try:
             # Import lazily to avoid circular package import at module import time
-            from src.services.dialogue import call_ollama
+            from src.services.dialogue import call_llm, call_ollama
 
-            resp = await call_ollama(prompt, model=settings.OLLAMA_MODEL, language="en")
+            if settings.LLM_PROVIDER == "openai":
+                resp = await call_llm(prompt, model=settings.OPENAI_MODEL, language="en")
+            else:
+                resp = await call_ollama(prompt, model=settings.OLLAMA_MODEL, language="en")
         except Exception:
             resp = ""
         if resp:
