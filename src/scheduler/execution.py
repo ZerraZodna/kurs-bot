@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from src.core.timezone import utc_now
 from src.lessons import get_english_lesson_text
-from src.lessons.delivery import get_english_lesson_preview, deliver_lesson, get_lesson_or_import
+from src.lessons.delivery import deliver_lesson_text, get_english_lesson_preview, get_lesson_or_import
 from src.memories import MemoryManager
 from src.memories.constants import MemoryKey
 from src.models.database import Lesson, Schedule, User, get_session
@@ -235,7 +235,7 @@ def _execute_lesson_schedule(db: Session, schedule: Schedule, user: User, memory
         state.get("previous_lesson_id"),
     )
 
-    english_text = deliver_lesson(db, schedule.user_id, None, memory_manager)
+    english_text = deliver_lesson_text(db, schedule.user_id, None, memory_manager)
     if english_text:
         lang = get_user_language(memory_manager, schedule.user_id)
         if lang and lang.lower() not in ("en",):

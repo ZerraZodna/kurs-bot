@@ -7,7 +7,7 @@ from src.config import settings
 from src.core.timezone import format_dt_in_timezone, get_user_timezone_from_db
 from src.language.prompt_builder import PromptBuilder
 from src.language.onboarding_prompts import get_onboarding_message
-from src.lessons.delivery import _parse_lesson_int, deliver_lesson
+from src.lessons.delivery import _parse_lesson_int, deliver_lesson_text
 
 from src.memories import MemoryManager
 from src.memories.constants import MemoryCategory, MemoryKey
@@ -119,44 +119,43 @@ class DialogueEngine:
         else:
             logger.warning("[commands] Bot commands registration via /start returned false")
 
-    async def _ask_practice_reminders(self, session: Session, user_id: int, memory_manager: MemoryManager) -> None:
-        """Background task: check if current lesson has practice reminders and ask user."""
+    async def _build_practice_reminder_text(self, session: Session, user_id: int, memory_manager: MemoryManager) -> str:
+        """Build practice reminder text to append to lesson, or empty string if not applicable."""
         try:
             from src.lessons.state import get_current_lesson
             from src.lessons.practice_extractor import check_and_extract_practice_instructions
-            from src.integrations.telegram import send_message
             from src.models.database import User as UserModel
             from src.memories.constants import MemoryKey
 
             user_obj = session.query(UserModel).filter_by(user_id=user_id).first()
             if not user_obj:
-                return
+                return ""
 
             last_sent = get_current_lesson(memory_manager, user_id)
             if not last_sent:
-                return
+                return ""
 
             lesson_id = _parse_lesson_int(last_sent)
             if lesson_id is None or lesson_id == 0:
-                return
+                return ""
 
             # Skip if already declined today
             declined = memory_manager.get_memory(user_id, MemoryKey.PRACTICE_REMINDER_DECLINED_TODAY)
             if declined:
-                return
+                return ""
 
             # Skip if already pending
             pending = memory_manager.get_memory(user_id, MemoryKey.PRACTICE_REMINDER_PENDING)
             if pending:
-                return
+                return ""
 
             instructions = check_and_extract_practice_instructions(lesson_id, session=session)
             if not instructions:
-                return
+                return ""
 
             frequency = instructions.get("frequency", "single")
             if frequency == "single":
-                return
+                return ""
 
             freq_labels = {
                 "hourly": "hourly today",
@@ -166,12 +165,7 @@ class DialogueEngine:
             }
             freq_label = freq_labels.get(frequency, f"{frequency}")
 
-            message = (
-                f"This lesson suggests practicing {freq_label}. "
-                f"Would you like me to send you reminders throughout the day? (yes/no)"
-            )
-            await send_message(int(user_obj.external_id), message)
-
+            # Store pending state so the dialogue engine can handle the yes/no response
             memory_manager.store_memory(
                 user_id=user_id,
                 key=MemoryKey.PRACTICE_REMINDER_PENDING,
@@ -180,8 +174,11 @@ class DialogueEngine:
                 category=MemoryCategory.CONVERSATION.value,
                 source="dialogue_engine",
             )
+
+            return f"\n\n⏰ This lesson suggests practicing {freq_label}. Reply yes to get reminders, or no to skip."
         except Exception as e:
-            logger.warning("Failed to ask practice reminders for user %d: %s", user_id, e)
+            logger.warning("Failed to build practice reminder text for user %d: %s", user_id, e)
+            return ""
 
     async def _check_user_restrictions(self, user_id: int, text: str, user: User, session: Session) -> str | None:
         """Handle GDPR commands and check if user is deleted or restricted."""
@@ -279,12 +276,14 @@ class DialogueEngine:
         else:
             return None
 
-        english_text = deliver_lesson(session, user_id, target_lesson_id, self.memory_manager)
+        english_text = deliver_lesson_text(session, user_id, target_lesson_id, self.memory_manager)
         if english_text is not None:
             logger.info(f"[command /{cmd_name} user={user_id}] lesson_id={log_id}")
-            # Ask about practice reminders before returning (ensures correct message order)
-            await self._ask_practice_reminders(session, user_id, self.memory_manager)
-            return english_text  # Already translated in deliver_lesson if needed
+            # Append practice reminder question if applicable
+            reminder_text = await self._build_practice_reminder_text(session, user_id, self.memory_manager)
+            if reminder_text:
+                english_text = f"{english_text}{reminder_text}"
+            return english_text  # Already translated if needed
         return get_onboarding_message("commands.lesson_error", user_lang)
 
     async def _handle_onboarding_stage(self, user_id: int, text: str, session: Session) -> str | None:

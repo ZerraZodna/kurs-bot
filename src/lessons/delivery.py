@@ -65,7 +65,7 @@ def get_english_lesson_preview(
     return None
 
 
-def deliver_lesson(
+def deliver_lesson_text(
     db: Session,
     user_id: int,
     target_lesson_id: int | None,
