@@ -222,14 +222,6 @@ class DialogueEngine:
         english_text = deliver_lesson(session, user_id, target_lesson_id, self.memory_manager)
         if english_text is not None:
             logger.info(f"[command /{cmd_name} user={user_id}] lesson_id={log_id}")
-            # After delivering the lesson, check if extra practice is suggested
-            from src.models.database import User as UserModel
-
-            user_obj = session.query(UserModel).filter_by(user_id=user_id).first()
-            if user_obj:
-                from src.scheduler.execution import _maybe_ask_practice_reminders
-
-                await _maybe_ask_practice_reminders(session, user_id, self.memory_manager, user_obj)
             return english_text  # Already translated in deliver_lesson if needed
         return get_onboarding_message("commands.lesson_error", user_lang)
 
