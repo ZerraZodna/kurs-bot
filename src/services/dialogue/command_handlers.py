@@ -151,7 +151,7 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
     """
     if not text or not text.strip():
         return None
-    text_lower = text.strip().lower()
+    text_lower = text.strip().lower().lstrip("/")
     triggers = {
         "list all my memories",
         "list my memories",
@@ -194,7 +194,9 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
             if text_lower.startswith(trig + " "):
                 matched_trigger = True
                 # preserve original text after the trigger (not lowercased)
-                query_tail = text[len(trig) :].strip()
+                # Strip leading '/' from text so slicing aligns with the trigger
+                clean_text = text.lstrip("/")
+                query_tail = clean_text[len(trig) :].strip()
                 break
         if not matched_trigger:
             return None
