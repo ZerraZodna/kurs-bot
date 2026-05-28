@@ -7,7 +7,6 @@ This test file covers the query_schedule function handler which:
 - Includes messages for one-time reminders from memory
 """
 
-import json
 from datetime import datetime, UTC
 from unittest.mock import Mock, patch
 
@@ -15,7 +14,6 @@ import pytest
 
 from src.functions.executor import FunctionExecutor
 from src.memories import MemoryManager
-from src.memories.constants import MemoryCategory, MemoryKey
 from src.models.database import Schedule
 
 
@@ -179,26 +177,23 @@ class TestHandleQuerySchedule:
         db_session.add(schedule)
         db_session.commit()
 
-        # Mock memory manager to return message for this schedule
-        message_data = json.dumps({"schedule_id": schedule.schedule_id, "message": "Don't forget your lesson!"})
-        mock_memory_manager.get_memory.return_value = [{"key": MemoryKey.SCHEDULE_MESSAGE, "value": message_data}]
+        # Set the custom message directly on the schedule (code reads from schedule.custom_message)
+        schedule.custom_message = "Don't forget your lesson!"
+        db_session.commit()
 
         with patch("src.core.timezone.get_user_timezone_from_db", return_value="UTC"):
             with patch("src.core.timezone.format_dt_in_timezone") as mock_format:
                 mock_format.return_value = (schedule.next_send_time, "UTC")
 
                 with patch("src.scheduler.api.get_user_schedules", return_value=[schedule]):
-                    with patch("src.scheduler.memory_helpers.get_schedule_message") as mock_get_msg:
-                        mock_get_msg.return_value = "Don't forget your lesson!"
+                    context = {
+                        "user_id": test_user.user_id,
+                        "session": db_session,
+                        "memory_manager": mock_memory_manager,
+                    }
 
-                        context = {
-                            "user_id": test_user.user_id,
-                            "session": db_session,
-                            "memory_manager": mock_memory_manager,
-                        }
-
-                        exec_result = await executor.execute_single("query_schedule", {}, context)
-                        result = exec_result.result
+                    exec_result = await executor.execute_single("query_schedule", {}, context)
+                    result = exec_result.result
 
         assert exec_result.success
         assert result["ok"] is True
@@ -375,16 +370,9 @@ class TestHandleQueryScheduleIntegration:
         db_session.add(schedule)
         db_session.commit()
 
-        # Store schedule message in memory using real MemoryManager
-        mm = MemoryManager(db_session)
-        message_data = json.dumps({"schedule_id": schedule.schedule_id, "message": "Your custom reminder message"})
-        mm.store_memory(
-            user_id=test_user.user_id,
-            key=MemoryKey.SCHEDULE_MESSAGE,
-            value=message_data,
-            category=MemoryCategory.CONVERSATION.value,  # Use valid category
-            source="test",
-        )
+        # Set the custom message directly on the schedule (code reads from schedule.custom_message)
+        schedule.custom_message = "Your custom reminder message"
+        db_session.commit()
 
         with patch("src.core.timezone.get_user_timezone_from_db", return_value="UTC"):
             with patch("src.core.timezone.format_dt_in_timezone") as mock_format:
@@ -394,7 +382,7 @@ class TestHandleQueryScheduleIntegration:
                     context = {
                         "user_id": test_user.user_id,
                         "session": db_session,
-                        "memory_manager": mm,
+                        "memory_manager": None,
                     }
 
                     exec_result = await executor.execute_single("query_schedule", {}, context)

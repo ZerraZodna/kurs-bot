@@ -119,11 +119,7 @@ class TestOneTimeReminderUTCConversion:
             patch("src.scheduler.operations.schedule_manager.create_schedule", side_effect=capture_create_schedule),
             patch("src.scheduler.operations.schedule_manager.find_existing_one_time_reminder", return_value=None),
             patch("src.scheduler.operations.schedule_jobs") as mock_jobs,
-            patch("src.scheduler.operations.MemoryManager") as mock_mm_class,
         ):
-            mock_mm = Mock()
-            mock_mm_class.return_value = mock_mm
-
             # Create a one-time reminder for 15:14 local time (Oslo)
             local_tz = "Europe/Oslo"
             local_run_at = datetime(2026, 3, 2, 15, 14, 0, tzinfo=ZoneInfo(local_tz))

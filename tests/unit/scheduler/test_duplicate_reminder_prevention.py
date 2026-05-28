@@ -153,25 +153,20 @@ class TestCreateOneTimeScheduleDeduplication:
         with patch("src.scheduler.operations.schedule_manager.find_existing_one_time_reminder") as mock_find:
             mock_find.return_value = existing_schedule
 
-            # Mock MemoryManager
-            with patch("src.scheduler.operations.MemoryManager") as mock_mm_class:
-                mock_mm = MagicMock()
-                mock_mm_class.return_value = mock_mm
+            # Mock sync_job_for_schedule
+            with patch("src.scheduler.operations.schedule_jobs.sync_job_for_schedule"):
+                run_at = datetime(2024, 1, 15, 14, 30, 0, tzinfo=UTC)
+                result = create_one_time_schedule(
+                    user_id=123,
+                    run_at=run_at,
+                    message="Test reminder",
+                    session=None,  # Will create its own session
+                )
 
-                # Mock sync_job_for_schedule
-                with patch("src.scheduler.operations.schedule_jobs.sync_job_for_schedule"):
-                    run_at = datetime(2024, 1, 15, 14, 30, 0, tzinfo=UTC)
-                    result = create_one_time_schedule(
-                        user_id=123,
-                        run_at=run_at,
-                        message="Test reminder",
-                        session=None,  # Will create its own session
-                    )
-
-                    # Should return the existing schedule, not create a new one
-                    assert result.schedule_id == 42
-                    # Verify find was called
-                    mock_find.assert_called_once()
+                # Should return the existing schedule, not create a new one
+                assert result.schedule_id == 42
+                # Verify find was called
+                mock_find.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_create_one_time_schedule_creates_new_when_no_duplicate(self):
@@ -187,25 +182,20 @@ class TestCreateOneTimeScheduleDeduplication:
             with patch("src.scheduler.operations.schedule_manager.create_schedule") as mock_create:
                 mock_create.return_value = mock_new_schedule
 
-                # Mock MemoryManager
-                with patch("src.scheduler.operations.MemoryManager") as mock_mm_class:
-                    mock_mm = MagicMock()
-                    mock_mm_class.return_value = mock_mm
+                # Mock sync_job_for_schedule
+                with patch("src.scheduler.operations.schedule_jobs.sync_job_for_schedule"):
+                    run_at = datetime(2024, 1, 15, 14, 30, 0, tzinfo=UTC)
+                    result = create_one_time_schedule(
+                        user_id=123,
+                        run_at=run_at,
+                        message="Test reminder",
+                        session=None,
+                    )
 
-                    # Mock sync_job_for_schedule
-                    with patch("src.scheduler.operations.schedule_jobs.sync_job_for_schedule"):
-                        run_at = datetime(2024, 1, 15, 14, 30, 0, tzinfo=UTC)
-                        result = create_one_time_schedule(
-                            user_id=123,
-                            run_at=run_at,
-                            message="Test reminder",
-                            session=None,
-                        )
-
-                        # Should create a new schedule
-                        assert result.schedule_id == 99
-                        # Verify create was called
-                        mock_create.assert_called_once()
+                    # Should create a new schedule
+                    assert result.schedule_id == 99
+                    # Verify create was called
+                    mock_create.assert_called_once()
 
 
 if __name__ == "__main__":

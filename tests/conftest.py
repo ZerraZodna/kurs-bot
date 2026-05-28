@@ -397,13 +397,6 @@ def truncate_test_tables(db_engine):
         conn.commit()
 
 
-# Serial test handling - collect serial tests last so they run in isolation
-def pytest_collection_modifyitems(config, items):
-    serial_items = [i for i in items if i.get_closest_marker("serial")]
-    other_items = [i for i in items if not i.get_closest_marker("serial")]
-    items[:] = other_items + serial_items
-
-
 # Model overrides for test configuration
 def pytest_configure(config):
     defaults_model = "llama3.2:3b"

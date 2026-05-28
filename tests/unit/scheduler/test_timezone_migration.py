@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, UTC
 
 from src.core.timezone import format_dt_in_timezone, to_utc
-from src.models.database import Schedule, SessionLocal, User
+from src.models.database import Schedule, User
 from src.scheduler import SchedulerService
 from src.scheduler import manager as schedule_manager
 
@@ -29,33 +29,30 @@ def _create_test_user(db, timezone_name=None):
     return user.user_id
 
 
-def test_create_schedule_europe_oslo_0900():
-    db = SessionLocal()
-    try:
-        user_id = _create_test_user(db, timezone_name="Europe/Oslo")
+def test_create_schedule_europe_oslo_0900(db_session):
+    user_id = _create_test_user(db_session, timezone_name="Europe/Oslo")
 
-        # Create schedule for 09:00 local time
-        sched = SchedulerService.create_daily_schedule(user_id=user_id, lesson_id=None, time_str="09:00", session=db)
-        assert sched is not None
+    # Create schedule for 09:00 local time
+    sched = SchedulerService.create_daily_schedule(
+        user_id=user_id, lesson_id=None, time_str="09:00", session=db_session
+    )
+    assert sched is not None
 
-        # reload schedules using the same session and pick active one
-        # Note: We use the session directly instead of SchedulerService.get_user_schedules
-        # to ensure we're using the same database connection
-        all_schedules = db.query(Schedule).filter_by(user_id=user_id).all()
-        active = [s for s in all_schedules if s.is_active]
-        assert len(active) >= 1
-        s = active[0]
+    # reload schedules using the same session and pick active one
+    # Note: We use the session directly instead of SchedulerService.get_user_schedules
+    # to ensure we're using the same database connection
+    all_schedules = db_session.query(Schedule).filter_by(user_id=user_id).all()
+    active = [s for s in all_schedules if s.is_active]
+    assert len(active) >= 1
+    s = active[0]
 
-        # Stored next_send_time may be naive depending on DB backend (SQLite)
-        # Normalize with `to_utc()` helper before assertions.
-        if s.next_send_time is not None:
-            normalized = to_utc(s.next_send_time)
-            # When displayed in Europe/Oslo, should show hour 9
-            local_dt, resolved = format_dt_in_timezone(normalized, "Europe/Oslo")
-            assert local_dt.hour == 9 and local_dt.minute == 0
-
-    finally:
-        db.close()
+    # Stored next_send_time may be naive depending on DB backend (SQLite)
+    # Normalize with `to_utc()` helper before assertions.
+    if s.next_send_time is not None:
+        normalized = to_utc(s.next_send_time)
+        # When displayed in Europe/Oslo, should show hour 9
+        local_dt, resolved = format_dt_in_timezone(normalized, "Europe/Oslo")
+        assert local_dt.hour == 9 and local_dt.minute == 0
 
 
 def _parse_run_at(run_at_val) -> datetime:
@@ -76,45 +73,37 @@ def _parse_run_at(run_at_val) -> datetime:
 
 
 def test_parse_run_at_iso_and_epoch():
-    db = SessionLocal()
-    try:
-        now = datetime.now(UTC).replace(microsecond=0)
-        iso = now.isoformat()
-        parsed_iso = _parse_run_at(iso)
-        assert parsed_iso is not None
-        assert parsed_iso.tzinfo is not None
-        # parsed_iso should be equal to to_utc(now)
-        assert to_utc(parsed_iso) == to_utc(now)
+    now = datetime.now(UTC).replace(microsecond=0)
+    iso = now.isoformat()
+    parsed_iso = _parse_run_at(iso)
+    assert parsed_iso is not None
+    assert parsed_iso.tzinfo is not None
+    # parsed_iso should be equal to to_utc(now)
+    assert to_utc(parsed_iso) == to_utc(now)
 
-        epoch = int(now.timestamp())
-        parsed_epoch = _parse_run_at(epoch)
-        assert parsed_epoch is not None
-        assert parsed_epoch.tzinfo is not None
-        assert to_utc(parsed_epoch) == to_utc(datetime.fromtimestamp(epoch, UTC))
-
-    finally:
-        db.close()
+    epoch = int(now.timestamp())
+    parsed_epoch = _parse_run_at(epoch)
+    assert parsed_epoch is not None
+    assert parsed_epoch.tzinfo is not None
+    assert to_utc(parsed_epoch) == to_utc(datetime.fromtimestamp(epoch, UTC))
 
 
-def test_update_schedule_persists_utc_aware():
-    db = SessionLocal()
-    try:
-        user_id = _create_test_user(db)
+def test_update_schedule_persists_utc_aware(db_session):
+    user_id = _create_test_user(db_session)
 
-        # Create initial schedule
-        sched = SchedulerService.create_daily_schedule(user_id=user_id, lesson_id=None, time_str="08:00", session=db)
-        assert sched is not None
+    # Create initial schedule
+    sched = SchedulerService.create_daily_schedule(
+        user_id=user_id, lesson_id=None, time_str="08:00", session=db_session
+    )
+    assert sched is not None
 
-        # Update schedule next_send_time with a naive datetime (assume local) and ensure manager normalizes it
-        naive_local = datetime(2026, 2, 8, 7, 30)  # naive
-        updated = schedule_manager.update_schedule(sched.schedule_id, {"next_send_time": naive_local}, session=db)
-        assert updated is not None
-        assert updated.next_send_time is not None
-        # DB may return naive datetimes; normalize before checking
-        normalized = to_utc(updated.next_send_time)
-        assert normalized.tzinfo is not None
-        # Should be stored/normalized as UTC (utcoffset 0)
-        assert normalized.utcoffset() == timedelta(0)
-
-    finally:
-        db.close()
+    # Update schedule next_send_time with a naive datetime (assume local) and ensure manager normalizes it
+    naive_local = datetime(2026, 2, 8, 7, 30)  # naive
+    updated = schedule_manager.update_schedule(sched.schedule_id, {"next_send_time": naive_local}, session=db_session)
+    assert updated is not None
+    assert updated.next_send_time is not None
+    # DB may return naive datetimes; normalize before checking
+    normalized = to_utc(updated.next_send_time)
+    assert normalized.tzinfo is not None
+    # Should be stored/normalized as UTC (utcoffset 0)
+    assert normalized.utcoffset() == timedelta(0)
