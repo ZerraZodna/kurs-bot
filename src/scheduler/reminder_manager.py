@@ -6,7 +6,6 @@ Handles hourly, twice_daily, three_times_daily, and morning_evening patterns.
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from typing import Any
@@ -212,21 +211,8 @@ def _create_reminder_schedule(
     )
 
     # Store reminder message in memory
-    memory_manager = MemoryManager(session)
-    payload = json.dumps({
-        "schedule_id": schedule.schedule_id,
-        "message": message,
-        "lesson_id": lesson_id,
-    })
-    memory_manager.store_memory(
-        user_id=user_id,
-        key=MemoryKey.SCHEDULE_MESSAGE,
-        value=payload,
-        category=MemoryCategory.CONVERSATION.value,
-        ttl_hours=48,
-        source="reminder_manager",
-        allow_duplicates=True,
-    )
+    # Store the message directly on the schedule
+    schedule.custom_message = message
 
     # Sync job to APScheduler
     try:
@@ -285,19 +271,17 @@ def stop_daily_reminders(user_id: int, session: Session | None = None) -> int:
 
             # Clear practice reminder state so the next lesson re-asks
             from src.memories import MemoryManager
-            from src.models.database import get_session as get_db_session
 
-            with get_db_session() as mem_db:
-                mm = MemoryManager(mem_db)
-                for key in (MemoryKey.PRACTICE_REMINDER_PENDING, MemoryKey.PRACTICE_REMINDER_DECLINED_TODAY):
-                    mm.store_memory(
-                        user_id=user_id,
-                        key=key,
-                        value="",
-                        ttl_hours=1,
-                        category=MemoryCategory.CONVERSATION.value,
-                        source="reminder_manager",
-                    )
+            mm = MemoryManager(db)
+            for key in (MemoryKey.PRACTICE_REMINDER_PENDING, MemoryKey.PRACTICE_REMINDER_DECLINED_TODAY):
+                mm.store_memory(
+                    user_id=user_id,
+                    key=key,
+                    value="",
+                    ttl_hours=1,
+                    category=MemoryCategory.CONVERSATION.value,
+                    source="reminder_manager",
+                )
 
             return len(practice_reminders)
         except Exception as e:

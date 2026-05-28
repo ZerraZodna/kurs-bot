@@ -51,7 +51,7 @@ def _build_schedule_message(
 ) -> str | None:
     """Build the outbound message for a schedule (without sending)."""
     if is_one_time_schedule_type(schedule.schedule_type):
-        message = get_schedule_message(memory_manager, schedule.user_id, schedule.schedule_id)
+        message = get_schedule_message(db, schedule.schedule_id)
         return message or "Reminder"
 
     from src.lessons.state import get_current_lesson
@@ -203,7 +203,7 @@ def _execute_one_time_schedule(db: Session, schedule: Schedule, user: User, memo
 
     Returns list of messages produced during simulation.
     """
-    message = get_schedule_message(memory_manager, schedule.user_id, schedule.schedule_id)
+    message = get_schedule_message(db, schedule.schedule_id)
     if not message:
         message = "Reminder"
     send_outbound_message(db, user, message)

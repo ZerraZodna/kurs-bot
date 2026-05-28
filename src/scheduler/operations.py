@@ -5,15 +5,12 @@ Contains schedule create/update/deactivate flows and APScheduler sync wiring.
 
 from __future__ import annotations
 
-import json
 import logging
 from src.core.timezone import datetime
 
 from sqlalchemy.orm import Session
 
 from src.core.timezone import get_user_timezone_from_db, utc_now
-from src.memories import MemoryManager
-from src.memories.constants import MemoryCategory, MemoryKey
 from src.models.database import Schedule, get_session
 
 from . import jobs as schedule_jobs
@@ -188,18 +185,8 @@ def create_one_time_schedule(
             session=s,
         )
 
-        # Store reminder message
-        memory_manager = MemoryManager(s)
-        payload = json.dumps({"schedule_id": schedule.schedule_id, "message": message})
-        memory_manager.store_memory(
-            user_id=user_id,
-            key=MemoryKey.SCHEDULE_MESSAGE,
-            value=payload,
-            category=MemoryCategory.CONVERSATION.value,
-            ttl_hours=48,
-            source="scheduler",
-            allow_duplicates=True,
-        )
+        # Store reminder message directly on the schedule
+        schedule.custom_message = message
 
         # Sync job to APScheduler
         try:

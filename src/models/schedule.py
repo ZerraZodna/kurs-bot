@@ -28,6 +28,7 @@ class Schedule(Base):
     lesson_id = Column(Integer, ForeignKey("lessons.lesson_id"))
     schedule_type = Column(String(32), nullable=False)  # one_time|daily|weekly|interval_reminder
     cron_expression = Column(String(64), nullable=False)
+    custom_message = Column(Text, nullable=True)  # Custom message for one-time reminders
     next_send_time = Column(DateTime(timezone=True))
     last_sent_at = Column(DateTime(timezone=True))
     is_active = Column(Boolean, default=True, nullable=False)

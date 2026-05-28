@@ -85,7 +85,6 @@ class ScheduleHandler:
         """Handle query_schedule."""
         user_id = context.get("user_id")
         session = context.get("session")
-        memory_manager = context.get("memory_manager")
 
         tz_name = get_user_timezone_from_db(session, user_id) if session else "UTC"
 
@@ -111,8 +110,8 @@ class ScheduleHandler:
                     "is_active": s.is_active,
                 }
 
-                if is_one_time_schedule_type(s.schedule_type) and memory_manager:
-                    message = get_schedule_message(memory_manager, user_id, s.schedule_id)
+                if is_one_time_schedule_type(s.schedule_type) and session:
+                    message = get_schedule_message(session, s.schedule_id)
                     if message:
                         schedule_data["message"] = message
 
