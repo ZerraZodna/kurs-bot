@@ -114,7 +114,7 @@
 - Still avoid `from datetime import timezone` in application code; prefer `datetime.UTC` or `src.core.timezone`
 
 ## Testing and Pull Requests
-- Standard command: `npm test`
+- Standard command: `npm test` (runs in parallel via `-n auto`); `npm test -- -n 1` for single-threaded.
 - Targeted: `npm test -- tests/test_telegram_handler.py -q` (add more as needed).
 - Equivalent direct wrapper: `node ./scripts/venv.js test [pytest args]`
 - Test framework: `pytest` (`pytest.ini` uses `tests/`). They can run in paralell too, but might fail with sql races.
