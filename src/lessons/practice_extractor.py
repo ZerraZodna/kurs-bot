@@ -58,7 +58,8 @@ def _extract_via_llm(lesson: Lesson) -> dict[str, Any] | None:
     try:
         import asyncio
 
-        from src.services.dialogue import call_llm
+        from src.config import settings
+        from src.services.dialogue import call_llm, call_ollama
 
         prompt = EXTRACTION_PROMPT.format(content=lesson.content)
         try:
@@ -68,7 +69,10 @@ def _extract_via_llm(lesson: Lesson) -> dict[str, Any] | None:
             import concurrent.futures
 
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(lambda: asyncio.run(call_llm(prompt)))
+                if settings.LLM_PROVIDER == "openai":
+                    future = executor.submit(lambda: asyncio.run(call_llm(prompt)))
+                else:
+                    future = executor.submit(lambda: asyncio.run(call_ollama(prompt)))
                 result = future.result()
         except RuntimeError:
             # No running loop — safe to use asyncio.run directly
