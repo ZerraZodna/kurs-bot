@@ -283,20 +283,21 @@ def stop_daily_reminders(user_id: int, session: Session | None = None) -> int:
 
             logger.info("Stopped %d practice reminder(s) for user %d", len(practice_reminders), user_id)
 
-            # Clear pending state so the next lesson re-asks about reminders
+            # Clear practice reminder state so the next lesson re-asks
             from src.memories import MemoryManager
             from src.models.database import get_session as get_db_session
 
             with get_db_session() as mem_db:
                 mm = MemoryManager(mem_db)
-                mm.store_memory(
-                    user_id=user_id,
-                    key=MemoryKey.PRACTICE_REMINDER_PENDING,
-                    value="",
-                    ttl_hours=1,
-                    category=MemoryCategory.CONVERSATION.value,
-                    source="reminder_manager",
-                )
+                for key in (MemoryKey.PRACTICE_REMINDER_PENDING, MemoryKey.PRACTICE_REMINDER_DECLINED_TODAY):
+                    mm.store_memory(
+                        user_id=user_id,
+                        key=key,
+                        value="",
+                        ttl_hours=1,
+                        category=MemoryCategory.CONVERSATION.value,
+                        source="reminder_manager",
+                    )
 
             return len(practice_reminders)
         except Exception as e:
