@@ -285,6 +285,58 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
         return "Failed to list memories."
 
 
+def handle_list_schedules(text: str, memory_manager, session: Session, user_id: int) -> str | None:
+    """Handle user commands that request listing schedules.
+
+    Recognizes aliases like `list schedules`, `list my schedules`, `list_schedules`.
+    Returns a formatted string when matched, otherwise `None`.
+    """
+    if not text or not text.strip():
+        return None
+    text_lower = text.strip().lower().lstrip("/")
+    triggers = {
+        "list all my schedules",
+        "list my schedules",
+        "list schedules",
+        "list_schedules",
+        "list schedule",
+    }
+
+    matched_trigger = False
+    for trig in triggers:
+        if text_lower == trig or text_lower.startswith(trig + " "):
+            matched_trigger = True
+            break
+    if not matched_trigger:
+        return None
+
+    try:
+        from src.models.schedule import Schedule
+
+        schedules = (
+            session.query(Schedule).filter_by(user_id=user_id, is_active=True).order_by(Schedule.created_at).all()
+        )
+
+        if not schedules:
+            return "You have no active schedules."
+
+        lines = ["Schedule"]
+        for s in schedules:
+            next_time = s.next_send_time.strftime("%m-%d %H:%M") if s.next_send_time else "-"
+            last_time = s.last_sent_at.strftime("%m-%d %H:%M") if s.last_sent_at else "-"
+            lesson_name = ""
+            if s.lesson:
+                lesson_name = f" [{s.lesson.title}]"
+            lines.append(
+                f"{s.schedule_id} type={s.schedule_type}{lesson_name} "
+                f"cron={s.cron_expression} next={next_time} last={last_time}"
+            )
+        return "<pre>\n" + "\n".join(lines) + "\n</pre>"
+    except Exception as e:
+        logger.exception("Failed to build schedule list: %s", e)
+        return "Failed to list schedules."
+
+
 def handle_custom_system_prompt_command(text: str, memory_manager, user_id: int) -> str | None:
     """Handle `custom_prompt` commands for system prompt overrides.
 

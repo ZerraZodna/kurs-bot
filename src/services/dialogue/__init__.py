@@ -11,6 +11,7 @@ from src.scheduler.schedule_query_handler import build_schedule_status_response
 from .command_handlers import (
     handle_gdpr_commands,
     handle_list_memories,
+    handle_list_schedules,
     handle_custom_system_prompt_command,
     parse_custom_prefix,
 )
@@ -30,6 +31,7 @@ __all__ = [
     "handle_custom_system_prompt_command",
     "parse_custom_prefix",
     "handle_list_memories",
+    "handle_list_schedules",
     "handle_gdpr_commands",
     "handle_schedule_messages",
 ]

@@ -134,11 +134,19 @@ class DialogueEngine:
 
     async def _handle_commands(self, user_id: int, text: str, session: Session, user_lang: str) -> str | None:
         """Handle various specialized commands."""
-        from src.services.dialogue import handle_list_memories, handle_custom_system_prompt_command
+        from src.services.dialogue import (
+            handle_list_memories,
+            handle_list_schedules,
+            handle_custom_system_prompt_command,
+        )
 
         list_memories = handle_list_memories(text, self.memory_manager, session, user_id)
         if list_memories:
             return list_memories
+
+        list_schedules = handle_list_schedules(text, self.memory_manager, session, user_id)
+        if list_schedules:
+            return list_schedules
 
         prompt_cmd_response = handle_custom_system_prompt_command(text, self.memory_manager, user_id)
         if prompt_cmd_response:
