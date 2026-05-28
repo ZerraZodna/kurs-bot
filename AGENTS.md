@@ -122,6 +122,11 @@
 - Add or update tests for behavior changes, bug fixes, and regressions.
 - Run tests in parallel with `pytest -n auto` (uses pytest-xdist) for faster execution.
 - Keep commits focused and imperative (for example: `refactor: split dialogue scheduler checks`).
+- **Pre-commit formatting**: Always run `pre-commit run --all-files` before committing. Unformatted files (migrations, tests, etc.) will be auto-fixed by the hook, creating a separate style commit.
+
+### Test Fixture Gotchas
+- **Never import `SessionLocal` at module level in tests.** The `ensure_test_db` fixture monkeypatches `SessionLocal` at function scope, but `from X import Y` binds the name at import time (module load), so the patch is never picked up. Use the `db_session` fixture instead, which does the import inside the function body.
+- When changing where data is stored (e.g., from memories table to a model column), update all tests that assert on the old storage location.
 
 ## Key Architecture Docs (Read These First for Context)
 - `docs/dev/ARCHITECTURE.md` — Overall system architecture.
