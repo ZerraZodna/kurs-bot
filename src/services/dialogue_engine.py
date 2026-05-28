@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from typing import Dict, Any
 
@@ -283,12 +282,8 @@ class DialogueEngine:
         english_text = deliver_lesson(session, user_id, target_lesson_id, self.memory_manager)
         if english_text is not None:
             logger.info(f"[command /{cmd_name} user={user_id}] lesson_id={log_id}")
-            # Schedule practice reminder check in background (don't block lesson delivery)
-            try:
-                loop = asyncio.get_running_loop()
-                loop.create_task(self._ask_practice_reminders(session, user_id, self.memory_manager))
-            except RuntimeError:
-                pass
+            # Ask about practice reminders before returning (ensures correct message order)
+            await self._ask_practice_reminders(session, user_id, self.memory_manager)
             return english_text  # Already translated in deliver_lesson if needed
         return get_onboarding_message("commands.lesson_error", user_lang)
 
