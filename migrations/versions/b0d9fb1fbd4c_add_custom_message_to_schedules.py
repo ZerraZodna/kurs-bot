@@ -5,6 +5,7 @@ Revises: e5aff986e038
 Create Date: 2026-05-28 15:26:52.512252
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -12,10 +13,10 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'b0d9fb1fbd4c'
-down_revision: Union[str, Sequence[str], None] = 'e5aff986e038'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "b0d9fb1fbd4c"
+down_revision: str | Sequence[str] | None = "e5aff986e038"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
