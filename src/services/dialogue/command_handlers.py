@@ -177,8 +177,11 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
                     val = val[:297] + "..."
                 category = category or ""
 
+                # Escape HTML entities to prevent breaking Telegram's HTML parser
+                val = val.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 # Wrap label in backticks to prevent Markdown italics from underscores
                 # Format: date `label` "value"
+                line = f"{date_short} {category}.{key_part}={val}"
                 line = f"{date_short} {category}.{key_part}={val}"
                 out.append(line)
             return out
@@ -231,7 +234,7 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
             else:
                 lines.append("(no user row found)")
 
-            return "<pre>\n" + "\n".join(lines) + "\n</pre>"
+            return "\n".join(lines)
 
         # Otherwise run a semantic search for the provided query tail and list matching memories
         def _run_coro_sync(coro):
@@ -279,7 +282,7 @@ def handle_list_memories(text: str, memory_manager, session: Session, user_id: i
             return "No results for query"
         mems = [m for (m, s) in results]
         lines = _format_mem_lines(mems)
-        return "<pre>\n" + "\n".join(lines) + "\n</pre>"
+        return "\n".join(lines)
     except Exception as e:
         logger.exception("Failed to build memory list: %s", e)
         return "Failed to list memories."
@@ -331,7 +334,7 @@ def handle_list_schedules(text: str, memory_manager, session: Session, user_id: 
                 f"{s.schedule_id} type={s.schedule_type}{lesson_name} "
                 f"cron={s.cron_expression} next={next_time} last={last_time}"
             )
-        return "<pre>\n" + "\n".join(lines) + "\n</pre>"
+        return "\n".join(lines)
     except Exception as e:
         logger.exception("Failed to build schedule list: %s", e)
         return "Failed to list schedules."
