@@ -229,7 +229,7 @@ class DialogueEngine:
             if user_obj:
                 from src.scheduler.execution import _maybe_ask_practice_reminders
 
-                _maybe_ask_practice_reminders(session, user_id, self.memory_manager, user_obj)
+                await _maybe_ask_practice_reminders(session, user_id, self.memory_manager, user_obj)
             return english_text  # Already translated in deliver_lesson if needed
         return get_onboarding_message("commands.lesson_error", user_lang)
 

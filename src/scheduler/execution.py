@@ -16,7 +16,7 @@ from src.core.timezone import utc_now
 from src.lessons import get_english_lesson_text
 from src.lessons.delivery import get_english_lesson_preview, deliver_lesson, get_lesson_or_import
 from src.memories import MemoryManager
-from src.memories.constants import MemoryCategory, MemoryKey
+from src.memories.constants import MemoryKey
 from src.models.database import Lesson, Schedule, User, get_session
 from src.scheduler.message_utils import send_outbound_message
 
@@ -245,10 +245,10 @@ def _execute_lesson_schedule(db: Session, schedule: Schedule, user: User, memory
         send_outbound_message(db, user, english_text)
 
         # After delivering the lesson, check if extra practice is suggested
-        _maybe_ask_practice_reminders(db, schedule.user_id, memory_manager, user)
+        asyncio.run(_maybe_ask_practice_reminders(db, schedule.user_id, memory_manager, user))
 
 
-def _maybe_ask_practice_reminders(db: Session, user_id: int, memory_manager: MemoryManager, user: User) -> None:
+async def _maybe_ask_practice_reminders(db: Session, user_id: int, memory_manager: MemoryManager, user: User) -> None:
     """After lesson delivery, ask user if they want practice reminders.
 
     Only triggers for lessons with non-single practice frequency.
@@ -293,14 +293,9 @@ def _maybe_ask_practice_reminders(db: Session, user_id: int, memory_manager: Mem
         f"This lesson suggests practicing {freq_label}. "
         f"Would you like me to send you reminders throughout the day? (yes/no)"
     )
-    send_outbound_message(db, user, message)
+    try:
+        from src.integrations.telegram import send_message
 
-    # Store pending state so the dialogue engine can handle the response
-    memory_manager.store_memory(
-        user_id=user_id,
-        key=MemoryKey.PRACTICE_REMINDER_PENDING,
-        value=str(lesson_id),
-        ttl_hours=1,
-        category=MemoryCategory.CONVERSATION.value,
-        source="scheduler",
-    )
+        await send_message(int(user.external_id), message)
+    except Exception as e:
+        logger.error("Failed to send practice reminder to user %d: %s", user_id, e)
