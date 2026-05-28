@@ -61,7 +61,11 @@ def _extract_via_llm(lesson: Lesson) -> dict[str, Any] | None:
         from src.services.dialogue import call_llm
 
         prompt = EXTRACTION_PROMPT.format(content=lesson.content)
-        result = asyncio.run(call_llm(prompt))
+        try:
+            loop = asyncio.get_running_loop()
+            result = loop.run_until_complete(call_llm(prompt))
+        except RuntimeError:
+            result = asyncio.run(call_llm(prompt))
         if not result:
             return None
 
