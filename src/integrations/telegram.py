@@ -24,7 +24,6 @@ BOT_COMMANDS = [
     {"command": "help", "description": "Show available commands"},
     {"command": "lesson", "description": "View a specific lesson (e.g. /lesson 29)"},
     {"command": "todays_lesson", "description": "View today's lesson"},
-    {"command": "introduction", "description": "View the course introduction"},
     {"command": "list_memories", "description": "List all your stored memories"},
     {"command": "list_schedules", "description": "List your active schedules"},
     {"command": "stop_daily_reminders", "description": "Stop daily practice reminders"},

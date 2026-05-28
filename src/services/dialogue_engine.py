@@ -257,17 +257,13 @@ class DialogueEngine:
         return "No active practice reminders to stop."
 
     async def _handle_lesson_command(self, session: Session, user_id: int, text: str, user_lang: str) -> str | None:
-        """Handle /todays_lesson, /introduction, /lesson commands."""
+        """Handle /todays_lesson, /lesson commands."""
         text_lower = text.strip().lower()
 
         if "/todays_lesson" in text_lower:
             target_lesson_id = None
             cmd_name = "todays_lesson"
             log_id = "current"
-        elif "/introduction" in text_lower:
-            target_lesson_id = 0
-            cmd_name = "introduction"
-            log_id = 0
         elif text_lower.startswith("/lesson"):
             parts = text.strip().split(maxsplit=1)
             target_lesson_id = _parse_lesson_int(parts[1] if len(parts) > 1 else None)
