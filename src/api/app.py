@@ -155,24 +155,6 @@ async def lifespan(app: FastAPI):
         # Don't let scheduler initialization block app startup; log and continue
         logging.exception("Could not initialize scheduler at startup")
 
-    # Register bot commands with Telegram so they appear in the / menu
-    if not getattr(settings, "IS_TEST_ENV", False):
-        try:
-            from src.integrations.telegram import set_bot_commands
-
-            logging.info("[startup] Registering bot commands with Telegram...")
-            task = asyncio.create_task(set_bot_commands())
-
-            async def _on_shutdown():
-                try:
-                    await task
-                except Exception:
-                    logging.exception("Bot commands registration task failed")
-
-            app.router.on_shutdown.append(_on_shutdown)
-        except Exception:
-            logging.exception("Could not register bot commands at startup")
-
     # Startup info and health checks
     # Configure logging - respect uvicorn's log level if set
     # Uvicorn sets its error logger to DEBUG when --log-level debug is used
