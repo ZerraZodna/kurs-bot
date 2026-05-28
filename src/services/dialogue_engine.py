@@ -117,10 +117,11 @@ class DialogueEngine:
         """Register the bot's command list with Telegram (appears in / menu)."""
         from src.integrations.telegram import set_bot_commands
 
-        try:
-            await set_bot_commands()
-        except Exception as e:
-            logger.warning("Failed to register bot commands: %s", e)
+        ok = await set_bot_commands()
+        if ok:
+            logger.info("[commands] Bot commands registered via /start")
+        else:
+            logger.warning("[commands] Bot commands registration via /start returned false")
 
     async def _check_user_restrictions(self, user_id: int, text: str, user: User, session: Session) -> str | None:
         """Handle GDPR commands and check if user is deleted or restricted."""

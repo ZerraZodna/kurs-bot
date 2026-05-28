@@ -160,7 +160,16 @@ async def lifespan(app: FastAPI):
         try:
             from src.integrations.telegram import set_bot_commands
 
-            asyncio.create_task(set_bot_commands())
+            logging.info("[startup] Registering bot commands with Telegram...")
+            task = asyncio.create_task(set_bot_commands())
+
+            async def _on_shutdown():
+                try:
+                    await task
+                except Exception:
+                    logging.exception("Bot commands registration task failed")
+
+            app.router.on_shutdown.append(_on_shutdown)
         except Exception:
             logging.exception("Could not register bot commands at startup")
 
