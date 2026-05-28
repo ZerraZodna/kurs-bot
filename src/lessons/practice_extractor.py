@@ -62,9 +62,16 @@ def _extract_via_llm(lesson: Lesson) -> dict[str, Any] | None:
 
         prompt = EXTRACTION_PROMPT.format(content=lesson.content)
         try:
-            loop = asyncio.get_running_loop()
-            result = loop.run_until_complete(call_llm(prompt))
+            asyncio.get_running_loop()
+            # We are inside a running loop (uvicorn) — create a new event loop
+            # in a separate thread to avoid "loop already running" conflict
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(lambda: asyncio.run(call_llm(prompt)))
+                result = future.result()
         except RuntimeError:
+            # No running loop — safe to use asyncio.run directly
             result = asyncio.run(call_llm(prompt))
         if not result:
             return None
@@ -132,15 +139,20 @@ def check_and_extract_practice_instructions(lesson_id: int, session: Session | N
             result = _extract_via_llm(lesson)
             if result is None:
                 result = _default_extraction()
-
-            # Cache result
-            lesson.practice_instructions = json.dumps(result)
-            db.commit()
-            logger.info(
-                "Extracted and cached practice instructions for lesson %d: %s",
-                lesson_id,
-                result.get("frequency", "single"),
-            )
+                logger.info(
+                    "AI extraction failed for lesson %d, using default (frequency=%s)",
+                    lesson_id,
+                    result.get("frequency", "single"),
+                )
+            else:
+                # Cache only on successful extraction
+                lesson.practice_instructions = json.dumps(result)
+                db.commit()
+                logger.info(
+                    "Extracted and cached practice instructions for lesson %d: %s",
+                    lesson_id,
+                    result.get("frequency", "single"),
+                )
             return result
         except Exception as e:
             logger.error("Failed to extract practice instructions for lesson %d: %s", lesson_id, e)
