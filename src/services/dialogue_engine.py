@@ -113,6 +113,15 @@ class DialogueEngine:
 
         return await detect_and_store_language(self.memory_manager, user_id, text)
 
+    async def _register_bot_commands(self) -> None:
+        """Register the bot's command list with Telegram (appears in / menu)."""
+        from src.integrations.telegram import set_bot_commands
+
+        try:
+            await set_bot_commands()
+        except Exception as e:
+            logger.warning("Failed to register bot commands: %s", e)
+
     async def _check_user_restrictions(self, user_id: int, text: str, user: User, session: Session) -> str | None:
         """Handle GDPR commands and check if user is deleted or restricted."""
         from src.services.dialogue import handle_gdpr_commands
@@ -155,6 +164,8 @@ class DialogueEngine:
         # /help command
         if text.strip().lower() in ["/help", "/start"]:
             help_text = get_onboarding_message("commands.help", user_lang)
+            # Register bot commands so they appear in Telegram's / menu
+            await self._register_bot_commands()
             return help_text
 
         # Lesson commands

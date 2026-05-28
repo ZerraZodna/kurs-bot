@@ -17,6 +17,44 @@ logger = logging.getLogger(__name__)
 TELEGRAM_BOT_TOKEN = settings.TELEGRAM_BOT_TOKEN
 API_BASE = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
+# Bot command definitions (shown in Telegram's / menu)
+BOT_COMMANDS = [
+    {"command": "start", "description": "Start the bot and show help"},
+    {"command": "help", "description": "Show available commands"},
+    {"command": "lesson", "description": "View a specific lesson (e.g. /lesson 29)"},
+    {"command": "todays_lesson", "description": "View today's lesson"},
+    {"command": "introduction", "description": "View the course introduction"},
+    {"command": "list_memories", "description": "List all your stored memories"},
+    {"command": "list_schedules", "description": "List your active schedules"},
+    {"command": "stop_daily_reminders", "description": "Stop daily practice reminders"},
+    {"command": "custom_prompt", "description": "Manage system prompts"},
+    {"command": "consent", "description": "Manage data consent"},
+    {"command": "delete", "description": "Delete all your data (GDPR)"},
+]
+
+
+async def set_bot_commands() -> bool:
+    """Register the bot's command list with Telegram so it appears in the / menu."""
+    client = await _get_telegram_client()
+    try:
+        r = await client.post(
+            f"{API_BASE}/setMyCommands",
+            json={"commands": BOT_COMMANDS},
+            timeout=10.0,
+        )
+        r.raise_for_status()
+        data = r.json()
+        ok = data.get("ok", False)
+        if ok:
+            logger.info("[telegram] Bot commands registered (%d commands)", len(BOT_COMMANDS))
+        else:
+            logger.warning("[telegram] Failed to set bot commands: %s", data)
+        return ok
+    except Exception as e:
+        logger.error("[telegram] Error setting bot commands: %s", e)
+        return False
+
+
 # Shared httpx client with connection pooling to avoid creating a new
 # client for every Telegram API call (especially during streaming where
 # edit_message is called 20+ times per response).
