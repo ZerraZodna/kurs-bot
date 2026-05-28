@@ -44,12 +44,17 @@ async def set_bot_commands() -> bool:
         )
         r.raise_for_status()
         data = r.json()
+        logger.info("[telegram] setMyCommands response: %s", data)
         ok = data.get("ok", False)
         if ok:
             logger.info("[telegram] Bot commands registered (%d commands)", len(BOT_COMMANDS))
         else:
-            logger.warning("[telegram] Failed to set bot commands: %s", data)
+            desc = data.get("description", "no description")
+            logger.warning("[telegram] Failed to set bot commands: %s", desc)
         return ok
+    except httpx.HTTPStatusError as e:
+        logger.error("[telegram] HTTP error setting bot commands: %s %s", e.response.status_code, e.response.text)
+        return False
     except Exception as e:
         logger.error("[telegram] Error setting bot commands: %s", e)
         return False
