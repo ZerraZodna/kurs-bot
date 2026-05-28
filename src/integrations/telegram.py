@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import re
 import time
@@ -44,7 +45,7 @@ async def set_bot_commands() -> bool:
         )
         r.raise_for_status()
         data = r.json()
-        logger.info("[telegram] setMyCommands response: %s", data)
+        logger.info("[telegram] setMyCommands response: %s", json.dumps(data))
         ok = data.get("ok", False)
         if ok:
             logger.info("[telegram] Bot commands registered (%d commands)", len(BOT_COMMANDS))
