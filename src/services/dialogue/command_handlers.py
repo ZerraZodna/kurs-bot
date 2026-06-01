@@ -314,27 +314,15 @@ def handle_list_schedules(text: str, memory_manager, session: Session, user_id: 
         return None
 
     try:
+        from src.core.timezone import get_user_timezone_from_db
         from src.models.schedule import Schedule
+        from src.scheduler.schedule_query_handler import build_schedule_status_response
 
         schedules = (
             session.query(Schedule).filter_by(user_id=user_id, is_active=True).order_by(Schedule.created_at).all()
         )
-
-        if not schedules:
-            return "You have no active schedules."
-
-        lines = ["Schedule"]
-        for s in schedules:
-            next_time = s.next_send_time.strftime("%m-%d %H:%M") if s.next_send_time else "-"
-            last_time = s.last_sent_at.strftime("%m-%d %H:%M") if s.last_sent_at else "-"
-            lesson_name = ""
-            if s.lesson:
-                lesson_name = f" [{s.lesson.title}]"
-            lines.append(
-                f"{s.schedule_id} type={s.schedule_type}{lesson_name} "
-                f"cron={s.cron_expression} next={next_time} last={last_time}"
-            )
-        return "\n".join(lines)
+        tz_name = get_user_timezone_from_db(session, user_id)
+        return build_schedule_status_response(schedules, tz_name)
     except Exception as e:
         logger.exception("Failed to build schedule list: %s", e)
         return "Failed to list schedules."
