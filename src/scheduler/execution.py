@@ -16,7 +16,7 @@ from src.core.timezone import utc_now
 from src.lessons import get_english_lesson_text
 from src.lessons.delivery import deliver_lesson_text, get_english_lesson_preview, get_lesson_or_import
 from src.memories import MemoryManager
-from src.memories.constants import MemoryKey
+
 from src.models.database import Lesson, Schedule, User, get_session
 from src.scheduler.message_utils import send_outbound_message
 
@@ -24,6 +24,33 @@ from .domain import is_one_time_schedule_type, job_id_for_schedule
 from .memory_helpers import get_schedule_message, get_user_language
 
 logger = logging.getLogger(__name__)
+
+
+async def _send_practice_reminder_prompt(db: Session, user_id: int, memory_manager: MemoryManager, user: User) -> None:
+    """After lesson delivery, ask user if they want practice reminders.
+
+    Delegates to DialogueEngine._build_practice_reminder_text for the shared
+    logic (frequency check, pending guard, declined guard, memory flag) and
+    sends the prompt as a separate Telegram message.
+    """
+    from src.services.dialogue_engine import DialogueEngine
+
+    # Build the reminder text using the single source of truth
+    engine = DialogueEngine.__new__(DialogueEngine)
+    engine.memory_manager = memory_manager
+    engine.db = db
+    reminder_text = await engine._build_practice_reminder_text(db, user_id, memory_manager)
+    if not reminder_text:
+        return
+
+    # Strip the leading newline and append emoji for a standalone message
+    message = reminder_text.strip()
+    try:
+        from src.integrations.telegram import send_message
+
+        await send_message(int(user.external_id), message)
+    except Exception as e:
+        logger.error("Failed to send practice reminder to user %d: %s", user_id, e)
 
 
 def _parse_lesson_int(value) -> int | None:
@@ -80,8 +107,7 @@ def run_recovery_check(
         try:
             now = utc_now()
             due = (
-                db
-                .query(Schedule)
+                db.query(Schedule)
                 .filter(
                     Schedule.is_active,
                     Schedule.next_send_time is not None,
@@ -245,57 +271,4 @@ def _execute_lesson_schedule(db: Session, schedule: Schedule, user: User, memory
         send_outbound_message(db, user, english_text)
 
         # After delivering the lesson, check if extra practice is suggested
-        asyncio.run(_maybe_ask_practice_reminders(db, schedule.user_id, memory_manager, user))
-
-
-async def _maybe_ask_practice_reminders(db: Session, user_id: int, memory_manager: MemoryManager, user: User) -> None:
-    """After lesson delivery, ask user if they want practice reminders.
-
-    Only triggers for lessons with non-single practice frequency.
-    """
-    from src.lessons.state import get_current_lesson
-
-    last_sent = get_current_lesson(memory_manager, user_id)
-    if not last_sent:
-        return
-
-    lesson_id = _parse_lesson_int(last_sent)
-    if lesson_id is None or lesson_id == 0:
-        return
-
-    # Check if user already declined today (skip asking again)
-    declined_today = memory_manager.get_memory(user_id, MemoryKey.PRACTICE_REMINDER_DECLINED_TODAY)
-    if declined_today:
-        return
-
-    # Check practice instructions
-    from src.lessons.practice_extractor import check_and_extract_practice_instructions
-
-    instructions = check_and_extract_practice_instructions(lesson_id, session=db)
-    if not instructions:
-        return
-
-    frequency = instructions.get("frequency", "single")
-    if frequency == "single":
-        return
-
-    # Build frequency label
-    freq_labels = {
-        "hourly": "hourly today",
-        "twice_daily": "twice today (morning and evening)",
-        "three_times_daily": "three times today",
-        "morning_evening": "twice today (morning and evening)",
-    }
-    freq_label = freq_labels.get(frequency, f"{frequency}")
-
-    # Ask user
-    message = (
-        f"This lesson suggests practicing {freq_label}. "
-        f"Would you like me to send you reminders throughout the day? (yes/no)"
-    )
-    try:
-        from src.integrations.telegram import send_message
-
-        await send_message(int(user.external_id), message)
-    except Exception as e:
-        logger.error("Failed to send practice reminder to user %d: %s", user_id, e)
+        asyncio.run(_send_practice_reminder_prompt(db, schedule.user_id, memory_manager, user))
