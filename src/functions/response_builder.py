@@ -284,7 +284,7 @@ class ResponseBuilder:
             try:
                 minute = int(parts[0])
                 hour = int(parts[1])
-                return format_cron_local(hour, minute, tz_name)
+                return format_cron_local(hour, minute, tz_name)[0]
             except (ValueError, IndexError):
                 pass
 
