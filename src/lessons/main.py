@@ -39,6 +39,7 @@ def main() -> int:
     parser.add_argument("--no-clear", action="store_true", help="Preserve existing lessons")
     parser.add_argument("--verify", action="store_true", help="Verify import count")
     parser.add_argument("--dump-text", type=str, help="Dump extracted text to file (for debugging)")
+    parser.add_argument("--dump-json", type=str, help="Dump parsed lessons as JSON to file")
 
     args = parser.parse_args()
 
@@ -80,6 +81,14 @@ def main() -> int:
             logger.info("First 3 lessons found:")
             for i, (_lid, title, _content) in enumerate(lessons[:3], 1):
                 logger.info(f"  - Lesson {i}: {title[:80]}...")
+
+        # Dump parsed lessons as JSON (for Go import)
+        if args.dump_json:
+            import json
+            json_data = [{"id": lid, "title": title, "content": content} for lid, title, content in lessons]
+            with open(args.dump_json, "w", encoding="utf-8") as f:
+                json.dump(json_data, f, indent=2, ensure_ascii=False)
+            logger.info(f"Parsed lessons saved to JSON: {args.dump_json}")
 
         # Import to database
         clear_flag = args.clear or (not args.no_clear and not len(lessons))
