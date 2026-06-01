@@ -85,6 +85,7 @@ def main() -> int:
         # Dump parsed lessons as JSON (for Go import)
         if args.dump_json:
             import json
+
             json_data = [{"id": lid, "title": title, "content": content} for lid, title, content in lessons]
             with open(args.dump_json, "w", encoding="utf-8") as f:
                 json.dump(json_data, f, indent=2, ensure_ascii=False)
