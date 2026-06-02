@@ -219,12 +219,19 @@ class DialogueEngine:
         if prompt_cmd_response:
             return prompt_cmd_response
 
-        # /help command
-        if text.strip().lower() in ["/help", "/start"]:
+        # /help command — show quick reference
+        if text.strip().lower() == "/help":
             help_text = get_onboarding_message("commands.help", user_lang)
             # Register bot commands so they appear in Telegram's / menu
             await self._register_bot_commands()
             return help_text
+
+        # /start command — show welcome / getting started
+        if text.strip().lower() == "/start":
+            start_text = get_onboarding_message("commands.start", user_lang)
+            # Register bot commands so they appear in Telegram's / menu
+            await self._register_bot_commands()
+            return start_text
 
         # Lesson commands
         lesson_response = await self._handle_lesson_command(session, user_id, text, user_lang)
@@ -236,25 +243,84 @@ class DialogueEngine:
         if stop_response:
             return stop_response
 
+        # Enable daily reminders command
+        enable_response = await self._handle_enable_daily_reminders(user_id, text, session)
+        if enable_response:
+            return enable_response
+
         return None
 
     async def _handle_stop_daily_reminders(self, user_id: int, text: str, session: Session) -> str | None:
-        """Handle /stop_daily_reminders command or natural language 'stop reminders'."""
+        """Handle /disable_reminders command or natural language 'stop reminders'."""
         text_lower = text.strip().lower()
-        is_command = text_lower in ("/stop_daily_reminders", "/stop_reminders")
+        is_command = text_lower in (
+            "/disable_reminders",
+            "/disable_daily_reminders",
+            "/stop_reminders",
+            "/stop_daily_reminders",
+        )
         is_natural = any(
             phrase in text_lower
-            for phrase in ["stop daily reminders", "stop reminders", "no more reminders", "stop practice reminders"]
+            for phrase in [
+                "stop daily reminders",
+                "stop reminders",
+                "no more reminders",
+                "stop practice reminders",
+                "disable reminders",
+            ]
         )
         if not is_command and not is_natural:
             return None
+
+        from src.memories.constants import MemoryKey, MemoryCategory
+
+        # Set preference to disabled
+        self.memory_manager.store_memory(
+            user_id=user_id,
+            key=MemoryKey.PRACTICE_REMINDER_ENABLED,
+            value="false",
+            ttl_hours=24 * 365,  # Persist until explicitly changed
+            category=MemoryCategory.PREFERENCES.value,
+            source="dialogue_engine",
+        )
 
         from src.scheduler.reminder_manager import stop_daily_reminders
 
         count = stop_daily_reminders(user_id, session=session)
         if count:
-            return f"Stopped {count} practice reminder(s) for today."
-        return "No active practice reminders to stop."
+            return f"Disabled practice reminders. Stopped {count} active reminder(s)."
+        return "Practice reminders are now disabled."
+
+    async def _handle_enable_daily_reminders(self, user_id: int, text: str, session: Session) -> str | None:
+        """Handle /enable_reminders command or natural language 'enable reminders'."""
+        text_lower = text.strip().lower()
+        is_command = text_lower in ("/enable_reminders", "/enable_daily_reminders")
+        is_natural = any(
+            phrase in text_lower
+            for phrase in [
+                "enable daily reminders",
+                "enable reminders",
+                "start reminders",
+                "resume reminders",
+                "turn on reminders",
+            ]
+        )
+        if not is_command and not is_natural:
+            return None
+
+        from src.memories.constants import MemoryKey, MemoryCategory
+
+        # Set preference to enabled
+        self.memory_manager.store_memory(
+            user_id=user_id,
+            key=MemoryKey.PRACTICE_REMINDER_ENABLED,
+            value="true",
+            ttl_hours=24 * 365,  # Persist until explicitly changed
+            category=MemoryCategory.PREFERENCES.value,
+            source="dialogue_engine",
+        )
+
+        return "Practice reminders are now enabled. You'll receive reminders with the next lesson that has practice instructions."
 
     async def _handle_lesson_command(self, session: Session, user_id: int, text: str, user_lang: str) -> str | None:
         """Handle /todays_lesson, /lesson commands."""
@@ -296,7 +362,7 @@ class DialogueEngine:
         from src.services.dialogue import handle_schedule_messages
 
         # Check for practice reminder response first (before general schedule handling)
-        practice_response = await self._handle_practice_reminder_response(user_id, text, session)
+        practice_response = await self._handle_practice_reminder_response(user_id, text, session, user_lang)
         if practice_response:
             return practice_response
 
@@ -314,7 +380,9 @@ class DialogueEngine:
 
         return None
 
-    async def _handle_practice_reminder_response(self, user_id: int, text: str, session: Session) -> str | None:
+    async def _handle_practice_reminder_response(
+        self, user_id: int, text: str, session: Session, user_lang: str
+    ) -> str | None:
         """Handle user response to practice reminder prompt (yes/no) or 'start reminders' after declining."""
         text_lower = text.strip().lower()
 
@@ -336,6 +404,13 @@ class DialogueEngine:
                 if lesson_id:
                     instructions = check_and_extract_practice_instructions(lesson_id, session=session)
                     if instructions and instructions.get("frequency", "single") != "single":
+                        # Check if reminders are enabled
+                        enabled = self.memory_manager.get_memory(user_id, MemoryKey.PRACTICE_REMINDER_ENABLED)
+                        is_disabled = enabled and str(enabled[0].get("value", "true")).lower() == "false"
+
+                        if is_disabled:
+                            return "Practice reminders are disabled. Use /enable_reminders to enable them first."
+
                         create_reminders(lesson_id, user_id, instructions, session=session)
                         self.memory_manager.store_memory(
                             user_id=user_id,
@@ -345,7 +420,25 @@ class DialogueEngine:
                             category=MemoryCategory.CONVERSATION.value,
                             source="dialogue_engine",
                         )
-                        return "Great! I've sent you practice reminders for today."
+                        # Tailored confirmation per frequency
+                        freq = instructions.get("frequency", "single")
+                        if freq == "hourly":
+                            return (
+                                "Great! I'll send you reminders every hour, on the hour and on the half-hour. "
+                                "Each will show today's key phrase for a brief moment of reflection."
+                            )
+                        elif freq in ("twice_daily", "morning_evening"):
+                            return (
+                                "Great! I'll send you reminders twice today — morning and evening. "
+                                "Each will include today's key phrase."
+                            )
+                        elif freq == "three_times_daily":
+                            return (
+                                "Great! I'll send you reminders three times today. "
+                                "Each will include today's key phrase."
+                            )
+                        else:
+                            return "Great! I've set up practice reminders for today's lesson."
 
         # Normal yes/no flow
         pending = self.memory_manager.get_memory(user_id, MemoryKey.PRACTICE_REMINDER_PENDING)
@@ -380,16 +473,17 @@ class DialogueEngine:
 
             instructions = check_and_extract_practice_instructions(lesson_id, session=session)
             if instructions:
-                create_reminders(lesson_id, user_id, instructions, session=session)
-                freq = instructions.get("frequency", "hourly")
-                freq_labels = {
-                    "hourly": "at the top of each hour",
-                    "twice_daily": "twice today (morning and evening)",
-                    "three_times_daily": "three times today",
-                    "morning_evening": "twice today (morning and evening)",
-                }
-                label = freq_labels.get(freq, "throughout the day")
-                response = f"Great! I'll send you reminders {label}. Each will include today's key phrase and a brief instruction."
+                # Check if reminders are enabled
+                enabled = self.memory_manager.get_memory(user_id, MemoryKey.PRACTICE_REMINDER_ENABLED)
+                is_disabled = enabled and str(enabled[0].get("value", "true")).lower() == "false"
+
+                if is_disabled:
+                    response = get_onboarding_message("practice_reminder.disabled", user_lang)
+                else:
+                    create_reminders(lesson_id, user_id, instructions, session=session)
+                    response = get_onboarding_message(
+                        f"practice_reminder.{instructions.get('frequency', 'single')}", user_lang
+                    )
             else:
                 response = "I couldn't determine the practice pattern. No reminders will be sent."
 
@@ -403,7 +497,7 @@ class DialogueEngine:
                 category=MemoryCategory.CONVERSATION.value,
                 source="dialogue_engine",
             )
-            response = "No problem. You can always ask me to send reminders later with 'start reminders'."
+            response = get_onboarding_message("practice_reminder.declined", user_lang)
 
         # Clear pending state
         self.memory_manager.store_memory(

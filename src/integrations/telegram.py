@@ -20,16 +20,23 @@ API_BASE = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
 # Bot command definitions (shown in Telegram's / menu)
 BOT_COMMANDS = [
-    {"command": "start", "description": "Start the bot and show help"},
-    {"command": "help", "description": "Show available commands"},
-    {"command": "lesson", "description": "View a specific lesson (e.g. /lesson 29)"},
-    {"command": "todays_lesson", "description": "View today's lesson"},
-    {"command": "list_memories", "description": "List all your stored memories"},
-    {"command": "list_schedules", "description": "List your active schedules"},
-    {"command": "stop_daily_reminders", "description": "Stop daily practice reminders"},
-    {"command": "custom_prompt", "description": "Manage system prompts"},
-    {"command": "consent", "description": "Manage data consent"},
-    {"command": "delete", "description": "Delete all your data (GDPR)"},
+    # Core
+    {"command": "start", "description": "Welcome & getting started"},
+    {"command": "help", "description": "Quick command reference"},
+    # Lessons
+    {"command": "todays_lesson", "description": "View today's ACIM lesson"},
+    {"command": "lesson", "description": "View a specific lesson"},
+    # Reminders
+    {"command": "enable_reminders", "description": "Turn on practice reminders"},
+    {"command": "disable_reminders", "description": "Turn off practice reminders"},
+    # Memory & Schedules
+    {"command": "list_memories", "description": "View your stored memories"},
+    {"command": "list_schedules", "description": "View your active schedules"},
+    # Personalization
+    {"command": "custom_prompt", "description": "Manage AI personality"},
+    {"command": "consent", "description": "Manage data permissions"},
+    # Privacy
+    {"command": "delete", "description": "Delete all your data"},
 ]
 
 

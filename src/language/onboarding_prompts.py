@@ -65,63 +65,105 @@ You can also:
 
 # Onboarding & command messages - bilingual EN/NO
 ONBOARD_MESSAGES = {
+    # ─── HELP (quick reference) ─────────────────────────────────────────────
     "commands.help": {
-        "en": """<b>🌟 Kurs Bot - ACIM Spiritual Companion</b>
+        "en": """
+🌟 <b>ACIM Kurs Bot - Quick Commands</b>
 
-<b>📖 Lessons & Reminders</b>
-• Daily ACIM lessons sent automatically
-• <b>Set your time:</b> "Set daily lesson reminder for 9AM" or "morning"
-• <b>Manual:</b> <code>/lesson 29</code>, "Next lesson", "Repeat lesson"
-• "What's my current lesson?"
+📖 <b>Lessons</b>
+<code>/todays_lesson</code> — View today's lesson
+<code>/lesson 29</code> — View any lesson
+Say "next lesson" or "repeat lesson"
 
-<b>🧠 Personal Memory</b>
-• I remember our conversations & preferences
-• "Forget [topic]" to remove specific memory
-• "Remember [important fact]" for persistence
-• "List my memories" (existing command)
+⏰ <b>Practice Reminders</b>
+<code>/enable_reminders</code> — Turn on hourly/daily reminders
+<code>/disable_reminders</code> — Turn off reminders
+Reply "yes" when prompted to start
 
-<b>⚙️ Personalization</b>
-• Language auto-detected (EN/DE/others)
-• Custom system prompt: [use existing command]
-• Timezone auto-detected from messages
+💾 <b>Memory & Schedules</b>
+<code>/list_memories</code> — View stored memories
+<code>/list_schedules</code> — View active schedules
 
-<b>🔒 Privacy/GDPR</b>
-• /delete - full data deletion
-• /consent - manage data permissions
-• Data retention: 90 days conversations, profiles forever until deleted
+⚙️ <b>Settings</b>
+<code>/custom_prompt</code> — Customize my personality
+<code>/consent</code> — Manage data permissions
 
-<b>Talk naturally! 🙏</b>
-Type /help anytime.
+🔒 <b>Privacy</b>
+<code>/delete</code> — Erase all your data
 
-/start also shows this help.""",
-        "no": """<b>🌟 Kurs Bot - ACIM Åndelig Følgesvenn</b>
+💬 <b>Tip:</b> Chat naturally — I'm here to help!
+""",
+        "no": """
+🌟 <b>ACIM Kurs Bot - Hurtigreferanse</b>
 
-<b>📖 Leksjoner & Påminnelser</b>
-• Daglige ACIM-leksjoner sendes automatisk
-• <b>Sett din tid:</b> "Sett daglig leksjonspåminnelse kl. 9" eller "morgen"
-• <b>Manuell:</b> <code>/leksjon 29</code>, "Neste leksjon", "Gjenta leksjon"
-• "Hva er min nåværende leksjon?"
+📖 <b>Leksjoner</b>
+<code>/todays_lesson</code> — Vis dagens leksjon
+<code>/lesson 29</code> — Vis en hvilken som helst leksjon
+Si "neste leksjon" eller "gjenta leksjon"
 
-<b>🧠 Personlig Minne</b>
-• Jeg husker våre samtaler & preferanser
-• "Glem [emne]" fjerner spesifikt minne
-• "Husk [viktig faktum]" for persistens
-• "List mine minner" (eksisterende kommando)
+⏰ <b>Praktiske Påminnelser</b>
+<code>/enable_reminders</code> — Slå på påminnelser
+<code>/disable_reminders</code> — Slå av påminnelser
+Svar "ja" når du blir spurt
 
-<b>⚙️ Personalisering</b>
-• Språk auto-deteksjon (EN/NO/andre)
-• Egendefinert system prompt: [bruk eksisterende kommando]
-• Tidssone auto-deteksjon fra meldinger
+💾 <b>Minne & Planer</b>
+<code>/list_memories</code> — Vis lagrede minner
+<code>/list_schedules</code> — Vis aktive planer
 
-<b>🔒 Personvern/GDPR</b>
-• /delete - full datasletting
-• /consent - administrer datatillatelser
-• Dataretensjon: 90 dager samtaler, profiler evig til slettet
+⚙️ <b>Innstillinger</b>
+<code>/custom_prompt</code> — Tilpass min personlighet
+<code>/consent</code> — Administrer datatillatelser
 
-<b>Snakk naturlig! 🙏</b>
-Skriv /help når som helst.
+🔒 <b>Personvern</b>
+<code>/delete</code> — Slett alle dataene dine
 
-/start viser også denne hjelpen.""",
+💬 <b>Tips:</b> Snakk naturlig — jeg er her for å hjelpe!
+""",
+    },
+    # ─── START (welcome / getting started) ───────────────────────────────────
+    "commands.start": {
+        "en": """
+🙏 <b>Welcome to ACIM Kurs Bot</b>
+
+I'm your spiritual companion for <b>A Course in Miracles</b>.
+
+Here's how we start:
+
+🌅 <b>Each day</b> — I send you one lesson at your chosen time.
+
+🗣️ <b>Each moment</b> — We can reflect, discuss, or you can ask me anything.
+
+📝 <b>Practice reminders</b> — After each lesson with practice instructions, I'll ask if you want hourly reminders. Say <b>yes</b> to start, or use <code>/enable_reminders</code> anytime.
+
+You have two options:
+
+✅ <b>Continue</b> — I'll send you <b>Lesson 1</b> right now.
+
+❌ <b>Skip</b> — Reply <b>no</b> and I'll stay quiet until you reach out.
+
+Just send your first message to begin! 🌿
+""",
+        "no": """
+🙏 <b>Velkommen til ACIM Kurs Bot</b>
+
+Jeg er din åndelige følgesvenn for <b>Et kurs i mirakler</b>.
+
+Slik starter vi:
+
+🌅 <b>Hver dag</b> — Jeg sender deg én leksjon på ditt valgte tidspunkt.
+
+🗣️ <b>Hvert øyeblikk</b> — Vi kan reflektere, diskutere, eller du kan spørre meg om hva som helst.
+
+📝 <b>Praktiske påminnelser</b> — Etter hver leksjon med øvingsinstruksjoner spør jeg om du vil ha time-påminnelser. Si <b>ja</b> for å starte, eller bruk <code>/enable_reminders</code> når som helst.
+
+Du har to alternativer:
+
+✅ <b>Fortsett</b> — Jeg sender deg <b>Leksjon 1</b> nå.
+
+❌ <b>Hopp over</b> — Svar <b>nei</b> så holder jeg pause til du tar kontakt.
+
+Bare send din første melding for å begynne! 🌿
+""",
     },
     "commands.lesson_error": {
         "en": "Sorry, could not deliver lesson. Please check lesson number or try /help.",
@@ -150,6 +192,41 @@ Skriv /help når som helst.
     "lesson_0_fallback": {
         "en": "Introduction\n\nWelcome to A Course in Miracles. This introduction gives you the context for the journey ahead and how to work with the lessons gently, one day at a time.",
         "no": "Introduksjon\n\nVelkommen til Et kurs i mirakler. Denne introduksjonen gir deg rammen for reisen videre og hvordan du kan jobbe med leksjonene rolig, én dag av gangen.",
+    },
+    # ─── Practice Reminder Confirmations ────────────────────────────────────
+    "practice_reminder.hourly": {
+        "en": (
+            "Great! I'll send you reminders every hour — on the hour and on the half-hour. "
+            "Each will show today's key phrase for a brief moment of reflection."
+        ),
+        "no": (
+            "Flott! Jeg sender deg påminnelser hver time — på hele og halvtimen. "
+            "Hver vil vise dagens nøkkelord for et kort øyeblikk med refleksjon."
+        ),
+    },
+    "practice_reminder.twice_daily": {
+        "en": (
+            "Great! I'll send you reminders twice today — morning and evening. Each will include today's key phrase."
+        ),
+        "no": (
+            "Flott! Jeg sender deg påminnelser to ganger i dag — morgen og kveld. Hver vil inkludere dagens nøkkelord."
+        ),
+    },
+    "practice_reminder.three_times_daily": {
+        "en": "Great! I'll send you reminders three times today. Each will include today's key phrase.",
+        "no": "Flott! Jeg sender deg påminnelser tre ganger i dag. Hver vil inkludere dagens nøkkelord.",
+    },
+    "practice_reminder.disabled": {
+        "en": "Practice reminders are currently disabled. Use /enable_reminders to enable them first.",
+        "no": "Praktiske påminnelser er for øyeblikket deaktivert. Bruk /enable_reminders for å aktivere dem først.",
+    },
+    "practice_reminder.declined": {
+        "en": "No problem. You can always ask me to send reminders later with 'start reminders'.",
+        "no": "Ingen problem. Du kan alltid be meg sende påminnelser senere med 'start reminders'.",
+    },
+    "practice_reminder.generic": {
+        "en": "Great! I've set up practice reminders for today's lesson.",
+        "no": "Flott! Jeg har satt opp praktiske påminnelser for dagens leksjon.",
     },
 }
 

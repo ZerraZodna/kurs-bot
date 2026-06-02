@@ -46,28 +46,41 @@ class TestReminderMessageFormatting:
         msg = _format_reminder_message(
             key_phrase="I seek but what belongs to me in truth.",
             instructions="Take five minutes. Find a quiet moment.",
-            practice_window="",
+            include_instructions=True,
         )
         assert "Time to practice." in msg
         assert "I seek but what belongs to me in truth." in msg
         assert "Take five minutes" in msg
+        assert "<b>" in msg  # Key phrase should be bold
 
     def test_with_key_phrase_only(self):
         msg = _format_reminder_message(
             key_phrase="Nothing I see means anything.",
             instructions="",
-            practice_window="",
+            include_instructions=False,
         )
         assert "Time to practice." in msg
         assert "Nothing I see means anything." in msg
+        assert "<b>" in msg  # Key phrase should be bold
 
     def test_with_no_content(self):
         msg = _format_reminder_message(
             key_phrase="",
             instructions="",
-            practice_window="",
+            include_instructions=False,
         )
         assert "Time to practice." in msg
+
+    def test_hourly_reminder_skips_instructions(self):
+        """Hourly reminders should not include long instructions."""
+        msg = _format_reminder_message(
+            key_phrase="Miracles are seen in light.",
+            instructions="Devote five minutes twice a day...",
+            include_instructions=False,
+        )
+        assert "Time to practice." in msg
+        assert "Miracles are seen in light." in msg
+        assert "Devote five minutes" not in msg
 
 
 class TestParseEveningCutoff:

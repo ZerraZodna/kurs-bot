@@ -80,6 +80,7 @@ class MemoryKey:
     PRACTICE_REMINDER_PENDING = "practice_reminder_pending"
     PRACTICE_REMINDER_DECLINED_TODAY = "practice_reminder_declined_today"
     PRACTICE_REMINDER_EVENING_CUTOFF = "practice_reminder_evening_cutoff"
+    PRACTICE_REMINDER_ENABLED = "practice_reminder_enabled"
 
     # Centralized key sets for memory category inference (DRY)
     # These are frozensets for efficient membership testing

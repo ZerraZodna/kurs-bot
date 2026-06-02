@@ -44,15 +44,21 @@ def _parse_evening_cutoff(time_str: str) -> int:
         return DEFAULT_REMINDER_LATE_HOUR
 
 
-def _format_reminder_message(key_phrase: str, instructions: str, practice_window: str) -> str:
-    """Format a reminder message with key phrase and instructions."""
+def _format_reminder_message(key_phrase: str, instructions: str = "", include_instructions: bool = True) -> str:
+    """Format a reminder message with key phrase and optional instructions.
+
+    Args:
+        key_phrase: The key phrase to display (will be wrapped in <b> tags)
+        instructions: Practice instructions to include
+        include_instructions: Whether to include the instructions text
+    """
     parts = ["\U0001f550 Time to practice."]
 
     if key_phrase:
         parts.append("")
-        parts.append(f'"{key_phrase}"')
+        parts.append(f"<b>{key_phrase}</b>")
 
-    if instructions:
+    if instructions and include_instructions:
         parts.append("")
         parts.append(instructions)
 
@@ -114,8 +120,12 @@ def create_reminders(
 
             if frequency == "hourly":
                 # Every hour from next full hour until evening cutoff
+                # Plus half-hour times for the on-the-hour/half-hour pattern
                 start_hour = _parse_hour_from_time_str(practice_window) or DEFAULT_REMINDER_EARLY_HOUR
                 reminder_times = _generate_hourly_times(start_hour, end_hour)
+                # Also add half-hour times (e.g., 07:30, 08:30, etc.)
+                for h in range(start_hour, end_hour):
+                    reminder_times.append(f"{h:02d}:30")
             elif frequency in ("twice_daily", "morning_evening"):
                 default_times = DEFAULT_TIMES.get(frequency, ["09:00", "18:00"])
                 reminder_times = default_times
@@ -130,6 +140,9 @@ def create_reminders(
             if not reminder_times:
                 logger.info("No reminder times determined for lesson %d", lesson_id)
                 return []
+
+            # Sort times chronologically
+            reminder_times.sort()
 
             # Filter out times that have already passed today
             current_hour = now.hour
@@ -155,6 +168,7 @@ def create_reminders(
                     time_str=time_str,
                     key_phrases=key_phrases,
                     instructions=instructions,
+                    frequency=frequency,
                     session=db,
                 )
                 if schedule:
@@ -173,12 +187,38 @@ def create_reminders(
             return []
 
 
+def _get_key_phrase_for_time(key_phrases: list[str], time_str: str, frequency: str) -> str:
+    """Select the appropriate key phrase for a given time.
+
+    For hourly/half-hour pattern:
+    - On the hour (mm=00): use the first key phrase
+    - On the half hour (mm=30): use the second key phrase if available
+
+    For other frequencies, use the first key phrase.
+    """
+    if not key_phrases:
+        return ""
+
+    try:
+        _, m = map(int, time_str.split(":"))
+    except (ValueError, IndexError):
+        m = 0
+
+    if frequency == "hourly" and m == 30 and len(key_phrases) > 1:
+        # Half-hour: use second key phrase
+        return key_phrases[1]
+    else:
+        # On the hour or single key phrase: use first
+        return key_phrases[0]
+
+
 def _create_reminder_schedule(
     user_id: int,
     lesson_id: int,
     time_str: str,
     key_phrases: list[str],
     instructions: str,
+    frequency: str,
     session: Session,
 ) -> Schedule | None:
     """Create a single one-time reminder schedule."""
@@ -196,9 +236,11 @@ def _create_reminder_schedule(
         # Time already passed today, skip
         return None
 
-    # Format reminder message
-    key_phrase = key_phrases[0] if key_phrases else ""
-    message = _format_reminder_message(key_phrase, instructions, "")
+    # Select appropriate key phrase based on time
+    key_phrase = _get_key_phrase_for_time(key_phrases, time_str, frequency)
+    # For hourly reminders, don't include the long instructions (user already knows them)
+    include_instructions = frequency != "hourly"
+    message = _format_reminder_message(key_phrase, instructions, include_instructions)
 
     # Create schedule
     schedule = schedule_manager.create_schedule(
@@ -210,8 +252,7 @@ def _create_reminder_schedule(
         session=session,
     )
 
-    # Store reminder message in memory
-    # Store the message directly on the schedule
+    # Store reminder message directly on the schedule
     schedule.custom_message = message
 
     # Sync job to APScheduler
