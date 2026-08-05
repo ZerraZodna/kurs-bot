@@ -30,7 +30,7 @@ repos:
       - id: ruff-format
 
   - repo: https://github.com/pypa/pip-audit
-    rev: v2.10.0
+    rev: v2.10.1
     hooks:
       - id: pip-audit
 
