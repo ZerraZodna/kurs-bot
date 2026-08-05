@@ -6,22 +6,17 @@ A chatbot with persistent memory that delivers daily lessons via Telegram and em
 
 ## Prerequisites
 
+- Node.js (for task runner scripts only)
+- Python 3.12+
+
 ### macOS
 ```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-brew install git node python
+brew install node python
 ```
 
 ### Ubuntu/Debian
 ```bash
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y git curl build-essential python3 python3-venv python3-pip
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt install -y nodejs
-```
-
-### Windows
-```powershell
-winget install -e --id Git.Git --id OpenJS.NodeJS.LTS --id Python.Python.3.10
+sudo apt install -y git curl build-essential python3 python3-venv nodejs
 ```
 
 ### Optional: ngrok (for Telegram webhooks)
@@ -52,21 +47,14 @@ Edit `.env` and add your Telegram bot token:
 TELEGRAM_BOT_TOKEN=your_bot_token_here
 ```
 
-### Option A: With npm (recommended)
 ```bash
-npm install
-npm test
-npm start
+./run.sh ensure-venv
+./run.sh install
+./run.sh test
+./run.sh start
 ```
 
-### Option B: Without npm (direct Python)
-```bash
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install --upgrade pip
-pip install -e .[dev]
-uvicorn src.api.app:app --host 127.0.0.1 --port 8000
-```
+**No npm required.** Uses `./run.sh` (thin wrapper around `scripts/venv.js`) for all tasks. Only needs Node.js and Python 3.12+.
 
 **Note**: Uses modern `pyproject.toml` for dependencies (replaces legacy requirements.txt).
 
@@ -87,17 +75,17 @@ Useful for: no ngrok account needed, NAT/firewall traversal, simpler setup.
 | `TELEGRAM_POLL_TIMEOUT` | 25 | Poll timeout (seconds) |
 | `TELEGRAM_POLL_LIMIT` | 100 | Max updates per request |
 
-## NPM Commands
+## Commands
 
 | Command | Description |
 |---------|-------------|
-| `npm install` | Install dependencies |
-| `npm start` | Start API + ngrok |
-| `npm stop` | Stop services |
-| `npm run start:ui` | Dev web UI |
-| `npm run init_db` | Initialize database |
-| `npm run config` | Edit `.env` |
-| `npm run test` | Run tests |
+| `./run.sh install` | Install dependencies |
+| `./run.sh start` | Start API + ngrok |
+| `./run.sh stop` | Stop services |
+| `./run.sh start:ui` | Dev web UI |
+| `./run.sh init_db` | Initialize database |
+| `./run.sh config` | Edit `.env` |
+| `./run.sh test` | Run tests |
 
 ## Configuration (.env)
 
@@ -115,7 +103,8 @@ DATABASE_URL=            # SQLite (dev) / SQL Server (prod)
 ## Tech Stack
 
 - Python 3.10+ / FastAPI / SQLAlchemy
-- Node.js (build tooling only)
+- Python 3.12+ / FastAPI / SQLAlchemy
+- Node.js (task runner only)
 - SQLite (dev) / SQL Server (prod)
 
 ## Project Structure

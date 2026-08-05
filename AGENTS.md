@@ -36,13 +36,12 @@
 - Migrations: `migrations/`; helper scripts: `scripts/`; docs: `docs/`; task tracking: `tasks/`.
 
 ## Build, Test, and Development Commands
-- `npm install`: create `.venv` and install Python dependencies.
-`npm run init_db`: initialize production database (`node ./scripts/venv.js run scripts/utils/init_db.py --yes --db prod`).
-- `npm start`: start local stack via helper scripts.
-`npm run start:foreground`: run API only (`node ./scripts/venv.js exec -m uvicorn src.api.app:app --host 127.0.0.1 --port 8000`).
-`npm test`: run parallel test suite (`node ./scripts/venv.js test -- -n auto -q`).
-- Targeted: `npm test -- tests/test_telegram_handler.py -q`.
-- Prefer `npm test` / `node ./scripts/venv.js test`.
+- `./run.sh ensure-venv && ./run.sh install`: create `.venv` and install Python dependencies.
+- `./run.sh init_db`: initialize production database.
+- `./run.sh start`: start local stack.
+- `./run.sh start:foreground`: run API only.
+- `./run.sh test`: run parallel test suite.
+- Targeted: `./run.sh test -- tests/test_telegram_handler.py -q`.
 
 ## Engineering Workflow (All Contributors)
 
@@ -114,9 +113,8 @@
 - Still avoid `from datetime import timezone` in application code; prefer `datetime.UTC` or `src.core.timezone`
 
 ## Testing and Pull Requests
-- Standard command: `npm test` (runs in parallel via `-n auto`); `npm test -- -n 1` for single-threaded.
-- Targeted: `npm test -- tests/test_telegram_handler.py -q` (add more as needed).
-- Equivalent direct wrapper: `node ./scripts/venv.js test [pytest args]`
+- Standard command: `./run.sh test` (runs in parallel via `-n auto`); `./run.sh test -- -n 1` for single-threaded.
+- Targeted: `./run.sh test -- tests/test_telegram_handler.py -q` (add more as needed).
 - Test framework: `pytest` (`pytest.ini` uses `tests/`). They can run in paralell too, but might fail with sql races.
 - Naming: `test_*.py` files and `test_*` functions.
 - Add or update tests for behavior changes, bug fixes, and regressions.

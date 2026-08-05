@@ -146,23 +146,22 @@ switch (cmd) {
     // Print a short npm-level help first (matches scripts/npm_help.js)
     const npmHelp = [
       '',
-      'Project npm commands (short guide):',
+      'Project commands (short guide):',
       '',
-      '  npm install          # installs JS deps and runs `postinstall` to set up Python venv and deps',
-      '  # or explicitly (if you prefer):',
-      '  npm run install:py   # install Python deps into .venv from pyproject.toml',
-      '  npm test             # runs pytest via the consolidated runner',
-      '  npm start            # starts the backend (uvicorn) and ngrok if available (detached)',
-      '  npm stop             # stop ngrok and uvicorn processes started by `npm start`',
-      '  npm restart          # stop then start services (equivalent to stop + start)',
-      '  npm run start:ui     # serve the dev frontend (equivalent to serve_dev_ui.ps1) — opens browser by default; use `--no-open` or set BROWSER=none to disable',
-  '  npm run init_db     # initialize database (defaults to prod.db)',
-  '  npm run status      # print DB counts for active users, lessons, and messages',
-
-      '  npm run config       # create .env from .env.template (if missing) and open it in your editor',
-      "  npm run update       # run 'git pull' and, if changes were pulled, restart services (stop then start)",
-      '  npm run list         # list running ngrok and uvicorn processes',
-      '  npm run tail         # print last 50 lines of uvicorn/ngrok logs (non-follow)',
+      '  ./run.sh (no args)   # show this help',
+      '  ./run.sh ensure-venv # create .venv if missing',
+      '  ./run.sh install     # install Python deps into .venv from pyproject.toml',
+      '  ./run.sh test        # runs pytest via the consolidated runner',
+      '  ./run.sh start       # starts the backend (uvicorn) and ngrok if available (detached)',
+      '  ./run.sh stop        # stop ngrok and uvicorn processes started by `./run.sh start`',
+      '  ./run.sh restart     # stop then start services',
+      '  ./run.sh start:ui    # serve the dev frontend — opens browser by default; use `--no-open` or set BROWSER=none to disable',
+      '  ./run.sh init_db     # initialize database (defaults to prod.db)',
+      '  ./run.sh status      # print DB counts for active users, lessons, and messages',
+      '  ./run.sh config      # create .env from .env.template (if missing) and open it in your editor',
+      "  ./run.sh update      # run 'git pull' and, if changes were pulled, restart services",
+      '  ./run.sh list        # list running ngrok and uvicorn processes',
+      '  ./run.sh tail        # print last 50 lines of uvicorn/ngrok logs (non-follow)',
       '',
       'For lower-level runner commands (venv, test args, run scripts):',
       '  node ./scripts/venv.js help',
@@ -171,14 +170,14 @@ switch (cmd) {
     for (const l of npmHelp) console.log(l);
 
     // Then print the venv.js specific help
-    console.log('Usage: node scripts/venv.js <command> [args]\n');
+    console.log('Usage: ./run.sh <command> [args]\n');
     console.log('Commands:');
-    console.log('  ensure-venv       Create .venv if missing');
-    console.log('  install           Install Python deps from pyproject.toml');
+    console.log('  ensure-venv         Create .venv if missing');
+    console.log('  install             Install Python deps from pyproject.toml');
     console.log('  test [pytest-args]  Run pytest');
     console.log('  run <script> [args] Run a Python script');
     console.log('  exec <python-args>  Run arbitrary python with args');
-    console.log('  status            Print current DB counts for active users, lessons, and messages');
+    console.log('  status              Print current DB counts for active users, lessons, and messages');
     process.exit(0);
     break;
   case 'ensure-venv':
